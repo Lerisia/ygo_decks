@@ -11,6 +11,7 @@ import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import Info from "./pages/Info";
 import Unauthorized from "./pages/Unauthorized";
+import DeckStatistics from "./pages/Statistics";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/info" element={<Info />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/statistics" element={<DeckStatistics />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

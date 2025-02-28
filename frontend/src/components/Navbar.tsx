@@ -10,6 +10,9 @@ function Navbar() {
         <Link to="/info" className="text-base sm:text-lg md:text-xl break-keep">
           ℹ️ 사이트 소개
         </Link>
+        <Link to="/statistics" className="text-base sm:text-lg md:text-xl break-keep">
+          📊 통계
+        </Link>
         <Link to="/changelog" className="text-base sm:text-lg md:text-xl break-keep">
           📜 패치노트
         </Link>
