@@ -74,22 +74,32 @@ function QuestionPage() {
     if (answers.length === 0) return;
 
     const lastAnswer = answers[answers.length - 1];
-    setAnswers((prev) => prev.slice(0, -1));
-
     const isRequired = requiredQuestions.some((q) => q.key === lastAnswer.key);
+    const isOptional = optionalQuestions.some((q) => q.key === lastAnswer.key);
 
-    if (isRequired) {
-      setCurrentIndex((prev) => Math.max(prev - 1, 0));
-      setSelectedOptionalQuestions([]);
-    } else if (selectedOptionalQuestions.length > 0) {
-      setSelectedOptionalQuestions([]);
-    } else {
-      const previousOptional = optionalQuestions.find((q) => q.key === lastAnswer.key);
-      if (previousOptional) {
-        setSelectedOptionalQuestions([previousOptional]);
-      } else {
-        setCurrentIndex((prev) => Math.max(prev - 1, 0));
-      }
+    // case 1: In selected question, just go to question selection page
+    if (selectedOptionalQuestions.length > 0) {
+        setSelectedOptionalQuestions([]);
+        return;
+    }
+
+    // case 2: In question selection page and previous question is optional,
+    // go back to that question and remove recent answer
+    if (!isRequired && isOptional) {
+        setAnswers((prev) => prev.slice(0, -1));
+        setSelectedOptionalQuestions(optionalQuestions.filter((q) => q.key === lastAnswer.key));
+        return;
+    }
+
+    // case 3: In selection page or question page and previous question is required.
+    if (isRequired && !isOptional) {
+        setAnswers((prev) => prev.slice(0, -1));
+        setCurrentIndex(answers.length - 1);
+    }
+
+    // case 4: Do nothing
+    if (!isRequired && !isOptional) {
+        return;
     }
   };
 
