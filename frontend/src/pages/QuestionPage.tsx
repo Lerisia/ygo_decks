@@ -45,30 +45,28 @@ function QuestionPage() {
       setSelectedOptionalQuestions([question]);
     }
   };
+  
+  // get # of hidden questions (that have only 1 available answer)
+  const getHiddenQuestionsCount = () => {
+    return optionalQuestions.filter((question) => getAvailableOptions(question).length <= 1).length;
+  };
 
-  const getDisabledOptions = (questionKey: string) => {
-    if (!requiredQuestions.length && !selectedOptionalQuestions.length) return [];
-    
-    const currentQuestion =
-      currentIndex < requiredQuestions.length
-        ? requiredQuestions[currentIndex]
-        : selectedOptionalQuestions[0];
-    
-    if (!currentQuestion) return [];
+  const getAvailableOptions = (question: Question) => {
+    return question.options.filter((option) => {
+      const newAnswers = [...answers, { key: question.key, value: option.value }];
+      return generateAnswerKey(newAnswers) in lookupTable;
+    });
+  };
 
-    return currentQuestion.options
-      .filter((option) => {
-        const newAnswers = [...answers, { key: questionKey, value: option.value }];
-        return !(generateAnswerKey(newAnswers) in lookupTable);
-      })
-      .map((option) => option.value);
+  const getValidOptionalQuestions = () => {
+    return optionalQuestions.filter(
+      (question) => getAvailableOptions(question).length > 1 || answers.some((a) => a.key === question.key)
+    );
   };
 
   const handleAnswer = (questionKey: string, value: number) => {
     setAnswers((prev) => [...prev, { key: questionKey, value }]);
-    
-    setTimeout(() => setCurrentIndex((prev) => prev + 1), 300);
-
+    setCurrentIndex((prev) => prev + 1);
     setSelectedOptionalQuestions([]);
   };
 
@@ -78,25 +76,29 @@ function QuestionPage() {
     const lastAnswer = answers[answers.length - 1];
     setAnswers((prev) => prev.slice(0, -1));
 
-    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    const isRequired = requiredQuestions.some((q) => q.key === lastAnswer.key);
 
-    if (requiredQuestions.some((q) => q.key === lastAnswer.key)) {
+    if (isRequired) {
+      setCurrentIndex((prev) => Math.max(prev - 1, 0));
+      setSelectedOptionalQuestions([]);
+    } else if (selectedOptionalQuestions.length > 0) {
       setSelectedOptionalQuestions([]);
     } else {
-      const previousQuestion = optionalQuestions.find((q) => q.key === lastAnswer.key);
-      if (previousQuestion) {
-        setSelectedOptionalQuestions([previousQuestion]);
+      const previousOptional = optionalQuestions.find((q) => q.key === lastAnswer.key);
+      if (previousOptional) {
+        setSelectedOptionalQuestions([previousOptional]);
+      } else {
+        setCurrentIndex((prev) => Math.max(prev - 1, 0));
       }
     }
   };
 
   useEffect(() => {
     const totalQuestions = requiredQuestions.length + optionalQuestions.length;
-  
-    // Prevent this to be executed before loading questions
-    if (totalQuestions > 0 && answers.length === totalQuestions) {
+
+    if (totalQuestions > 0 && answers.length + getHiddenQuestionsCount() >= totalQuestions) {
       const answerKey = generateAnswerKey(answers);
-  
+
       if (Object.keys(lookupTable).some((key) => key.startsWith(answerKey))) {
         console.log("All questions answered, navigating to result page.");
         localStorage.setItem("answerKey", answerKey);
@@ -104,13 +106,12 @@ function QuestionPage() {
       }
     }
   }, [answers, lookupTable, navigate, requiredQuestions, optionalQuestions]);
-  
-  
+
   useEffect(() => {
     if (answers.length > 0) {
       const answerKey = generateAnswerKey(answers);
       console.log("Current answers:", answerKey);
-      
+
       if (lookupTable[answerKey] === 1) {
         console.log("Go to the result page.");
         localStorage.setItem("answerKey", answerKey);
@@ -120,29 +121,23 @@ function QuestionPage() {
   }, [answers, navigate]);
 
   return (
-    <div className="p-4 text-left h-auto min-h-screen flex flex-col items-center">
+    <div className="mb-4 p-4 text-left h-auto min-h-screen flex flex-col items-center">
       <div className="mt-6 w-full max-w-lg">
         {currentIndex < requiredQuestions.length ? (
           <QuestionItem
             key={requiredQuestions[currentIndex].key}
             question={requiredQuestions[currentIndex].question}
-            options={requiredQuestions[currentIndex].options}
-            selectedValue={
-              answers.find((a) => a.key === requiredQuestions[currentIndex].key)?.value
-            }
+            options={getAvailableOptions(requiredQuestions[currentIndex])}
+            selectedValue={answers.find((a) => a.key === requiredQuestions[currentIndex].key)?.value}
             onSelect={(value) => handleAnswer(requiredQuestions[currentIndex].key, value)}
-            disabledOptions={getDisabledOptions(requiredQuestions[currentIndex].key)}
           />
         ) : selectedOptionalQuestions.length > 0 ? (
           <QuestionItem
             key={selectedOptionalQuestions[0].key}
             question={selectedOptionalQuestions[0].question}
-            options={selectedOptionalQuestions[0].options}
-            selectedValue={
-              answers.find((a) => a.key === selectedOptionalQuestions[0].key)?.value
-            }
+            options={getAvailableOptions(selectedOptionalQuestions[0])}
+            selectedValue={answers.find((a) => a.key === selectedOptionalQuestions[0].key)?.value}
             onSelect={(value) => handleAnswer(selectedOptionalQuestions[0].key, value)}
-            disabledOptions={getDisabledOptions(selectedOptionalQuestions[0].key)}
           />
         ) : (
           <div>
@@ -150,21 +145,29 @@ function QuestionPage() {
               다음 질문을 골라 주세요
             </h3>
             <div className="flex flex-col items-center space-y-4 w-full">
-              {optionalQuestions.map((q) => (
-                <button
-                  key={q.key}
-                  className={`px-4 py-2 rounded-lg transition break-keep w-full max-w-2xl text-center
-                    ${
-                      answers.some((a) => a.key === q.key)
-                        ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
-                        : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 hover:dark:bg-gray-600 dark:text-gray-100"
-                    }`}
-                  onClick={() => handleSelectOptionalQuestion(q)}
-                  disabled={answers.some((a) => a.key === q.key)}
-                >
-                  {q.question}
-                </button>
-              ))}
+              {getValidOptionalQuestions().length > 0 ? (
+                getValidOptionalQuestions().map((q) => {
+                  const isAnswered = answers.some((a) => a.key === q.key); // 🔥 이미 답변한 질문 확인
+
+                  return (
+                    <button
+                      key={q.key}
+                      className={`px-4 py-2 rounded-lg transition break-keep w-full max-w-2xl text-center
+                        ${
+                          isAnswered
+                            ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400" // 🔥 이미 답변한 질문은 회색 처리
+                            : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 hover:dark:bg-gray-600 dark:text-gray-100"
+                        }`}
+                      onClick={() => handleSelectOptionalQuestion(q)}
+                      disabled={isAnswered}
+                    >
+                      {q.question}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">선택할 수 있는 추가 질문이 없습니다.</p>
+              )}
             </div>
           </div>
         )}

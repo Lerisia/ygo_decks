@@ -25,6 +25,7 @@ class SummoningMethod(models.Model):
 class PerformanceTag(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True, help_text="Enter a brief description of this tag.")
 
     def __str__(self):
         return self.name
@@ -32,6 +33,7 @@ class PerformanceTag(models.Model):
 class AestheticTag(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True, help_text="Enter a brief description of this tag.")
 
     def __str__(self):
         return self.name

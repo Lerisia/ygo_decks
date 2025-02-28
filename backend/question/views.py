@@ -61,14 +61,14 @@ def get_questions(request):
         },
         {
             "key": "ptag",
-            "question": "성능과 관련된 태그 (락, 차원계 등)",
-            "options": [{"value": performanceTag.id, "label": performanceTag.name}
+            "question": "선호하는 덱 기믹은?",
+            "options": [{"value": performanceTag.id, "label": performanceTag.description}
                         for performanceTag in PerformanceTag.objects.all()]
         },
         {
             "key": "atag",
-            "question": "성능 외적 태그 (애니테마, 미소녀 등)",
-            "options": [{"value": aestheticTag.id, "label": aestheticTag.name}
+            "question": "그 외 특징은? (애니테마, 미소녀 등)",
+            "options": [{"value": aestheticTag.id, "label": aestheticTag.description}
                         for aestheticTag in AestheticTag.objects.all()]
         }
     ]
