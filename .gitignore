@@ -1,0 +1,39 @@
+# Backend: Ignore Python cache & migrations
+backend/**/__pycache__/
+backend/**/migrations/
+backend/**/migrations/*.pyc
+backend/**/migrations/*.py
+!backend/**/migrations/__init__.py
+
+# Backend: Ignore database files
+backend/*.sqlite3
+backend/*.json
+backend/*.csv
+backend/*.db
+
+# Backend: Ignore Django settings & logs
+backend/.env
+backend/*.log
+backend/*.pyc
+
+# Backend: Ignore virtual environment (venv)
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+
+# Frontend: Ignore Node.js dependencies & build files
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+frontend/.cache/
+frontend/yarn.lock
+frontend/package-lock.json
+frontend/coverage/
+frontend/.DS_Store
+
+# Global: Ignore system files
+.DS_Store
+Thumbs.db
