@@ -1,7 +1,5 @@
 from django.db import models
 
-# Create your models here.
-
 class SummoningMethod(models.Model):
     id = models.IntegerField(primary_key=True)
     class SummonType(models.IntegerChoices):
@@ -79,9 +77,14 @@ class Deck(models.Model):
     summoning_methods = models.ManyToManyField(SummoningMethod)
     performance_tags = models.ManyToManyField(PerformanceTag)
     aesthetic_tags = models.ManyToManyField(AestheticTag)
+    num_views = models.PositiveIntegerField(default=0)
 
     description = models.TextField(
         blank=True,
         null=True,
         help_text="Provide details about the deck's features, usage tips, or overall concept."   
     )
+    
+    def increment_views(self):
+        self.num_views += 1
+        self.save(update_fields=['num_views'])

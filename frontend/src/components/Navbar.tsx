@@ -7,8 +7,8 @@ function Navbar() {
         <Link to="/" className="text-base sm:text-lg md:text-xl font-bold break-keep">
           🔍 성향 테스트
         </Link>
-        <Link to="/decks" className="text-base sm:text-lg md:text-xl break-keep">
-          📂 결과 모아보기
+        <Link to="/info" className="text-base sm:text-lg md:text-xl break-keep">
+          ℹ️ 사이트 소개
         </Link>
         <Link to="/changelog" className="text-base sm:text-lg md:text-xl break-keep">
           📜 패치노트

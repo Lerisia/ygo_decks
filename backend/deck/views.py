@@ -1,8 +1,9 @@
 import random
 from django.http import JsonResponse
-from django.shortcuts import get_list_or_404
-from django.db.models import Q, Count
+from django.db.models import Q
+from django.utils.timezone import now
 from .models import Deck
+from userstatistics.models import UserResponse
 
 def parse_answer_key(answer_key):
     """ Convert answer_key to dictionary form """
@@ -24,6 +25,10 @@ def parse_answer_key(answer_key):
 
 def get_deck_result(request):
     answer_key = request.GET.get("key")
+    session_id = request.session.session_key
+    if not session_id:
+        request.session.create()
+        session_id = request.session.session_key
 
     if not answer_key:
         return JsonResponse({"error": "answer_key is required"}, status=400)
@@ -67,6 +72,20 @@ def get_deck_result(request):
 
     deck = random.choice(list(decks)) if decks.count() > 1 else decks.first()
     print("Selected Deck:", deck)
+
+    # Prevent duplicated answer to be saved
+    if UserResponse.objects.filter(session_id=session_id, answers=search_params).exists():
+        print("Duplicate response detected, skipping save.")
+    else:
+        UserResponse.objects.create(
+            session_id=session_id,
+            deck=deck,
+            answers=search_params,
+            date=now()
+        )
+
+        deck.num_views += 1
+        deck.save(update_fields=['num_views'])
 
     result_data = {
         "name": deck.name,

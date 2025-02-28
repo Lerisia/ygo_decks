@@ -9,6 +9,7 @@ import ResultPage from "./pages/ResultPage";
 import Footer from "./components/Footer";
 import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
+import Info from "./pages/Info";
 import Unauthorized from "./pages/Unauthorized";
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/questions" element={<QuestionPage />} />
           <Route path="/result" element={<ResultPage />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/info" element={<Info />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
