@@ -37,3 +37,6 @@ frontend/.DS_Store
 # Global: Ignore system files
 .DS_Store
 Thumbs.db
+
+frontend/src/data/lookup_table.json
+backend/lookup_table.json
