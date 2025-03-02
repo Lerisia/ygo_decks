@@ -62,6 +62,8 @@ def generate_lookup_table():
         final_key = sorted_key([base_key, "end"])
         if final_key not in lookup_table:
             lookup_table[final_key] = lookup_table[base_key]
+    
+    lookup_table["empty"] = STATUS_MAPPING["multiple"]
 
     lookup_file_path = os.path.join(os.path.dirname(__file__), "lookup_table.json")
     with open(lookup_file_path, "w") as f:

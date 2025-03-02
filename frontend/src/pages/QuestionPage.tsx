@@ -25,16 +25,18 @@ function QuestionPage() {
   useEffect(() => {
     fetchQuestions()
       .then((data) => {
-        const required = data.slice(0, 3);
-        const optional = data.slice(3, 7);
+        const required = data.slice(0, 4);
+        const optional = data.slice(4, 7);
         setRequiredQuestions(required);
         setOptionalQuestions(optional);
       })
       .catch((error) => console.error("Error loading questions:", error));
   }, []);
 
-  const generateAnswerKey = (answers: { key: string; value: number }[]) => {
-    return answers
+  const generateAnswerKey = (answers: { key: string; value: number | null }[]) => {
+    const filteredAnswers = answers.filter(({ value }) => value !== null && value !== undefined);
+    if (filteredAnswers.length === 0) return "empty";
+    return filteredAnswers
       .map(({ key, value }) => `${key}=${value}`)
       .sort()
       .join("|");
@@ -46,16 +48,29 @@ function QuestionPage() {
     }
   };
   
-  // get # of hidden questions (that have only 1 available answer)
+  // Get # of hidden questions that have only 1 available answer
+  // or 2 available answers including "상관 없음"
   const getHiddenQuestionsCount = () => {
-    return optionalQuestions.filter((question) => getAvailableOptions(question).length <= 1).length;
+    return optionalQuestions.filter((question) => {
+      const availableOptions = getAvailableOptions(question);
+      return (
+        availableOptions.length <= 1 ||
+        (availableOptions.length === 2 && availableOptions.some(o => o.label === "상관 없음"))
+      );
+    }).length;
   };
 
   const getAvailableOptions = (question: Question) => {
-    return question.options.filter((option) => {
+    const validOptions = question.options.filter((option) => {
       const newAnswers = [...answers, { key: question.key, value: option.value }];
       return generateAnswerKey(newAnswers) in lookupTable;
     });
+
+    // 옵션이 2개인데 '상관 없음'이 포함된 경우 필터링
+    if (validOptions.length === 2 && validOptions.some(o => o.label === "상관 없음")) {
+      return [];
+    }
+    return validOptions;
   };
 
   const getValidOptionalQuestions = () => {
@@ -151,7 +166,7 @@ function QuestionPage() {
           />
         ) : (
           <div>
-            <h3 className="text-lg font-semibold space-y-4 text-gray-900 dark:text-white">
+            <h3 className="mb-4 text-lg font-semibold space-y-4 text-gray-900 dark:text-white">
               다음 질문을 골라 주세요
             </h3>
             <div className="flex flex-col items-center space-y-4 w-full">

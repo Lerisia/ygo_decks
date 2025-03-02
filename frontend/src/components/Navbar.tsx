@@ -8,7 +8,7 @@ function Navbar() {
           🔍 성향 테스트
         </Link>
         <Link to="/info" className="text-base sm:text-lg md:text-xl break-keep">
-          ℹ️ 사이트 소개
+          📖 사용 설명서
         </Link>
         <Link to="/statistics" className="text-base sm:text-lg md:text-xl break-keep">
           📊 통계

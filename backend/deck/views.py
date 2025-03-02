@@ -65,6 +65,10 @@ def get_deck_result(request):
     # Apply initial query
     decks = Deck.objects.filter(query).distinct()
     print("Filtered QuerySet count:", decks.count())
+    
+    if answer_key == "empty":
+        all_decks = Deck.objects.all()
+        deck = random.choice(all_decks) if all_decks.exists() else None
 
     if not decks.exists():
         print("No matching decks found!")

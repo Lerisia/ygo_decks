@@ -9,5 +9,5 @@ class UserResponseAdmin(admin.ModelAdmin):
     ordering = ("-date",)
 
     def get_deck_name(self, obj):
-        return obj.deck.name  # deck의 name을 가져와 표시
-    get_deck_name.short_description = "Deck Name"  # 관리자 페이지에서 보이는 필드명 변경
+        return obj.deck.name
+    get_deck_name.short_description = "Deck Name"

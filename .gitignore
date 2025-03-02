@@ -16,6 +16,9 @@ backend/.env
 backend/*.log
 backend/*.pyc
 
+# Backend: Ignore media files
+backend/media/deck_covers/*
+
 # Backend: Ignore virtual environment (venv)
 backend/venv/
 backend/.venv/
