@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+// import { isAuthenticated } from "../api/AccountApi";
 
 function Navbar() {
+  // const isLoggedIn = isAuthenticated();
+
   return (
     <nav className="bg-transparent py-4 text-black dark:text-white justify-center items-center">
       <div className="container mx-auto flex space-x-4 justify-center items-center">
@@ -16,6 +19,13 @@ function Navbar() {
         <Link to="/changelog" className="text-base sm:text-lg md:text-xl break-keep">
           📜 패치노트
         </Link>
+        {/* {isLoggedIn ? (
+                        <Link to="/mypage"  className="text-base sm:text-lg md:text-xl break-keep">
+                          👤 마이페이지</Link>
+                    ) : (
+                        <Link to="/login"  className="text-base sm:text-lg md:text-xl break-keep">
+                          🔑 로그인</Link>
+        )} */}
       </div>
     </nav>
   );

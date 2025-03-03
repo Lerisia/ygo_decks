@@ -84,7 +84,7 @@ function ResultPage() {
   }
 
   return (
-    <div className="p-6 text-center">
+    <div className="h-auto min-h-screen p-6 text-center">
       <h1 className="text-3xl font-extrabold">{result?.name}</h1>
       {result?.cover_image && (
         <img src={result.cover_image} alt={result.name} className="mt-4 rounded-lg shadow-md w-full max-w-md mx-auto" />

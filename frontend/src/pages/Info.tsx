@@ -1,6 +1,6 @@
 function Info() {
   return (
-    <div className="p-6 max-w-3xl mx-auto text-gray-900 dark:text-white">
+    <div className="p-6 h-auto min-h-screen  max-w-3xl mx-auto text-gray-900 dark:text-white">
       <h1 className="text-2xl font-bold mb-4">사이트 소개</h1>
       <p className="mb-4 break-keep">
         이 사이트는 <strong>'유희왕 마스터 듀얼'</strong> 유저를 위한 덱 성향 테스트를 제공합니다.

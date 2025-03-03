@@ -2,8 +2,6 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag
 
-# Register your models here.
-
 @admin.register(Deck)
 class DeckAdmin(admin.ModelAdmin):
     list_display = (
@@ -16,7 +14,8 @@ class DeckAdmin(admin.ModelAdmin):
         'display_performance_tags',
         'display_aesthetic_tags'
     )
-
+    search_fields = ('name', )
+    list_filter = ('strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
 
     def display_summoning_methods(self, obj):
