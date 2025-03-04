@@ -57,7 +57,7 @@ INSTALLED_APPS = [
     'deck',
     'question',
     'userstatistics',
-    'tournament'
+    'tournament',
     'account'
 ]
 
@@ -133,6 +133,7 @@ DATABASES = {
     }
 }
 
+# AUTH_USER_MODEL = 'account.User'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

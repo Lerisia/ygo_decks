@@ -2,8 +2,9 @@ import requests
 import os
 import requests
 from django.core.files.base import ContentFile
+from django.db import transaction
 from bs4 import BeautifulSoup
-from card.models import Card
+from card.models import LimitRegulation, Card
 
 def fetch_ygo_cards():
     url = "https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes"
