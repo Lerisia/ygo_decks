@@ -61,17 +61,19 @@ function QuestionPage() {
   };
 
   const getAvailableOptions = (question: Question) => {
-    const validOptions = question.options.filter((option) => {
+    let validOptions = question.options.filter((option) => {
       const newAnswers = [...answers, { key: question.key, value: option.value }];
       return generateAnswerKey(newAnswers) in lookupTable;
     });
-
-    // 옵션이 2개인데 '상관 없음'이 포함된 경우 필터링
-    if (validOptions.length === 2 && validOptions.some(o => o.label === "상관 없음")) {
-      return [];
+  
+    // Remove "상관 없음" if the question has only two answers
+    if (validOptions.length === 2) {
+      validOptions = validOptions.filter(o => o.label !== "상관 없음");
     }
+  
     return validOptions;
   };
+  
 
   const getValidOptionalQuestions = () => {
     return optionalQuestions.filter(
@@ -117,7 +119,7 @@ function QuestionPage() {
         return;
     }
   };
-
+  
   useEffect(() => {
     const totalQuestions = requiredQuestions.length + optionalQuestions.length;
 
@@ -172,7 +174,7 @@ function QuestionPage() {
             <div className="flex flex-col items-center space-y-4 w-full">
               {getValidOptionalQuestions().length > 0 ? (
                 getValidOptionalQuestions().map((q) => {
-                  const isAnswered = answers.some((a) => a.key === q.key); // 🔥 이미 답변한 질문 확인
+                  const isAnswered = answers.some((a) => a.key === q.key);
 
                   return (
                     <button

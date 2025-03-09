@@ -30,7 +30,7 @@ urlpatterns = [
     path('api/', include('deck.urls')),
     path('api/', include('userstatistics.urls')),
     path('api/', include('card.urls')),
-    path('api/auth/', include('account.urls')),
+    path('api/', include('user.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

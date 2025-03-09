@@ -21,12 +21,15 @@ const Login = () => {
             setMessage("로그인 성공. 메인 페이지로 이동합니다.");
             setTimeout(() => navigate("/"), 500);
         } else {
-            setMessage("로그인 실패: " + (result.error || "잘못된 정보입니다."));
+            setMessage(
+                "로그인 실패: " +
+                (result.error || "아이디 또는 비밀번호가 잘못되었습니다.\n이메일 인증을 완료하지 않았다면 인증을 진행해주세요.")
+            );
         }
     };
 
     return (
-        <div className = "h-auto min-h-screen">
+        <div className = "h-auto min-h-screen flex flex-col items-center">
             <div className="mt-6">
             <input
                 type="text"
@@ -45,7 +48,7 @@ const Login = () => {
             </div>
             <button className="mt-6 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-all"
             onClick={handleLogin}>로그인</button>
-            {message && <p>{message}</p>}
+            {message && <p style={{ marginTop: "8px", whiteSpace: "pre-line" }}>{message}</p>}
 
             <p className="mt-4">
                 계정이 없으신가요?{" "}
