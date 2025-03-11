@@ -2,10 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import QuestionItem from "../components/QuestionItem";
 import { fetchQuestions } from "../api/questionApi";
-import lookupTableData from "../data/lookup_table.json";
+import { fetchLookupTable } from "../api/lookupApi";
 
 type LookupTable = { [key: string]: number };
-const lookupTable: LookupTable = lookupTableData;
 
 type Question = {
   key: string;
@@ -14,6 +13,7 @@ type Question = {
 };
 
 function QuestionPage() {
+  const [lookupTable, setLookupTable] = useState<LookupTable | null>(null);
   const [requiredQuestions, setRequiredQuestions] = useState<Question[]>([]);
   const [optionalQuestions, setOptionalQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -23,6 +23,9 @@ function QuestionPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Get look-up table from backend
+    fetchLookupTable().then(setLookupTable);
+
     fetchQuestions()
       .then((data) => {
         const required = data.slice(0, 4);
@@ -32,6 +35,13 @@ function QuestionPage() {
       })
       .catch((error) => console.error("Error loading questions:", error));
   }, []);
+
+  useEffect(() => {
+    if (lookupTable && Object.keys(lookupTable).length === 1 && lookupTable["empty"] === 0) {
+      console.log("모든 덱을 보유한 유저입니다. /no-results로 이동합니다.");
+      navigate("/no-results");
+    }
+  }, [lookupTable, navigate]);
 
   const generateAnswerKey = (answers: { key: string; value: number | null }[]) => {
     const filteredAnswers = answers.filter(({ value }) => value !== null && value !== undefined);
@@ -61,6 +71,8 @@ function QuestionPage() {
   };
 
   const getAvailableOptions = (question: Question) => {
+    if (!lookupTable) return [];
+
     let validOptions = question.options.filter((option) => {
       const newAnswers = [...answers, { key: question.key, value: option.value }];
       return generateAnswerKey(newAnswers) in lookupTable;
@@ -121,20 +133,28 @@ function QuestionPage() {
   };
   
   useEffect(() => {
+    if (!lookupTable) return;
     const totalQuestions = requiredQuestions.length + optionalQuestions.length;
 
     if (totalQuestions > 0 && answers.length + getHiddenQuestionsCount() >= totalQuestions) {
       const answerKey = generateAnswerKey(answers);
-
-      if (Object.keys(lookupTable).some((key) => key.startsWith(answerKey))) {
-        console.log("All questions answered, navigating to result page.");
+    
+      console.log("현재 answerKey:", answerKey);
+      console.log("lookup table에서 찾은 값:", lookupTable[answerKey]);
+    
+      if (lookupTable[answerKey] === 1) { 
+        console.log("✅ All questions answered, navigating to result page.");
         localStorage.setItem("answerKey", answerKey);
         navigate("/result");
+      } else {
+        console.log("🚨 lookupTable에 존재하지만 결과를 내면 안 됨!");
       }
-    }
+    }    
   }, [answers, lookupTable, navigate, requiredQuestions, optionalQuestions]);
 
   useEffect(() => {
+    if (!lookupTable) return;
+    
     if (answers.length > 0) {
       const answerKey = generateAnswerKey(answers);
       console.log("Current answers:", answerKey);

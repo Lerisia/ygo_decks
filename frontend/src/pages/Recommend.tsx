@@ -15,11 +15,11 @@ function Recommend() {
           간단한 문답을 통해 나와 어울리는 덱 알아보기.
         </p>
         <p className="text-lg mt-2 break-keep">
-          유효한 결과가 없는 문항 및 응답은 표시되지 않습니다.
+          회원가입을 통해 내 덱 저장하고 관리하기, 보유한 덱을 테스트에서 제외하기 등 다양한 추가 기능을 사용할 수 있습니다.
         </p>
-        {/* <p className="text-lg text-red-600 mt-2 break-keep">
+        <p className="text-lg text-red-600 mt-2 break-keep">
           현재 점검 중으로 제대로 동작하지 않을 수 있습니다.
-        </p> */}
+        </p>
         <Link to="/questions">
           <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-all">
             테스트 시작

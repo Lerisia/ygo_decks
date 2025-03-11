@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { login, isAuthenticated } from "../api/AccountApi";
+import { login, isAuthenticated } from "../api/accountApi";
 
 const Login = () => {
     const [username, setUsername] = useState("");
@@ -19,7 +19,10 @@ const Login = () => {
         const result = await login(username, password);
         if (result.access) {
             setMessage("로그인 성공. 메인 페이지로 이동합니다.");
-            setTimeout(() => navigate("/"), 500);
+            setTimeout(() => {
+                navigate("/");
+                setTimeout(() => window.location.reload(), 100);
+            }, 500);
         } else {
             setMessage(
                 "로그인 실패: " +
@@ -27,13 +30,14 @@ const Login = () => {
             );
         }
     };
+    
 
     return (
         <div className = "h-auto min-h-screen flex flex-col items-center">
             <div className="mt-6">
             <input
                 type="text"
-                placeholder="사용자명"
+                placeholder="이메일 주소"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
             />

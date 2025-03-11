@@ -4,6 +4,9 @@ from django.db.models import Q
 from django.utils.timezone import now
 from .models import Deck
 from userstatistics.models import UserResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from user.models import User
 
 def parse_answer_key(answer_key):
     """ Convert answer_key to dictionary form """
@@ -23,6 +26,7 @@ def parse_answer_key(answer_key):
     print("Converted answer keys:", criteria)
     return criteria
 
+@api_view(["GET"])
 def get_deck_result(request):
     answer_key = request.GET.get("key")
     session_id = request.session.session_key
@@ -66,6 +70,16 @@ def get_deck_result(request):
     decks = Deck.objects.filter(query).distinct()
     print("Filtered QuerySet count:", decks.count())
     
+    if request.user.is_authenticated and request.user.use_custom_lookup: # if logged in and use custom lookup
+        owned_deck_ids = list(request.user.owned_decks.values_list("id", flat=True))
+        print(f"Owned deck IDs to exclude: {owned_deck_ids}")
+
+        if owned_deck_ids:
+            decks = decks.exclude(id__in=owned_deck_ids)
+            print("Filtered QuerySet after owned deck exclusion:", decks.count())
+        else:
+            print("No owned decks to exclude.")
+
     if answer_key == "empty":
         all_decks = Deck.objects.all()
         deck = random.choice(all_decks) if all_decks.exists() else None
@@ -105,3 +119,72 @@ def get_deck_result(request):
     }
 
     return JsonResponse(result_data, safe=False)
+
+@api_view(["GET"])
+def get_all_decks(request):
+    decks = Deck.objects.all().order_by("name")
+
+    deck_data = [
+        {
+            "id": deck.id,
+            "name": deck.name,
+            "cover_image": deck.cover_image_small.url if deck.cover_image_small else None,
+        }
+        for deck in decks
+    ]
+    return Response({"decks": deck_data})
+
+@api_view(["GET"])
+def get_deck_data(request, deck_id):
+    try:
+        deck = Deck.objects.get(id=deck_id)
+    except Deck.DoesNotExist:
+        return Response({"error": "덱을 찾을 수 없습니다."}, status=404)
+
+    deck_data = {
+        "id": deck.id,
+        "name": deck.name,
+        "cover_image": deck.cover_image.url if deck.cover_image else None,
+        "strength": deck.get_strength_display(),
+        "difficulty": deck.get_difficulty_display(),
+        "deck_type": deck.get_deck_type_display(),
+        "art_style": deck.get_art_style_display(),
+        "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
+        "performance_tags": [tag.name for tag in deck.performance_tags.all()],
+        "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
+        "description": deck.description,
+    }
+
+    return Response(deck_data)
+
+import os
+import json
+from django.conf import settings
+from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(["GET"])
+def get_lookup_table(request):
+    base_lookup_path = os.path.join(settings.MEDIA_ROOT, "lookup_tables", "lookup_table.json")
+
+    # Case 1: Not logged in -> default look-up table
+    if not request.user.is_authenticated:
+        with open(base_lookup_path, "r") as f:
+            return Response({"lookup_table": json.load(f)})
+
+    # Case 2: Logged in but not use custom test -> default look-up table
+    user = request.user
+    if not user.use_custom_lookup:
+        with open(base_lookup_path, "r") as f:
+            return Response({"lookup_table": json.load(f)})
+
+    # Case 3: Logged in and use custom test -> custom look-up table
+    user_lookup_path = os.path.join(settings.MEDIA_ROOT, "lookup_tables", f"lookup_table_{user.id}.json")
+    
+    if os.path.exists(user_lookup_path):
+        with open(user_lookup_path, "r") as f:
+            return Response({"lookup_table": json.load(f)})
+
+    with open(base_lookup_path, "r") as f:
+        return Response({"lookup_table": json.load(f), "message": "Custom Look-up Table이 아직 생성되지 않아 기본 테이블을 제공합니다."})

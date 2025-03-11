@@ -17,7 +17,7 @@ def get_deck_statistics(request):
         {
             "name": deck.name,
             "num_views": deck.num_views,
-            "cover_image": deck.cover_image.url if deck.cover_image else None,
+            "cover_image": deck.cover_image_small.url if deck.cover_image else None,
             "percentage": round((deck.num_views / total_views) * 100, 2) if total_views > 0 else 0
         }
         for deck in decks

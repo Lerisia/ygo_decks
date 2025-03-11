@@ -13,8 +13,19 @@ export type DeckData = {
 
 export const fetchDeckResult = async (answerKey: string) => {
   try {
-    const response = await fetch(`api/deck?key=${encodeURIComponent(answerKey)}`);
-    
+    const token = localStorage.getItem("access_token");
+    const headers: HeadersInit = token
+      ? { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      : { "Content-Type": "application/json" }; // If not logged in
+
+    const response = await fetch(`/api/deck/result?key=${encodeURIComponent(answerKey)}`, {
+      method: "GET",
+      headers,
+    });
+
     if (!response.ok) {
       throw new Error("Failed to fetch result");
     }
@@ -24,4 +35,14 @@ export const fetchDeckResult = async (answerKey: string) => {
     console.error("Error fetching deck result:", error);
     return null;
   }
+};
+
+export const getAllDecks = async () => {
+  const response = await fetch("/api/deck/");
+  return response.json();
+};
+
+export const getDeckData = async (deckId: number) => {
+  const response = await fetch(`/api/deck/${deckId}/`);
+  return response.json();
 };

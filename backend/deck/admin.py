@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag
+import os
 
 @admin.register(Deck)
 class DeckAdmin(admin.ModelAdmin):
@@ -37,10 +38,22 @@ class DeckAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-width:200px; height:auto;" />', obj.cover_image.url)
         return "-"
     cover_image_preview.short_description = "Cover Image Preview"
+    
+    def small_image_exists(self, obj):
+        if obj.cover_image:
+            small_img_path = os.path.join(
+                obj.cover_image.storage.location,
+                "deck_covers/small",
+                os.path.basename(obj.cover_image.name)
+            )
+            if os.path.exists(small_img_path):
+                return format_html('<span style="color: green;">✔ 존재함</span>')
+        return format_html('<span style="color: red;">✘ 없음</span>')
+    small_image_exists.short_description = "Small Image"
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return self.readonly_fields + ['cover_image_preview']
+            return self.readonly_fields + ['cover_image_preview'] + ['small_image_exists']
         return self.readonly_fields
 
 @admin.register(SummoningMethod)

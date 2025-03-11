@@ -1,14 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
-import { isAuthenticated, logout } from "../api/AccountApi";
+import { Link } from "react-router-dom";
+import { isAuthenticated } from "../api/accountApi";
 
 function Navbar() {
   const isLoggedIn = isAuthenticated();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
 
   return (
     <nav className="bg-transparent py-4 text-black dark:text-white justify-center items-center">
@@ -26,12 +20,9 @@ function Navbar() {
           📜 패치노트
         </Link>
         {isLoggedIn ? (
-          <span
-            className="text-base sm:text-lg md:text-xl break-keep cursor-pointer"
-            onClick={handleLogout}
-          >
-            🚪 로그아웃
-          </span>
+          <Link to="/mypage" className="text-base sm:text-lg md:text-xl break-keep">
+          👤 마이페이지
+        </Link>
         ) : (
           <Link to="/login" className="text-base sm:text-lg md:text-xl break-keep">
             🔑 로그인

@@ -2,6 +2,15 @@ import React from "react";
 
 const patchNotes = [
   {
+    version: "v2.1.0",
+    date: "2025.03.11",
+    changes: [
+      "로그인 기능 추가",
+      "보유힌 덱 설정 기능 추가",
+      "보유한 덱 테스트에서 제외하는 기능 추가 ",
+    ],
+  },
+  {
     version: "v2.0.0",
     date: "2025.02.28",
     changes: [

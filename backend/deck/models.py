@@ -1,4 +1,6 @@
 from django.db import models
+from PIL import Image
+import os
 
 class SummoningMethod(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -69,6 +71,8 @@ class Deck(models.Model):
         null=True,
         help_text="Upload a representative image for the deck."
     )
+    
+    cover_image_small = models.ImageField(upload_to='deck_covers/small/', blank=True, null=True)
 
     strength = models.IntegerField(choices=_Strength.choices)
     difficulty = models.IntegerField(choices=_Difficulty.choices)
@@ -78,12 +82,32 @@ class Deck(models.Model):
     performance_tags = models.ManyToManyField(PerformanceTag)
     aesthetic_tags = models.ManyToManyField(AestheticTag)
     num_views = models.PositiveIntegerField(default=0)
+    
 
     description = models.TextField(
         blank=True,
         null=True,
         help_text="Provide details about the deck's features, usage tips, or overall concept."   
     )
+
+    def __str__(self):
+        return self.name  # 덱의 이름을 반환하여 Admin에서 보이게 함
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.cover_image:
+            small_img_path = os.path.join("media/deck_covers/small/", os.path.basename(self.cover_image.name))
+            small_img_relative_path = f"deck_covers/small/{os.path.basename(self.cover_image.name)}"
+
+            os.makedirs(os.path.dirname(small_img_path), exist_ok=True)
+            img = Image.open(self.cover_image.path)
+            img = img.resize((200, 200))
+            img.save(small_img_path)
+
+            # Save auto-created small cover image
+            self.cover_image_small.name = small_img_relative_path
+            super().save(update_fields=["cover_image_small"])
     
     def increment_views(self):
         self.num_views += 1

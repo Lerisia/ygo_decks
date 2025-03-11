@@ -14,6 +14,9 @@ import Unauthorized from "./pages/Unauthorized";
 import DeckStatistics from "./pages/Statistics";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Mypage from "./pages/Mypage";
+import Mydecks from "./pages/Mydecks";
+import Noresults from "./pages/Noresults";
 
 function App() {
   return (
@@ -31,6 +34,9 @@ function App() {
           <Route path="/statistics" element={<DeckStatistics />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/mypage" element={<Mypage />} />
+          <Route path="/mypage/mydecks" element={<Mydecks />} />
+          <Route path="/no-results" element={<Noresults />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
