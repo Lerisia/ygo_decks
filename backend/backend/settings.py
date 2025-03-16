@@ -33,7 +33,7 @@ urlpatterns = [
 SECRET_KEY = 'django-insecure-xq4@b6!emq4z0mw4#0vp3$5ayf-i2u8g%g8@ynu-t(s+w2)gtc'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
@@ -58,8 +58,8 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'corsheaders',
-    'card',
     'deck',
+    'card',
     'question',
     'userstatistics',
     'tournament',

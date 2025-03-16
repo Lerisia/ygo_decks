@@ -1,4 +1,5 @@
 export type DeckData = {
+  id: number;
   name: string;
   cover_image?: string;
   strength: string;

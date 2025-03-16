@@ -143,3 +143,8 @@ def update_user_settings(request):
         user.save()
 
     return Response({"message": "설정이 저장되었습니다.", "use_custom_lookup": user.use_custom_lookup})
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def is_admin(request):
+    return Response({"is_admin": request.user.is_staff})

@@ -134,7 +134,7 @@ const Mydecks = () => {
             className="mr-2 w-4 h-4"
           />
           <label htmlFor="excludeOwnedDecks" className="text-base">
-            성향 테스트에서 보유한 덱 제외
+            보유한 덱을 성향 테스트에서 제외
           </label>
         </div>
       )}

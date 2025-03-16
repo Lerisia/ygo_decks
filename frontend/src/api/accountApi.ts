@@ -148,3 +148,15 @@ export const updateUserSettings = async (useCustomLookup: boolean) => {
     });
     return response.json();
 };
+
+// Check if currently logged in user is admin
+export const isAdmin = async () => {
+    const response = await fetch("/api/is_admin/", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+    });
+    const data = await response.json();
+    return data.is_admin;
+  };
+  

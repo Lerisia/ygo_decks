@@ -13,11 +13,11 @@ function Navbar() {
         <Link to="/info" className="text-base sm:text-lg md:text-xl break-keep">
           📖 사용 설명서
         </Link>
+        <Link to="/database" className="text-base sm:text-lg md:text-xl break-keep">
+          📚 덱 도감
+        </Link>
         <Link to="/statistics" className="text-base sm:text-lg md:text-xl break-keep">
           📊 통계
-        </Link>
-        <Link to="/changelog" className="text-base sm:text-lg md:text-xl break-keep">
-          📜 패치노트
         </Link>
         {isLoggedIn ? (
           <Link to="/mypage" className="text-base sm:text-lg md:text-xl break-keep">

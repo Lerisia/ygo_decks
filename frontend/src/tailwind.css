@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1 {
+    @apply text-5xl font-bold;
+    margin: 0.2em 0;
+  }
+
+  h2 {
+    @apply text-4xl font-bold;
+    margin: 0.2em 0;
+  }
+
+  h3 {
+    @apply text-3xl font-bold;
+    margin: 0.2em 0;
+  }
+
+  h4 {
+    @apply text-2xl font-semibold;
+    margin: 0.2em 0;
+  }
+
+  /* h5와 h6 모두 text-base지만, h5는 약간 더 굵게 */
+  h5 {
+    @apply text-xl font-semibold;
+    margin: 0.2em 0;
+  }
+
+  /* h6는 본문 크기 & 일반 굵기 → h5와 약간 차이 */
+  h6 {
+    @apply text-lg font-semibold;
+    margin: 0.2em 0;
+  }
+
+  .markdown-content ul {
+    @apply list-disc pl-6; /* 불릿 목록 */
+  }
+  
+  .markdown-content ol {
+    @apply list-decimal pl-6; /* 숫자 목록 */
+  }
+
+  .markdown-content li {
+    @apply leading-relaxed; /* 간격 조정 */
+  }
+  
+  .markdown a {
+    @apply text-blue-500 underline hover:text-blue-700;
+  }
+
+}

@@ -2,11 +2,25 @@ import React from "react";
 
 const patchNotes = [
   {
+    version: "v2.2.1",
+    date: "2025.03.14",
+    changes: [
+      "주박, 소환수의 2개 덱 추가 (총 131종)",
+    ],
+  },
+  {
+    version: "v2.2.0",
+    date: "2025.03.12",
+    changes: [
+      "덱 도감 추가",
+    ],
+  },
+  {
     version: "v2.1.0",
     date: "2025.03.11",
     changes: [
       "로그인 기능 추가",
-      "보유힌 덱 설정 기능 추가",
+      "보유한 덱 설정 기능 추가",
       "보유한 덱 테스트에서 제외하는 기능 추가 ",
     ],
   },

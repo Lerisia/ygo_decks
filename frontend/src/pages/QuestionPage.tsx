@@ -134,23 +134,32 @@ function QuestionPage() {
   
   useEffect(() => {
     if (!lookupTable) return;
+    
     const totalQuestions = requiredQuestions.length + optionalQuestions.length;
-
-    if (totalQuestions > 0 && answers.length + getHiddenQuestionsCount() >= totalQuestions) {
-      const answerKey = generateAnswerKey(answers);
-    
-      console.log("현재 answerKey:", answerKey);
-      console.log("lookup table에서 찾은 값:", lookupTable[answerKey]);
-    
-      if (lookupTable[answerKey] === 1) { 
-        console.log("✅ All questions answered, navigating to result page.");
-        localStorage.setItem("answerKey", answerKey);
-        navigate("/result");
-      } else {
-        console.log("🚨 lookupTable에 존재하지만 결과를 내면 안 됨!");
-      }
-    }    
+    const answeredAndHiddenCount = answers.length + getHiddenQuestionsCount();
+    const answerKey = generateAnswerKey(answers);
+  
+    console.log("응답한 질문 개수:", answers.length);
+    console.log("비활성화된 질문 개수:", getHiddenQuestionsCount());
+    console.log("전체 질문 개수:", totalQuestions);
+    console.log("현재 answerKey:", answerKey);
+    console.log("lookup table에서 찾은 값:", lookupTable[answerKey]);
+  
+    if (answeredAndHiddenCount >= totalQuestions) {
+      console.log("더 이상 답할 수 있는 질문이 없음. 결과 페이지로 이동합니다.");
+      localStorage.setItem("answerKey", answerKey);
+      navigate("/result");
+      return;
+    }
+  
+    if (lookupTable[answerKey] === 1) { 
+      console.log("answerKey가 유효한 값(1)임. 결과 페이지로 이동합니다.");
+      localStorage.setItem("answerKey", answerKey);
+      navigate("/result");
+    }
   }, [answers, lookupTable, navigate, requiredQuestions, optionalQuestions]);
+  
+
 
   useEffect(() => {
     if (!lookupTable) return;

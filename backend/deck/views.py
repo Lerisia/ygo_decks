@@ -2,10 +2,12 @@ import random
 from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
-from .models import Deck
+from django.shortcuts import get_object_or_404
+from .models import Deck, AestheticTag, PerformanceTag
 from userstatistics.models import UserResponse
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser
 from user.models import User
 
 def parse_answer_key(answer_key):
@@ -106,6 +108,7 @@ def get_deck_result(request):
         deck.save(update_fields=['num_views'])
 
     result_data = {
+        "id": deck.id,
         "name": deck.name,
         "cover_image": request.build_absolute_uri(deck.cover_image.url) if deck.cover_image else None,
         "strength": deck.get_strength_display(),
@@ -128,6 +131,13 @@ def get_all_decks(request):
         {
             "id": deck.id,
             "name": deck.name,
+            "strength": deck.get_strength_display(),
+            "difficulty": deck.get_difficulty_display(),
+            "deck_type": deck.get_deck_type_display(),
+            "art_style": deck.get_art_style_display(),
+            "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
+            "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
+            "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
             "cover_image": deck.cover_image_small.url if deck.cover_image_small else None,
         }
         for deck in decks
@@ -153,9 +163,11 @@ def get_deck_data(request, deck_id):
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
         "description": deck.description,
+        "wiki_content": deck.wiki_content,
     }
 
     return Response(deck_data)
+
 
 import os
 import json
@@ -188,3 +200,23 @@ def get_lookup_table(request):
 
     with open(base_lookup_path, "r") as f:
         return Response({"lookup_table": json.load(f), "message": "Custom Look-up Table이 아직 생성되지 않아 기본 테이블을 제공합니다."})
+
+def get_tags(request):
+    aesthetic_tags = list(AestheticTag.objects.values_list("name", flat=True))
+    performance_tags = list(PerformanceTag.objects.values_list("name", flat=True))
+
+    return JsonResponse({
+        "aesthetic_tags": aesthetic_tags,
+        "performance_tags": performance_tags
+    })
+    
+@api_view(["PUT"])
+@permission_classes([IsAdminUser]) # Admin only
+def update_wiki_content(request, deck_id):
+    deck = get_object_or_404(Deck, id=deck_id)
+    wiki_content = request.data.get("wiki_content", "")
+
+    deck.wiki_content = wiki_content
+    deck.save()
+
+    return Response({"message": "Wiki content updated successfully."})

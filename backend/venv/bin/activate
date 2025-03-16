@@ -67,3 +67,7 @@ fi
 if [ -n "${BASH:-}" -o -n "${ZSH_VERSION:-}" ] ; then
     hash -r 2> /dev/null
 fi
+
+# Node.js 및 npm 경로 추가
+export PATH=$HOME/.nvm/versions/node/v22.14.0/bin:$PATH
+

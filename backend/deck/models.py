@@ -89,9 +89,15 @@ class Deck(models.Model):
         null=True,
         help_text="Provide details about the deck's features, usage tips, or overall concept."   
     )
+    
+    wiki_content = models.TextField(
+        blank=True,
+        null=True,
+        help_text="A detailed explanation of the deck, its strategies, history, and variations. Supports HTML formatting."
+    ) #  Wiki content with HTML
 
     def __str__(self):
-        return self.name  # 덱의 이름을 반환하여 Admin에서 보이게 함
+        return self.name
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchDeckResult, DeckData } from "../api/deckApi";
 
-// We use Abbreviation for keys because of look-up table size
-// But DB has full name of keys so we should convert to full name to get final result
+// Mapping for field abbreviations
 const fieldMapping: { [key: string]: string } = {
   s: "strength",
   d: "difficulty",
@@ -14,9 +13,9 @@ const fieldMapping: { [key: string]: string } = {
   atag: "aesthetic_tags",
 };
 
+// Expands abbreviated answer keys to full field names
 const expandAnswerKey = (answerKey: string): string => {
   if (answerKey === "empty") return "empty";
-
   return answerKey
     .split("|")
     .map(pair => {
@@ -104,6 +103,16 @@ function ResultPage() {
       </p>
 
       <p className="mt-2 text-lg break-keep">{result?.description}</p>
+
+      {/* Button to navigate to deck details */}
+      {result?.id && (
+        <button
+          onClick={() => navigate(`/database/${result.id}`)}
+          className="mt-6 px-6 py-3 bg-blue-600 text-white text-lg font-semibold rounded-lg shadow-md hover:bg-blue-700 transition"
+        >
+          덱 상세 정보 보기
+        </button>
+      )}
     </div>
   );
 }
