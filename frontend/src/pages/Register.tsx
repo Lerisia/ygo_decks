@@ -106,7 +106,7 @@ const Register = () => {
           placeholder="이메일 주소"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 border rounded-md"
+          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
           disabled={isLoading}
         />
         {checkingEmail ? (
@@ -122,7 +122,7 @@ const Register = () => {
           placeholder="닉네임"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full p-2 border rounded-md"
+          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
           disabled={isLoading}
         />
         {checkingUsername ? (
@@ -138,7 +138,7 @@ const Register = () => {
           placeholder="비밀번호"
           value={password1}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full p-2 border rounded-md"
+          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
           disabled={isLoading}
         />
       </div>
@@ -149,7 +149,7 @@ const Register = () => {
           placeholder="비밀번호 확인"
           value={password2}
           onChange={(e) => setPassword2(e.target.value)}
-          className="w-full p-2 border rounded-md"
+          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
           disabled={isLoading}
         />
       </div>

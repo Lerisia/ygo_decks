@@ -105,13 +105,12 @@ class CustomConfirmEmailView(ConfirmEmailView):
 @permission_classes([IsAuthenticated])
 def get_user_decks(request):  # Check owned decks of currently logged-in user
     user = request.user
-    owned_decks = user.owned_decks.all()
-    
+    owned_decks = user.owned_decks.order_by("name")
+
     return Response({
         "owned_decks": [{"id": deck.id, "name": deck.name} for deck in owned_decks],
         "use_custom_lookup": user.use_custom_lookup
     })
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

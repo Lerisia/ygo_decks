@@ -155,6 +155,7 @@ def get_deck_data(request, deck_id):
         "id": deck.id,
         "name": deck.name,
         "cover_image": deck.cover_image.url if deck.cover_image else None,
+        "cover_image_small": deck.cover_image_small.url if deck.cover_image_small else None,
         "strength": deck.get_strength_display(),
         "difficulty": deck.get_difficulty_display(),
         "deck_type": deck.get_deck_type_display(),

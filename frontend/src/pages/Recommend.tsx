@@ -25,6 +25,13 @@ function Recommend() {
             테스트 시작
           </button>
         </Link>
+        <div>
+        <Link to="/statistics">
+          <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-all">
+            통계 보기
+          </button>
+        </Link>
+        </div>
       </div>
     </div>
   )

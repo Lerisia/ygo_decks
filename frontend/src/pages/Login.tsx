@@ -38,6 +38,7 @@ const Login = () => {
             <input
                 type="text"
                 placeholder="이메일 주소"
+                className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
             />
@@ -46,6 +47,7 @@ const Login = () => {
             <input
                 type="password"
                 placeholder="비밀번호"
+                className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
             />

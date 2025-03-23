@@ -16,8 +16,8 @@ function Navbar() {
         <Link to="/database" className="text-base sm:text-lg md:text-xl break-keep">
           📚 덱 도감
         </Link>
-        <Link to="/statistics" className="text-base sm:text-lg md:text-xl break-keep">
-          📊 통계
+        <Link to="/records" className="text-base sm:text-lg md:text-xl break-keep">
+          📝 전적 시트
         </Link>
         {isLoggedIn ? (
           <Link to="/mypage" className="text-base sm:text-lg md:text-xl break-keep">

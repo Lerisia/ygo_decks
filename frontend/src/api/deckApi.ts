@@ -2,6 +2,7 @@ export type DeckData = {
   id: number;
   name: string;
   cover_image?: string;
+  cover_image_small?: string;
   strength: string;
   difficulty: string;
   deck_type: string;

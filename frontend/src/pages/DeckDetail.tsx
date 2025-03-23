@@ -37,8 +37,6 @@ export default function DeckDetail() {
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   const [isAdminUser, setIsAdminUser] = useState(false);
 
-  // ✅ (1) options를 useMemo로 캐싱
-  // 매 렌더마다 새 객체를 생성하지 않도록 막아줌
   const mdeOptions = useMemo(() => {
     return {
       spellChecker: false,
