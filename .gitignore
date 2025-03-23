@@ -10,6 +10,7 @@ backend/*.sqlite3
 backend/*.json
 backend/*.csv
 backend/*.db
+backend/staticfiles/*
 
 # Backend: Ignore Django settings & logs
 backend/.env
@@ -17,7 +18,7 @@ backend/*.log
 backend/*.pyc
 
 # Backend: Ignore media files
-backend/media/deck_covers/*
+backend/media/*
 
 # Backend: Ignore virtual environment (venv)
 backend/venv/
@@ -43,3 +44,9 @@ Thumbs.db
 
 frontend/src/data/lookup_table.json
 backend/lookup_table.json
+
+# node_modules
+node_modules/
+
+# media files
+media/
