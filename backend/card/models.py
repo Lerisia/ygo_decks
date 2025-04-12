@@ -17,6 +17,7 @@ class Card(models.Model):
     korean_name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     image_url = models.URLField(blank=True, null=True)
+    card_illust = models.ImageField(upload_to='card_illusts/', blank=True, null=True, help_text="Upload a card image.")
     card_image = models.ImageField(upload_to='card_images/', blank=True, null=True, help_text="Upload a card image.")
 
     def get_image(self):
@@ -43,3 +44,19 @@ class LimitRegulationEntry(models.Model):
 
     def __str__(self):
         return f"{self.entry.name} - {self.card.name}: {self.get_regulation_status_display()}"
+
+class UploadRecord(models.Model):
+    uploaded_image = models.ImageField(upload_to='uploads/')
+    detected_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+class CardDetection(models.Model):
+    record = models.ForeignKey(UploadRecord, on_delete=models.CASCADE)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE)
+    confidence = models.FloatField()
+    illust_image = models.ImageField(upload_to='illusts/')

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { register, checkEmailExists, checkUsernameExists } from "../api/accountApi";
-import { useNavigate } from "react-router-dom";
 
 const Register = () => {
   const [email, setEmail] = useState("");
@@ -14,8 +13,6 @@ const Register = () => {
   const [usernameError, setUsernameError] = useState("");
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
-
-  const navigate = useNavigate();
 
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -84,7 +81,7 @@ const Register = () => {
     }
 
     setIsLoading(true);
-    setMessage("인증 이메일을 전송하는 중입니다...");
+    setMessage("인증 이메일을 발송 중입니다. 이 페이지를 닫지 마세요.");
 
     const result = await register(email, username, password1, password2);
 
@@ -93,8 +90,7 @@ const Register = () => {
     if (result.error) {
       setMessage(result.error);
     } else {
-      setMessage("회원가입 성공! 이메일을 확인하고 인증을 완료해주세요.");
-      setTimeout(() => navigate("/login"), 3000);
+      setMessage("발송 완료! 메일이 도착하지 않는다면 스팸 메일함을 확인해 주세요.");
     }
   };
 
@@ -135,7 +131,7 @@ const Register = () => {
       <div className="mt-6 w-80">
         <input
           type="password"
-          placeholder="비밀번호"
+          placeholder="비밀번호(6자 이상)"
           value={password1}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"

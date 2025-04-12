@@ -50,3 +50,8 @@ node_modules/
 
 # media files
 media/
+
+# files related to deep learning
+*.pt
+*.pth
+*.csv

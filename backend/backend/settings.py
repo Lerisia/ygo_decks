@@ -33,7 +33,7 @@ urlpatterns = [
 SECRET_KEY = 'django-insecure-xq4@b6!emq4z0mw4#0vp3$5ayf-i2u8g%g8@ynu-t(s+w2)gtc'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
@@ -80,7 +80,7 @@ MIDDLEWARE = [
 ]
 
 DJ_REST_AUTH = {
-    'USE_JWT': True
+    'USE_JWT': False
 }
 
 REST_FRAMEWORK = {
@@ -155,26 +155,18 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
 AUTH_USER_MODEL = 'user.User'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
+AUTH_PASSWORD_VALIDATORS = []
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -230,3 +222,6 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 
 CSRF_COOKIE_SECURE = False
 CSRF_USE_SESSIONS = False
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 2MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 2MB

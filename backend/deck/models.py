@@ -118,3 +118,10 @@ class Deck(models.Model):
     def increment_views(self):
         self.num_views += 1
         self.save(update_fields=['num_views'])
+        
+class DeckAlias(models.Model):
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name='aliases')
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name

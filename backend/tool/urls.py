@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     create_record_group, get_user_record_groups, add_match_to_record_group,
     delete_record_group, delete_match_record, get_record_group_statistics,
-    get_record_group_matches, get_record_group_statistics_full, update_record_group_name
+    get_record_group_matches, get_record_group_statistics_full, update_record_group_name, update_match_record,
+    recent_meta_deck_stats
 )
 
 urlpatterns = [
@@ -15,4 +16,7 @@ urlpatterns = [
     path("match-records/<int:match_id>/delete/", delete_match_record, name="delete-match-record"),
     path("record-groups/<int:record_group_id>/matches/", get_record_group_matches, name="record-group-matches"),
     path("record-groups/<int:record_group_id>/update-name/", update_record_group_name, name="update_record_group_name"),
+    path("match-records/<int:match_id>/update/", update_match_record, name="update-match-record"),\
+    path("recent-meta-deck-stats/", recent_meta_deck_stats, name="recent_meta_deck_stats"),
+
 ]

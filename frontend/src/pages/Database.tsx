@@ -15,6 +15,7 @@ interface Deck {
   summoning_methods: string[];
   performance_tags: string[];
   aesthetic_tags: string[];
+  aliases: string[];
 }
 
 export default function DatabasePage() {
@@ -34,6 +35,68 @@ export default function DatabasePage() {
   const navigate = useNavigate();
 
   const summoningMethods = ["융합", "의식", "싱크로", "엑시즈", "펜듈럼", "링크", "다양"];
+
+  const saveFilters = () => {
+    const filters = {
+      searchQuery,
+      selectedPerformanceTags,
+      selectedAestheticTags,
+      selectedSummoningMethod,
+      selectedStrength,
+      selectedDifficulty,
+      selectedDeckType,
+      selectedArtStyle,
+    };
+    localStorage.setItem("deck_filters", JSON.stringify(filters));
+  };
+
+  useEffect(() => {
+    return () => {
+      saveFilters();
+    };
+  }, [
+    searchQuery,
+    selectedPerformanceTags,
+    selectedAestheticTags,
+    selectedSummoningMethod,
+    selectedStrength,
+    selectedDifficulty,
+    selectedDeckType,
+    selectedArtStyle,
+  ]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("deck_filters");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSearchQuery(parsed.searchQuery || "");
+        setSelectedPerformanceTags(parsed.selectedPerformanceTags || []);
+        setSelectedAestheticTags(parsed.selectedAestheticTags || []);
+        setSelectedSummoningMethod(parsed.selectedSummoningMethod || null);
+        setSelectedStrength(parsed.selectedStrength || null);
+        setSelectedDifficulty(parsed.selectedDifficulty || null);
+        setSelectedDeckType(parsed.selectedDeckType || null);
+        setSelectedArtStyle(parsed.selectedArtStyle || null);
+  
+        const hasAnyFilter =
+          (parsed.selectedPerformanceTags?.length ?? 0) > 0 ||
+          (parsed.selectedAestheticTags?.length ?? 0) > 0 ||
+          parsed.selectedSummoningMethod ||
+          parsed.selectedStrength ||
+          parsed.selectedDifficulty ||
+          parsed.selectedDeckType ||
+          parsed.selectedArtStyle;
+  
+        if (hasAnyFilter) {
+          setFilterExpanded(true);
+        }
+      } catch (err) {
+        console.error("필터 복원 실패:", err);
+      }
+    }
+  }, []);
+  
 
   useEffect(() => {
     // Get decks from backend
@@ -56,9 +119,13 @@ export default function DatabasePage() {
 
   // Apply filtering
   useEffect(() => {
-    let filtered = decks.filter((deck) =>
-      deck.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    let filtered = decks.filter((deck) => {
+      const lowerQuery = searchQuery.toLowerCase();
+      return (
+        deck.name.toLowerCase().includes(lowerQuery) ||
+        deck.aliases?.some((alias) => alias.toLowerCase().includes(lowerQuery))
+      );
+    });
 
     if (selectedPerformanceTags.length > 0) {
       filtered = filtered.filter((deck) =>
@@ -250,6 +317,17 @@ export default function DatabasePage() {
                 </Badge>
               ))}
             </div>
+          </div>
+          <div className="flex justify-center">
+            <button
+              className="p-2 bg-red-400 text-white rounded w-auto inline-block self-start"
+              onClick={() => {
+                localStorage.removeItem("deck_filters");
+                window.location.reload();
+              }}
+            >
+              필터 초기화
+            </button>
           </div>
         </div>
       )}

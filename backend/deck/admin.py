@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag
+from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag, DeckAlias
 import os
 
 @admin.register(Deck)
@@ -67,3 +67,8 @@ class PerformanceTagAdmin(admin.ModelAdmin):
 @admin.register(AestheticTag)
 class AestheticTagAdmin(admin.ModelAdmin):
     list_display = ('name',)
+
+@admin.register(DeckAlias)
+class DeckAliasAdmin(admin.ModelAdmin):
+    list_display = ('name', 'deck')
+    search_fields = ('name',)

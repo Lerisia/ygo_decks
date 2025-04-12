@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from .models import Deck, AestheticTag, PerformanceTag
+from .models import Deck, AestheticTag, PerformanceTag, DeckAlias
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -125,12 +125,15 @@ def get_deck_result(request):
 
 @api_view(["GET"])
 def get_all_decks(request):
-    decks = Deck.objects.all().order_by("name")
+    decks = Deck.objects.all().prefetch_related(
+        "summoning_methods", "performance_tags", "aesthetic_tags", "aliases"
+    ).order_by("name")
 
     deck_data = [
         {
             "id": deck.id,
             "name": deck.name,
+            "aliases": [alias.name for alias in deck.aliases.all()],  # << 여기 추가
             "strength": deck.get_strength_display(),
             "difficulty": deck.get_difficulty_display(),
             "deck_type": deck.get_deck_type_display(),

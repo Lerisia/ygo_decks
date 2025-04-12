@@ -12,8 +12,8 @@ class CardAdmin(admin.ModelAdmin):
     readonly_fields = []
     
     def card_image_preview(self, obj):
-        if obj.card_image:
-            return format_html('<img src="{}" style="max-width:200px; height:auto;" />', obj.card_image.url)
+        if obj.card_illust:
+            return format_html('<img src="{}" style="max-width:200px; height:auto;" />', obj.card_illust.url)
         return "-"
     
     card_image_preview.short_description = "Card Image Preview"
@@ -69,3 +69,25 @@ class LimitRegulationAdmin(admin.ModelAdmin):
 
     get_total_cards.short_description = "num_cards"
     
+from .models import UploadRecord, CardDetection
+
+class CardDetectionInline(admin.TabularInline):
+    model = CardDetection
+    extra = 0
+    readonly_fields = ('card', 'confidence', 'illust_image')
+    show_change_link = True
+
+@admin.register(UploadRecord)
+class UploadRecordAdmin(admin.ModelAdmin):
+    list_display = ('user', 'id', 'uploaded_image', 'detected_at')
+    list_filter = ('detected_at',)
+    readonly_fields = ('detected_at',)
+    search_fields = ('user',)
+    inlines = [CardDetectionInline]
+
+@admin.register(CardDetection)
+class CardDetectionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'record', 'card', 'confidence', 'illust_image')
+    list_filter = ('card', 'confidence')
+    search_fields = ('record__id', 'card__name')
+    raw_id_fields = ('record', 'card')

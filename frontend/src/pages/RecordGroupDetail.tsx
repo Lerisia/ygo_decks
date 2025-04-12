@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord, updateRecordGroupName } from "@/api/toolApi";
+import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
+         updateRecordGroupName, updateMatchRecord } from "@/api/toolApi";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -16,11 +17,19 @@ const customSelectStyles = {
   }),
 };
 
-type DeckShortData = {
+type DeckBase = {
   id: number;
   name: string;
-  cover_image_small: string | null; 
 };
+
+type DeckShortData = DeckBase & {
+  cover_image_small: string | null;
+};
+
+type DeckData = DeckBase & {
+  aliases: string[];
+};
+
 
 type MatchRecord = {
   id: number;
@@ -34,15 +43,175 @@ type MatchRecord = {
   notes: string;
 };
 
-type DeckData = {
-  id: number;
-  name: string;
-};
-
 type OptionType = {
   value: string;
   label: string;
+  aliases?: string[];
 };
+
+export const EditMatchModal = ({
+  match,
+  onClose,
+  onUpdated,
+  rankOptions,
+}: {
+  match: any;
+  onClose: () => void;
+  onUpdated: () => void;
+  ownedDecks: any[];
+  allOptions: any[];
+  rankOptions: { value: string; label: string }[];
+}) => {
+  const [form, setForm] = useState({
+    coin_toss_result: match.coin_toss_result,
+    first_or_second: match.first_or_second,
+    result: match.result,
+    rank: match.rank || "",
+    score: match.score?.toString() || "",
+    notes: match.notes || "",
+  });
+
+  const [useRankOrScore, setUseRankOrScore] = useState("none");
+
+  useEffect(() => {
+    if (match.rank) setUseRankOrScore("rank");
+    else if (match.score) setUseRankOrScore("score");
+  }, [match]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await updateMatchRecord(match.id, {
+        ...form,
+        score: form.score ? Number(form.score) : null,
+        rank: form.rank || null,
+      });
+      alert("수정 완료!");
+      onUpdated();
+      onClose();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg w-[400px] max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
+        <h2 className="text-lg font-bold">기록 수정</h2>
+        <div>
+          <label className="block text-sm font-medium">코인토스</label>
+          <select
+            name="coin_toss_result"
+            value={form.coin_toss_result}
+            onChange={handleChange}
+            className="w-full border rounded p-2 bg-white text-black"
+          >
+            <option value="win">코인토스 승리</option>
+            <option value="lose">코인토스 패배</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">선공/후공</label>
+          <select
+            name="first_or_second"
+            value={form.first_or_second}
+            onChange={handleChange}
+            className="w-full border rounded p-2 bg-white text-black"
+          >
+            <option value="first">선공</option>
+            <option value="second">후공</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">결과</label>
+          <select
+            name="result"
+            value={form.result}
+            onChange={handleChange}
+            className="w-full border rounded p-2 bg-white text-black"
+          >
+            <option value="win">승리</option>
+            <option value="lose">패배</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">랭크/점수 입력 방식</label>
+          <select
+            value={useRankOrScore}
+            onChange={(e) => {
+              setUseRankOrScore(e.target.value);
+              setForm((prev) => ({ ...prev, rank: "", score: "" }));
+            }}
+            className="w-full border rounded p-2 bg-white text-black"
+          >
+            <option value="none">입력 안 함</option>
+            <option value="rank">랭크</option>
+            <option value="score">점수</option>
+          </select>
+        </div>
+
+        {useRankOrScore === "rank" && (
+          <div>
+            <label className="block text-sm font-medium">랭크</label>
+            <select
+              name="rank"
+              value={form.rank}
+              onChange={handleChange}
+              className="w-full border rounded p-2 bg-white text-black"
+            >
+              <option value="">선택</option>
+              {rankOptions.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {useRankOrScore === "score" && (
+          <div>
+            <label className="block text-sm font-medium">점수</label>
+            <input
+              name="score"
+              value={form.score}
+              onChange={handleChange}
+              type="number"
+              className="w-full border rounded p-2 bg-white text-black"
+            />
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium">메모</label>
+          <input
+            name="notes"
+            value={form.notes}
+            onChange={handleChange}
+            className="w-full border rounded p-2 bg-white text-black"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="px-3 py-1 rounded border">
+            취소
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const RecordGroupDetailPage = () => {
   const [recordGroupName, setRecordGroupName] = useState("");
@@ -65,6 +234,7 @@ const RecordGroupDetailPage = () => {
   const [owned_decks, setOwnedDecks] = useState<DeckData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [useRankOrScore, setUseRankOrScore] = useState("none");
+  const [editingMatch, setEditingMatch] = useState<any | null>(null);
 
   const RANK_OPTIONS = [
     { value: "rookie2", label: "루키 2" },
@@ -107,19 +277,14 @@ const RecordGroupDetailPage = () => {
     { value: "master1", label: "마스터 1" },
   ];
 
-  const handleChangeRankOrScore = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setUseRankOrScore(value);
-
-    if (value === "rank") {
-      setNewMatch((prev) => ({ ...prev, score: "", rank: "" }));
-    } else if (value === "score") {
-      setNewMatch((prev) => ({ ...prev, score: "", rank: "" }));
-    } else {
-      // none
-      setNewMatch((prev) => ({ ...prev, score: "", rank: "" }));
-    }
-  };
+  const allOptions: OptionType[] = [
+    { value: "null", label: "모름/기타", aliases: [] },
+    ...decks.map((deck) => ({
+      value: String(deck.id),
+      label: deck.name,
+      aliases: deck.aliases || [],
+    })),
+  ];
 
   const handleEditName = async () => {
     const newName = prompt("새로운 시트명을 입력하세요:", recordGroupName);
@@ -197,7 +362,23 @@ const RecordGroupDetailPage = () => {
     } catch (error) {
       console.error("삭제 실패:", error);
     }
- };
+  };
+
+  const getInitials = (text: string): string => {
+    const initials = [
+      'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ',
+      'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ',
+      'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+    ];
+    return Array.from(text).map(char => {
+      const code = char.charCodeAt(0) - 44032;
+      if (code >= 0 && code <= 11171) {
+        return initials[Math.floor(code / 588)];
+      }
+      if (initials.includes(char)) return char;
+      return '';
+    }).join('');
+  };
   
  useEffect(() => {
   if (matches.length > 0 && owned_decks.length > 0) {
@@ -257,12 +438,43 @@ const RecordGroupDetailPage = () => {
     }
   };
 
+  const deckOptions = owned_decks.map((deck) => ({
+    value: String(deck.id),
+    label: deck.name,
+  }));
+
   const handleOpponentDeckChange = (selectedOption: OptionType | null) => {
     setNewMatch((prev) => ({
       ...prev,
       opponent_deck: selectedOption ? selectedOption.value : "",
     }));
   };
+
+  const coinOptions = [
+    { value: "win", label: "코인토스 승리" },
+    { value: "lose", label: "코인토스 패배" },
+  ];
+  
+  const firstSecondOptions = [
+    { value: "first", label: "선공" },
+    { value: "second", label: "후공" },
+  ];
+
+  const resultOptions = [
+    { value: "win", label: "승리" },
+    { value: "lose", label: "패배" },
+  ];
+
+  const rankTypeOptions = [
+    { value: "none", label: "입력 안 함" },
+    { value: "rank", label: "랭크" },
+    { value: "score", label: "점수" },
+  ];
+
+  const rankOptions = RANK_OPTIONS.map((r) => ({
+    value: r.value,
+    label: r.label,
+  }));
 
   return (
     <div className="px-2 py-4 min-h-screen max-w-screen-sm mx-auto p-4">
@@ -281,128 +493,180 @@ const RecordGroupDetailPage = () => {
         </a>
       </div>
       <div className="text-red-600 mb-4 text-center">
-        <span>
+        <p>
           <a href="/mypage/mydecks" className="underline">
-            마이페이지
+            마이페이지(링크)
           </a>
           에 등록한 덱만 내 덱에 표시됩니다.
-        </span>
+        </p>
+        <p>
+          내 덱이 없다면{" "}
+          <a href="/" className="underline">
+            메인 화면</a>
+          의 오픈채팅방으로 문의주세요.
+        </p>
       </div>
 
       <div className="p-4 border rounded-lg shadow bg-white mb-6 max-w-2xl w-full mx-auto">
         <h2 className="text-lg font-semibold mb-2">기록 등록</h2>
         <div className="flex flex-col gap-2">
-          <select
-            value={newMatch.deck}
-            onChange={(e) => setNewMatch({ ...newMatch, deck: e.target.value })}
-            className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <option>Loading...</option>
-            ) : (
-              <>
-                <option value="">내 덱 선택</option>
-                {owned_decks
-                  .map((deck) => (
-                    <option key={deck.id} value={deck.id}>
-                      {deck.name}
-                    </option>
-                  ))}
-              </>
-            )}
-          </select>
           <Select
-            options={[
-              { value: "null", label: "모름/기타" },
-              ...decks.map((deck) => ({ value: String(deck.id), label: deck.name })),
-            ]}
-            value={
-              [{ value: "null", label: "모름/기타" }, ...decks.map((deck) => ({ value: String(deck.id), label: deck.name }))]
-                .find((option) => option.value === newMatch.opponent_deck) || null
+            options={deckOptions}
+            value={deckOptions.find((d) => d.value === newMatch.deck) || null}
+            onChange={(selected) =>
+              setNewMatch((prev) => ({
+                ...prev,
+                deck: selected?.value || "",
+              }))
             }
-            onChange={handleOpponentDeckChange}
             isDisabled={isLoading}
-            placeholder="상대 덱 선택"
+            placeholder="내 덱 선택"
             isClearable
             styles={customSelectStyles}
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
           />
-          <select
-            value={newMatch.coin_toss_result}
-            onChange={(e) => setNewMatch({ ...newMatch, coin_toss_result: e.target.value })}
-            className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-          >
-            <option value="win">코인토스 승리</option>
-            <option value="lose">코인토스 패배</option>
-          </select>
-          <select
-            value={newMatch.first_or_second}
-            onChange={(e) => setNewMatch({ ...newMatch, first_or_second: e.target.value })}
-            className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-          >
-            <option value="first">선공</option>
-            <option value="second">후공</option>
-          </select>
-          <select
-            value={newMatch.result}
-            onChange={(e) => setNewMatch({ ...newMatch, result: e.target.value })}
-            className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-          >
-            <option value="win">승리</option>
-            <option value="lose">패배</option>
-          </select>
-         <div className="flex items-center gap-2">
-            <span>랭크/점수:</span>
-            <select
-              value={useRankOrScore}
-              onChange={handleChangeRankOrScore}
-              className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-            >
-              <option value="none">입력 안 함</option>
-              <option value="rank">랭크</option>
-              <option value="score">점수</option>
-            </select>
+          <Select<OptionType>
+            options={allOptions}
+            value={allOptions.find((option) => option.value === newMatch.opponent_deck) || null}
+            onChange={handleOpponentDeckChange}
+            isDisabled={isLoading}
+            placeholder="상대 덱 선택 (초성 검색 가능)"
+            isClearable
+            styles={customSelectStyles}
+            filterOption={(option, input) => {
+  	      const lowered = input.toLowerCase();
+  	      const label = option.label.toLowerCase();
+  	      const isAllInitials = /^[ㄱ-ㅎ]+$/.test(lowered); // 전부 초성인지 확인
+  	      const labelInitials = getInitials(label);
+	
+  	      const labelMatch = label.includes(lowered);
+              const aliasMatch = Array.isArray(option.data.aliases)
+               ? option.data.aliases.some((alias) => alias.toLowerCase().includes(lowered))
+               : false;
+	
+  	      if (isAllInitials) {
+   	      const initialsMatch = labelInitials.startsWith(lowered) ||
+      	      (Array.isArray(option.data.aliases) &&
+	        option.data.aliases.some((alias) => getInitials(alias.toLowerCase()).startsWith(lowered)));
+ 	      return initialsMatch;
+ 	     }
+
+ 	   return labelMatch || aliasMatch;
+	  }}
+
+	  />
+          <Select
+            options={coinOptions}
+            value={coinOptions.find((opt) => opt.value === newMatch.coin_toss_result)}
+            onChange={(selected) => {
+              const value = selected?.value || "win";
+              setNewMatch((prev) => ({
+                ...prev,
+                coin_toss_result: value,
+                first_or_second: value === "lose" ? "second" : value === "win" ? "first" : prev.first_or_second,
+              }));
+            }}
+            placeholder="코인토스 결과"
+            styles={customSelectStyles}
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+          />
+          <Select
+            options={firstSecondOptions}
+            value={firstSecondOptions.find((opt) => opt.value === newMatch.first_or_second)}
+            onChange={(selected) =>
+              setNewMatch((prev) => ({
+                ...prev,
+                first_or_second: selected?.value || "first",
+              }))
+            }
+            placeholder="선공/후공"
+            styles={customSelectStyles}
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+          />
+          <Select
+            options={resultOptions}
+            value={resultOptions.find((opt) => opt.value === newMatch.result)}
+            onChange={(selected) =>
+              setNewMatch((prev) => ({
+                ...prev,
+                result: selected?.value || "win",
+              }))
+            }
+            placeholder="결과 선택"
+            styles={customSelectStyles}
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+          />
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="block text-sm font-medium">랭크/점수 입력 방식</label>
+              <Select
+                options={rankTypeOptions}
+                value={rankTypeOptions.find((opt) => opt.value === useRankOrScore)}
+                onChange={(selected) => {
+                  const value = selected?.value || "none";
+                  setUseRankOrScore(value);
+                  setNewMatch((prev) => ({ ...prev, rank: "", score: "" }));
+                }}
+                styles={customSelectStyles}
+                menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+              />
+            </div>
+
+            {useRankOrScore === "rank" && (
+              <div>
+                <label className="block text-sm font-medium">랭크</label>
+                <Select
+                  options={rankOptions}
+                  value={rankOptions.find((r) => r.value === newMatch.rank)}
+                  onChange={(selected) =>
+                    setNewMatch((prev) => ({
+                      ...prev,
+                      rank: selected?.value || "",
+                    }))
+                  }
+                  isClearable
+                  styles={customSelectStyles}
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                />
+              </div>
+            )}
+
+            {useRankOrScore === "score" && (
+              <div>
+                <label className="block text-sm font-medium">점수</label>
+                <input
+                  type="number"
+                  className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white w-full"
+                  placeholder="예: 1612 (레이팅) / 23738 (듀얼리스트 컵)"
+                  value={newMatch.score}
+                  onChange={(e) =>
+                    setNewMatch((prev) => ({ ...prev, score: e.target.value }))
+                  }
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium">메모</label>
+              <textarea
+                value={newMatch.notes}
+                onChange={(e) => setNewMatch((prev) => ({ ...prev, notes: e.target.value }))}
+                className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white w-full"
+                placeholder="메모. 예: '증식의 G 통과', '패 말림' 등"
+              />
+            </div>
           </div>
-          {useRankOrScore === "rank" && (
-            <select
-              value={newMatch.rank}
-              onChange={(e) => setNewMatch((prev) => ({ ...prev, rank: e.target.value }))}
-              className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">랭크 선택</option>
-              {RANK_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          )}
-          {useRankOrScore === "score" && (
-            <input
-              type="number"
-              className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-              placeholder="예: 1612 (레이팅) / 23738 (듀얼리스트 컵)"
-              value={newMatch.score}
-              onChange={(e) => setNewMatch((prev) => ({ ...prev, score: e.target.value }))}
-            />
-          )}
-          <textarea
-            value={newMatch.notes}
-            onChange={(e) => setNewMatch((prev) => ({ ...prev, notes: e.target.value }))}
-            className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white"
-            placeholder="메모. 예: '증식의 G 통과', '패 말림' 등"
-          />
           <button onClick={handleRegisterMatch} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
             기록 추가
           </button>
         </div>
       </div>
-
+      
       <div className="flex justify-end gap-4 mb-4">
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
-          className="p-2 border rounded"
+          className="p-2 border rounded bg-white text-black"
         >
           <option value="10">10개씩 보기</option>
           <option value="20">20개씩 보기</option>
@@ -433,9 +697,7 @@ const RecordGroupDetailPage = () => {
               key={match.id}
               className={`border rounded-lg shadow-sm mb-2 ${blockColor}`}
             >
-              {/* 상단: 전체 정보 flex */}
               <div className="flex items-center justify-between p-2 sm:p-3">
-                {/* 코인토스 */}
                 <div className="w-12 sm:w-16 flex justify-center">
                   {coinImg && (
                     <img
@@ -446,7 +708,6 @@ const RecordGroupDetailPage = () => {
                   )}
                 </div>
 
-                {/* 내 덱 */}
                 <div className="w-16 sm:w-32 flex flex-col items-center">
                   {match.deck.cover_image_small && (
                     <img
@@ -458,7 +719,6 @@ const RecordGroupDetailPage = () => {
                   <p className="text-xs sm:text-sm mt-1 text-center">{match.deck.name}</p>
                 </div>
 
-                {/* 가운데 정보 */}
                 <div className="flex-1 px-2 text-center">
                   <p className="text-sm sm:text-base font-semibold">
                     {match.result === "win" ? "승리" : "패배"}
@@ -469,7 +729,6 @@ const RecordGroupDetailPage = () => {
                   {rankOrScore && <p className="text-xs sm:text-sm">{rankOrScore}</p>}
                 </div>
 
-                {/* 상대 덱 */}
                 <div className="w-16 sm:w-32 flex flex-col items-center">
                   {match.opponent_deck?.cover_image_small && (
                     <img
@@ -483,18 +742,26 @@ const RecordGroupDetailPage = () => {
                   </p>
                 </div>
 
-                {/* 삭제 버튼 */}
-                <div className="w-12 sm:w-16 flex justify-center">
-                  <button
-                    onClick={() => handleDelete(match.id)}
-                    className="px-2 py-1 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600 w-full"
-                  >
-                    삭제
-                  </button>
+                <div className="w-12 sm:w-16 flex flex-col items-center gap-1">
+                <button
+                  onClick={() => {
+                    if (confirm("이 기록을 삭제할까요?")) {
+                      handleDelete(match.id);
+                    }
+                  }}
+                  className="px-2 py-1 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600 w-full"
+                >
+                  삭제
+                </button>
+                <button
+                  onClick={() => setEditingMatch(match)}
+                  className="px-2 py-1 text-xs sm:text-sm bg-green-500 text-white rounded hover:bg-green-600 w-full"
+                >
+                  수정
+                </button>
                 </div>
               </div>
 
-              {/* 하단: 메모 */}
               {match.notes && (
                 <div className="px-4 pb-2 text-xs sm:text-sm text-gray-700 whitespace-pre-wrap break-words">
                   <span className="font-medium"></span> {match.notes}
@@ -523,6 +790,19 @@ const RecordGroupDetailPage = () => {
           다음
         </button>
       </div>
+      {editingMatch && (
+        <EditMatchModal
+          match={editingMatch}
+          ownedDecks={owned_decks}
+          allOptions={allOptions}
+          rankOptions={RANK_OPTIONS}
+          onClose={() => setEditingMatch(null)}
+          onUpdated={() => {
+            loadMatches();
+            setEditingMatch(null);
+          }}
+        />
+      )}
     </div>
   );
 };

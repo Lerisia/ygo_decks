@@ -61,12 +61,47 @@ class Bracket(models.Model):
         ('random', 'Random Matchups'),
         ('group_stage', 'Group Stage'),
     ]
-    
-    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='brackets')
+
+    name = models.CharField(max_length=100, default="Untitled Bracket")
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='brackets', null=True, blank=True)
     group_stage = models.ForeignKey(GroupStage, on_delete=models.CASCADE, related_name='brackets', null=True, blank=True)
-    round = models.IntegerField()
     type = models.CharField(max_length=20, choices=TOURNAMENT_TYPES)
+    round = models.IntegerField(default=1)
     matches = models.JSONField(default=dict)
-    
+
     def __str__(self):
-        return f"{self.tournament.name} - Round {self.round} ({self.type})"
+        return f"{self.name} - Round {self.round} ({self.type})"
+    
+class BracketParticipant(models.Model):
+    bracket = models.ForeignKey(Bracket, on_delete=models.CASCADE, related_name='participants')
+    name = models.CharField(max_length=100)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+
+    wins = models.IntegerField(default=0)
+    losses = models.IntegerField(default=0)
+    draws = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.name} ({self.bracket.name})"
+    
+class BracketMatch(models.Model):
+    RESULT_CHOICES = [
+        ('P1', 'Player 1 Win'),
+        ('P2', 'Player 2 Win'),
+        ('DRAW', 'Draw'),
+    ]
+
+    bracket = models.ForeignKey(Bracket, on_delete=models.CASCADE, related_name='match_set')
+    round = models.IntegerField()
+    player1 = models.ForeignKey(BracketParticipant, on_delete=models.CASCADE, related_name='matches_as_p1')
+    player2 = models.ForeignKey(BracketParticipant, on_delete=models.CASCADE, related_name='matches_as_p2')
+    result = models.CharField(max_length=10, choices=RESULT_CHOICES, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('bracket', 'round', 'player1', 'player2')
+
+    def __str__(self):
+        return f"[{self.bracket.name} R{self.round}] {self.player1.name} vs {self.player2.name} ({self.result or 'Pending'})"
+

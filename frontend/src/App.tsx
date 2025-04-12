@@ -25,19 +25,22 @@ import CreateTournament from "./pages/CreateTournament";
 import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
+import BracketPage from "./pages/BracketDetail";
+import DeckClassifier from "./pages/Classifier";
+import CardClassifier from "./pages/CardDetector";
 
 function App() {
   return (
     <div>
       <Navbar />
       <Routes>
-          <Route path="/" element={<Recommend />} />
+          <Route path="/" element={<Info />} />
+          <Route path="/recommend" element ={<Recommend />} />
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/decks" element={<Decks />} />
           <Route path="/questions" element={<QuestionPage />} />
           <Route path="/result" element={<ResultPage />} />
           <Route path="/terms" element={<Terms />} />
-          <Route path="/info" element={<Info />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/statistics" element={<DeckStatistics />} />
           <Route path="/register" element={<Register />} />
@@ -53,6 +56,9 @@ function App() {
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />
           <Route path="/record-groups/:recordGroupId/statistics" element={<RecordGroupStatistics />} />
+          <Route path="/bracket" element={<BracketPage />} />  
+          <Route path="/deck-detector" element={<DeckClassifier />} />    
+          <Route path="/card-detector" element={<CardClassifier />} />    
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

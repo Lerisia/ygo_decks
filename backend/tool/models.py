@@ -48,6 +48,7 @@ class RecordGroup(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.username} - {self.name}"
@@ -56,6 +57,7 @@ class MatchRecord(models.Model):
     record_group = models.ForeignKey("RecordGroup", on_delete=models.CASCADE, related_name="matches")
     deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="player_matches",)
     opponent_deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="opponent_matches", blank=True, null=True)
+    is_deleted = models.BooleanField(default=False)
 
     first_or_second = models.CharField(
         max_length=10,

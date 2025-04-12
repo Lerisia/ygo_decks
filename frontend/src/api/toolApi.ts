@@ -56,6 +56,39 @@ export const updateRecordGroupName = async (recordGroupId: number, name: string)
   return response.json();
 };
 
+export const updateMatchRecord = async (
+  matchId: number,
+  data: {
+    deck?: number;
+    opponent_deck?: number | null;
+    first_or_second?: "first" | "second";
+    coin_toss_result?: "win" | "lose";
+    result?: "win" | "lose";
+    rank?: string | null;
+    score?: number | null;
+    notes?: string;
+  }
+) => {
+  const token = localStorage.getItem("access_token");
+
+  const response = await fetch(`${API_BASE_URL}/match-records/${matchId}/update/`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error?.error || `수정 실패: ${response.status}`);
+  }
+
+  return response.json();
+};
+
 export const deleteRecordGroup = async (recordGroupId: number) => {
   const token = localStorage.getItem("access_token");
   const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/delete/`, {
@@ -160,4 +193,28 @@ export const getRecordGroupMatches = async (recordGroupId: number, page: number,
   }
 
   return response.json();
+};
+
+export type MetaDeckStat = {
+  meta_deck_id: number;
+  meta_deck_name: string;
+  appearance_percent: number;
+  win_rate: number;
+};
+
+export type MetaDeckStatsResponse = {
+  total_matches: number;
+  meta_decks: MetaDeckStat[];
+};
+
+export const getMetaDeckStats = async () => {
+  const response = await fetch(`${API_BASE_URL}/recent-meta-deck-stats/`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`API 요청 실패: ${response.status}`);
+  }
+
+  return await response.json();
 };

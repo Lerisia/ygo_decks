@@ -6,8 +6,8 @@ function Recommend() {
       <div>
         {/* YGO Master Duel Logo Image */}
         <div className="relative mb-6">
-          <img src="/images/md_logo_small.jpg" alt="Small" className="block mx-auto sm:hidden w-full h-auto" />
-          <img src="/images/md_logo_big.jpg" alt="Large" className="hidden sm:block w-3/4 sm:w-3/4 md:w-3/4 lg:w-3/4 mx-auto object-cover rounded-lg" />
+          <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto" />
+          <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 sm:w-3/4 md:w-3/4 lg:w-3/4 mx-auto object-cover rounded-lg" />
         </div>
         {/* The title and descriptions */}
         <h1 className="text-xl sm:text-2xl md:text-4xl font-bold">유희왕 마스터 듀얼 덱 성향 테스트</h1>

@@ -62,13 +62,13 @@ function QuestionPage() {
   // or 2 available answers including "상관 없음"
   const getHiddenQuestionsCount = () => {
     return optionalQuestions.filter((question) => {
+      if (answers.some((a) => a.key === question.key)) return false;
+  
       const availableOptions = getAvailableOptions(question);
-      return (
-        availableOptions.length <= 1 ||
-        (availableOptions.length === 2 && availableOptions.some(o => o.label === "상관 없음"))
-      );
+      return availableOptions.length <= 1;
     }).length;
   };
+  
 
   const getAvailableOptions = (question: Question) => {
     if (!lookupTable) return [];
@@ -77,6 +77,8 @@ function QuestionPage() {
       const newAnswers = [...answers, { key: question.key, value: option.value }];
       return generateAnswerKey(newAnswers) in lookupTable;
     });
+
+    console.log(validOptions);
   
     // Remove "상관 없음" if the question has only two answers
     if (validOptions.length === 2) {
@@ -133,7 +135,7 @@ function QuestionPage() {
   };
   
   useEffect(() => {
-    if (!lookupTable) return;
+    if (!lookupTable || Object.keys(lookupTable).length === 0) return;
     
     const totalQuestions = requiredQuestions.length + optionalQuestions.length;
     const answeredAndHiddenCount = answers.length + getHiddenQuestionsCount();
@@ -159,23 +161,6 @@ function QuestionPage() {
     }
   }, [answers, lookupTable, navigate, requiredQuestions, optionalQuestions]);
   
-
-
-  useEffect(() => {
-    if (!lookupTable) return;
-    
-    if (answers.length > 0) {
-      const answerKey = generateAnswerKey(answers);
-      console.log("Current answers:", answerKey);
-
-      if (lookupTable[answerKey] === 1) {
-        console.log("Go to the result page.");
-        localStorage.setItem("answerKey", answerKey);
-        navigate("/result");
-      }
-    }
-  }, [answers, navigate]);
-
   return (
     <div className="mb-4 p-4 text-left h-auto min-h-screen flex flex-col items-center">
       <div className="mt-6 w-full max-w-lg">
@@ -211,7 +196,7 @@ function QuestionPage() {
                       className={`px-4 py-2 rounded-lg transition break-keep w-full max-w-2xl text-center
                         ${
                           isAnswered
-                            ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400" // 🔥 이미 답변한 질문은 회색 처리
+                            ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
                             : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 hover:dark:bg-gray-600 dark:text-gray-100"
                         }`}
                       onClick={() => handleSelectOptionalQuestion(q)}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tournament, Participant, DeckPhoto, GroupStage, Bracket
+from .models import Tournament, Participant, DeckPhoto, GroupStage, Bracket, BracketParticipant, BracketMatch
 
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
@@ -29,3 +29,16 @@ class BracketAdmin(admin.ModelAdmin):
     list_display = ("tournament", "round", "type")
     list_filter = ("type", "tournament")
     search_fields = ("tournament__name",)
+
+@admin.register(BracketParticipant)
+class BracketParticipantAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'bracket', 'wins', 'losses', 'draws', 'user')
+    list_filter = ('bracket',)
+    search_fields = ('name',)
+
+
+@admin.register(BracketMatch)
+class BracketMatchAdmin(admin.ModelAdmin):
+    list_display = ('id', 'bracket', 'round', 'player1', 'player2', 'result')
+    list_filter = ('bracket', 'round', 'result')
+    search_fields = ('player1__name', 'player2__name')

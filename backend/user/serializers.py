@@ -8,6 +8,18 @@ from django.contrib.auth.hashers import check_password
 User = get_user_model()
 
 class CustomRegisterSerializer(RegisterSerializer):
+    def validate(self, data):
+    # validate_password() 호출 막기 위해 validate 오버라이딩
+        return data
+    
+    def validate_password1(self, value):
+        # 기본에서는 여기서 validate_password(value)를 호출함
+        # 그걸 막고 그냥 그대로 반환하면 검사 통과
+        return value
+
+    def validate_password2(self, value):
+        return value
+
     def get_cleaned_data(self):
         data = super().get_cleaned_data()
         return data

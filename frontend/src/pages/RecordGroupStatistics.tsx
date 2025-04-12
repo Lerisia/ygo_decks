@@ -14,6 +14,7 @@ interface DeckWinRateStatsItem {
   count: number;
   ratio: number;
   total_games: number;
+  total_wins: number;
   win_rate: number;
   first_win_rate: number;
   second_win_rate: number;
@@ -24,6 +25,7 @@ interface DeckWinRateStatsItem {
 interface StatisticsData {
   basic: {
     total_games: number;
+    total_wins: number;
     overall_win_rate: number;
     first_ratio: number;
     coin_toss_win_rate: number;
@@ -82,20 +84,30 @@ const StatisticsPage = () => {
           <p className="text-xl font-bold">{stats.basic.overall_win_rate.toFixed(1)}%</p>
         </div>
         <div>
+          <p className="text-gray-500 text-sm">승리 수</p>
+          <p className="text-xl font-bold">{Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100)}</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">패배 수</p>
+          <p className="text-xl font-bold">{stats.basic.total_games - Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100)}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mb-8 text-center">
+        <div>
           <p className="text-gray-500 text-sm">코인토스 승률</p>
           <p className="text-xl font-bold">{stats.basic.coin_toss_win_rate.toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-gray-500 text-sm">선공 비율</p>
-          <p className="text-xl font-bold">{stats.basic.first_ratio.toFixed(1)}%</p>
-        </div>
-        <div>
-          <p className="text-gray-500 text-sm">코인 앞면 시 승률</p>
+          <p className="text-gray-500 text-sm">앞면 시 승률</p>
           <p className="text-xl font-bold">{stats.basic.coin_toss_win_win_rate.toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-gray-500 text-sm">코인 뒷면 시 승률</p>
+          <p className="text-gray-500 text-sm">뒷면 시 승률</p>
           <p className="text-xl font-bold">{stats.basic.coin_toss_lose_win_rate.toFixed(1)}%</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">선공 비율</p>
+          <p className="text-xl font-bold">{stats.basic.first_ratio.toFixed(1)}%</p>
         </div>
         <div>
           <p className="text-gray-500 text-sm">선공 시 승률</p>
@@ -226,8 +238,8 @@ const StatisticsPage = () => {
                 >
                 <image
                 href={entry.deck.cover_image_small || ""}
-                width="70%"
-                height="70%"
+                width="50%"
+                height="50%"
                 preserveAspectRatio="xMidYMid slice"
                 />
                 </pattern>

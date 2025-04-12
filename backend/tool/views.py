@@ -1,13 +1,15 @@
-from django.db.models import Count, Q, F
-from django.utils.timezone import now
+from django.db.models import Count, Q, F, FloatField, ExpressionWrapper
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import RecordGroup, MatchRecord
 from deck.models import Deck
 from django.core.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
+from datetime import timedelta
+from django.utils import timezone
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -44,9 +46,9 @@ def update_record_group_name(request, record_group_id):
 @permission_classes([IsAuthenticated])
 def get_user_record_groups(request):
     user = request.user
-    record_groups = RecordGroup.objects.filter(user=user).values(
+    record_groups = RecordGroup.objects.filter(user=user, is_deleted=False).values(
         "id", "name", "created_at"
-    )
+    ).order_by("-created_at")
 
     return Response(list(record_groups))
 
@@ -94,9 +96,37 @@ def delete_record_group(request, record_group_id):
     if not record_group:
         return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    record_group.delete()
+    record_group.is_deleted = True
+    record_group.save()
+    record_group.matches.update(is_deleted=True)
+
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_match_record(request, match_id):
+    user = request.user
+    match = MatchRecord.objects.filter(id=match_id, record_group__user=user, is_deleted=False).first()
+
+    if not match:
+        return Response({"error": "게임 기록을 찾을 수 없습니다."}, status=404)
+
+    updatable_fields = [
+        "deck", "opponent_deck", "first_or_second", "coin_toss_result",
+        "result", "rank", "score", "notes"
+    ]
+    
+    for field in updatable_fields:
+        if field in request.data:
+            setattr(match, field, request.data[field])
+
+    try:
+        match.full_clean()
+    except ValidationError as e:
+        return Response({"error": e.message_dict}, status=400)
+
+    match.save()
+    return Response({"message": "수정되었습니다."})
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
@@ -107,7 +137,9 @@ def delete_match_record(request, match_id):
     if not match:
         return Response({"error": "게임 기록을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    match.delete()
+    match.is_deleted = True
+    match.save()
+
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -120,7 +152,7 @@ def get_record_group_statistics(request, record_group_id):
     if not record_group:
         return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    matches = record_group.matches.all()
+    matches = record_group.matches.filter(is_deleted=False)
 
     total_games = matches.count()
     total_wins = matches.filter(result="win").count()
@@ -156,7 +188,7 @@ def get_record_group_statistics_full(request, record_group_id):
     if not record_group:
         return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    matches = record_group.matches.all()
+    matches = record_group.matches.filter(is_deleted=False)
 
     # ----------------------
     # 1) Basic statistics
@@ -355,7 +387,7 @@ def get_record_group_matches(request, record_group_id):
     page_size = int(request.GET.get("page_size", 10)) 
     deck_filter = request.GET.get("deck")
 
-    query = Q(record_group_id=record_group_id)
+    query = Q(record_group_id=record_group_id) & Q(is_deleted=False)
     
     if deck_filter:
         query &= Q(deck_id=deck_filter)
@@ -403,3 +435,53 @@ def get_record_group_matches(request, record_group_id):
     ]
 
     return Response({"matches": data, "total_pages": paginator.num_pages, "record_group_name": record_group.name})
+
+RANK_RANGE = [
+    "diamond5", "diamond4", "diamond3", "diamond2", "diamond1",
+    "master5", "master4", "master3", "master2"
+]
+
+@api_view(["GET"])
+def recent_meta_deck_stats(request):
+    one_week_ago = timezone.now() - timedelta(days=7)
+
+    qs = MatchRecord.objects.filter(
+        ~Q(opponent_deck__name=""),
+        opponent_deck__isnull=False,
+        opponent_deck__name__isnull=False,
+        created_at__gte=one_week_ago,
+        rank__in=RANK_RANGE,
+        is_deleted=False,
+    )
+
+    total_matches = qs.count()
+
+    qs = qs.annotate(
+        meta_deck_id=F("opponent_deck_id"),
+        meta_deck_name=F("opponent_deck__name")
+    )
+
+    deck_stats = qs.values(
+        "meta_deck_id", "meta_deck_name"
+    ).annotate(
+        count=Count("id"),
+        wins=Count("id", filter=Q(result="lose"))
+    )
+
+    results = []
+    for stat in deck_stats:
+        percent = stat["count"] / total_matches * 100 if total_matches > 0 else 0
+        win_rate = stat["wins"] / stat["count"] * 100 if stat["count"] > 0 else 0
+        results.append({
+            "meta_deck_id": stat["meta_deck_id"],
+            "meta_deck_name": stat["meta_deck_name"],
+            "appearance_percent": round(percent, 1),
+            "win_rate": round(win_rate, 1),
+        })
+
+    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
+
+    return Response({
+        "total_matches": total_matches,
+        "meta_decks": results
+    }, status=status.HTTP_200_OK)

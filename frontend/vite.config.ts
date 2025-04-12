@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"), // `@/`를 `src/`로 매핑
+      "@": path.resolve(__dirname, "src"),
     },
   },
   server: {
@@ -17,5 +17,17 @@ export default defineConfig({
       usePolling: true,
     },
   },
-  
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react")) return "react";
+            if (id.includes("lodash")) return "lodash";
+            if (id.includes("tailwindcss")) return "tailwind";
+          }
+        },
+      },
+    },
+  },
 });

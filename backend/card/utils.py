@@ -21,7 +21,6 @@ def fetch_ygo_cards():
         return
     
     cards = data["data"]
-    
     existing_cards = {card.card_id: card for card in Card.objects.all()}
     
     updated_count = 0
@@ -35,41 +34,60 @@ def fetch_ygo_cards():
         
         for idx, image in enumerate(card_images):
             new_id = base_card_id * 100 + idx
-            image_url = image["image_url_cropped"]
+            image_url = image["image_url"]
+            cropped_url = image["image_url_cropped"]
             
-            if new_id in existing_cards:
-                existing_card = existing_cards[new_id]
+            if str(new_id) in existing_cards:
+                existing_card = existing_cards[str(new_id)]
+
                 if existing_card.name != name:
                     existing_card.name = name
                     existing_card.save()
                     updated_count += 1
-                    
+
                 if not existing_card.card_image:
                     try:
-                        response = requests.get(image_url, stream=True)
-                        if response.status_code == 200:
+                        img_resp = requests.get(image_url, stream=True)
+                        if img_resp.status_code == 200:
                             file_name = f"{new_id}.jpg"
-                            existing_card.card_image.save(file_name, ContentFile(response.content), save=False)
+                            existing_card.card_image.save(file_name, ContentFile(img_resp.content), save=False)
                             existing_card.save()
                     except requests.RequestException as e:
-                        print(f"❌ Failed to download image for {name} (ID: {new_id}): {e}")
+                        print(f"❌ Failed to download full image for {name} (ID: {new_id}): {e}")
+
+                if not existing_card.card_illust:
+                    try:
+                        illust_resp = requests.get(cropped_url, stream=True)
+                        if illust_resp.status_code == 200:
+                            file_name = f"{new_id}_illust.jpg"
+                            existing_card.card_illust.save(file_name, ContentFile(illust_resp.content), save=False)
+                            existing_card.save()
+                    except requests.RequestException as e:
+                        print(f"❌ Failed to download cropped image for {name} (ID: {new_id}): {e}")
+
             else:
                 new_card = Card(card_id=new_id, konami_id=konami_id, name=name)
-                
+
                 try:
-                    response = requests.get(image_url, stream=True)
-                    if response.status_code == 200:
-                        file_name = f"{new_id}.jpg"
-                        new_card.card_image.save(file_name, ContentFile(response.content), save=False)
+                    cropped_resp = requests.get(cropped_url, stream=True)
+                    if cropped_resp.status_code == 200:
+                        file_name = f"{new_id}_illust.jpg"
+                        new_card.card_illust.save(file_name, ContentFile(cropped_resp.content), save=False)
                 except requests.RequestException as e:
-                    print(f"❌ Failed to download image for {name} (ID: {new_id}): {e}")
-                
+                    print(f"❌ Failed to download cropped image for {name} (ID: {new_id}): {e}")
+
+                try:
+                    image_resp = requests.get(image_url, stream=True)
+                    if image_resp.status_code == 200:
+                        file_name = f"{new_id}.jpg"
+                        new_card.card_image.save(file_name, ContentFile(image_resp.content), save=False)
+                except requests.RequestException as e:
+                    print(f"❌ Failed to download full image for {name} (ID: {new_id}): {e}")
+
                 new_card.save()
                 created_count += 1
-    
+
     print(f"{created_count} new cards added, {updated_count} cards updated in the database.")
-
-
 
 def fetch_korean_name(konami_id):
     url = f"https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid={konami_id}&request_locale=ko"
@@ -102,14 +120,17 @@ def fetch_korean_name(konami_id):
 
 def update_korean_names():
     cards = Card.objects.exclude(konami_id=0).exclude(konami_id=None)
-    
+
     updated_cards = []
     updated_count = 0
 
     for card in cards:
+        if card.korean_name:
+            continue
+
         korean_name = fetch_korean_name(card.konami_id)
 
-        if korean_name and card.korean_name != korean_name:
+        if korean_name:
             card.korean_name = korean_name
             updated_cards.append(card)
             updated_count += 1
