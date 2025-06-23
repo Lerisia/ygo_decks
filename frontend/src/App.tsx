@@ -26,8 +26,8 @@ import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import BracketPage from "./pages/BracketDetail";
-import DeckClassifier from "./pages/Classifier";
 import CardClassifier from "./pages/CardDetector";
+import DeckScanner from "./pages/DeckScanner";
 
 function App() {
   return (
@@ -57,7 +57,7 @@ function App() {
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />
           <Route path="/record-groups/:recordGroupId/statistics" element={<RecordGroupStatistics />} />
           <Route path="/bracket" element={<BracketPage />} />  
-          <Route path="/deck-detector" element={<DeckClassifier />} />    
+          <Route path="/deck-scanner" element={<DeckScanner />} />    
           <Route path="/card-detector" element={<CardClassifier />} />    
           <Route path="*" element={<NotFound />} />
       </Routes>

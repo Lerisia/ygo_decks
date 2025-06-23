@@ -21,7 +21,7 @@ function Navbar() {
           <Link to="/records" className="text-base break-keep">
             📝 전적 시트
           </Link>
-          <Link to="/deck-detector" className="text-base break-keep">
+          <Link to="/deck-scanner" className="text-base break-keep">
             🪄 AI 덱 추출
           </Link>
           {isLoggedIn ? (
@@ -50,8 +50,8 @@ function Navbar() {
             <Link to="/records" className="text-lg md:text-xl break-keep">
               📝 전적 시트
             </Link>
-            <Link to="/deck-detector" className="text-lg md:text-xl break-keep">
-              🪄 AI 덱 추출기
+            <Link to="/deck-scanner" className="text-lg md:text-xl break-keep">
+              🪄 AI 덱 스캐너
             </Link>
             {isLoggedIn ? (
               <Link to="/mypage" className="text-lg md:text-xl break-keep">

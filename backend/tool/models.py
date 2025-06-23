@@ -2,6 +2,7 @@ from django.db import models
 from user.models import User
 from deck.models import Deck
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 RANK_CHOICES = [
     ("rookie2", "루키 2"),
@@ -81,6 +82,14 @@ class MatchRecord(models.Model):
         null=True,
         help_text="플래티넘 1, 마스터 3 등"
     )
+    
+    wins = models.IntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(-3), MaxValueValidator(4)],
+        help_text="-3부터 4 사이의 승수만 입력 가능합니다. -4면 강등, +5면 승급입니다."
+    )
+    
     score = models.PositiveIntegerField(
         blank=True,
         null=True,
@@ -95,9 +104,16 @@ class MatchRecord(models.Model):
 
         has_rank = bool(self.rank)
         has_score = bool(self.score)
+        has_wins = bool(self.wins)
 
-        if has_rank and has_score:
-            raise ValidationError("랭크와 점수 중 하나만 입력하세요.")
+        if has_rank:
+            if has_score and has_wins:
+                raise ValidationError("랭크를 입력한 경우 승수 또는 점수만 입력할 수 있습니다. 둘 다 입력할 수 없습니다.")
+            elif has_score and not self.wins:
+                raise ValidationError("랭크가 입력된 경우 승수를 입력할 수 있습니다.")
+
+        if has_score and has_wins:
+            raise ValidationError("점수와 승수는 동시에 입력할 수 없습니다.")
 
     def __str__(self):
         return f"{self.record_group} - {self.deck} vs {self.opponent_deck} ({self.result})"

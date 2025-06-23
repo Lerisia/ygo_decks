@@ -43,7 +43,11 @@ def fetch_ygo_cards():
                 if existing_card.name != name:
                     existing_card.name = name
                     existing_card.save()
-                    updated_count += 1
+                    updated = True
+                    
+                if existing_card.konami_id != konami_id:
+                    existing_card.konami_id = konami_id
+                    updated = True
 
                 if not existing_card.card_image:
                     try:
@@ -64,6 +68,10 @@ def fetch_ygo_cards():
                             existing_card.save()
                     except requests.RequestException as e:
                         print(f"❌ Failed to download cropped image for {name} (ID: {new_id}): {e}")
+                        
+                if updated:
+                    existing_card.save()
+                    updated_count += 1
 
             else:
                 new_card = Card(card_id=new_id, konami_id=konami_id, name=name)

@@ -14,7 +14,7 @@ type ApiResponse = {
 
 const isLoggedIn = isAuthenticated();
 
-export default function DeckClassifier() {
+export default function DeckScanner() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [results, setResults] = useState<DetectionResult[]>([]);
   const [boxedImage, setBoxedImage] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export default function DeckClassifier() {
 
   return (
     <div className="min-h-screen p-4 max-w-4xl mx-auto flex flex-col items-center">
-      <h1 className="text-2xl font-bold mb-6">덱 리스트 추출기 (베타 테스트)</h1>
+      <h1 className="text-2xl font-bold mb-6">덱 스캐너 (베타 테스트)</h1>
       <div className="text-center">
         유희왕 마스터 듀얼 '덱 리스트' 사진을 올려주세요.
       </div>

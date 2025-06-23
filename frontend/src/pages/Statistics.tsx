@@ -25,7 +25,7 @@ function DeckStatisticsTable() {
   return (
     <div className="h-auto min-h-screen p-6 bg-white dark:bg-gray-900 rounded-lg shadow-md">
       <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-gray-800 dark:text-gray-100 mb-4">
-        자주 등장한 덱 순위 (2025.04)
+        자주 등장한 덱 순위 (2025.06)
       </h2>
       <p className="text-lg md:text-xl lg:text-2xl font-medium text-gray-600 dark:text-gray-400 mb-4">
         총 참여 횟수: <span className="text-blue-500 font-bold">{totalViews.toLocaleString()}</span> | 

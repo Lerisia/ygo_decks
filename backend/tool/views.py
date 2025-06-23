@@ -8,8 +8,9 @@ from .models import RecordGroup, MatchRecord
 from deck.models import Deck
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.utils import timezone
+from django.utils.timezone import make_aware
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -76,6 +77,7 @@ def add_match_to_record_group(request, record_group_id):
         notes=data.get("notes"),
         coin_toss_result=data.get("coin_toss_result"),
         rank=data.get("rank"),
+        wins=data.get("wins"),
         score=data.get("score"),
     )
     # Check it has only 1 field between rank and score
@@ -113,7 +115,7 @@ def update_match_record(request, match_id):
 
     updatable_fields = [
         "deck", "opponent_deck", "first_or_second", "coin_toss_result",
-        "result", "rank", "score", "notes"
+        "result", "rank", "wins", "score", "notes"
     ]
     
     for field in updatable_fields:
@@ -289,9 +291,10 @@ def get_record_group_statistics_full(request, record_group_id):
         opp_first = opp_matches.filter(first_or_second="first")
         opp_second = opp_matches.filter(first_or_second="second")
         opp_first_win = opp_first.filter(result="win").count()
+        opp_first_ratio = opp_first.count() / opp_total * 100 if opp_total > 0 else 0
+        opp_first_win_rate = (opp_first_win / opp_first.count() * 100) if opp_first.count() > 0 else None
         opp_second_win = opp_second.filter(result="win").count()
-        opp_first_win_rate = (opp_first_win / opp_first.count() * 100) if opp_first.count() > 0 else 0
-        opp_second_win_rate = (opp_second_win / opp_second.count() * 100) if opp_second.count() > 0 else 0
+        opp_second_win_rate = (opp_second_win / opp_second.count() * 100) if opp_second.count() > 0 else None
 
         opp_coin_toss_win = opp_matches.filter(coin_toss_result="win")
         opp_coin_toss_lose = opp_matches.filter(coin_toss_result="lose")
@@ -312,6 +315,7 @@ def get_record_group_statistics_full(request, record_group_id):
             "ratio": opp_ratio,
             "total_games": opp_total,
             "win_rate": opp_win_rate,
+            "first_ratio": opp_first_ratio,
             "first_win_rate": opp_first_win_rate,
             "second_win_rate": opp_second_win_rate,
             "coin_toss_win_win_rate": opp_coin_toss_win_rate,
@@ -428,6 +432,7 @@ def get_record_group_matches(request, record_group_id):
             "coin_toss_result": match.coin_toss_result,
             "result": match.result,
             "rank": match.rank,
+            "wins": match.wins,
             "score": match.score,
             "notes": match.notes,
         }
@@ -443,13 +448,15 @@ RANK_RANGE = [
 
 @api_view(["GET"])
 def recent_meta_deck_stats(request):
+    reset_time = make_aware(datetime(2025, 6, 4, 15, 0, 0))
     one_week_ago = timezone.now() - timedelta(days=7)
+    time_threshold = max(reset_time, one_week_ago)  # 둘 중 더 최근 시각
 
     qs = MatchRecord.objects.filter(
         ~Q(opponent_deck__name=""),
         opponent_deck__isnull=False,
         opponent_deck__name__isnull=False,
-        created_at__gte=one_week_ago,
+        created_at__gte=time_threshold,
         rank__in=RANK_RANGE,
         is_deleted=False,
     )
@@ -485,3 +492,4 @@ def recent_meta_deck_stats(request):
         "total_matches": total_matches,
         "meta_decks": results
     }, status=status.HTTP_200_OK)
+

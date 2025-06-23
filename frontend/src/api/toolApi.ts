@@ -65,6 +65,7 @@ export const updateMatchRecord = async (
     coin_toss_result?: "win" | "lose";
     result?: "win" | "lose";
     rank?: string | null;
+    wins?: number | null;
     score?: number | null;
     notes?: string;
   }
@@ -112,6 +113,7 @@ type NewMatchPayload = {
   notes?: string;
   coin_toss_result?: "win" | "lose";
   rank?: string;
+  wins?: number | null;
   score?: number;
 };
 

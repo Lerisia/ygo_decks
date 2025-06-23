@@ -232,16 +232,16 @@ const RecordGroups = () => {
               <p className="text-xs text-gray-700">
                 ※ 지난 일주일간 다이아 ~ 마스터 구간의 전적 기반
               </p>
+              <p className="text-xs text-gray-700">
+                ※ 셀렉션 팩 출시 시 초기화
+              </p>
               <p className="text-xs text-gray-700 mb-3 font-medium">
                 총 집계 게임 수: {totalMatches.toLocaleString()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 왼쪽 빈 칼럼 (모바일에선 안 보임) */}
                 <div className="hidden md:block">
                   <MetaDeckPieChart data={metaStats} deckCovers={deckCovers} />
                 </div>
-
-                {/* 오른쪽에 있는 메타 통계 표 */}
                 <div className="space-y-2">
                   {metaStats.map((deck, idx) => (
                     <div

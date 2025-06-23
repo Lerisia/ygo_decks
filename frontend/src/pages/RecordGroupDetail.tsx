@@ -39,6 +39,7 @@ type MatchRecord = {
   coin_toss_result: "win" | "lose";
   result: "win" | "lose";
   rank: string | null;
+  wins: number | null;
   score: number | null;
   notes: string;
 };
@@ -47,6 +48,29 @@ type OptionType = {
   value: string;
   label: string;
   aliases?: string[];
+};
+
+export const getValidWinOptions = (rank: string): { value: number; label: string }[] => {
+  if (!rank) return [];
+
+  const onlyZero = [{ value: 0, label: "0승" }];
+  const zeroAndOne = [{ value: 0, label: "0승" }, { value: 1, label: "1승" },];
+  const zeroToThree = Array.from({ length: 4 }, (_, i) => ({ value: i, label: `${i}승` }));
+  const minusThreeToThree = Array.from({ length: 7 }, (_, i) => ({ value: i - 3, label: `${i - 3}승 ` }));
+  const minusTwoToThree = Array.from({ length: 6 }, (_, i) => ({ value: i - 2, label: `${i - 2}승` }));
+  const zeroToFour = Array.from({ length: 5 }, (_, i) => ({ value: i, label: `${i}승` }));
+  const minusTwoToFour = Array.from({ length: 7 }, (_, i) => ({ value: i - 2, label: `${i - 2}승` }));
+
+  if (rank.startsWith("rookie") || rank.startsWith("bronze")) return onlyZero;
+  if (rank.startsWith("silver")) return zeroAndOne;
+  if (rank.startsWith("gold") || rank === "platinum5" || rank === "diamond5") return zeroToThree;
+  if (rank.startsWith("platinum") && rank !== "platinum5") return minusThreeToThree;
+  if (rank.startsWith("diamond") && rank !== "diamond5") return minusTwoToThree;
+  if (rank === "master5") return zeroToFour;
+  if (["master4", "master3", "master2"].includes(rank)) return minusTwoToFour;
+  if (rank === "master1") return [];
+
+  return [];
 };
 
 export const EditMatchModal = ({
@@ -67,6 +91,7 @@ export const EditMatchModal = ({
     first_or_second: match.first_or_second,
     result: match.result,
     rank: match.rank || "",
+    wins: match.wins || null,
     score: match.score?.toString() || "",
     notes: match.notes || "",
   });
@@ -109,8 +134,8 @@ export const EditMatchModal = ({
             onChange={handleChange}
             className="w-full border rounded p-2 bg-white text-black"
           >
-            <option value="win">코인토스 승리</option>
-            <option value="lose">코인토스 패배</option>
+            <option value="win">앞면</option>
+            <option value="lose">뒷면</option>
           </select>
         </div>
 
@@ -157,20 +182,44 @@ export const EditMatchModal = ({
         </div>
 
         {useRankOrScore === "rank" && (
-          <div>
-            <label className="block text-sm font-medium">랭크</label>
-            <select
-              name="rank"
-              value={form.rank}
-              onChange={handleChange}
-              className="w-full border rounded p-2 bg-white text-black"
-            >
-              <option value="">선택</option>
-              {rankOptions.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium">랭크</label>
+              <select
+                name="rank"
+                value={form.rank}
+                onChange={handleChange}
+                className="w-full border rounded p-2 bg-white text-black"
+              >
+                <option value="">선택</option>
+                {rankOptions.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium">승수</label>
+              <select
+                name="wins"
+                value={form.wins ?? ""}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    wins: e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                className="w-full border rounded p-2 bg-white text-black"
+              >
+                <option value="">입력 안 함</option>
+                {getValidWinOptions(form.rank).map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         {useRankOrScore === "score" && (
@@ -220,13 +269,25 @@ const RecordGroupDetailPage = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
-  const [newMatch, setNewMatch] = useState({
+  interface MatchForm {
+    deck: string;
+    opponent_deck: string;
+    first_or_second: string;
+    coin_toss_result: string;
+    result: string;
+    rank: string;
+    wins: number | null;
+    score: string;
+    notes: string;
+  }
+  const [newMatch, setNewMatch] = useState<MatchForm>({
     deck: "",
     opponent_deck: "",
     first_or_second: "first",
     coin_toss_result: "win",
     result: "win",
     rank: "",
+    wins: null,
     score: "",
     notes: "",
   });
@@ -235,6 +296,7 @@ const RecordGroupDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [useRankOrScore, setUseRankOrScore] = useState("none");
   const [editingMatch, setEditingMatch] = useState<any | null>(null);
+  const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
 
   const RANK_OPTIONS = [
     { value: "rookie2", label: "루키 2" },
@@ -355,6 +417,32 @@ const RecordGroupDetailPage = () => {
     }
   };
 
+  const getRecentOpponentDeckOptions = (): OptionType[] => {
+    const seen = new Set<number>();
+    const recent: OptionType[] = [];
+  
+    for (const match of matches) {
+      const opp = match.opponent_deck;
+      if (opp && !seen.has(opp.id)) {
+        seen.add(opp.id);
+        const full = decks.find((d) => d.id === opp.id);
+        recent.push({
+          value: String(opp.id),
+          label: opp.name,
+          aliases: full?.aliases || [],
+        });
+      }
+      if (recent.length >= 5) break;
+    }
+  
+    return recent;
+  };
+
+  const recentOptions = getRecentOpponentDeckOptions();
+  const recentIds = new Set(recentOptions.map((o) => o.value));
+  const otherOptions = allOptions.filter((opt) => !recentIds.has(opt.value));
+  const prioritizedOptions = [...recentOptions, ...otherOptions];
+
   const handleDelete = async (matchId: number) => {
     try {
       await deleteMatchRecord(matchId);
@@ -379,6 +467,88 @@ const RecordGroupDetailPage = () => {
       return '';
     }).join('');
   };
+
+  const getValidWinOptions = (rank: string): { value: number; label: string }[] => {
+    if (!rank) return [];
+    const onlyZero = [{ value: 0, label: "0승 " }];
+    const zeroAndOne = [{ value: 0, label: "0승 " }, { value: 1, label: "1승 " },];
+    const zeroToThree = Array.from({ length: 4 }, (_, i) => ({ value: i, label: `${i}승 ` }));
+    const minusThreeToThree = Array.from({ length: 7 }, (_, i) => ({ value: i - 3, label: `${i - 3}승  ` }));
+    const minusTwoToThree = Array.from({ length: 6 }, (_, i) => ({ value: i - 2, label: `${i - 2}승 ` }));
+    const zeroToFour = Array.from({ length: 5 }, (_, i) => ({ value: i, label: `${i}승 ` }));
+    const minusTwoToFour = Array.from({ length: 7 }, (_, i) => ({ value: i - 2, label: `${i - 2}승 ` }));
+    if (rank.startsWith("rookie") || rank.startsWith("bronze")) return onlyZero;
+    if (rank.startsWith("silver")) return zeroAndOne;
+    if (rank.startsWith("gold") || rank === "platinum5" || rank === "diamond5") return zeroToThree;
+    if (rank.startsWith("platinum") && rank !== "platinum5") return minusThreeToThree;
+    if (rank.startsWith("diamond") && rank !== "diamond5") return minusTwoToThree;
+    if (rank === "master5") return zeroToFour;
+    if (["master4", "master3", "master2"].includes(rank)) return minusTwoToFour;
+    if (rank === "master1") return [];
+    return [];
+  };
+
+  const getUpperRank = (currentRank: string): string => {
+    const index = RANK_OPTIONS.findIndex((r) => r.value === currentRank);
+    if (index < 0 || index === RANK_OPTIONS.length - 1) return currentRank;
+    return RANK_OPTIONS[index + 1].value;
+  };
+  
+  const getLowerRank = (currentRank: string): string => {
+    const index = RANK_OPTIONS.findIndex((r) => r.value === currentRank);
+    if (index <= 0) return currentRank;
+    return RANK_OPTIONS[index - 1].value;
+  };
+
+  const getNextRankAndWins = (
+    rank: string,
+    currentWins: number | null,
+    result: "win" | "lose"
+  ): { nextRank: string; nextWins: number | null } => {
+    if (rank === "master1") return { nextRank: rank, nextWins: null };
+  
+    if (rank === "rookie2" || rank === "rookie1") {
+      const next = getUpperRank(rank);
+      return { nextRank: next, nextWins: 0 };
+    }
+  
+    const options = getValidWinOptions(rank).map((o) => o.value);
+    const max = Math.max(...options);
+    const min = Math.min(...options);
+
+    if (currentWins === null) {
+      return { nextRank: rank, nextWins: null };
+    }
+  
+    let newWins = result === "win" ? currentWins + 1 : currentWins - 1;
+  
+    if (currentWins < 0 && result === "win") {
+      newWins = 1;
+    }
+ 
+    if (
+      result === "lose" &&
+      (
+        (currentWins === -2 && !options.includes(-3)) ||
+        currentWins === -3
+      )
+    ) {
+      const next = getLowerRank(rank);
+      return { nextRank: next, nextWins: 0 };
+    } 
+  
+    if (newWins > max) {
+      const next = getUpperRank(rank);
+      return { nextRank: next, nextWins: 0 };
+    }
+  
+    if (newWins < min) {
+      newWins = min;
+    }
+  
+    return { nextRank: rank, nextWins: newWins };
+  };
+  
   
  useEffect(() => {
   if (matches.length > 0 && owned_decks.length > 0) {
@@ -394,9 +564,15 @@ const RecordGroupDetailPage = () => {
 
     if (lastMatch.rank) {
       setUseRankOrScore("rank");
+      const { nextRank, nextWins } = getNextRankAndWins(
+        lastMatch.rank,
+        lastMatch.wins ?? null,
+        lastMatch.result === "win" ? "win" : "lose"
+      );
       setNewMatch((prev) => ({
         ...prev,
-        rank: lastMatch.rank ?? "",
+        rank: nextRank,
+        wins: nextWins,
         score: "",
       }));
     } else if (lastMatch.score) {
@@ -428,11 +604,12 @@ const RecordGroupDetailPage = () => {
         result: newMatch.result as "win" | "lose",
         score: Number(newMatch.score),
         rank: newMatch.rank,
+        wins: newMatch.wins,
         notes: newMatch.notes
       });
       await loadMatches();
       setNewMatch({ deck: "", opponent_deck: "", first_or_second: "first",
-                    coin_toss_result: "win", result: "win", score: "", rank:"", notes: "" });
+                    coin_toss_result: "win", result: "win", rank: "", wins: null, score: "", notes: "" });
     } catch (error) {
       console.error("기록 추가 실패:", error);
     }
@@ -450,9 +627,73 @@ const RecordGroupDetailPage = () => {
     }));
   };
 
+  useEffect(() => {
+    const options = getValidWinOptions(newMatch.rank);
+    setWinOptions(options);
+  }, [newMatch.rank]);
+  
+  useEffect(() => {
+    if (
+      useRankOrScore === "rank" &&
+      newMatch.rank &&
+      newMatch.wins != null &&
+      winOptions.length > 0
+    ) {
+      const valid = winOptions.find((opt) => opt.value === newMatch.wins);
+      if (!valid) {
+        setNewMatch((prev) => ({ ...prev, wins: null }));
+      }
+    }
+  }, [winOptions, newMatch.wins, newMatch.rank, useRankOrScore]);
+
+  const getMobileRankOrScoreDisplay = (
+    rank: string | null,
+    wins: number | null,
+    score: number | null
+  ): string | null => {
+    if (rank) {
+      const match = rank.match(/^([a-z]+)(\d)$/);
+      if (!match) return rank;
+  
+      const tierMap: Record<string, string> = {
+        rookie: "루", bronze: "브", silver: "실",
+        gold: "골", platinum: "플", diamond: "다", master: "마",
+      };
+  
+      const tier = tierMap[match[1]];
+      const level = match[2];
+  
+      const short = tier ? `${tier}${level}` : rank;
+      return wins !== null ? `${short}·${wins}` : short;
+    }
+  
+    if (score !== null) {
+      return `${score}`;
+    }
+  
+    return null;
+  };
+  
+  const getRankOrScoreDisplay = (
+    rank: string | null,
+    wins: number | null,
+    score: number | null
+  ): string | null => {
+    if (rank) {
+      const label = RANK_OPTIONS.find((r) => r.value === rank)?.label || rank;
+      return wins !== null ? `${label} / ${wins}승` : label;
+    }
+  
+    if (score !== null) {
+      return `${score}점`;
+    }
+  
+    return null;
+  };
+
   const coinOptions = [
-    { value: "win", label: "코인토스 승리" },
-    { value: "lose", label: "코인토스 패배" },
+    { value: "win", label: "앞면" },
+    { value: "lose", label: "뒷면" },
   ];
   
   const firstSecondOptions = [
@@ -506,6 +747,9 @@ const RecordGroupDetailPage = () => {
           의 오픈채팅방으로 문의주세요.
         </p>
       </div>
+      <div className="text-red-600 mb-4 text-center">
+        승수 옵션이 새로 추가되어 아직 테스트 중입니다. 버그 제보 주세요!
+      </div>
 
       <div className="p-4 border rounded-lg shadow bg-white mb-6 max-w-2xl w-full mx-auto">
         <h2 className="text-lg font-semibold mb-2">기록 등록</h2>
@@ -526,79 +770,106 @@ const RecordGroupDetailPage = () => {
             menuPortalTarget={typeof window !== "undefined" ? document.body : null}
           />
           <Select<OptionType>
-            options={allOptions}
-            value={allOptions.find((option) => option.value === newMatch.opponent_deck) || null}
+            options={prioritizedOptions}
+            value={prioritizedOptions.find((option) => option.value === newMatch.opponent_deck) || null}
             onChange={handleOpponentDeckChange}
             isDisabled={isLoading}
             placeholder="상대 덱 선택 (초성 검색 가능)"
             isClearable
             styles={customSelectStyles}
             filterOption={(option, input) => {
-  	      const lowered = input.toLowerCase();
-  	      const label = option.label.toLowerCase();
-  	      const isAllInitials = /^[ㄱ-ㅎ]+$/.test(lowered); // 전부 초성인지 확인
-  	      const labelInitials = getInitials(label);
-	
-  	      const labelMatch = label.includes(lowered);
+              const lowered = input.toLowerCase();
+              const label = option.label.toLowerCase();
+              const isAllInitials = /^[ㄱ-ㅎ]+$/.test(lowered);
+              const labelInitials = getInitials(label);
+
+              const labelMatch = label.includes(lowered);
               const aliasMatch = Array.isArray(option.data.aliases)
-               ? option.data.aliases.some((alias) => alias.toLowerCase().includes(lowered))
-               : false;
-	
-  	      if (isAllInitials) {
-   	      const initialsMatch = labelInitials.startsWith(lowered) ||
-      	      (Array.isArray(option.data.aliases) &&
-	        option.data.aliases.some((alias) => getInitials(alias.toLowerCase()).startsWith(lowered)));
- 	      return initialsMatch;
- 	     }
+                ? option.data.aliases.some((alias) =>
+                    alias.toLowerCase().includes(lowered)
+                  )
+                : false;
 
- 	   return labelMatch || aliasMatch;
-	  }}
+              if (isAllInitials) {
+                const initialsMatch =
+                  labelInitials.startsWith(lowered) ||
+                  (Array.isArray(option.data.aliases) &&
+                    option.data.aliases.some((alias) =>
+                      getInitials(alias.toLowerCase()).startsWith(lowered)
+                    ));
+                return initialsMatch;
+              }
 
-	  />
-          <Select
-            options={coinOptions}
-            value={coinOptions.find((opt) => opt.value === newMatch.coin_toss_result)}
-            onChange={(selected) => {
-              const value = selected?.value || "win";
-              setNewMatch((prev) => ({
-                ...prev,
-                coin_toss_result: value,
-                first_or_second: value === "lose" ? "second" : value === "win" ? "first" : prev.first_or_second,
-              }));
+              return labelMatch || aliasMatch;
             }}
-            placeholder="코인토스 결과"
-            styles={customSelectStyles}
-            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
           />
-          <Select
-            options={firstSecondOptions}
-            value={firstSecondOptions.find((opt) => opt.value === newMatch.first_or_second)}
-            onChange={(selected) =>
-              setNewMatch((prev) => ({
-                ...prev,
-                first_or_second: selected?.value || "first",
-              }))
-            }
-            placeholder="선공/후공"
-            styles={customSelectStyles}
-            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
-          />
-          <Select
-            options={resultOptions}
-            value={resultOptions.find((opt) => opt.value === newMatch.result)}
-            onChange={(selected) =>
-              setNewMatch((prev) => ({
-                ...prev,
-                result: selected?.value || "win",
-              }))
-            }
-            placeholder="결과 선택"
-            styles={customSelectStyles}
-            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-1 text-left">코인토스</label>
+            <div className="flex gap-2">
+              {coinOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() =>
+                    setNewMatch((prev) => ({
+                      ...prev,
+                      coin_toss_result: opt.value,
+                      first_or_second: opt.value === "win" ? "first" : "second",
+                    }))
+                  }
+                  className={`px-3 py-1 rounded border ${
+                    newMatch.coin_toss_result === opt.value
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-black"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-left">선공/후공</label>
+            <div className="flex gap-2">
+              {firstSecondOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() =>
+                    setNewMatch((prev) => ({ ...prev, first_or_second: opt.value }))
+                  }
+                  className={`px-3 py-1 rounded border ${
+                    newMatch.first_or_second === opt.value
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-black"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-left">결과</label>
+            <div className="flex gap-2">
+              {resultOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() =>
+                    setNewMatch((prev) => ({ ...prev, result: opt.value }))
+                  }
+                  className={`px-3 py-1 rounded border ${
+                    newMatch.result === opt.value
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-black"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col gap-2">
             <div>
-              <label className="block text-sm font-medium">랭크/점수 입력 방식</label>
+              <label className="block text-sm font-medium text-left">랭크/점수 입력 방식</label>
               <Select
                 options={rankTypeOptions}
                 value={rankTypeOptions.find((opt) => opt.value === useRankOrScore)}
@@ -613,10 +884,11 @@ const RecordGroupDetailPage = () => {
             </div>
 
             {useRankOrScore === "rank" && (
+            <>
               <div>
-                <label className="block text-sm font-medium">랭크</label>
+                <label className="block text-sm font-medium text-left">랭크</label>
                 <Select
-                  options={rankOptions}
+                  options={rankOptions.slice().reverse()} // 역순으로 표시
                   value={rankOptions.find((r) => r.value === newMatch.rank)}
                   onChange={(selected) =>
                     setNewMatch((prev) => ({
@@ -629,11 +901,38 @@ const RecordGroupDetailPage = () => {
                   menuPortalTarget={typeof window !== "undefined" ? document.body : null}
                 />
               </div>
-            )}
-
+              <div>
+                <label className="block text-sm font-medium text-left">승점</label>
+                <Select
+                  options={[
+                    { value: null, label: "선택 안 함" },
+                    ...winOptions,
+                  ]}
+                  value={
+                    winOptions.find((opt) => opt.value === newMatch.wins) ??
+                    (newMatch.wins === null ? { value: null, label: "선택 안 함" } : null)
+                  }
+                  onChange={(selected) =>
+                    setNewMatch((prev) => ({
+                      ...prev,
+                      wins: selected?.value ?? null,
+                    }))
+                  }
+                  isClearable
+                  styles={customSelectStyles}
+                  placeholder={
+                    winOptions.length > 0
+                      ? "선택 항목입니다"
+                      : "해당 랭크는 승수를 입력하지 않습니다"
+                  }
+                  isDisabled={winOptions.length === 0}
+                />
+              </div>
+              </>
+             )}
             {useRankOrScore === "score" && (
               <div>
-                <label className="block text-sm font-medium">점수</label>
+                <label className="block text-sm font-medium text-left">점수</label>
                 <input
                   type="number"
                   className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white w-full"
@@ -647,7 +946,7 @@ const RecordGroupDetailPage = () => {
             )}
 
             <div>
-              <label className="block text-sm font-medium">메모</label>
+              <label className="block text-sm font-medium text-left">메모</label>
               <textarea
                 value={newMatch.notes}
                 onChange={(e) => setNewMatch((prev) => ({ ...prev, notes: e.target.value }))}
@@ -682,14 +981,6 @@ const RecordGroupDetailPage = () => {
             coinImg = "/images/coin_front.png";
           } else if (match.coin_toss_result === "lose") {
             coinImg = "/images/coin_back.png";
-          }
-          
-          let rankOrScore = null;
-          if (match.rank) {
-            const rankLabel = RANK_OPTIONS.find((r) => r.value === match.rank)?.label || match.rank;
-            rankOrScore = `${rankLabel}`;
-          } else if (match.score) {
-            rankOrScore = `${match.score}점`;
           }
 
           return (
@@ -726,7 +1017,12 @@ const RecordGroupDetailPage = () => {
                   <p className="text-xs sm:text-sm">
                     {match.first_or_second === "first" ? "선공" : "후공"}
                   </p>
-                  {rankOrScore && <p className="text-xs sm:text-sm">{rankOrScore}</p>}
+                  <span className="hidden sm:inline text-sm">
+                    {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
+                  </span>
+                  <span className="inline sm:hidden text-sm">
+                    {getMobileRankOrScoreDisplay(match.rank, match.wins, match.score)}
+                  </span>
                 </div>
 
                 <div className="w-16 sm:w-32 flex flex-col items-center">
