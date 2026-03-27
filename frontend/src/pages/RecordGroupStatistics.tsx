@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { getRecordGroupStatisticsFull } from "@/api/toolApi";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { getRecordGroupStatisticsFull, getRecordGroupRankHistory } from "@/api/toolApi";
 
 interface DeckInfo {
   id: number;
@@ -40,6 +40,40 @@ interface StatisticsData {
   opponent_deck_stats: DeckWinRateStatsItem[];
 }
 
+interface RankHistoryItem {
+  index: number;
+  rank: string | null;
+  wins: number | null;
+  score: number | null;
+  result: string;
+}
+
+const RANK_ORDER = [
+  "rookie2", "rookie1",
+  "bronze5", "bronze4", "bronze3", "bronze2", "bronze1",
+  "silver5", "silver4", "silver3", "silver2", "silver1",
+  "gold5", "gold4", "gold3", "gold2", "gold1",
+  "platinum5", "platinum4", "platinum3", "platinum2", "platinum1",
+  "diamond5", "diamond4", "diamond3", "diamond2", "diamond1",
+  "master5", "master4", "master3", "master2", "master1",
+];
+
+const RANK_LABELS: Record<string, string> = {
+  rookie2: "루키 2", rookie1: "루키 1",
+  bronze5: "브론즈 5", bronze4: "브론즈 4", bronze3: "브론즈 3", bronze2: "브론즈 2", bronze1: "브론즈 1",
+  silver5: "실버 5", silver4: "실버 4", silver3: "실버 3", silver2: "실버 2", silver1: "실버 1",
+  gold5: "골드 5", gold4: "골드 4", gold3: "골드 3", gold2: "골드 2", gold1: "골드 1",
+  platinum5: "플래 5", platinum4: "플래 4", platinum3: "플래 3", platinum2: "플래 2", platinum1: "플래 1",
+  diamond5: "다이아 5", diamond4: "다이아 4", diamond3: "다이아 3", diamond2: "다이아 2", diamond1: "다이아 1",
+  master5: "마스터 5", master4: "마스터 4", master3: "마스터 3", master2: "마스터 2", master1: "마스터 1",
+};
+
+const rankToNumeric = (rank: string, wins: number | null): number => {
+  const idx = RANK_ORDER.indexOf(rank);
+  if (idx === -1) return 0;
+  return idx + (wins ?? 0) / 8;
+};
+
 const isUnknownDeck = (entry: { deck: DeckInfo | null }) =>
   !entry.deck || !entry.deck.name?.trim();
 
@@ -70,18 +104,24 @@ const StatisticsPage = () => {
   const { recordGroupId } = useParams();
   const navigate = useNavigate();
   const [stats, setStats] = useState<StatisticsData | null>(null);
-  const [activeTab, setActiveTab] = useState<"basic" | "deck">("basic");
+  const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"basic" | "deck" | "rankChange">("basic");
+  const [rankSubTab, setRankSubTab] = useState<"rank" | "score">("rank");
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const res = await getRecordGroupStatisticsFull(Number(recordGroupId));
-        setStats(res);
+        const [statsRes, rankRes] = await Promise.all([
+          getRecordGroupStatisticsFull(Number(recordGroupId)),
+          getRecordGroupRankHistory(Number(recordGroupId)),
+        ]);
+        setStats(statsRes);
+        setRankHistory(rankRes.matches || []);
       } catch (err) {
         console.error("통계 데이터를 불러오지 못했습니다", err);
       }
     };
-    fetchStats();
+    fetchData();
   }, [recordGroupId]);
 
   if (!stats) return <div className="p-6">로딩 중...</div>;
@@ -98,6 +138,43 @@ const StatisticsPage = () => {
       return b.count - a.count;
     });
 
+  const rankData = rankHistory
+    .filter((m) => m.rank)
+    .map((m) => ({
+      index: m.index,
+      value: rankToNumeric(m.rank!, m.wins),
+      result: m.result,
+      label: `${RANK_LABELS[m.rank!] || m.rank}${m.wins != null ? ` / ${m.wins}승` : ""}`,
+    }));
+
+  const scoreData = rankHistory
+    .filter((m) => m.score != null)
+    .map((m) => ({
+      index: m.index,
+      value: m.score!,
+      result: m.result,
+      label: `${m.score}점`,
+    }));
+
+  // Y축에 표시할 랭크 틱 계산
+  const rankTicks = (() => {
+    if (rankData.length === 0) return [];
+    const values = rankData.map((d) => d.value);
+    const minVal = Math.floor(Math.min(...values));
+    const maxVal = Math.ceil(Math.max(...values));
+    const ticks: number[] = [];
+    for (let i = Math.max(0, minVal - 1); i <= Math.min(RANK_ORDER.length - 1, maxVal + 1); i++) {
+      ticks.push(i);
+    }
+    return ticks;
+  })();
+
+  const tabClass = (tab: string) =>
+    `px-4 py-2 font-semibold ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
+
+  const subTabClass = (tab: string) =>
+    `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
+
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto">
       <button
@@ -108,22 +185,9 @@ const StatisticsPage = () => {
       </button>
 
       <div className="flex justify-center gap-4 mb-6 border-b dark:border-gray-700 pb-2">
-        <button
-          onClick={() => setActiveTab("basic")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "basic" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"
-          }`}
-        >
-          요약
-        </button>
-        <button
-          onClick={() => setActiveTab("deck")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "deck" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"
-          }`}
-        >
-          덱별 통계
-        </button>
+        <button onClick={() => setActiveTab("basic")} className={tabClass("basic")}>요약</button>
+        <button onClick={() => setActiveTab("deck")} className={tabClass("deck")}>덱별 통계</button>
+        <button onClick={() => setActiveTab("rankChange")} className={tabClass("rankChange")}>랭크 변화</button>
       </div>
 
       {activeTab === "basic" && (
@@ -336,6 +400,115 @@ const StatisticsPage = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {activeTab === "rankChange" && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button onClick={() => setRankSubTab("rank")} className={subTabClass("rank")}>랭크</button>
+            <button onClick={() => setRankSubTab("score")} className={subTabClass("score")}>점수</button>
+          </div>
+
+          {rankSubTab === "rank" && (
+            rankData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={rankData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="index"
+                    tick={{ fontSize: 12 }}
+                    label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
+                  />
+                  <YAxis
+                    domain={[Math.max(0, Math.floor(Math.min(...rankData.map(d => d.value))) - 1), Math.min(RANK_ORDER.length - 1, Math.ceil(Math.max(...rankData.map(d => d.value))) + 1)]}
+                    ticks={rankTicks}
+                    tickFormatter={(v: number) => RANK_LABELS[RANK_ORDER[v]] || ""}
+                    tick={{ fontSize: 11 }}
+                    width={70}
+                  />
+                  <Tooltip
+                    formatter={(_: number, __: string, props: any) => [props.payload.label, "랭크"]}
+                    labelFormatter={(v: number) => `${v}번째 게임`}
+                    contentStyle={{ fontSize: "0.875rem" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      return (
+                        <circle
+                          key={payload.index}
+                          cx={cx}
+                          cy={cy}
+                          r={4}
+                          fill={payload.result === "win" ? "#3b82f6" : "#ef4444"}
+                          stroke="white"
+                          strokeWidth={1.5}
+                        />
+                      );
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-16">
+                랭크 데이터가 없습니다.
+              </div>
+            )
+          )}
+
+          {rankSubTab === "score" && (
+            scoreData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={scoreData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="index"
+                    tick={{ fontSize: 12 }}
+                    label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
+                  />
+                  <YAxis
+                    domain={["dataMin - 50", "dataMax + 50"]}
+                    tick={{ fontSize: 12 }}
+                    width={50}
+                  />
+                  <Tooltip
+                    formatter={(_: number, __: string, props: any) => [props.payload.label, "점수"]}
+                    labelFormatter={(v: number) => `${v}번째 게임`}
+                    contentStyle={{ fontSize: "0.875rem" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      return (
+                        <circle
+                          key={payload.index}
+                          cx={cx}
+                          cy={cy}
+                          r={4}
+                          fill={payload.result === "win" ? "#8b5cf6" : "#ef4444"}
+                          stroke="white"
+                          strokeWidth={1.5}
+                        />
+                      );
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-16">
+                점수 데이터가 없습니다.
+              </div>
+            )
+          )}
         </div>
       )}
     </div>

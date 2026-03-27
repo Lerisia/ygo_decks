@@ -61,6 +61,7 @@ export const updateMatchRecord = async (
   data: {
     deck?: number;
     opponent_deck?: number | null;
+    opponent_deck_name?: string | null;
     first_or_second?: "first" | "second";
     coin_toss_result?: "win" | "lose";
     result?: "win" | "lose";
@@ -108,6 +109,7 @@ export const deleteRecordGroup = async (recordGroupId: number) => {
 type NewMatchPayload = {
   deck: number;
   opponent_deck: number | null;
+  opponent_deck_name?: string | null;
   first_or_second: "first" | "second";
   result: "win" | "lose";
   notes?: string;
@@ -212,6 +214,18 @@ export type MetaDeckStatsResponse = {
 export const getMetaDeckStats = async () => {
   const response = await fetch(`${API_BASE_URL}/recent-meta-deck-stats/`, {
     method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`API 요청 실패: ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+export const getRecordGroupRankHistory = async (recordGroupId: number) => {
+  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
   });
 
   if (!response.ok) {

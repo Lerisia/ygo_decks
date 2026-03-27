@@ -71,7 +71,8 @@ def add_match_to_record_group(request, record_group_id):
     match = MatchRecord(
         record_group=record_group,
         deck_id=data.get("deck"),
-        opponent_deck_id=data.get("opponent_deck"),
+        opponent_deck_id=opponent_deck,
+        opponent_deck_name=data.get("opponent_deck_name") or None,
         first_or_second=data.get("first_or_second"),
         result=data.get("result"),
         notes=data.get("notes"),
@@ -114,8 +115,8 @@ def update_match_record(request, match_id):
         return Response({"error": "게임 기록을 찾을 수 없습니다."}, status=404)
 
     updatable_fields = [
-        "deck", "opponent_deck", "first_or_second", "coin_toss_result",
-        "result", "rank", "wins", "score", "notes"
+        "deck", "opponent_deck", "opponent_deck_name", "first_or_second",
+        "coin_toss_result", "result", "rank", "wins", "score", "notes"
     ]
     
     fk_fields = {"deck", "opponent_deck"}
@@ -319,6 +320,7 @@ def get_record_group_statistics_full(request, record_group_id):
 
         opponent_deck_stats.append({
             "deck": DeckShortSerializer(opp_deck).data,
+            "custom_name": None,
             "count": opp_count,
             "ratio": opp_ratio,
             "total_games": opp_total,
@@ -328,6 +330,33 @@ def get_record_group_statistics_full(request, record_group_id):
             "second_win_rate": opp_second_win_rate,
             "coin_toss_win_win_rate": opp_coin_toss_win_rate,
             "coin_toss_lose_win_rate": opp_coin_toss_lose_win_rate,
+        })
+
+    custom_names = (
+        matches.filter(opponent_deck__isnull=True)
+        .exclude(opponent_deck_name__isnull=True)
+        .exclude(opponent_deck_name="")
+        .values_list("opponent_deck_name", flat=True)
+        .distinct()
+    )
+    for name in custom_names:
+        c_matches = matches.filter(opponent_deck__isnull=True, opponent_deck_name=name)
+        c_total = c_matches.count()
+        c_win = c_matches.filter(result="win").count()
+        c_first = c_matches.filter(first_or_second="first")
+        c_second = c_matches.filter(first_or_second="second")
+        opponent_deck_stats.append({
+            "deck": None,
+            "custom_name": name,
+            "count": c_total,
+            "ratio": c_total / total_games * 100 if total_games > 0 else 0,
+            "total_games": c_total,
+            "win_rate": (c_win / c_total * 100) if c_total > 0 else 0,
+            "first_ratio": c_first.count() / c_total * 100 if c_total > 0 else 0,
+            "first_win_rate": (c_first.filter(result="win").count() / c_first.count() * 100) if c_first.count() > 0 else None,
+            "second_win_rate": (c_second.filter(result="win").count() / c_second.count() * 100) if c_second.count() > 0 else None,
+            "coin_toss_win_win_rate": 0,
+            "coin_toss_lose_win_rate": 0,
         })
 
     # ----------------------
@@ -444,6 +473,7 @@ def get_record_group_matches(request, record_group_id):
             "wins": match.wins,
             "score": match.score,
             "notes": match.notes,
+            "opponent_deck_name": match.opponent_deck_name,
         }
         for match in current_page
     ]
@@ -501,4 +531,31 @@ def recent_meta_deck_stats(request):
         "total_matches": total_matches,
         "meta_decks": results
     }, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+def get_record_group_rank_history(request, record_group_id):
+    record_group = RecordGroup.objects.filter(id=record_group_id).first()
+    if not record_group:
+        return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    matches = (
+        record_group.matches
+        .filter(is_deleted=False)
+        .filter(Q(rank__isnull=False) | Q(score__isnull=False))
+        .order_by("id")
+        .values("rank", "wins", "score", "result")
+    )
+
+    data = [
+        {
+            "index": i + 1,
+            "rank": m["rank"],
+            "wins": m["wins"],
+            "score": m["score"],
+            "result": m["result"],
+        }
+        for i, m in enumerate(matches)
+    ]
+
+    return Response({"matches": data}, status=status.HTTP_200_OK)
 
