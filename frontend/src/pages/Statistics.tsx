@@ -34,20 +34,22 @@ function DeckStatisticsTable() {
         총 덱 개수: <span className="text-green-500 font-bold">{totalDecks.toLocaleString()}</span>
       </p>
 
-      <table className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+      <table className="w-full table-fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
         <thead>
           <tr className="bg-gray-100 dark:bg-gray-700">
-            <th className="whitespace-nowrap px-2 md:px-3 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
-              순위
+            <th className="w-10 md:w-14 px-1 md:px-3 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
+              #
             </th>
             <th className="px-2 md:px-6 py-3 text-left text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
               덱
             </th>
-            <th className="whitespace-nowrap px-2 md:px-6 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
-              등장 횟수
+            <th className="w-20 md:w-28 px-1 md:px-6 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
+              <span className="hidden md:inline">등장 횟수</span>
+              <span className="md:hidden">횟수</span>
             </th>
-            <th className="whitespace-nowrap px-2 md:px-6 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
-              등장 비율
+            <th className="w-16 md:w-28 px-1 md:px-6 py-3 text-center text-sm md:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-300">
+              <span className="hidden md:inline">등장 비율</span>
+              <span className="md:hidden">비율</span>
             </th>
           </tr>
         </thead>
@@ -57,26 +59,28 @@ function DeckStatisticsTable() {
               key={index}
               className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
             >
-              <td className="w-10 px-2 md:px-3 py-2 text-center text-gray-700 dark:text-gray-300 font-bold text-sm md:text-lg lg:text-xl">
+              <td className="px-1 md:px-3 py-2 text-center text-gray-700 dark:text-gray-300 font-bold text-sm md:text-lg lg:text-xl">
                 {index + 1}
               </td>
-              <td className="px-2 md:px-6 py-2 flex items-center space-x-2 md:space-x-4 break-keep">
-                {deck.cover_image && (
-                  <img
-                    src={deck.cover_image}
-                    alt={deck.name}
-                    className="w-10 h-10 md:w-16 md:h-16 lg:w-20 lg:h-20 object-cover block flex-shrink-0"
-                  />
-                )}
-                <span className="text-gray-800 dark:text-gray-100 font-medium text-sm md:text-lg lg:text-xl">
-                  {deck.name}
-                </span>
+              <td className="px-2 md:px-6 py-2">
+                <div className="flex items-center space-x-2 md:space-x-4">
+                  {deck.cover_image && (
+                    <img
+                      src={deck.cover_image}
+                      alt={deck.name}
+                      className="w-8 h-8 md:w-16 md:h-16 lg:w-20 lg:h-20 object-cover block flex-shrink-0"
+                    />
+                  )}
+                  <span className="text-gray-800 dark:text-gray-100 font-medium text-sm md:text-lg lg:text-xl break-keep">
+                    {deck.name}
+                  </span>
+                </div>
               </td>
-              <td className="px-2 md:px-6 py-2 text-center text-gray-700 dark:text-gray-300 font-semibold text-sm md:text-lg lg:text-xl">
+              <td className="px-1 md:px-6 py-2 text-center text-gray-700 dark:text-gray-300 font-semibold text-sm md:text-lg lg:text-xl">
                 {deck.num_views.toLocaleString()}
               </td>
-              <td className="px-2 md:px-6 py-2 text-center text-gray-700 dark:text-gray-300 font-semibold text-sm md:text-lg lg:text-xl">
-                {deck.percentage.toFixed(2)}%
+              <td className="px-1 md:px-6 py-2 text-center text-gray-700 dark:text-gray-300 font-semibold text-sm md:text-lg lg:text-xl">
+                {deck.percentage.toFixed(1)}%
               </td>
             </tr>
           ))}
