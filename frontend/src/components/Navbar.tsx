@@ -1,17 +1,20 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { isAuthenticated } from "../api/accountApi";
 import logo from "/images/logo_big.png";
 
 function Navbar() {
   const isLoggedIn = isAuthenticated();
+  const isHome = useLocation().pathname === "/";
 
   return (
     <header className="bg-transparent text-black dark:text-white">
-      <div className="sm:hidden flex justify-center py-3">
-        <Link to="/" className="hover:opacity-80 transition">
-          <img src={logo} alt="사이트 로고" className="h-12 object-contain" />
-        </Link>
-      </div>
+      {!isHome && (
+        <div className="sm:hidden flex justify-center py-3">
+          <Link to="/" className="hover:opacity-80 transition">
+            <img src={logo} alt="사이트 로고" className="h-12 object-contain" />
+          </Link>
+        </div>
+      )}
       <div className="hidden sm:flex justify-center py-4">
         <div className="flex items-center space-x-8">
           <Link to="/" className="hover:opacity-80 transition shrink-0">
