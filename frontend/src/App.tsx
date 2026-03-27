@@ -1,6 +1,8 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import './App.css'
 import Navbar from "./components/Navbar";
+import BottomTabBar from "./components/BottomTabBar";
 import Recommend from './pages/Recommend'
 import QuestionPage from "./pages/QuestionPage";
 import ResultPage from "./pages/ResultPage";
@@ -28,6 +30,9 @@ import CardClassifier from "./pages/CardDetector";
 import DeckScanner from "./pages/DeckScanner";
 
 function App() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+
   return (
     <div>
       <Navbar />
@@ -58,6 +63,8 @@ function App() {
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
+      <BottomTabBar />
+      <div className="sm:hidden h-16" />
     </div>
   );
 }

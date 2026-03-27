@@ -7,33 +7,10 @@ function Navbar() {
 
   return (
     <header className="bg-transparent text-black dark:text-white">
-      <div className="sm:hidden flex flex-col items-center py-4 space-y-4">
+      <div className="sm:hidden flex justify-center py-3">
         <Link to="/" className="hover:opacity-80 transition">
-          <img src={logo} alt="사이트 로고" className="h-16 object-contain" />
+          <img src={logo} alt="사이트 로고" className="h-12 object-contain" />
         </Link>
-        <nav className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-          <Link to="/recommend" className="text-base font-bold break-keep">
-            🔍 성향 테스트
-          </Link>
-          <Link to="/database" className="text-base break-keep">
-            📚 덱 도감
-          </Link>
-          <Link to="/records" className="text-base break-keep">
-            📝 전적 시트
-          </Link>
-          <Link to="/deck-scanner" className="text-base break-keep">
-            🪄 AI 덱 추출
-          </Link>
-          {isLoggedIn ? (
-            <Link to="/mypage" className="text-base break-keep">
-              👤 마이페이지
-            </Link>
-          ) : (
-            <Link to="/login" className="text-base break-keep">
-              🔑 로그인
-            </Link>
-          )}
-        </nav>
       </div>
       <div className="hidden sm:flex justify-center py-4">
         <div className="flex items-center space-x-8">
