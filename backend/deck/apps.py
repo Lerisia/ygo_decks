@@ -5,5 +5,3 @@ class DeckConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'deck'
 
-    def ready(self):
-        import deck.signals  # noqa: F401
