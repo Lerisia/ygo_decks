@@ -30,7 +30,14 @@ export default function DatabasePage() {
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(null);
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const summoningMethods = ["융합", "의식", "싱크로", "엑시즈", "펜듈럼", "링크", "다양"];
 
@@ -326,6 +333,15 @@ export default function DatabasePage() {
           </div>
         ))}
       </div>
+
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-24 right-4 sm:bottom-8 w-10 h-10 bg-gray-700 text-white rounded-full shadow-lg flex items-center justify-center text-lg hover:bg-gray-600 transition z-50"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 }

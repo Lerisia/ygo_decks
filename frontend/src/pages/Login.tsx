@@ -36,7 +36,8 @@ const Login = () => {
         <div className="h-auto min-h-screen flex flex-col items-center">
             <div className="mt-6 w-80">
             <input
-                type="text"
+                type="email"
+                autoComplete="email"
                 placeholder="이메일 주소"
                 className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={username}
@@ -46,6 +47,7 @@ const Login = () => {
             <div className="mt-4 w-80">
             <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="비밀번호"
                 className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={password}
