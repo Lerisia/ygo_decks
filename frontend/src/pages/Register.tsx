@@ -102,7 +102,7 @@ const Register = () => {
           placeholder="이메일 주소"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+          className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
         {checkingEmail ? (
@@ -118,7 +118,7 @@ const Register = () => {
           placeholder="닉네임"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+          className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
         {checkingUsername ? (
@@ -134,7 +134,7 @@ const Register = () => {
           placeholder="비밀번호(6자 이상)"
           value={password1}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+          className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
       </div>
@@ -145,16 +145,16 @@ const Register = () => {
           placeholder="비밀번호 확인"
           value={password2}
           onChange={(e) => setPassword2(e.target.value)}
-          className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+          className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
       </div>
 
       <button
-        className={`mt-6 px-4 py-2 rounded-lg transition-all ${
+        className={`mt-6 w-80 px-4 py-2 rounded-lg font-semibold transition ${
           isLoading || emailError || usernameError || checkingEmail || checkingUsername || username.length < 3
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-blue-500 hover:bg-blue-600 text-white"
+            ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700 text-white"
         }`}
         onClick={handleRegister}
         disabled={isLoading || !!emailError || !!usernameError || checkingEmail || checkingUsername || username.length < 3}

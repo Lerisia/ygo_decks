@@ -27,14 +27,14 @@ export default function TournamentList() {
                 {loggedIn ? (
                     <button
                         onClick={() => navigate("/tournaments/create")}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
                     >
                         대회 생성
                     </button>
                 ) : (
                     <div className="relative group">
                         <button
-                            className="px-4 py-2 bg-gray-400 text-white rounded-lg shadow cursor-not-allowed"
+                            className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-lg cursor-not-allowed"
                             disabled
                         >
                             대회 생성

@@ -95,7 +95,7 @@ const Mypage = () => {
 
   return (
     <div className="h-auto min-h-screen px-4 text-center p-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-xl mx-auto p-6">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 shadow-lg rounded-xl mx-auto p-6">
         <h2 className="text-2xl font-semibold text-center mb-4">마이페이지</h2>
 
         {/* Email (Read-only) */}
@@ -128,9 +128,9 @@ const Mypage = () => {
           </p>
           <button
             onClick={handleChangeUsername}
-            className={`w-full mt-2 py-2 rounded-lg ${
-              isUsernameValid && username !== originalUsername ? "bg-blue-500 hover:bg-blue-600" : "bg-gray-400 cursor-not-allowed"
-            } text-white`}
+            className={`w-full mt-2 py-2 rounded-lg font-semibold transition ${
+              isUsernameValid && username !== originalUsername ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+            }`}
             disabled={!isUsernameValid || username === originalUsername}
           >
             닉네임 변경
@@ -166,10 +166,10 @@ const Mypage = () => {
 
           <button
             onClick={handleChangePassword}
-            className={`w-full mt-2 py-2 rounded-lg ${
+            className={`w-full mt-2 py-2 rounded-lg font-semibold transition ${
               newPassword && newPassword === confirmNewPassword
-                ? "bg-green-500 hover:bg-green-600 text-white"
-                : "bg-gray-400 cursor-not-allowed text-white"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
             }`}
             disabled={!newPassword || newPassword !== confirmNewPassword}
           >
@@ -181,7 +181,7 @@ const Mypage = () => {
         <div className="mb-4">
           <button
             onClick={() => navigate("/mypage/mydecks")}
-            className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg"
+            className="w-full py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
           >
             보유 덱 관리
           </button>
@@ -190,7 +190,7 @@ const Mypage = () => {
         {/* Logout button */}
         <button
           onClick={handleLogout}
-          className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
+          className="w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition"
         >
           로그아웃
         </button>

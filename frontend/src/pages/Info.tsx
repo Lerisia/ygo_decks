@@ -51,7 +51,7 @@ function Info() {
         href="https://www.buymeacoffee.com/elyss"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center px-4 py-2 bg-[#FF5F5F] text-white text-lg font-bold rounded-lg shadow-md hover:bg-[#E64C4C] transition"
+        className="inline-flex items-center px-4 py-2 bg-red-500 text-white text-lg font-bold rounded-lg shadow-md hover:bg-red-600 transition"
       >
         ☕ Buy me a coffee
       </a>

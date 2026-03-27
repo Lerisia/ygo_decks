@@ -142,11 +142,11 @@ const Mydecks = () => {
       {message && <p className="mt-4 text-green-500">{message}</p>}
 
       <div className="mb-6 flex justify-center gap-4">
-        <button onClick={() => navigate("/mypage")} className="px-4 py-2 bg-gray-500 text-white rounded-lg">
+        <button onClick={() => navigate("/mypage")} className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
           마이페이지로 돌아가기
         </button>
 
-        <button onClick={handleSave} className="px-4 py-2 bg-blue-500 text-white rounded-lg">
+        <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
           저장
         </button>
       </div>
@@ -168,7 +168,7 @@ const Mydecks = () => {
       </div>
 
       <div className="mt-6 flex flex-col items-center">
-        <button onClick={handleSave} className="px-4 py-2 bg-blue-500 text-white rounded-lg">
+        <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
           저장
         </button>
         {message && <p className="mt-4 text-green-500">{message}</p>}

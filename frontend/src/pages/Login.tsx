@@ -33,28 +33,28 @@ const Login = () => {
     
 
     return (
-        <div className = "h-auto min-h-screen flex flex-col items-center">
-            <div className="mt-6">
+        <div className="h-auto min-h-screen flex flex-col items-center">
+            <div className="mt-6 w-80">
             <input
                 type="text"
                 placeholder="이메일 주소"
-                className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
             />
             </div>
-            <div className="mt-6">
+            <div className="mt-4 w-80">
             <input
                 type="password"
                 placeholder="비밀번호"
-                className="w-full p-2 border rounded-md bg-white text-black dark:bg-gray-800 dark:text-white"
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
             />
             </div>
-            <button className="mt-6 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-all"
+            <button className="mt-6 w-80 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
             onClick={handleLogin}>로그인</button>
-            {message && <p style={{ marginTop: "8px", whiteSpace: "pre-line" }}>{message}</p>}
+            {message && <p className="mt-2 text-center whitespace-pre-line">{message}</p>}
 
             <p className="mt-4">
                 계정이 없으신가요?{" "}

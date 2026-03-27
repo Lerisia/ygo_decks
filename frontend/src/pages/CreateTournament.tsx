@@ -69,7 +69,7 @@ export default function CreateTournament() {
     return (
         <div className="h-auto min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4 text-center">대회 생성</h1>
-            <form onSubmit={handleSubmit} className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
+            <form onSubmit={handleSubmit} className="max-w-lg mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
                 {error && <p className="text-red-500 text-center mb-4">{error}</p>}
 
                 <label className="block mb-2 font-semibold">대회 이름 *</label>
@@ -79,7 +79,7 @@ export default function CreateTournament() {
                     value={formData.name}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border rounded-lg mb-4"
+                    className="w-full px-3 py-2 border rounded-lg mb-4 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <label className="block mb-2 font-semibold">회차</label>
@@ -88,7 +88,7 @@ export default function CreateTournament() {
                     name="edition"
                     value={formData.edition}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-lg mb-4"
+                    className="w-full px-3 py-2 border rounded-lg mb-4 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <label className="block mb-2 font-semibold">커버 이미지 (최대 1MB)</label>
@@ -96,7 +96,7 @@ export default function CreateTournament() {
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full px-3 py-2 border rounded-lg mb-4"
+                    className="w-full px-3 py-2 border rounded-lg mb-4 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {coverPreview && (
                     <img src={coverPreview} alt="Preview" className="w-full h-48 object-cover rounded mb-4" />
@@ -108,7 +108,7 @@ export default function CreateTournament() {
                     value={formData.description}
                     onChange={handleChange}
                     rows={4}
-                    className="w-full px-3 py-2 border rounded-lg mb-4"
+                    className="w-full px-3 py-2 border rounded-lg mb-4 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <label className="block mb-2 font-semibold">일시 *</label>
@@ -118,13 +118,13 @@ export default function CreateTournament() {
                     value={formData.event_date}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border rounded-lg mb-4"
+                    className="w-full px-3 py-2 border rounded-lg mb-4 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <div className="flex flex-col gap-2">
                     <button 
                         type="submit" 
-                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
                     >
                         대회 생성
                     </button>
@@ -132,7 +132,7 @@ export default function CreateTournament() {
                     <button
                         type="button"
                         onClick={() => navigate("/tournaments")}
-                        className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg shadow hover:bg-gray-600 transition"
+                        className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition"
                     >
                         대회 목록으로 돌아가기
                     </button>
