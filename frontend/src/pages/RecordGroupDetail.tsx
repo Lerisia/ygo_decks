@@ -77,19 +77,21 @@ export const EditMatchModal = ({
   match,
   onClose,
   onUpdated,
+  allOptions,
   rankOptions,
 }: {
   match: any;
   onClose: () => void;
   onUpdated: () => void;
   ownedDecks: any[];
-  allOptions: any[];
+  allOptions: { value: string; label: string }[];
   rankOptions: { value: string; label: string }[];
 }) => {
   const [form, setForm] = useState({
     coin_toss_result: match.coin_toss_result,
     first_or_second: match.first_or_second,
     result: match.result,
+    opponent_deck: match.opponent_deck?.id?.toString() || "",
     rank: match.rank || "",
     wins: match.wins || null,
     score: match.score?.toString() || "",
@@ -111,6 +113,7 @@ export const EditMatchModal = ({
     try {
       await updateMatchRecord(match.id, {
         ...form,
+        opponent_deck: form.opponent_deck || null,
         score: form.score ? Number(form.score) : null,
         rank: form.rank || null,
       });
@@ -126,6 +129,18 @@ export const EditMatchModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-[400px] max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
         <h2 className="text-lg font-bold">기록 수정</h2>
+        <div>
+          <label className="block text-sm font-medium">상대 덱</label>
+          <select
+            value={form.opponent_deck}
+            onChange={(e) => setForm({ ...form, opponent_deck: e.target.value })}
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
+          >
+            {allOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium">코인토스</label>
           <select

@@ -118,9 +118,17 @@ def update_match_record(request, match_id):
         "result", "rank", "wins", "score", "notes"
     ]
     
+    fk_fields = {"deck", "opponent_deck"}
     for field in updatable_fields:
         if field in request.data:
-            setattr(match, field, request.data[field])
+            value = request.data[field]
+            if field in fk_fields:
+                if value in (None, "", "null"):
+                    setattr(match, f"{field}_id", None)
+                else:
+                    setattr(match, f"{field}_id", int(value))
+            else:
+                setattr(match, field, value)
 
     try:
         match.full_clean()
