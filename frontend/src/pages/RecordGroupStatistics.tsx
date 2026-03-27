@@ -176,7 +176,7 @@ const StatisticsPage = () => {
     `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
 
   return (
-    <div className="px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
       <button
         onClick={() => navigate(`/record-groups/${recordGroupId}`)}
         className="text-lg font-semibold hover:text-blue-600 mb-4"
