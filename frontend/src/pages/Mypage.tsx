@@ -5,7 +5,7 @@ import { getUserInfo, changeUsername, changePassword, logout, checkUsernameExist
 const Mypage = () => {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
-  const [originalUsername, setOriginalUsername] = useState(""); // 기존 닉네임 저장
+  const [originalUsername, setOriginalUsername] = useState("");
   const [isUsernameValid, setIsUsernameValid] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -13,19 +13,17 @@ const Mypage = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [message, setMessage] = useState("");
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
-  // Check if the user is logged in & fetch user info
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-
     if (!token) {
       navigate("/unauthorized");
       return;
     }
 
-    // Fetch user info (e-mail, username)
     const fetchUserInfo = async () => {
       const userInfo = await getUserInfo();
       if (userInfo) {
@@ -34,168 +32,173 @@ const Mypage = () => {
         setOriginalUsername(userInfo.username);
       }
     };
-
     fetchUserInfo();
   }, [navigate]);
 
-  // Change username handler
   const handleChangeUsername = async () => {
     if (!isUsernameValid || username === "" || username === originalUsername) return;
     const response = await changeUsername(username);
     setMessage(response.message || response.error);
   };
 
-  // Change password handler
   const handleChangePassword = async () => {
     if (newPassword !== confirmNewPassword) {
       setPasswordError("새 비밀번호가 일치하지 않습니다.");
       return;
     }
-  
     setPasswordError("");
     const response = await changePassword(currentPassword, newPassword);
-  
     if (response.error) {
-      setMessage(response.error);
-      if (response.error.includes("현재 비밀번호")) {
-        setMessage("현재 비밀번호가 올바르지 않습니다. 다시 확인해주세요.");
-      }
+      setMessage(response.error.includes("현재 비밀번호")
+        ? "현재 비밀번호가 올바르지 않습니다."
+        : response.error);
     } else {
       setMessage("비밀번호가 성공적으로 변경되었습니다.");
     }
   };
 
-  // Logout
   const handleLogout = () => {
     logout();
     navigate("/");
-
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
+    setTimeout(() => window.location.reload(), 100);
   };
 
-  // Username duplication check & validation
   useEffect(() => {
     if (username.length < 3) {
       setIsUsernameValid(null);
       return;
     }
-
     setCheckingUsername(true);
-
     const timeoutId = setTimeout(async () => {
       const exists = await checkUsernameExists(username);
       setIsUsernameValid(!exists);
       setCheckingUsername(false);
     }, 500);
-
     return () => clearTimeout(timeoutId);
   }, [username]);
 
-  return (
-    <div className="h-auto min-h-screen px-4 text-center p-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 shadow-lg rounded-xl mx-auto p-6">
-        <h2 className="text-2xl font-semibold text-center mb-4">마이페이지</h2>
+  const toggle = (section: string) =>
+    setExpandedSection((prev) => (prev === section ? null : section));
 
-        {/* Email (Read-only) */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-500">이메일</label>
-          <p className="w-full px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed">{email}</p>
+  const inputClass = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  return (
+    <div className="h-auto min-h-screen px-4 py-6">
+      <div className="w-full max-w-md mx-auto space-y-3">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400">이메일</p>
+          <p className="font-medium">{email}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">닉네임</p>
+          <p className="font-medium">{originalUsername}</p>
         </div>
 
-        {/* Change username */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium">닉네임</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black dark:bg-gray-800 dark:text-white"
-          />
-          <p className="text-sm mt-1">
-            {username.length < 3 ? (
-              <span className="text-red-500">닉네임은 최소 3글자 이상이어야 합니다.</span>
-            ) : checkingUsername ? (
-              <span className="text-gray-500">중복 확인 중...</span>
-            ) : username === originalUsername ? (
-              <span className="text-gray-500">현재 닉네임과 동일합니다.</span>
-            ) : isUsernameValid ? (
-              <span className="text-green-500">사용 가능한 닉네임입니다.</span>
-            ) : (
-              <span className="text-red-500">이미 사용 중인 닉네임입니다.</span>
-            )}
-          </p>
+        <button
+          onClick={() => navigate("/mypage/mydecks")}
+          className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+        >
+          보유 덱 관리 →
+        </button>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
           <button
-            onClick={handleChangeUsername}
-            className={`w-full mt-2 py-2 rounded-lg font-semibold transition ${
-              isUsernameValid && username !== originalUsername ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-            }`}
-            disabled={!isUsernameValid || username === originalUsername}
+            onClick={() => toggle("username")}
+            className="w-full px-4 py-3 text-left font-semibold flex justify-between items-center"
           >
             닉네임 변경
+            <span className="text-gray-400">{expandedSection === "username" ? "▲" : "▼"}</span>
           </button>
+          {expandedSection === "username" && (
+            <div className="px-4 pb-4 space-y-2">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={inputClass}
+                placeholder="새 닉네임"
+              />
+              <p className="text-xs">
+                {username.length < 3 ? (
+                  <span className="text-red-500">최소 3글자 이상</span>
+                ) : checkingUsername ? (
+                  <span className="text-gray-500">확인 중...</span>
+                ) : username === originalUsername ? (
+                  <span className="text-gray-500">현재 닉네임과 동일</span>
+                ) : isUsernameValid ? (
+                  <span className="text-green-500">사용 가능</span>
+                ) : (
+                  <span className="text-red-500">이미 사용 중</span>
+                )}
+              </p>
+              <button
+                onClick={handleChangeUsername}
+                className={`w-full py-2 rounded-lg font-semibold transition ${
+                  isUsernameValid && username !== originalUsername
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                }`}
+                disabled={!isUsernameValid || username === originalUsername}
+              >
+                변경
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Change password */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium">현재 비밀번호</label>
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black dark:bg-gray-800 dark:text-white"
-          />
-
-          <label className="block text-sm font-medium mt-2">새 비밀번호</label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black dark:bg-gray-800 dark:text-white"
-          />
-
-          <label className="block text-sm font-medium mt-2">새 비밀번호 확인</label>
-          <input
-            type="password"
-            value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black dark:bg-gray-800 dark:text-white"
-          />
-          {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>}
-
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
           <button
-            onClick={handleChangePassword}
-            className={`w-full mt-2 py-2 rounded-lg font-semibold transition ${
-              newPassword && newPassword === confirmNewPassword
-                ? "bg-blue-600 hover:bg-blue-700 text-white"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-            }`}
-            disabled={!newPassword || newPassword !== confirmNewPassword}
+            onClick={() => toggle("password")}
+            className="w-full px-4 py-3 text-left font-semibold flex justify-between items-center"
           >
             비밀번호 변경
+            <span className="text-gray-400">{expandedSection === "password" ? "▲" : "▼"}</span>
           </button>
+          {expandedSection === "password" && (
+            <div className="px-4 pb-4 space-y-2">
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className={inputClass}
+                placeholder="현재 비밀번호"
+              />
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className={inputClass}
+                placeholder="새 비밀번호"
+              />
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className={inputClass}
+                placeholder="새 비밀번호 확인"
+              />
+              {passwordError && <p className="text-red-500 text-xs">{passwordError}</p>}
+              <button
+                onClick={handleChangePassword}
+                className={`w-full py-2 rounded-lg font-semibold transition ${
+                  newPassword && newPassword === confirmNewPassword
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                }`}
+                disabled={!newPassword || newPassword !== confirmNewPassword}
+              >
+                변경
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Owned decks configuration button */}
-        <div className="mb-4">
-          <button
-            onClick={() => navigate("/mypage/mydecks")}
-            className="w-full py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
-          >
-            보유 덱 관리
-          </button>
-        </div>
-
-        {/* Logout button */}
         <button
           onClick={handleLogout}
-          className="w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition"
+          className="w-full py-3 text-red-500 font-semibold text-center"
         >
           로그아웃
         </button>
 
-        {message && <p className="text-center text-sm text-gray-600 mt-2">{message}</p>}
+        {message && <p className="text-center text-sm text-gray-600 dark:text-gray-400">{message}</p>}
       </div>
     </div>
   );
