@@ -57,6 +57,10 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    proxy: {
+      "/api": "http://localhost:8000",
+      "/media": "http://localhost:8000",
+    },
   },
   build: {
     rollupOptions: {

@@ -719,40 +719,27 @@ const RecordGroupDetailPage = () => {
 
   return (
     <div className="px-2 py-4 min-h-screen max-w-screen-sm mx-auto p-4">
-      <div className="relative mb-4">
-        <h1 className="text-2xl font-bold text-center inline-flex items-center justify-center gap-2 w-full">
-          {recordGroupName}
-          <button onClick={handleEditName} className="text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white">
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h1 className="text-2xl font-bold flex items-center gap-1 min-w-0">
+          <span className="truncate">{recordGroupName}</span>
+          <button onClick={handleEditName} className="shrink-0 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white">
             ✏️
           </button>
         </h1>
         <a
           href={`/record-groups/${recordGroupId}/statistics`}
-          className="absolute right-0 top-0 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+          className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg font-semibold hover:bg-blue-700 transition"
         >
           통계
         </a>
       </div>
-      <div className="text-red-600 mb-4 text-center">
-        <p>
-          <a href="/mypage/mydecks" className="underline">
-            마이페이지(링크)
-          </a>
-          에 등록한 덱만 내 덱에 표시됩니다.
-        </p>
-        <p>
-          내 덱이 없다면{" "}
-          <a href="/" className="underline">
-            메인 화면</a>
-          의 오픈채팅방으로 문의주세요.
-        </p>
-      </div>
-      <div className="text-red-600 mb-4 text-center">
-        승수 옵션이 새로 추가되어 아직 테스트 중입니다. 버그 제보 주세요!
-      </div>
-
       <div className="p-4 border rounded-lg shadow bg-white dark:bg-gray-800 mb-6 max-w-2xl w-full mx-auto">
-        <h2 className="text-lg font-semibold mb-2">기록 등록</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold">기록 등록</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            <a href="/mypage/mydecks" className="underline">보유 덱 관리</a>에서 등록한 덱만 선택 가능
+          </p>
+        </div>
         <div className="flex flex-col gap-2">
           <Select
             options={deckOptions}
@@ -803,68 +790,70 @@ const RecordGroupDetailPage = () => {
               return labelMatch || aliasMatch;
             }}
           />
-          <div>
-            <label className="block text-sm font-medium mb-1 text-left">코인토스</label>
-            <div className="flex gap-2">
-              {coinOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() =>
-                    setNewMatch((prev) => ({
-                      ...prev,
-                      coin_toss_result: opt.value,
-                      first_or_second: opt.value === "win" ? "first" : "second",
-                    }))
-                  }
-                  className={`px-3 py-1 rounded border ${
-                    newMatch.coin_toss_result === opt.value
-                      ? "bg-blue-500 text-white"
-                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1 text-left">코인토스</label>
+              <div className="flex gap-1">
+                {coinOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() =>
+                      setNewMatch((prev) => ({
+                        ...prev,
+                        coin_toss_result: opt.value,
+                        first_or_second: opt.value === "win" ? "first" : "second",
+                      }))
+                    }
+                    className={`flex-1 px-2 py-1.5 rounded border text-sm ${
+                      newMatch.coin_toss_result === opt.value
+                        ? "bg-blue-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-black dark:text-white"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-left">선공/후공</label>
-            <div className="flex gap-2">
-              {firstSecondOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() =>
-                    setNewMatch((prev) => ({ ...prev, first_or_second: opt.value }))
-                  }
-                  className={`px-3 py-1 rounded border ${
-                    newMatch.first_or_second === opt.value
-                      ? "bg-blue-500 text-white"
-                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div>
+              <label className="block text-xs font-medium mb-1 text-left">선/후공</label>
+              <div className="flex gap-1">
+                {firstSecondOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() =>
+                      setNewMatch((prev) => ({ ...prev, first_or_second: opt.value }))
+                    }
+                    className={`flex-1 px-2 py-1.5 rounded border text-sm ${
+                      newMatch.first_or_second === opt.value
+                        ? "bg-blue-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-black dark:text-white"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-left">결과</label>
-            <div className="flex gap-2">
-              {resultOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() =>
-                    setNewMatch((prev) => ({ ...prev, result: opt.value }))
-                  }
-                  className={`px-3 py-1 rounded border ${
-                    newMatch.result === opt.value
-                      ? "bg-blue-500 text-white"
-                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium mb-1 text-left">결과</label>
+              <div className="flex gap-1">
+                {resultOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() =>
+                      setNewMatch((prev) => ({ ...prev, result: opt.value }))
+                    }
+                    className={`flex-1 px-2 py-1.5 rounded border text-sm ${
+                      newMatch.result === opt.value
+                        ? "bg-blue-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-black dark:text-white"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -955,7 +944,7 @@ const RecordGroupDetailPage = () => {
               />
             </div>
           </div>
-          <button onClick={handleRegisterMatch} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+          <button onClick={handleRegisterMatch} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
             기록 추가
           </button>
         </div>
