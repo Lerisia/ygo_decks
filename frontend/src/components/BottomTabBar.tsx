@@ -11,6 +11,7 @@ const mainTabs = [
 
 const moreTabs = [
   { to: "/", icon: "🏠", label: "홈" },
+  { to: "/mypage/mydecks", icon: "🃏", label: "보유 덱", auth: true },
   { to: "/terms", icon: "📄", label: "이용약관" },
 ];
 
@@ -51,7 +52,7 @@ function BottomTabBar() {
           {moreTabs.map((tab) => (
             <Link
               key={tab.to}
-              to={tab.to}
+              to={tab.auth && !isLoggedIn ? "/login" : tab.to}
               className={`flex flex-col items-center text-xs py-2 rounded-lg ${
                 isActive(tab.to)
                   ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"

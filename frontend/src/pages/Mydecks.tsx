@@ -20,6 +20,8 @@ const Mydecks = () => {
   const [showOwnedDecksOnly, setShowOwnedDecksOnly] = useState(false);
   const [excludeOwnedDecks, setExcludeOwnedDecks] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,13 +33,8 @@ const Mydecks = () => {
 
     const fetchDecks = async () => {
       try {
-        console.log("전체 덱 목록 불러오는 중...");
         const allDecks = await getAllDecks();
-        console.log("전체 덱 목록 응답:", allDecks);
-
-        if (allDecks.decks) {
-          setDecks(allDecks.decks);
-        }
+        if (allDecks.decks) setDecks(allDecks.decks);
       } catch (error) {
         console.error("전체 덱 목록 API 호출 실패:", error);
       }
@@ -45,10 +42,7 @@ const Mydecks = () => {
 
     const fetchUserDecks = async () => {
       try {
-        console.log("유저 보유 덱 목록 불러오는 중...");
         const userDecks: UserDecksResponse = await getUserDecks();
-        console.log("유저 덱 목록 API 응답:", userDecks);
-
         if (userDecks.owned_decks) {
           setOwnedDecks(userDecks.owned_decks.map((deck: Deck) => deck.id));
         }
@@ -64,6 +58,12 @@ const Mydecks = () => {
     fetchUserDecks();
   }, [navigate]);
 
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const toggleDeck = (deckId: number) => {
     setOwnedDecks((prev) =>
       prev.includes(deckId) ? prev.filter((id) => id !== deckId) : [...prev, deckId]
@@ -73,105 +73,102 @@ const Mydecks = () => {
   const handleSave = async () => {
     setMessage("저장 중...");
     try {
-      const [deckResponse, settingsResponse] = await Promise.all([
+      await Promise.all([
         updateUserDecks(ownedDecks),
         updateUserSettings(excludeOwnedDecks ?? false),
       ]);
-
-      console.log("보유 덱 저장 응답:", deckResponse);
-      console.log("설정 저장 응답:", settingsResponse);
-
-      setMessage("보유 덱과 설정이 저장되었습니다.");
+      setMessage("저장되었습니다.");
+      setTimeout(() => setMessage(""), 2000);
     } catch (error) {
       console.error("저장 중 오류 발생:", error);
-      setMessage("저장에 실패했습니다. 다시 시도해주세요.");
+      setMessage("저장에 실패했습니다.");
     }
   };
 
-  const handleExcludeChange = () => {
-    setExcludeOwnedDecks((prev) => !prev);
-  };
-
-  const displayedDecks = showOwnedDecksOnly ? decks.filter(deck => ownedDecks.includes(deck.id)) : decks;
+  const displayedDecks = decks
+    .filter(deck => !showOwnedDecksOnly || ownedDecks.includes(deck.id))
+    .filter(deck => !searchQuery || deck.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="h-auto min-h-screen px-4 text-center p-4">
+    <div className="min-h-screen px-4 pt-4 pb-24">
       <h2 className="text-2xl font-semibold text-center mb-4">보유 덱 관리</h2>
 
-      <p className="text-base text-gray-600 mb-4">
-        원하는 덱을 찾으려면 <strong>브라우저 검색 기능 (Ctrl+F)</strong>을 사용하세요.
-      </p>
+      <input
+        type="text"
+        placeholder="덱 이름 검색..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full max-w-md mx-auto block mb-4 px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
 
-      <div className="text-center mb-4">
-        <p className="text-lg font-semibold">
-          보유한 덱: <span className="text-green-600">{ownedDecks.length}</span>개
-        </p>
-        <p className="text-lg font-semibold">
-          미보유 덱: <span className="text-red-600">{decks.length - ownedDecks.length}</span>개
-        </p>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mb-3 text-sm">
+        <span>
+          보유 <span className="font-semibold text-green-600">{ownedDecks.length}</span>개
+        </span>
+        <span>
+          미보유 <span className="font-semibold text-red-500">{decks.length - ownedDecks.length}</span>개
+        </span>
       </div>
 
-      <div className="flex items-center justify-center mb-4">
-        <input
-          type="checkbox"
-          id="showOwnedDecksOnly"
-          checked={showOwnedDecksOnly}
-          onChange={() => setShowOwnedDecksOnly((prev) => !prev)}
-          className="mr-2 w-4 h-4"
-        />
-        <label htmlFor="showOwnedDecksOnly" className="text-base">
-          보유한 덱만 보기
-        </label>
-      </div>
-
-      {excludeOwnedDecks !== null && (
-        <div className="flex items-center justify-center mb-4">
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mb-4 text-sm">
+        <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
-            id="excludeOwnedDecks"
-            checked={excludeOwnedDecks}
-            onChange={handleExcludeChange}
-            className="mr-2 w-4 h-4"
+            checked={showOwnedDecksOnly}
+            onChange={() => setShowOwnedDecksOnly((prev) => !prev)}
+            className="w-4 h-4"
           />
-          <label htmlFor="excludeOwnedDecks" className="text-base">
-            보유한 덱을 성향 테스트에서 제외
+          보유한 덱만 보기
+        </label>
+        {excludeOwnedDecks !== null && (
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeOwnedDecks}
+              onChange={() => setExcludeOwnedDecks((prev) => !prev)}
+              className="w-4 h-4"
+            />
+            테스트에서 제외
           </label>
-        </div>
-      )}
-
-      {message && <p className="mt-4 text-green-500">{message}</p>}
-
-      <div className="mb-6 flex justify-center gap-4">
-        <button onClick={() => navigate("/mypage")} className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
-          마이페이지로 돌아가기
-        </button>
-
-        <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
-          저장
-        </button>
+        )}
       </div>
 
-      {/* Filtered decks */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
         {displayedDecks.map((deck) => (
           <div key={deck.id} className="text-center cursor-pointer" onClick={() => toggleDeck(deck.id)}>
             <img
               src={deck.cover_image || "/default_cover.png"}
               alt={deck.name}
-              className={`w-full h-20 sm:h-24 md:h-28 object-cover rounded-lg ${
-                ownedDecks.includes(deck.id) ? "filter-none" : "filter grayscale"
+              className={`w-full h-20 sm:h-24 md:h-28 object-cover rounded-lg transition ${
+                ownedDecks.includes(deck.id) ? "" : "grayscale opacity-50"
               }`}
             />
-            <p className="mt-1 text-sm sm:text-base">{deck.name}</p>
+            <p className="mt-1 text-xs sm:text-sm">{deck.name}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col items-center">
-        <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
-          저장
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-24 right-4 sm:bottom-8 w-10 h-10 bg-gray-700 text-white rounded-full shadow-lg flex items-center justify-center text-lg hover:bg-gray-600 transition z-40"
+        >
+          ↑
         </button>
-        {message && <p className="mt-4 text-green-500">{message}</p>}
+      )}
+
+      <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3 z-40">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            저장
+          </button>
+          {message && (
+            <span className="text-sm text-green-600 dark:text-green-400 shrink-0">{message}</span>
+          )}
+        </div>
       </div>
     </div>
   );
