@@ -1,8 +1,4 @@
-import { useNavigate } from "react-router-dom";
-
 function Info() {
-  const navigate = useNavigate();
-
   return (
     <div className="p-6 h-auto min-h-screen max-w-3xl mx-auto text-gray-900 dark:text-white">
       <h1 className="text-2xl font-bold mb-4"> YGO Decks 소개</h1>
@@ -59,14 +55,6 @@ function Info() {
       >
         ☕ Buy me a coffee
       </a>
-      <div className="mt-6">
-        <button
-          onClick={() => navigate("/changelog")}
-          className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition"
-        >
-          📜 패치노트 보기
-        </button>
-      </div>
     </div>
   );
 }
