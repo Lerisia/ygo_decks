@@ -11,6 +11,7 @@ interface DeckInfo {
 
 interface DeckWinRateStatsItem {
   deck: DeckInfo;
+  custom_name: string | null;
   count: number;
   ratio: number;
   total_games: number;
@@ -74,8 +75,11 @@ const rankToNumeric = (rank: string, wins: number | null): number => {
   return idx + (wins ?? 0) / 8;
 };
 
-const isUnknownDeck = (entry: { deck: DeckInfo | null }) =>
-  !entry.deck || !entry.deck.name?.trim();
+const isUnknownDeck = (entry: { deck: DeckInfo | null; custom_name?: string | null }) =>
+  !entry.deck && !entry.custom_name;
+
+const getOppDeckName = (entry: { deck: DeckInfo | null; custom_name?: string | null }) =>
+  entry.deck?.name || entry.custom_name || "모름/기타";
 
 const StatCard = ({ label, value }: { label: string; value: string | number }) => (
   <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
@@ -131,7 +135,11 @@ const StatisticsPage = () => {
 
   const myDecks = [...stats.my_deck_stats].sort((a, b) => b.count - a.count);
   const oppDecks = [...stats.opponent_deck_stats]
-    .map((entry) => ({ ...entry, isUnknown: isUnknownDeck(entry) }))
+    .map((entry) => ({
+      ...entry,
+      isUnknown: isUnknownDeck(entry),
+      displayName: getOppDeckName(entry),
+    }))
     .sort((a, b) => {
       if (a.isUnknown && !b.isUnknown) return 1;
       if (!a.isUnknown && b.isUnknown) return -1;
@@ -268,17 +276,17 @@ const StatisticsPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart style={{ overflow: 'visible' }}>
-                  <Pie data={oppDecks} dataKey="ratio" nameKey="deck.name" cx="50%" cy="50%" outerRadius={110} label={false}>
+                  <Pie data={oppDecks} dataKey="ratio" nameKey="displayName" cx="50%" cy="50%" outerRadius={110} label={false}>
                     {oppDecks.map((entry, i) =>
-                      isUnknownDeck(entry)
-                        ? <Cell key={`unknown-${i}`} fill="#000" />
-                        : <Cell key={entry.deck.id} fill={`url(#image-oppo-${entry.deck.id})`} />
+                      entry.deck
+                        ? <Cell key={entry.deck.id} fill={`url(#image-oppo-${entry.deck.id})`} />
+                        : <Cell key={`other-${i}`} fill={entry.custom_name ? "#6b7280" : "#000"} />
                     )}
                   </Pie>
                   <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} contentStyle={{ fontSize: '0.875rem' }} />
                   <defs>
                     {oppDecks.map((entry) => {
-                      if (isUnknownDeck(entry)) return null;
+                      if (!entry.deck) return null;
                       return (
                         <pattern id={`image-oppo-${entry.deck.id}`} key={entry.deck.id} patternUnits="objectBoundingBox" width={1} height={1}>
                           <image href={entry.deck.cover_image_small || ""} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
@@ -300,7 +308,7 @@ const StatisticsPage = () => {
                     <DeckRow
                       key={entry.deck?.id ?? `unknown-${i}`}
                       image={isUnknownDeck(entry) ? null : entry.deck?.cover_image_small}
-                      name={isUnknownDeck(entry) ? "모름/기타" : entry.deck?.name}
+                      name={getOppDeckName(entry)}
                     >
                       <td className="text-right px-2 py-1.5">{entry.ratio.toFixed(1)}%</td>
                     </DeckRow>
@@ -348,7 +356,7 @@ const StatisticsPage = () => {
                   <DeckRow
                     key={entry.deck?.id ?? `unknown-${i}`}
                     image={isUnknownDeck(entry) ? null : entry.deck?.cover_image_small}
-                    name={isUnknownDeck(entry) ? "모름/기타" : entry.deck?.name}
+                    name={getOppDeckName(entry)}
                   >
                     <td className="text-right px-2 py-1.5">{entry.total_games}</td>
                     <td className="text-right px-2 py-1.5">{entry.win_rate.toFixed(1)}%</td>
@@ -386,7 +394,7 @@ const StatisticsPage = () => {
                         ) : (
                           <div className="w-5 h-5 rounded bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
                         )}
-                        <span className="hidden sm:inline truncate">{isUnknownDeck(entry) ? "모름/기타" : entry.deck?.name}</span>
+                        <span className="hidden sm:inline truncate">{getOppDeckName(entry)}</span>
                       </div>
                     </td>
                     <td className="text-right px-2 py-1.5">{entry.count}</td>

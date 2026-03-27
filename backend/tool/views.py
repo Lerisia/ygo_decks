@@ -282,7 +282,10 @@ def get_record_group_statistics_full(request, record_group_id):
     # ----------------------
     # 3) Statistics by opponents' decks
     # ----------------------
-    opponent_deck_ids = matches.values_list('opponent_deck_id', flat=True).distinct()
+    # FK가 있는 덱 + 진짜 모름/기타 (opponent_deck=None AND opponent_deck_name 비어있음)
+    fk_matches = matches.exclude(opponent_deck__isnull=True, opponent_deck_name__isnull=False)
+    fk_matches = fk_matches.exclude(opponent_deck__isnull=True, opponent_deck_name__gt="")
+    opponent_deck_ids = fk_matches.values_list('opponent_deck_id', flat=True).distinct()
 
     opponent_deck_stats = []
     for opp_deck_id in opponent_deck_ids:
@@ -290,9 +293,9 @@ def get_record_group_statistics_full(request, record_group_id):
             opp_deck = Deck.objects.get(id=opp_deck_id)
         except Deck.DoesNotExist:
             opp_deck = None
-        opp_count = matches.filter(opponent_deck_id=opp_deck_id).count()
+        opp_count = fk_matches.filter(opponent_deck_id=opp_deck_id).count()
         opp_ratio = opp_count / total_games * 100 if total_games > 0 else 0
-        opp_matches = matches.filter(opponent_deck_id=opp_deck_id)
+        opp_matches = fk_matches.filter(opponent_deck_id=opp_deck_id)
         opp_total = opp_matches.count()
         opp_win_count = opp_matches.filter(result="win").count()
         opp_win_rate = (opp_win_count / opp_total * 100) if opp_total > 0 else 0

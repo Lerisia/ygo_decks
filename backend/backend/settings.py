@@ -33,10 +33,7 @@ urlpatterns = [
 SECRET_KEY = 'django-insecure-xq4@b6!emq4z0mw4#0vp3$5ayf-i2u8g%g8@ynu-t(s+w2)gtc'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = ['ygodecks.com', 'www.ygodecks.com', 'localhost', '127.0.0.1']
 
@@ -128,7 +125,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
