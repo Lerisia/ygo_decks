@@ -1,4 +1,7 @@
+from datetime import timedelta
 from django.test import TestCase
+from django.utils import timezone
+from django.core.management import call_command
 from user.models import User
 from deck.models import Deck
 
@@ -42,3 +45,37 @@ class UserModelTest(TestCase):
         User.objects.create_user(email="a@test.com", username="same", password="pass1234")
         with self.assertRaises(Exception):
             User.objects.create_user(email="b@test.com", username="same", password="pass1234")
+
+
+class CleanupUnverifiedUsersTest(TestCase):
+    def test_deletes_old_inactive_users(self):
+        old = User.objects.create_user(email="old@test.com", username="old", password="pass1234", is_active=False)
+        old.date_joined = timezone.now() - timedelta(hours=49)
+        old.save(update_fields=["date_joined"])
+
+        call_command("cleanup_unverified_users")
+        self.assertFalse(User.objects.filter(id=old.id).exists())
+
+    def test_keeps_recent_inactive_users(self):
+        recent = User.objects.create_user(email="new@test.com", username="new", password="pass1234", is_active=False)
+        recent.date_joined = timezone.now() - timedelta(hours=1)
+        recent.save(update_fields=["date_joined"])
+
+        call_command("cleanup_unverified_users")
+        self.assertTrue(User.objects.filter(id=recent.id).exists())
+
+    def test_keeps_active_users(self):
+        active = User.objects.create_user(email="active@test.com", username="active", password="pass1234", is_active=True)
+        active.date_joined = timezone.now() - timedelta(days=30)
+        active.save(update_fields=["date_joined"])
+
+        call_command("cleanup_unverified_users")
+        self.assertTrue(User.objects.filter(id=active.id).exists())
+
+    def test_keeps_staff_even_if_inactive(self):
+        staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234", is_active=False, is_staff=True)
+        staff.date_joined = timezone.now() - timedelta(days=30)
+        staff.save(update_fields=["date_joined"])
+
+        call_command("cleanup_unverified_users")
+        self.assertTrue(User.objects.filter(id=staff.id).exists())

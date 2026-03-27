@@ -119,13 +119,19 @@ class Command(BaseCommand):
 
         # Case 2: Custom lookup table for all user
         elif all_users:
-            users = User.objects.all()
+            users = User.objects.filter(use_custom_lookup=True)
+            self.stdout.write(f"🔹 커스텀 룩업 활성화 유저: {users.count()}명")
+            skipped = 0
             for user in users:
                 excluded_decks = list(user.owned_decks.values_list("id", flat=True))
+                if not excluded_decks:
+                    skipped += 1
+                    continue
                 lookup_table = generate_lookup_table(excluded_decks)
                 filename = f"lookup_table_{user.id}.json"
                 save_lookup_table(lookup_table, filename)
-                print(f"✅ User {user.id}의 Lookup Table 생성 완료!")
+            if skipped:
+                self.stdout.write(f"⏭️ 보유 덱 없는 유저 {skipped}명 스킵")
 
             self.stdout.write("✅ 모든 유저의 Look-up Table 생성 완료!")
 

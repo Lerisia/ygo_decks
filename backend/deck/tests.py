@@ -1,4 +1,7 @@
+import os
+from unittest.mock import patch
 from django.test import TestCase, Client
+from django.conf import settings
 from rest_framework.test import APIClient
 from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag, DeckAlias
 from .views import parse_answer_key
@@ -179,3 +182,17 @@ class UpdateWikiContentTest(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 403)
+
+
+class LookupTableAutoRegenerateTest(TestCase):
+    @patch("deck.signals.generate_and_save_all_lookups")
+    def test_deck_save_triggers_regeneration(self, mock_regen):
+        _create_deck(name="새덱")
+        mock_regen.assert_called_once()
+
+    @patch("deck.signals.generate_and_save_all_lookups")
+    def test_deck_delete_triggers_regeneration(self, mock_regen):
+        deck = _create_deck(name="삭제덱")
+        mock_regen.reset_mock()
+        deck.delete()
+        mock_regen.assert_called_once()
