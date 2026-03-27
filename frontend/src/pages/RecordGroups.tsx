@@ -302,49 +302,67 @@ const RecordGroups = () => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {recordGroups.map((group) => (
-          <div
-            key={group.id}
-            onClick={() => navigate(`/record-groups/${group.id}`)}
-            className="p-4 border dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-          >
-            <h2 className="text-lg font-semibold hover:underline">{group.name}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">게임 수: {group.totalGames}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              총 승률: {group.overallWinRate.toFixed(1)}%
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              선공 비율: {group.firstRatio.toFixed(1)}%
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              선공 승률: {group.firstWinRate.toFixed(1)}%
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              후공 승률: {group.secondWinRate.toFixed(1)}%
-            </p>
-            <button
-              className="mt-4 px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm("이 시트를 삭제할까요?")) {
-                  deleteRecordGroup(group.id)
-                    .then(() => {
-                      alert("삭제 완료");
-                      window.location.reload();
-                    })
-                    .catch((err) => alert("삭제 실패: " + err.message));
-                }
-              }}
+        {recordGroups.map((group) => {
+          const wins = Math.round(group.totalGames * group.overallWinRate / 100);
+          const losses = group.totalGames - wins;
+          return (
+            <div
+              key={group.id}
+              onClick={() => navigate(`/record-groups/${group.id}`)}
+              className="relative p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition group"
             >
-              삭제
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">{group.name}</h2>
+                <button
+                  className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="삭제"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm("이 시트를 삭제할까요?")) {
+                      deleteRecordGroup(group.id)
+                        .then(() => {
+                          alert("삭제 완료");
+                          window.location.reload();
+                        })
+                        .catch((err) => alert("삭제 실패: " + err.message));
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="text-2xl font-bold mb-1">
+                {group.overallWinRate.toFixed(1)}%
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                {group.totalGames}전 {wins}승 {losses}패
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+                  <p className="text-gray-500 dark:text-gray-400">선공률</p>
+                  <p className="font-semibold">{group.firstRatio.toFixed(0)}%</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+                  <p className="text-gray-500 dark:text-gray-400">선공 승</p>
+                  <p className="font-semibold">{group.firstWinRate.toFixed(0)}%</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+                  <p className="text-gray-500 dark:text-gray-400">후공 승</p>
+                  <p className="font-semibold">{group.secondWinRate.toFixed(0)}%</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm mx-4">
             <h2 className="text-lg font-semibold mb-2">새로운 시트 추가</h2>
             <input
               type="text"
