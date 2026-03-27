@@ -1,7 +1,9 @@
-from django.contrib import admin
+import os
+import threading
+from django.contrib import admin, messages
 from django.utils.html import format_html
 from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag, DeckAlias
-import os
+from .management.commands.generate_lookup import generate_lookup_table, save_lookup_table
 
 @admin.register(Deck)
 class DeckAdmin(admin.ModelAdmin):
@@ -18,6 +20,22 @@ class DeckAdmin(admin.ModelAdmin):
     search_fields = ('name', )
     list_filter = ('strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
+    actions = ['regenerate_lookup_tables']
+
+    @admin.action(description="LUT 재생성 (기본 + 커스텀 유저)")
+    def regenerate_lookup_tables(self, request, queryset):
+        from user.models import User
+
+        def _run():
+            save_lookup_table(generate_lookup_table(), "lookup_table.json")
+            for user in User.objects.filter(use_custom_lookup=True):
+                excluded = list(user.owned_decks.values_list("id", flat=True))
+                if not excluded:
+                    continue
+                save_lookup_table(generate_lookup_table(excluded), f"lookup_table_{user.id}.json")
+
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(request, "LUT 재생성이 백그라운드에서 시작되었습니다.", messages.SUCCESS)
 
     def display_summoning_methods(self, obj):
         return ", ".join(

@@ -29,6 +29,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/admin/, /^\/api/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/ygodecks\.com\/api\//,
