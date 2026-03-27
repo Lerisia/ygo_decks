@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-// import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
 interface Deck {
@@ -189,99 +187,78 @@ export default function DatabasePage() {
       />
 
       {/* Filter expand / fold */}
-      <button onClick={toggleFilterSection} className="mb-4 p-2 bg-gray-300 rounded-lg">
+      <button onClick={toggleFilterSection} className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
         {filterExpanded ? "필터 숨기기 ▲" : "필터 보기 ▼"}
       </button>
 
       {/* Single selection filter 필터 */}
       {filterExpanded && (
         <div className="flex flex-col gap-4 mb-4">
-          {/* Deck Power Filter */}
-          <div>
-            <p className="text-left font-semibold mb-2">덱 파워</p>
-            <div className="flex flex-wrap gap-2">
-              {["티어권", "준티어권", "비티어권", "하위권"].map((option) => (
-                <Badge
-                  key={option}
-                  onClick={() => setSelectedStrength((prev) => (prev === option ? null : option))}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedStrength === option ? "bg-blue-500 text-white" : "bg-gray-500"
-                  }`}
-                >
-                  {option}
-                </Badge>
-              ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">덱 파워</label>
+              <select
+                value={selectedStrength || ""}
+                onChange={(e) => setSelectedStrength(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                {["티어권", "준티어권", "비티어권", "하위권"].map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          {/* Difficulty Filter */}
-          <div>
-            <p className="text-left font-semibold mb-2">난이도</p>
-            <div className="flex flex-wrap gap-2">
-              {["쉬움", "보통", "어려움"].map((option) => (
-                <Badge
-                  key={option}
-                  onClick={() => setSelectedDifficulty((prev) => (prev === option ? null : option))}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedDifficulty === option ? "bg-blue-500 text-white" : "bg-gray-500"
-                  }`}
-                >
-                  {option}
-                </Badge>
-              ))}
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">난이도</label>
+              <select
+                value={selectedDifficulty || ""}
+                onChange={(e) => setSelectedDifficulty(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                {["쉬움", "보통", "어려움"].map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          {/* Deck Type Filter */}
-          <div>
-            <p className="text-left font-semibold mb-2">덱 타입</p>
-            <div className="flex flex-wrap gap-2">
-              {["전개", "미드레인지", "운영", "특이"].map((option) => (
-                <Badge
-                  key={option}
-                  onClick={() => setSelectedDeckType((prev) => (prev === option ? null : option))}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedDeckType === option ? "bg-blue-500 text-white" : "bg-gray-500"
-                  }`}
-                >
-                  {option}
-                </Badge>
-              ))}
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">덱 타입</label>
+              <select
+                value={selectedDeckType || ""}
+                onChange={(e) => setSelectedDeckType(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                {["전개", "미드레인지", "운영", "특이"].map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          {/* Art Style Filter */}
-          <div>
-            <p className="text-left font-semibold mb-2">아트 스타일</p>
-            <div className="flex flex-wrap gap-2">
-              {["멋있는", "어두운", "명랑한", "환상적", "웅장한"].map((option) => (
-                <Badge
-                  key={option}
-                  onClick={() => setSelectedArtStyle((prev) => (prev === option ? null : option))}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedArtStyle === option ? "bg-blue-500 text-white" : "bg-gray-500"
-                  }`}
-                >
-                  {option}
-                </Badge>
-              ))}
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">아트 스타일</label>
+              <select
+                value={selectedArtStyle || ""}
+                onChange={(e) => setSelectedArtStyle(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                {["멋있는", "어두운", "명랑한", "환상적", "웅장한"].map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </div>
-          </div>
-          {/* Summoning Method Filter */}
-          <div>
-            <p className="text-left font-semibold mb-2">소환법</p>
-            <div className="flex flex-wrap gap-2">
-              {summoningMethods.map((method) => (
-                <Badge
-                  key={method}
-                  onClick={() => setSelectedSummoningMethod(prev => prev === method ? null : method)}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedSummoningMethod === method ? "bg-blue-500 text-white" : "bg-gray-500"
-                  }`}
-                >
-                  {method}
-                </Badge>
-              ))}
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">소환법</label>
+              <select
+                value={selectedSummoningMethod || ""}
+                onChange={(e) => setSelectedSummoningMethod(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                {summoningMethods.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </div>
           </div>
           {/* Combined Tag Filter (Aesthetic & Performance) */}
@@ -290,15 +267,17 @@ export default function DatabasePage() {
             <p className="text-left font-semibold mb-2">태그 (비성능적)</p>
             <div className="flex flex-wrap gap-2 mb-4">
               {aestheticTags.map((tag) => (
-                <Badge
+                <button
                   key={tag}
                   onClick={() => toggleTag(tag, setSelectedAestheticTags)}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedAestheticTags.includes(tag) ? "bg-blue-500 text-white" : "bg-gray-500"
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    selectedAestheticTags.includes(tag)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {tag}
-                </Badge>
+                </button>
               ))}
             </div>
 
@@ -306,21 +285,23 @@ export default function DatabasePage() {
             <p className="text-left font-semibold mb-2">태그 (성능적)</p>
             <div className="flex flex-wrap gap-2">
               {performanceTags.map((tag) => (
-                <Badge
+                <button
                   key={tag}
                   onClick={() => toggleTag(tag, setSelectedPerformanceTags)}
-                  className={`cursor-pointer px-3 py-2 rounded-lg border ${
-                    selectedPerformanceTags.includes(tag) ? "bg-blue-500 text-white" : "bg-gray-500"
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    selectedPerformanceTags.includes(tag)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {tag}
-                </Badge>
+                </button>
               ))}
             </div>
           </div>
           <div className="flex justify-center">
             <button
-              className="p-2 bg-red-400 text-white rounded w-auto inline-block self-start"
+              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
               onClick={() => {
                 localStorage.removeItem("deck_filters");
                 window.location.reload();
