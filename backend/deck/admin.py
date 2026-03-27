@@ -1,9 +1,23 @@
 import os
 import threading
 from django.contrib import admin, messages
+from django.urls import path
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 from django.utils.html import format_html
 from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag, DeckAlias
 from .management.commands.generate_lookup import generate_lookup_table, save_lookup_table
+
+
+def _regenerate_all_luts():
+    from user.models import User
+    save_lookup_table(generate_lookup_table(), "lookup_table.json")
+    for user in User.objects.filter(use_custom_lookup=True):
+        excluded = list(user.owned_decks.values_list("id", flat=True))
+        if not excluded:
+            continue
+        save_lookup_table(generate_lookup_table(excluded), f"lookup_table_{user.id}.json")
+
 
 @admin.register(Deck)
 class DeckAdmin(admin.ModelAdmin):
@@ -20,22 +34,18 @@ class DeckAdmin(admin.ModelAdmin):
     search_fields = ('name', )
     list_filter = ('strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
-    actions = ['regenerate_lookup_tables']
+    change_list_template = "admin/deck_changelist.html"
 
-    @admin.action(description="LUT 재생성 (기본 + 커스텀 유저)")
-    def regenerate_lookup_tables(self, request, queryset):
-        from user.models import User
+    def get_urls(self):
+        custom_urls = [
+            path("regenerate-lut/", self.admin_site.admin_view(self.regenerate_lut_view), name="deck_regenerate_lut"),
+        ]
+        return custom_urls + super().get_urls()
 
-        def _run():
-            save_lookup_table(generate_lookup_table(), "lookup_table.json")
-            for user in User.objects.filter(use_custom_lookup=True):
-                excluded = list(user.owned_decks.values_list("id", flat=True))
-                if not excluded:
-                    continue
-                save_lookup_table(generate_lookup_table(excluded), f"lookup_table_{user.id}.json")
-
-        threading.Thread(target=_run, daemon=True).start()
-        self.message_user(request, "LUT 재생성이 백그라운드에서 시작되었습니다.", messages.SUCCESS)
+    def regenerate_lut_view(self, request):
+        threading.Thread(target=_regenerate_all_luts, daemon=True).start()
+        messages.success(request, "LUT 재생성이 백그라운드에서 시작되었습니다.")
+        return redirect("admin:deck_deck_changelist")
 
     def display_summoning_methods(self, obj):
         return ", ".join(
@@ -56,7 +66,7 @@ class DeckAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-width:200px; height:auto;" />', obj.cover_image.url)
         return "-"
     cover_image_preview.short_description = "Cover Image Preview"
-    
+
     def small_image_exists(self, obj):
         if obj.cover_image:
             small_img_path = os.path.join(
@@ -81,7 +91,7 @@ class SummoningMethodAdmin(admin.ModelAdmin):
 @admin.register(PerformanceTag)
 class PerformanceTagAdmin(admin.ModelAdmin):
     list_display = ('name',)
-    
+
 @admin.register(AestheticTag)
 class AestheticTagAdmin(admin.ModelAdmin):
     list_display = ('name',)
