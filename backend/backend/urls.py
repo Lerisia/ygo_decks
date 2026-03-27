@@ -31,7 +31,6 @@ urlpatterns = [
     path('api/', include('userstatistics.urls')),
     path('api/', include('card.urls')),
     path('api/', include('user.urls')),
-    path('api/', include('tournament.urls')),
     path('api/', include('tool.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

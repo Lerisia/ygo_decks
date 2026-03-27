@@ -15,6 +15,5 @@ urlpatterns = [
     path('api/', include('question.urls')),
     path('api/', include('deck.urls')),
     path('api/', include('userstatistics.urls')),
-    path('api/', include('tournament.urls')),
     path('api/', include('tool.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

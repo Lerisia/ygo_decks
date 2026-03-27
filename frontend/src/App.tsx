@@ -19,13 +19,9 @@ import Mydecks from "./pages/Mydecks";
 import Noresults from "./pages/Noresults";
 import DatabasePage from "./pages/Database";
 import DeckDetail from "./pages/DeckDetail";
-import TournamentList from "./pages/Tournaments";
-import TournamentDetail from "./pages/TournamentDetail";
-import CreateTournament from "./pages/CreateTournament";
 import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
-import BracketPage from "./pages/BracketDetail";
 import DeckScanner from "./pages/DeckScanner";
 
 function App() {
@@ -50,13 +46,9 @@ function App() {
           <Route path="/no-results" element={<Noresults />} />
           <Route path="/database" element={<DatabasePage />} />
           <Route path="/database/:deckId" element={<DeckDetail />} />
-          <Route path="/tournaments" element={<TournamentList />} />
-          <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
-          <Route path="/tournaments/create" element={<CreateTournament />} />
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />
           <Route path="/record-groups/:recordGroupId/statistics" element={<RecordGroupStatistics />} />
-          <Route path="/bracket" element={<BracketPage />} />  
           <Route path="/deck-scanner" element={<DeckScanner />} />    
           <Route path="/card-detector" element={<DeckScanner />} />
           <Route path="*" element={<NotFound />} />
