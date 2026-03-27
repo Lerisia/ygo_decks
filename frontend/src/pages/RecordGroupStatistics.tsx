@@ -80,7 +80,7 @@ const StatisticsPage = () => {
         <button
           onClick={() => setActiveTab("basic")}
           className={`px-4 py-2 font-semibold ${
-            activeTab === "basic" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
+            activeTab === "basic" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"
           }`}
         >
           요약
@@ -88,7 +88,7 @@ const StatisticsPage = () => {
         <button
           onClick={() => setActiveTab("deck")}
           className={`px-4 py-2 font-semibold ${
-            activeTab === "deck" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
+            activeTab === "deck" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"
           }`}
         >
           덱별 통계
@@ -98,45 +98,45 @@ const StatisticsPage = () => {
         <div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 text-center">
           <div>
-            <p className="text-gray-500 text-sm">총 게임 수</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">총 게임 수</p>
             <p className="text-xl font-bold">{stats.basic.total_games}</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">승률</p>
             <p className="text-xl font-bold">{stats.basic.overall_win_rate.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">승리 수</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">승리 수</p>
             <p className="text-xl font-bold">{Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100)}</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">패배 수</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">패배 수</p>
             <p className="text-xl font-bold">{stats.basic.total_games - Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100)}</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 mb-8 text-center">
           <div>
-            <p className="text-gray-500 text-sm">코인토스 승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">코인토스 승률</p>
             <p className="text-xl font-bold">{stats.basic.coin_toss_win_rate.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">앞면 시 승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">앞면 시 승률</p>
             <p className="text-xl font-bold">{stats.basic.coin_toss_win_win_rate.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">뒷면 시 승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">뒷면 시 승률</p>
             <p className="text-xl font-bold">{stats.basic.coin_toss_lose_win_rate.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">선공 비율</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">선공 비율</p>
             <p className="text-xl font-bold">{stats.basic.first_ratio.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">선공 시 승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">선공 시 승률</p>
             <p className="text-xl font-bold">{stats.basic.first_win_rate.toFixed(1)}%</p>
           </div>
           <div>
-            <p className="text-gray-500 text-sm">후공 시 승률</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">후공 시 승률</p>
             <p className="text-xl font-bold">{stats.basic.second_win_rate.toFixed(1)}%</p>
           </div>
         </div>
@@ -393,7 +393,7 @@ const StatisticsPage = () => {
                         )}
                         <span className="hidden sm:inline">{isUnknownDeck(entry) ? "모름/기타" : entry.deck?.name}</span>
                         <span className="sm:hidden" data-tip={entry.deck?.name}>
-                          <i className="fas fa-info-circle text-gray-500" />
+                          <i className="fas fa-info-circle text-gray-500 dark:text-gray-400" />
                         </span>
                         </td>
                         <td className="text-right px-2">{entry.count}</td>

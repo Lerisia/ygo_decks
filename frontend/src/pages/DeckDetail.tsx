@@ -88,11 +88,11 @@ export default function DeckDetail() {
       
       {/* 우측(PC) / 상단(모바일) 테이블 섹션 */}
       <div className="w-full lg:w-[320px] overflow-x-auto mb-4 lg:float-right lg:ml-4">
-        <table className="w-full border border-gray-300 text-left">
+        <table className="w-full border border-gray-300 dark:border-gray-600 text-left">
           <tbody>
             <tr className="border-b">
               <td
-                className="p-3 font-extrabold text-center text-2xl bg-gray-200"
+                className="p-3 font-extrabold text-center text-2xl bg-gray-200 dark:bg-gray-700"
                 colSpan={2}
               >
                 {deck.name}
@@ -110,31 +110,31 @@ export default function DeckDetail() {
               </tr>
             )}
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-32">덱 파워</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">덱 파워</td>
               <td className="p-2">
                 {deck.strength !== "해당 없음" ? deck.strength : "정보 없음"}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-32">난이도</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">난이도</td>
               <td className="p-2">
                 {deck.difficulty !== "해당 없음" ? deck.difficulty : "정보 없음"}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-32">덱 타입</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">덱 타입</td>
               <td className="p-2">
                 {deck.deck_type !== "해당 없음" ? deck.deck_type : "정보 없음"}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-32">아트 스타일</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">아트 스타일</td>
               <td className="p-2">
                 {deck.art_style !== "해당 없음" ? deck.art_style : "정보 없음"}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-32">소환법</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">소환법</td>
               <td className="p-2">
                 {deck.summoning_methods.filter((m) => m !== "해당 없음").length > 0
                   ? deck.summoning_methods
@@ -144,7 +144,7 @@ export default function DeckDetail() {
               </td>
             </tr>
             <tr className="border-b">
-              <td className="p-2 font-semibold bg-gray-200 w-24">태그</td>
+              <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-24">태그</td>
               <td className="p-2">
                 {[...deck.performance_tags, ...deck.aesthetic_tags].filter(
                   (t) => t !== "해당 없음"
@@ -197,13 +197,13 @@ export default function DeckDetail() {
                     __html: converter.makeHtml(deck.wiki_content),
                   }}
                 />
-                <p className="text-center text-gray-800 mt-4">
+                <p className="text-center text-gray-800 dark:text-gray-200 mt-4">
                   틀린 내용이나 추가할 내용이 있나요?
                 </p>
               </>
             ) : (
               <>
-                <p className="text-center text-gray-800">
+                <p className="text-center text-gray-800 dark:text-gray-200">
                   아직 이 덱에 대한 설명이 없습니다.
                 </p>
               </>

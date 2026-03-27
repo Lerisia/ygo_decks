@@ -37,13 +37,13 @@ export default function TournamentDetail() {
             {tournament.cover_image && (
                 <img src={tournament.cover_image} alt={tournament.name} className="w-full h-48 md:h-64 object-contain rounded mb-4" />
             )}
-            <p className="text-lg text-gray-600 mb-2 text-center">
+            <p className="text-lg text-gray-600 dark:text-gray-400 mb-2 text-center">
                 일시: {new Date(tournament.event_date).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </p>
-            <p className="text-gray-800 mb-4 text-center">{tournament.description || "설명이 없습니다."}</p>
+            <p className="text-gray-800 dark:text-gray-200 mb-4 text-center">{tournament.description || "설명이 없습니다."}</p>
             <p className={`text-lg font-semibold mb-4 text-center ${
                 tournament.status === 'ongoing' ? 'text-green-500' :
-                tournament.status === 'completed' ? 'text-gray-500' :
+                tournament.status === 'completed' ? 'text-gray-500 dark:text-gray-400' :
                 'text-blue-500'
             }`}>
                 {tournament.status === 'ongoing' ? '진행 중' :
@@ -62,7 +62,7 @@ export default function TournamentDetail() {
                             <button className="px-4 py-2 bg-gray-400 text-white rounded cursor-not-allowed" disabled>
                                 참가 신청
                             </button>
-                            <span className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-48 text-center text-xs text-gray-700 bg-gray-100 p-2 rounded shadow opacity-0 group-hover:opacity-100 transition">
+                            <span className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-48 text-center text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 p-2 rounded shadow opacity-0 group-hover:opacity-100 transition">
                                 로그인한 유저만 참가 신청할 수 있습니다
                             </span>
                         </div>

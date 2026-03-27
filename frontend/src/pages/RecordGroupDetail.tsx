@@ -124,7 +124,7 @@ export const EditMatchModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg w-[400px] max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-[400px] max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
         <h2 className="text-lg font-bold">기록 수정</h2>
         <div>
           <label className="block text-sm font-medium">코인토스</label>
@@ -132,7 +132,7 @@ export const EditMatchModal = ({
             name="coin_toss_result"
             value={form.coin_toss_result}
             onChange={handleChange}
-            className="w-full border rounded p-2 bg-white text-black"
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
           >
             <option value="win">앞면</option>
             <option value="lose">뒷면</option>
@@ -145,7 +145,7 @@ export const EditMatchModal = ({
             name="first_or_second"
             value={form.first_or_second}
             onChange={handleChange}
-            className="w-full border rounded p-2 bg-white text-black"
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
           >
             <option value="first">선공</option>
             <option value="second">후공</option>
@@ -158,7 +158,7 @@ export const EditMatchModal = ({
             name="result"
             value={form.result}
             onChange={handleChange}
-            className="w-full border rounded p-2 bg-white text-black"
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
           >
             <option value="win">승리</option>
             <option value="lose">패배</option>
@@ -173,7 +173,7 @@ export const EditMatchModal = ({
               setUseRankOrScore(e.target.value);
               setForm((prev) => ({ ...prev, rank: "", score: "" }));
             }}
-            className="w-full border rounded p-2 bg-white text-black"
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
           >
             <option value="none">입력 안 함</option>
             <option value="rank">랭크</option>
@@ -189,7 +189,7 @@ export const EditMatchModal = ({
                 name="rank"
                 value={form.rank}
                 onChange={handleChange}
-                className="w-full border rounded p-2 bg-white text-black"
+                className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
               >
                 <option value="">선택</option>
                 {rankOptions.map((r) => (
@@ -209,7 +209,7 @@ export const EditMatchModal = ({
                     wins: e.target.value === "" ? null : Number(e.target.value),
                   }))
                 }
-                className="w-full border rounded p-2 bg-white text-black"
+                className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
               >
                 <option value="">입력 안 함</option>
                 {getValidWinOptions(form.rank).map((opt) => (
@@ -230,7 +230,7 @@ export const EditMatchModal = ({
               value={form.score}
               onChange={handleChange}
               type="number"
-              className="w-full border rounded p-2 bg-white text-black"
+              className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
             />
           </div>
         )}
@@ -241,7 +241,7 @@ export const EditMatchModal = ({
             name="notes"
             value={form.notes}
             onChange={handleChange}
-            className="w-full border rounded p-2 bg-white text-black"
+            className="w-full border rounded p-2 bg-white dark:bg-gray-800 text-black dark:text-white"
           />
         </div>
 
@@ -722,7 +722,7 @@ const RecordGroupDetailPage = () => {
       <div className="relative mb-4">
         <h1 className="text-2xl font-bold text-center inline-flex items-center justify-center gap-2 w-full">
           {recordGroupName}
-          <button onClick={handleEditName} className="text-gray-500 hover:text-black">
+          <button onClick={handleEditName} className="text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white">
             ✏️
           </button>
         </h1>
@@ -751,7 +751,7 @@ const RecordGroupDetailPage = () => {
         승수 옵션이 새로 추가되어 아직 테스트 중입니다. 버그 제보 주세요!
       </div>
 
-      <div className="p-4 border rounded-lg shadow bg-white mb-6 max-w-2xl w-full mx-auto">
+      <div className="p-4 border rounded-lg shadow bg-white dark:bg-gray-800 mb-6 max-w-2xl w-full mx-auto">
         <h2 className="text-lg font-semibold mb-2">기록 등록</h2>
         <div className="flex flex-col gap-2">
           <Select
@@ -819,7 +819,7 @@ const RecordGroupDetailPage = () => {
                   className={`px-3 py-1 rounded border ${
                     newMatch.coin_toss_result === opt.value
                       ? "bg-blue-500 text-white"
-                      : "bg-white text-black"
+                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
                   }`}
                 >
                   {opt.label}
@@ -839,7 +839,7 @@ const RecordGroupDetailPage = () => {
                   className={`px-3 py-1 rounded border ${
                     newMatch.first_or_second === opt.value
                       ? "bg-blue-500 text-white"
-                      : "bg-white text-black"
+                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
                   }`}
                 >
                   {opt.label}
@@ -859,7 +859,7 @@ const RecordGroupDetailPage = () => {
                   className={`px-3 py-1 rounded border ${
                     newMatch.result === opt.value
                       ? "bg-blue-500 text-white"
-                      : "bg-white text-black"
+                      : "bg-white dark:bg-gray-800 text-black dark:text-white"
                   }`}
                 >
                   {opt.label}
@@ -965,7 +965,7 @@ const RecordGroupDetailPage = () => {
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
-          className="p-2 border rounded bg-white text-black"
+          className="p-2 border rounded bg-white dark:bg-gray-800 text-black dark:text-white"
         >
           <option value="10">10개씩 보기</option>
           <option value="20">20개씩 보기</option>
@@ -1059,7 +1059,7 @@ const RecordGroupDetailPage = () => {
               </div>
 
               {match.notes && (
-                <div className="px-4 pb-2 text-xs sm:text-sm text-gray-700 whitespace-pre-wrap break-words">
+                <div className="px-4 pb-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
                   <span className="font-medium"></span> {match.notes}
                 </div>
               )}
@@ -1073,7 +1073,7 @@ const RecordGroupDetailPage = () => {
         <button
           onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           disabled={page === 1}
-          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+          className="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded disabled:opacity-50"
         >
           이전
         </button>
@@ -1081,7 +1081,7 @@ const RecordGroupDetailPage = () => {
         <button
           onClick={() => setPage((prev) => (prev < totalPages ? prev + 1 : prev))}
           disabled={page === totalPages}
-          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+          className="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded disabled:opacity-50"
         >
           다음
         </button>

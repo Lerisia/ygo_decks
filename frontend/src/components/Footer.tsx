@@ -1,38 +1,16 @@
-import React from "react";
 import { Link } from "react-router-dom";
 
-const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-const Footer: React.FC = () => {
+const Footer = () => {
   return (
-    <footer style={styles.footer}>
+    <footer className="text-center px-4 py-5 mt-10 text-xs text-gray-500 dark:text-gray-400">
       <p>© KONAMI. All Yu-Gi-Oh! related images and materials are the property of KONAMI.</p>
-      <p>
-      This website is an unofficial fan site and is not affiliated with or endorsed by KONAMI in any way.
-      </p>
+      <p>This website is an unofficial fan site and is not affiliated with or endorsed by KONAMI in any way.</p>
       <p>All images on this website belong to KONAMI and are used solely for informational purposes.</p>
-      
-      <Link to="/terms" style={styles.link}>이용약관</Link>
+      <Link to="/terms" className="inline-block mt-2 font-bold text-gray-600 dark:text-gray-300 hover:underline">
+        이용약관
+      </Link>
     </footer>
   );
 };
-
-const styles = {
-    footer: {
-      textAlign: "center" as const,
-      padding: "20px",
-      marginTop: "40px",
-    },
-    text: {
-      color: isDarkMode ? "#fff" : "#444",
-      fontSize: "14px",
-    },
-    link: {
-      color: isDarkMode ? "#bbb" : "#666",
-      textDecoration: "none",
-      fontWeight: "bold",
-    },
-  };
-  
 
 export default Footer;

@@ -18,7 +18,7 @@ export default function CreateTournament() {
     if (!isAuthenticated()) {
         return (
             <div className="h-auto min-h-screen p-4 flex justify-center items-center">
-                <p className="text-lg text-gray-600">로그인해야 대회를 생성할 수 있습니다.</p>
+                <p className="text-lg text-gray-600 dark:text-gray-400">로그인해야 대회를 생성할 수 있습니다.</p>
             </div>
         );
     }

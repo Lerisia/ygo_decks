@@ -34,12 +34,12 @@ export default function TournamentList() {
                 ) : (
                     <div className="relative group">
                         <button
-                            className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-lg cursor-not-allowed"
+                            className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg cursor-not-allowed"
                             disabled
                         >
                             대회 생성
                         </button>
-                        <span className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-48 text-center text-xs text-gray-700 bg-gray-100 p-2 rounded shadow opacity-0 group-hover:opacity-100 transition">
+                        <span className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-48 text-center text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 p-2 rounded shadow opacity-0 group-hover:opacity-100 transition">
                             로그인한 유저만 대회를 생성할 수 있습니다
                         </span>
                     </div>
@@ -65,12 +65,12 @@ export default function TournamentList() {
                         >
                             {tournament.edition ? `제 ${tournament.edition}회 ${tournament.name}` : tournament.name}
                         </h2>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                             일시: {new Date(tournament.event_date).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </p>
                         <p className={`text-sm font-semibold ${
                             tournament.status === 'ongoing' ? 'text-green-500' :
-                            tournament.status === 'completed' ? 'text-gray-500' :
+                            tournament.status === 'completed' ? 'text-gray-500 dark:text-gray-400' :
                             'text-blue-500'
                         }`}>
                             {tournament.status === 'ongoing' ? '진행 중' :

@@ -208,15 +208,15 @@ const RecordGroups = () => {
       <h1 className="text-2xl font-bold mb-4">시트 관리</h1>
       {metaStats?.length > 0 ? (
         <div className="mb-6">
-          <div className="text-sm text-gray-800">
+          <div className="text-sm text-gray-800 dark:text-gray-200">
             자주 출현하는 덱: <div className="grid grid-cols-3 gap-2 text-xs">
             {metaStats.slice(0, 3).map((deck, idx) => (
-              <div key={deck.meta_deck_id} className="bg-white shadow rounded p-2 text-center">
+              <div key={deck.meta_deck_id} className="bg-white dark:bg-gray-800 shadow rounded p-2 text-center">
                 <div className="text-xl">
                   {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
                 </div>
                 <div className="font-semibold">{deck.meta_deck_name}</div>
-                <div className="text-gray-500">{deck.appearance_percent}%</div>
+                <div className="text-gray-500 dark:text-gray-400">{deck.appearance_percent}%</div>
               </div>
             ))}
           </div>
@@ -228,14 +228,14 @@ const RecordGroups = () => {
             {showMetaStats ? "숨기기 ▲" : "더 보기 ▼"}
           </button>
           {showMetaStats && (
-            <div className="mt-2 p-4 bg-white shadow rounded">
-              <p className="text-xs text-gray-700">
+            <div className="mt-2 p-4 bg-white dark:bg-gray-800 shadow rounded">
+              <p className="text-xs text-gray-700 dark:text-gray-300">
                 ※ 지난 일주일간 다이아 ~ 마스터 구간의 전적 기반
               </p>
-              <p className="text-xs text-gray-700">
+              <p className="text-xs text-gray-700 dark:text-gray-300">
                 ※ 셀렉션 팩 출시 시 초기화
               </p>
-              <p className="text-xs text-gray-700 mb-3 font-medium">
+              <p className="text-xs text-gray-700 dark:text-gray-300 mb-3 font-medium">
                 총 집계 게임 수: {totalMatches.toLocaleString()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -259,9 +259,9 @@ const RecordGroups = () => {
                             className="w-10 h-10 rounded object-cover hidden sm:block"
                           />
                         )}
-                        <span className="font-medium text-gray-800">{deck.meta_deck_name}</span>
+                        <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
                       </div>
-                      <div className="text-right text-sm text-gray-600">
+                      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
                         <div>
                           출현률: <span className="font-semibold">{deck.appearance_percent}%</span>
                         </div>
@@ -273,7 +273,7 @@ const RecordGroups = () => {
                                 ? "text-blue-600"
                                 : deck.win_rate <= 45
                                 ? "text-red-500"
-                                : "text-gray-700"
+                                : "text-gray-700 dark:text-gray-300"
                             }`}
                           >
                             {deck.win_rate}%
@@ -288,7 +288,7 @@ const RecordGroups = () => {
           )}
         </div>
       ) : (
-        <div className="text-sm text-gray-500 mb-4">메타 덱 통계를 불러오는 중입니다...</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">메타 덱 통계를 불러오는 중입니다...</div>
       )}
       {isLoggedIn ? (
         <button
@@ -298,7 +298,7 @@ const RecordGroups = () => {
           + 시트 추가하기
         </button>
       ) : (
-        <p className="text-sm text-gray-600">로그인 후 사용해주세요.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">로그인 후 사용해주세요.</p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -306,20 +306,20 @@ const RecordGroups = () => {
           <div
             key={group.id}
             onClick={() => navigate(`/record-groups/${group.id}`)}
-            className="p-4 border rounded-lg shadow-sm bg-white cursor-pointer hover:bg-gray-100 transition"
+            className="p-4 border dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
           >
             <h2 className="text-lg font-semibold hover:underline">{group.name}</h2>
-            <p className="text-sm text-gray-600">게임 수: {group.totalGames}</p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">게임 수: {group.totalGames}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               총 승률: {group.overallWinRate.toFixed(1)}%
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               선공 비율: {group.firstRatio.toFixed(1)}%
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               선공 승률: {group.firstWinRate.toFixed(1)}%
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               후공 승률: {group.secondWinRate.toFixed(1)}%
             </p>
             <button
@@ -351,12 +351,12 @@ const RecordGroups = () => {
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="시트 이름"
-              className="p-2 border rounded w-full bg-white text-black"
+              className="p-2 border rounded w-full bg-white dark:bg-gray-800 text-black dark:text-white"
             />
             <div className="flex justify-end mt-4">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 mr-2 bg-gray-300 rounded"
+                className="px-4 py-2 mr-2 bg-gray-300 dark:bg-gray-600 rounded"
               >
                 취소
               </button>
