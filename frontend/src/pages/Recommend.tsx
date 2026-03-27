@@ -2,37 +2,33 @@ import { Link } from "react-router-dom";
 
 function Recommend() {
   return (
-    <div className="p-4 text-center h-auto min-h-screen items-center">
-      <div>
-        <div className="relative mb-6">
-          <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto" />
-          <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 sm:w-3/4 md:w-3/4 lg:w-3/4 mx-auto object-cover rounded-lg" />
-        </div>
-        <h1 className="text-xl sm:text-2xl md:text-4xl font-bold">유희왕 마스터 듀얼 덱 성향 테스트</h1>
-        <p className="text-lg mt-2 break-keep">
-          간단한 문답을 통해 나와 어울리는 덱 알아보기.
-        </p>
-        <p className="text-lg mt-2 break-keep">
-          회원가입을 통해 내 덱 저장하고 관리하기, 보유한 덱을 테스트에서 제외하기 등 다양한 추가 기능을 사용할 수 있습니다.
-        </p>
-        {/* <p className="text-lg text-red-600 mt-2 break-keep">
-          현재 점검 중으로 제대로 동작하지 않을 수 있습니다.
-        </p> */}
+    <div className="min-h-screen flex flex-col items-center px-4 pt-4">
+      <div className="relative mb-6 w-full max-w-2xl">
+        <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto rounded-lg" />
+        <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 mx-auto object-cover rounded-lg" />
+      </div>
+
+      <h1 className="text-2xl sm:text-3xl font-bold text-center break-keep">
+        덱 성향 테스트
+      </h1>
+      <p className="text-gray-500 dark:text-gray-400 mt-2 text-center break-keep">
+        간단한 문답으로 나에게 맞는 덱을 찾아보세요.
+      </p>
+
+      <div className="flex flex-col gap-3 mt-6 w-full max-w-xs">
         <Link to="/questions">
-          <button className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
-            테스트 시작
+          <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-lg">
+            시작하기
           </button>
         </Link>
-        <div>
         <Link to="/statistics">
-          <button className="mt-4 bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition">
+          <button className="w-full py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition">
             통계 보기
           </button>
         </Link>
-        </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default Recommend;

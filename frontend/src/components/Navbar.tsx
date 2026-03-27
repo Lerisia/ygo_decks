@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isAuthenticated } from "../api/accountApi";
 import logo from "/images/logo_big.png";
@@ -5,6 +6,20 @@ import logo from "/images/logo_big.png";
 function Navbar() {
   const isLoggedIn = isAuthenticated();
   const isHome = useLocation().pathname === "/";
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    if (moreOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [moreOpen]);
 
   return (
     <header className="bg-transparent text-black dark:text-white">
@@ -31,17 +46,51 @@ function Navbar() {
               📝 전적 시트
             </Link>
             <Link to="/deck-scanner" className="text-lg md:text-xl break-keep">
-              🪄 AI 덱 스캐너
+              🪄 AI 스캐너
             </Link>
-            {isLoggedIn ? (
-              <Link to="/mypage" className="text-lg md:text-xl break-keep">
-                👤 마이페이지
-              </Link>
-            ) : (
-              <Link to="/login" className="text-lg md:text-xl break-keep">
-                🔑 로그인
-              </Link>
-            )}
+            <div className="relative" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className="text-lg md:text-xl break-keep hover:opacity-70 transition"
+              >
+                ⋯ 더보기
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
+                  <Link
+                    to={isLoggedIn ? "/mypage/mydecks" : "/login"}
+                    className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    🃏 보유 덱 관리
+                  </Link>
+                  <Link
+                    to="/terms"
+                    className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    📄 이용약관
+                  </Link>
+                  {isLoggedIn ? (
+                    <Link
+                      to="/mypage"
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      👤 마이페이지
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      🔑 로그인
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       </div>
