@@ -269,9 +269,9 @@ const RecordGroups = () => {
                           승률:{" "}
                           <span
                             className={`font-semibold ${
-                              deck.win_rate >= 50
+                              deck.win_rate >= 55
                                 ? "text-blue-600"
-                                : deck.win_rate <= 40
+                                : deck.win_rate <= 45
                                 ? "text-red-500"
                                 : "text-gray-700"
                             }`}

@@ -3,7 +3,6 @@ import './App.css'
 import Navbar from "./components/Navbar";
 import Recommend from './pages/Recommend'
 import Changelog from './pages/Changelog'
-import Decks from './pages/Decks'
 import QuestionPage from "./pages/QuestionPage";
 import ResultPage from "./pages/ResultPage";
 import Footer from "./components/Footer";
@@ -37,7 +36,6 @@ function App() {
           <Route path="/" element={<Info />} />
           <Route path="/recommend" element ={<Recommend />} />
           <Route path="/changelog" element={<Changelog />} />
-          <Route path="/decks" element={<Decks />} />
           <Route path="/questions" element={<QuestionPage />} />
           <Route path="/result" element={<ResultPage />} />
           <Route path="/terms" element={<Terms />} />

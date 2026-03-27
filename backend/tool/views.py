@@ -448,7 +448,7 @@ RANK_RANGE = [
 
 @api_view(["GET"])
 def recent_meta_deck_stats(request):
-    reset_time = make_aware(datetime(2025, 6, 4, 15, 0, 0))
+    reset_time = make_aware(datetime(2025, 12, 5, 16, 50, 0))
     one_week_ago = timezone.now() - timedelta(days=7)
     time_threshold = max(reset_time, one_week_ago)  # 둘 중 더 최근 시각
 
