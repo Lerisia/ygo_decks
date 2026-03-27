@@ -58,6 +58,7 @@ class MatchRecord(models.Model):
     record_group = models.ForeignKey("RecordGroup", on_delete=models.CASCADE, related_name="matches")
     deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="player_matches",)
     opponent_deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="opponent_matches", blank=True, null=True)
+    opponent_deck_name = models.CharField(max_length=100, blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
 
     first_or_second = models.CharField(

@@ -117,6 +117,46 @@ class MatchRecordCRUDTest(TestCase):
         match.refresh_from_db()
         self.assertTrue(match.is_deleted)
 
+    def test_add_match_with_custom_opponent_name(self):
+        resp = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": self.deck.id,
+            "opponent_deck": None,
+            "opponent_deck_name": "스네이크아이",
+            "first_or_second": "first",
+            "result": "win",
+            "coin_toss_result": "win",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201)
+        match = MatchRecord.objects.get(id=resp.json()["match_id"])
+        self.assertIsNone(match.opponent_deck)
+        self.assertEqual(match.opponent_deck_name, "스네이크아이")
+
+    def test_update_opponent_deck_via_fk(self):
+        match = _create_match(self.group, self.deck)
+        resp = self.client.patch(f"/api/match-records/{match.id}/update/", {
+            "opponent_deck": self.opp_deck.id,
+        }, format="json")
+        self.assertEqual(resp.status_code, 200)
+        match.refresh_from_db()
+        self.assertEqual(match.opponent_deck_id, self.opp_deck.id)
+
+    def test_update_opponent_deck_name(self):
+        match = _create_match(self.group, self.deck, self.opp_deck)
+        resp = self.client.patch(f"/api/match-records/{match.id}/update/", {
+            "opponent_deck": None,
+            "opponent_deck_name": "커스텀덱",
+        }, format="json")
+        self.assertEqual(resp.status_code, 200)
+        match.refresh_from_db()
+        self.assertIsNone(match.opponent_deck)
+        self.assertEqual(match.opponent_deck_name, "커스텀덱")
+
+    def test_matches_response_includes_opponent_deck_name(self):
+        _create_match(self.group, self.deck, opponent_deck_name="커스텀")
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
+        match_data = resp.json()["matches"][0]
+        self.assertEqual(match_data["opponent_deck_name"], "커스텀")
+
     def test_other_user_cannot_update(self):
         other = User.objects.create_user(email="b@test.com", username="other", password="pass1234")
         other_client = APIClient()
@@ -185,6 +225,20 @@ class FullStatisticsTest(TestCase):
         self.assertEqual(data["basic"]["total_games"], 2)
         self.assertEqual(len(data["my_deck_stats"]), 2)
         self.assertEqual(len(data["opponent_deck_stats"]), 1)
+
+    def test_custom_opponent_grouped_in_personal_stats(self):
+        _create_match(self.group, self.deck1, opponent_deck_name="커스텀A", result="win")
+        _create_match(self.group, self.deck1, opponent_deck_name="커스텀A", result="lose")
+        _create_match(self.group, self.deck1, opponent_deck_name="커스텀B", result="win")
+
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/")
+        opp_stats = resp.json()["opponent_deck_stats"]
+        custom_a = [s for s in opp_stats if s.get("custom_name") == "커스텀A"]
+        custom_b = [s for s in opp_stats if s.get("custom_name") == "커스텀B"]
+        self.assertEqual(len(custom_a), 1)
+        self.assertEqual(custom_a[0]["total_games"], 2)
+        self.assertEqual(len(custom_b), 1)
+        self.assertEqual(custom_b[0]["total_games"], 1)
 
     def test_my_deck_stats_win_rate(self):
         _create_match(self.group, self.deck1, self.opp, result="win")
