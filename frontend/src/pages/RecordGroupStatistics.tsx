@@ -437,20 +437,8 @@ const StatisticsPage = () => {
                     dataKey="value"
                     stroke="#3b82f6"
                     strokeWidth={2}
-                    dot={(props: any) => {
-                      const { cx, cy, payload } = props;
-                      return (
-                        <circle
-                          key={payload.index}
-                          cx={cx}
-                          cy={cy}
-                          r={4}
-                          fill={payload.result === "win" ? "#3b82f6" : "#ef4444"}
-                          stroke="white"
-                          strokeWidth={1.5}
-                        />
-                      );
-                    }}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -486,20 +474,8 @@ const StatisticsPage = () => {
                     dataKey="value"
                     stroke="#8b5cf6"
                     strokeWidth={2}
-                    dot={(props: any) => {
-                      const { cx, cy, payload } = props;
-                      return (
-                        <circle
-                          key={payload.index}
-                          cx={cx}
-                          cy={cy}
-                          r={4}
-                          fill={payload.result === "win" ? "#8b5cf6" : "#ef4444"}
-                          stroke="white"
-                          strokeWidth={1.5}
-                        />
-                      );
-                    }}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
