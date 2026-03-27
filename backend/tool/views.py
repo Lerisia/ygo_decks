@@ -363,6 +363,7 @@ def get_record_group_statistics_full(request, record_group_id):
     # Overall
     # ----------------------
     data = {
+        "record_group_name": record_group.name,
         "basic": {
             "total_games": total_games,
             "overall_win_rate": overall_win_rate,

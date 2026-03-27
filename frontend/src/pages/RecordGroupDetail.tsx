@@ -962,9 +962,11 @@ const RecordGroupDetailPage = () => {
         </select>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 space-y-2">
         {matches.map((match) => {
-          const blockColor = match.result === "win" ? "bg-blue-100" : "bg-red-100";
+          const isWin = match.result === "win";
+          const borderColor = isWin ? "border-l-blue-500" : "border-l-red-400";
+          const resultBg = isWin ? "bg-blue-50 dark:bg-blue-950" : "bg-red-50 dark:bg-red-950";
           let coinImg = null;
           if (match.coin_toss_result === "win") {
             coinImg = "/images/coin_front.png";
@@ -975,81 +977,73 @@ const RecordGroupDetailPage = () => {
           return (
             <div
               key={match.id}
-              className={`border rounded-lg shadow-sm mb-2 ${blockColor}`}
+              className={`rounded-lg border border-gray-200 dark:border-gray-700 border-l-4 ${borderColor} ${resultBg} overflow-hidden`}
             >
               <div className="flex items-center justify-between p-2 sm:p-3">
-                <div className="w-12 sm:w-16 flex justify-center">
+                <div className="w-12 sm:w-16 flex justify-center flex-shrink-0">
                   {coinImg && (
-                    <img
-                      src={coinImg}
-                      alt="코인토스"
-                      className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
-                    />
+                    <img src={coinImg} alt="코인토스" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
                   )}
                 </div>
 
-                <div className="w-16 sm:w-32 flex flex-col items-center">
-                  {match.deck.cover_image_small && (
-                    <img
-                      src={match.deck.cover_image_small}
-                      alt={match.deck.name}
-                      className="w-10 h-10 sm:w-16 sm:h-16 object-cover"
-                    />
+                <div className="w-16 sm:w-32 flex flex-col items-center flex-shrink-0">
+                  {match.deck.cover_image_small ? (
+                    <img src={match.deck.cover_image_small} alt={match.deck.name} className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-16 sm:h-16 rounded bg-gray-200 dark:bg-gray-700" />
                   )}
-                  <p className="text-xs sm:text-sm mt-1 text-center">{match.deck.name}</p>
+                  <p className="text-xs sm:text-sm mt-1 text-center break-keep">{match.deck.name}</p>
                 </div>
 
-                <div className="flex-1 px-2 text-center">
-                  <p className="text-sm sm:text-base font-semibold">
-                    {match.result === "win" ? "승리" : "패배"}
-                  </p>
-                  <p className="text-xs sm:text-sm">
+                <div className="flex-1 px-1 text-center">
+                  <span className={`inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full ${
+                    isWin ? "bg-blue-500 text-white" : "bg-red-400 text-white"
+                  }`}>
+                    {isWin ? "WIN" : "LOSE"}
+                  </span>
+                  <p className="text-sm sm:text-base mt-1">
                     {match.first_or_second === "first" ? "선공" : "후공"}
                   </p>
-                  <span className="hidden sm:inline text-sm">
-                    {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
-                  </span>
-                  <span className="inline sm:hidden text-sm">
-                    {getMobileRankOrScoreDisplay(match.rank, match.wins, match.score)}
-                  </span>
+                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
+                    <span className="hidden sm:inline">
+                      {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
+                    </span>
+                    <span className="inline sm:hidden">
+                      {getMobileRankOrScoreDisplay(match.rank, match.wins, match.score)}
+                    </span>
+                  </p>
                 </div>
 
-                <div className="w-16 sm:w-32 flex flex-col items-center">
-                  {match.opponent_deck?.cover_image_small && (
-                    <img
-                      src={match.opponent_deck.cover_image_small}
-                      alt={match.opponent_deck.name}
-                      className="w-10 h-10 sm:w-16 sm:h-16 object-cover"
-                    />
+                <div className="w-16 sm:w-32 flex flex-col items-center flex-shrink-0">
+                  {match.opponent_deck?.cover_image_small ? (
+                    <img src={match.opponent_deck.cover_image_small} alt={match.opponent_deck.name} className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-16 sm:h-16 rounded bg-gray-200 dark:bg-gray-700" />
                   )}
-                  <p className="text-xs sm:text-sm mt-1 text-center">
+                  <p className="text-xs sm:text-sm mt-1 text-center break-keep">
                     {match.opponent_deck?.name ?? "모름/기타"}
                   </p>
                 </div>
 
-                <div className="w-12 sm:w-16 flex flex-col items-center gap-1">
-                <button
-                  onClick={() => {
-                    if (confirm("이 기록을 삭제할까요?")) {
-                      handleDelete(match.id);
-                    }
-                  }}
-                  className="px-2 py-1 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600 w-full"
-                >
-                  삭제
-                </button>
-                <button
-                  onClick={() => setEditingMatch(match)}
-                  className="px-2 py-1 text-xs sm:text-sm bg-green-500 text-white rounded hover:bg-green-600 w-full"
-                >
-                  수정
-                </button>
+                <div className="w-12 sm:w-16 flex flex-col items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => setEditingMatch(match)}
+                    className="px-2 py-1 text-xs sm:text-sm bg-green-500 text-white rounded hover:bg-green-600 w-full"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => { if (confirm("이 기록을 삭제할까요?")) handleDelete(match.id); }}
+                    className="px-2 py-1 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600 w-full"
+                  >
+                    삭제
+                  </button>
                 </div>
               </div>
 
               {match.notes && (
                 <div className="px-4 pb-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-                  <span className="font-medium"></span> {match.notes}
+                  {match.notes}
                 </div>
               )}
             </div>

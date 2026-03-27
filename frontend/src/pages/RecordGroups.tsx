@@ -54,7 +54,7 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
     <div className="hidden md:block w-full max-w-md">
       <h3 className="text-lg font-semibold mb-2">등장률 차트</h3>
       <ResponsiveContainer width="100%" height={350}>
-        <PieChart>
+        <PieChart style={{ overflow: 'visible' }}>
           <Pie
             data={chartData}
             dataKey="appearance_percent"
@@ -92,8 +92,8 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
                 >
                   <image
                     href={entry.cover}
-                    width="50%"
-                    height="50%"
+                    width="100%"
+                    height="100%"
                     preserveAspectRatio="xMidYMid slice"
                   />
                 </pattern>
