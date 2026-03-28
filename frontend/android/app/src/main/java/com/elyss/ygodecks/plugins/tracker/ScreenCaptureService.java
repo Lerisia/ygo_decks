@@ -169,6 +169,17 @@ public class ScreenCaptureService extends Service {
             Log.w(TAG, "metrics fail", e);
         }
 
+        // Step 5.5: Register callback (required on Android 14+)
+        if (Build.VERSION.SDK_INT >= 34) {
+            mediaProjection.registerCallback(new MediaProjection.Callback() {
+                @Override
+                public void onStop() {
+                    statusLog = "projection 중지됨";
+                    stopSelf();
+                }
+            }, mainHandler);
+        }
+
         // Step 6: Start capture
         try {
             startCapture();
