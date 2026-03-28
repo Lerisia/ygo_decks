@@ -118,7 +118,14 @@ def get_deck_result(request):
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
         "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
-        "description": deck.description
+        "description": deck.description,
+        "stats": {
+            "consistency": deck.stat_consistency,
+            "breakthrough": deck.stat_breakthrough,
+            "interruption": deck.stat_interruption,
+            "recovery": deck.stat_recovery,
+            "deck_space": deck.stat_deck_space,
+        },
     }
 
     return JsonResponse(result_data, safe=False)

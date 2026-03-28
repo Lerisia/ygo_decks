@@ -1,3 +1,11 @@
+export type DeckStats = {
+  consistency: number | null;
+  breakthrough: number | null;
+  interruption: number | null;
+  recovery: number | null;
+  deck_space: number | null;
+};
+
 export type DeckData = {
   id: number;
   name: string;
@@ -11,6 +19,7 @@ export type DeckData = {
   performance_tags: string[];
   aesthetic_tags: string[];
   description: string;
+  stats?: DeckStats;
 };
 
 export const fetchDeckResult = async (answerKey: string) => {
