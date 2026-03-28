@@ -18,11 +18,8 @@ const Login = () => {
     const handleLogin = async () => {
         const result = await login(username, password);
         if (result.access) {
-            setMessage("로그인 성공. 메인 페이지로 이동합니다.");
-            setTimeout(() => {
-                navigate("/");
-                setTimeout(() => window.location.reload(), 100);
-            }, 500);
+            navigate("/");
+            setTimeout(() => window.location.reload(), 100);
         } else {
             setMessage(
                 "로그인 실패: " +
@@ -33,7 +30,7 @@ const Login = () => {
     
 
     return (
-        <div className="h-auto min-h-screen flex flex-col items-center">
+        <form className="h-auto min-h-screen flex flex-col items-center" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
             <div className="mt-6 w-80">
             <input
                 type="email"
@@ -54,8 +51,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
             />
             </div>
-            <button className="mt-6 w-80 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-            onClick={handleLogin}>로그인</button>
+            <button type="submit" className="mt-6 w-80 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition">로그인</button>
             {message && <p className="mt-2 text-center whitespace-pre-line">{message}</p>}
 
             <p className="mt-4">
@@ -73,7 +69,7 @@ const Login = () => {
             >
                 비밀번호를 잊으셨나요?
             </button>
-        </div>
+        </form>
     );
 };
 

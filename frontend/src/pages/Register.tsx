@@ -95,7 +95,7 @@ const Register = () => {
   };
 
   return (
-    <div className="h-auto min-h-screen flex flex-col items-center">
+    <form className="h-auto min-h-screen flex flex-col items-center" onSubmit={(e) => { e.preventDefault(); handleRegister(); }}>
       <div className="mt-6 w-80">
         <input
           type="email"
@@ -163,7 +163,7 @@ const Register = () => {
       </button>
 
       {message && <p className="mt-4 text-center text-red-500">{message}</p>}
-    </div>
+    </form>
   );
 };
 

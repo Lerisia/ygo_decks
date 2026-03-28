@@ -27,6 +27,7 @@ import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import EmailVerified from "./pages/EmailVerified";
 
 function App() {
   const { pathname } = useLocation();
@@ -59,6 +60,7 @@ function App() {
           <Route path="/card-quiz" element={<CardQuiz />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/email-verified" element={<EmailVerified />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

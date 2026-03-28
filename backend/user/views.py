@@ -104,7 +104,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class CustomConfirmEmailView(ConfirmEmailView):
     def get(self, request, *args, **kwargs):
         response = super().get(request, *args, **kwargs)
-        return redirect("https://ygodecks.com/")
+        return redirect("https://ygodecks.com/email-verified")
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

@@ -28,7 +28,7 @@ export default function ForgotPassword() {
         가입한 이메일을 입력하면 재설정 링크를 보내드립니다.
       </p>
 
-      <div className="w-80 space-y-4">
+      <form className="w-80 space-y-4" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         <input
           type="email"
           placeholder="이메일 주소"
@@ -37,7 +37,7 @@ export default function ForgotPassword() {
           className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
-          onClick={handleSubmit}
+          type="submit"
           disabled={!email || loading}
           className={`w-full py-2 rounded-lg font-semibold transition ${
             !email || loading
@@ -50,7 +50,7 @@ export default function ForgotPassword() {
         {message && (
           <p className="text-center text-sm text-green-600 dark:text-green-400">{message}</p>
         )}
-      </div>
+      </form>
     </div>
   );
 }
