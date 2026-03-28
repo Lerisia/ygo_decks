@@ -181,59 +181,60 @@ public class ScreenAnalyzer {
     }
 
     /**
-     * Detect coin toss result.
-     * - Spinning: purple/pink effects → ignore
-     * - Landed WIN: golden center
-     * - Landed LOSE: dark/black center
+     * Detect coin toss result via OCR.
+     *
+     * Coin toss LOSE: "대전 상대가 선공 / 후공을 선택하고 있습니다"
+     *   → Opponent chooses = we lost the coin toss
+     *
+     * Coin toss WIN: Player sees selection buttons (선공/후공 선택)
+     *   → Detected separately when "당신이 선공/후공입니다" appears
+     *   → If we detect first/second without prior coin loss, coin was won
+     *
+     * So we only need to detect the "상대가 선택" text here.
      */
     private static AnalysisResult detectCoinToss(Bitmap bitmap) {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
-        int coinRadius = Math.min(width, height) / 6;
-        int cx = width / 2;
-        int cy = height / 2;
 
-        int purpleCount = 0;
-        int goldCount = 0;
-        int darkCount = 0;
-        int totalSamples = 0;
+        // The text appears in the lower-center area
+        int cropTop = height / 2;
+        int cropHeight = height / 3;
+        if (cropTop + cropHeight > height) cropHeight = height - cropTop;
 
-        for (int y = cy - coinRadius; y < cy + coinRadius; y += 3) {
-            for (int x = cx - coinRadius; x < cx + coinRadius; x += 3) {
-                if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        Bitmap textArea = Bitmap.createBitmap(bitmap, 0, cropTop, width, cropHeight);
+        InputImage image = InputImage.fromBitmap(textArea, 0);
 
-                int pixel = bitmap.getPixel(x, y);
-                float[] hsv = new float[3];
-                Color.colorToHSV(pixel, hsv);
+        AtomicReference<String> detected = new AtomicReference<>(null);
+        CountDownLatch latch = new CountDownLatch(1);
 
-                if (hsv[0] > 250 && hsv[0] < 340 && hsv[1] > 0.3 && hsv[2] > 0.4) {
-                    purpleCount++;
-                }
-                if (hsv[0] > 20 && hsv[0] < 65 && hsv[1] > 0.3 && hsv[2] > 0.5) {
-                    goldCount++;
-                }
-                if (hsv[2] < 0.15) {
-                    darkCount++;
-                }
-                totalSamples++;
-            }
+        textRecognizer.process(image)
+                .addOnSuccessListener(result -> {
+                    String text = result.getText();
+                    Log.d(TAG, "Coin OCR: " + text);
+                    if (text.contains("선택해주세요") || text.contains("선택해 주세요")) {
+                        detected.set("win");
+                    } else if (text.contains("상대가") && text.contains("선택")) {
+                        detected.set("lose");
+                    }
+                    latch.countDown();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Coin OCR failed", e);
+                    latch.countDown();
+                });
+
+        try {
+            latch.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
-        if (totalSamples == 0) return null;
+        textArea.recycle();
 
-        float purpleRatio = (float) purpleCount / totalSamples;
-        float goldRatio = (float) goldCount / totalSamples;
-        float darkRatio = (float) darkCount / totalSamples;
-
-        if (purpleRatio > 0.15) return null;
-
-        if (darkRatio > 0.5 && goldRatio < 0.05) {
-            return new AnalysisResult(DetectionType.COIN_TOSS, "lose");
+        String value = detected.get();
+        if (value != null) {
+            return new AnalysisResult(DetectionType.COIN_TOSS, value);
         }
-        if (goldRatio > 0.15 && darkRatio < 0.4) {
-            return new AnalysisResult(DetectionType.COIN_TOSS, "win");
-        }
-
         return null;
     }
 
