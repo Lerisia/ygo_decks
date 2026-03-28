@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { isAuthenticated, isAdmin } from "@/api/accountApi";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
@@ -168,25 +168,62 @@ export default function DeckDetail() {
           </tbody>
         </table>
 
-        {deck.stats && Object.values(deck.stats).some((v) => v > 0) && (
-          <div className="mt-4">
-            <ResponsiveContainer width="100%" height={250}>
-              <RadarChart
-                data={[
-                  { stat: "안정성", value: deck.stats.consistency },
-                  { stat: "돌파력", value: deck.stats.breakthrough },
-                  { stat: "견제력", value: deck.stats.interruption },
-                  { stat: "복구력", value: deck.stats.recovery },
-                  { stat: "덱 스페이스", value: deck.stats.deck_space },
-                ]}
-              >
-                <PolarGrid />
-                <PolarAngleAxis dataKey="stat" tick={{ fontSize: 12 }} />
-                <Radar dataKey="value" fill="#3b82f6" fillOpacity={0.4} stroke="#3b82f6" />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        {(() => {
+          const deckStatLabels = [
+            { key: "consistency" as const, label: "안정성" },
+            { key: "breakthrough" as const, label: "돌파력" },
+            { key: "deck_space" as const, label: "덱 스페이스" },
+            { key: "recovery" as const, label: "복구력" },
+            { key: "interruption" as const, label: "견제력" },
+          ];
+          const hasStats = deck.stats && deckStatLabels.some(({ key }) => deck.stats?.[key] != null);
+          const data = deckStatLabels.map(({ key, label }) => ({
+            stat: label,
+            value: deck.stats?.[key] ?? 0,
+            raw: deck.stats?.[key],
+          }));
+          return (
+            <div className="mt-4 relative">
+              <ResponsiveContainer width="100%" height={250}>
+                <RadarChart data={data}>
+                  <PolarGrid />
+                  <PolarAngleAxis
+                    dataKey="stat"
+                    tick={({ x, y, payload, index }: any) => {
+                      const raw = data[index]?.raw;
+                      return (
+                        <g>
+                          <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className={`text-xs ${hasStats ? "fill-current" : "fill-gray-400"}`}>
+                            {payload.value}
+                          </text>
+                          {hasStats && (
+                            <text x={x} y={y + 14} textAnchor="middle" className={`text-xs font-bold ${raw != null ? "fill-blue-500" : "fill-gray-400"}`}>
+                              {raw != null ? raw : "N/A"}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    }}
+                  />
+                  <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                  <Radar
+                    dataKey="value"
+                    fill={hasStats ? "#3b82f6" : "#9ca3af"}
+                    fillOpacity={hasStats ? 0.4 : 0.15}
+                    stroke={hasStats ? "#3b82f6" : "#9ca3af"}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+              {!hasStats && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-gray-400 dark:text-gray-500 text-sm font-semibold bg-white/70 dark:bg-gray-900/70 px-3 py-1 rounded">
+                    정보 없음
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
       
       {/* 본문 섹션 */}

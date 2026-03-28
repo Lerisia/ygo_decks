@@ -28,9 +28,9 @@ const expandAnswerKey = (answerKey: string): string => {
 const statLabels = [
   { key: "consistency", label: "안정성" },
   { key: "breakthrough", label: "돌파력" },
-  { key: "interruption", label: "견제력" },
-  { key: "recovery", label: "복구력" },
   { key: "deck_space", label: "덱 스페이스" },
+  { key: "recovery", label: "복구력" },
+  { key: "interruption", label: "견제력" },
 ] as const;
 
 function ResultPage() {
@@ -60,11 +60,8 @@ function ResultPage() {
         setError("결과를 불러오지 못했습니다.");
         setLoading(false);
       });
-
-    return () => {
-      localStorage.removeItem("answerKey");
-    };
-  }, [searchParams, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -84,12 +81,11 @@ function ResultPage() {
   }
 
   const hasStats = result?.stats && statLabels.some(({ key }) => result.stats?.[key] != null);
-  const chartData = hasStats
-    ? statLabels.map(({ key, label }) => ({
-        stat: label,
-        value: result?.stats?.[key] ?? 0,
-      }))
-    : [];
+  const chartData = statLabels.map(({ key, label }) => ({
+    stat: label,
+    value: result?.stats?.[key] ?? 0,
+    raw: result?.stats?.[key],
+  }));
 
   const tags = [
     ...(result?.performance_tags || []),
@@ -104,37 +100,54 @@ function ResultPage() {
         <img
           src={result.cover_image}
           alt={result.name}
-          className="mt-4 rounded-xl shadow-lg w-full max-w-sm mx-auto"
+          className="mt-4 rounded-xl shadow-lg w-full max-w-md mx-auto object-contain"
         />
       )}
 
-      {hasStats && (
-        <div className="mt-6 mx-auto">
-          <ResponsiveContainer width="100%" height={280}>
-            <RadarChart data={chartData}>
-              <PolarGrid />
-              <PolarAngleAxis
-                dataKey="stat"
-                tick={({ x, y, payload, index }: any) => {
-                  const val = chartData[index]?.value;
+      <div className="mt-6 mx-auto relative">
+        <ResponsiveContainer width="100%" height={280}>
+          <RadarChart data={hasStats ? chartData : statLabels.map(({ label }) => ({ stat: label, value: 0 }))}>
+            <PolarGrid />
+            <PolarAngleAxis
+              dataKey="stat"
+              tick={({ x, y, payload, index }: any) => {
+                if (!hasStats) {
                   return (
-                    <g>
-                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current text-xs">
-                        {payload.value}
-                      </text>
-                      <text x={x} y={y + 14} textAnchor="middle" className="fill-blue-500 text-xs font-bold">
-                        {val}
-                      </text>
-                    </g>
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-gray-400 text-xs">
+                      {payload.value}
+                    </text>
                   );
-                }}
-              />
-              <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
-              <Radar dataKey="value" fill="#3b82f6" fillOpacity={0.4} stroke="#3b82f6" />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+                }
+                const raw = chartData[index]?.raw;
+                return (
+                  <g>
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current text-xs">
+                      {payload.value}
+                    </text>
+                    <text x={x} y={y + 14} textAnchor="middle" className={`text-xs font-bold ${raw != null ? "fill-blue-500" : "fill-gray-400"}`}>
+                      {raw != null ? raw : "N/A"}
+                    </text>
+                  </g>
+                );
+              }}
+            />
+            <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+            <Radar
+              dataKey="value"
+              fill={hasStats ? "#3b82f6" : "#9ca3af"}
+              fillOpacity={hasStats ? 0.4 : 0.15}
+              stroke={hasStats ? "#3b82f6" : "#9ca3af"}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+        {!hasStats && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-gray-400 dark:text-gray-500 text-sm font-semibold bg-white/70 dark:bg-gray-900/70 px-3 py-1 rounded">
+              정보 없음
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow p-4 space-y-2 text-sm">
         <div className="flex justify-between">

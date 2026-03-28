@@ -27,9 +27,21 @@ class DeckAdmin(admin.ModelAdmin):
         'difficulty',
         'deck_type',
         'art_style',
+        'stat_consistency',
+        'stat_breakthrough',
+        'stat_interruption',
+        'stat_recovery',
+        'stat_deck_space',
         'display_summoning_methods',
         'display_performance_tags',
         'display_aesthetic_tags'
+    )
+    list_editable = (
+        'stat_consistency',
+        'stat_breakthrough',
+        'stat_interruption',
+        'stat_recovery',
+        'stat_deck_space',
     )
     search_fields = ('name', )
     list_filter = ('strength', 'difficulty', 'deck_type', 'art_style')

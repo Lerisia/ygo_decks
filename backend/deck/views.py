@@ -110,7 +110,7 @@ def get_deck_result(request):
     result_data = {
         "id": deck.id,
         "name": deck.name,
-        "cover_image": request.build_absolute_uri(deck.cover_image.url) if deck.cover_image else None,
+        "cover_image": deck.cover_image.url if deck.cover_image else None,
         "strength": deck.get_strength_display(),
         "difficulty": deck.get_difficulty_display(),
         "deck_type": deck.get_deck_type_display(),
