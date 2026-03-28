@@ -37,7 +37,7 @@ public class ScreenCaptureService extends Service {
     public static volatile String lastFirstSecond = null;
     public static volatile String lastDuelResult = null;
     public static volatile long lastDetectionTime = 0;
-    public static volatile String statusLog = "초기화 중...";
+    public static volatile String statusLog = "";
 
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
@@ -50,25 +50,56 @@ public class ScreenCaptureService extends Service {
     private DetectionOverlay overlay;
     private int captureCount = 0;
 
-    private int captureWidth;
-    private int captureHeight;
-    private int captureDensity;
+    private int captureWidth = 540;
+    private int captureHeight = 1200;
+    private int captureDensity = 210;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d(TAG, "Service onCreate");
-        createNotificationChannel();
+
+        // Notification channel + startForeground FIRST, before anything else
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, "듀얼 트래커", NotificationManager.IMPORTANCE_LOW);
+        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("YGODecks 트래커")
+                .setContentText("초기화 중...")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setOngoing(true)
+                .build();
+
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            statusLog = "startForeground 실패: " + e.getMessage();
+            Log.e(TAG, statusLog, e);
+            stopSelf();
+            return;
+        }
+
+        statusLog = "서비스 시작됨";
+        updateNotification(statusLog);
+
+        // Now safe to initialize everything else
         mainHandler = new Handler(getMainLooper());
 
-        // Background thread for capture + OCR
         captureThread = new HandlerThread("DuelTrackerCapture");
         captureThread.start();
         captureHandler = new Handler(captureThread.getLooper());
 
-        overlay = new DetectionOverlay(this);
+        try {
+            overlay = new DetectionOverlay(this);
+        } catch (Exception e) {
+            Log.w(TAG, "Overlay init failed", e);
+        }
 
-        // Use half resolution to save memory
         try {
             WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
             DisplayMetrics metrics = new DisplayMetrics();
@@ -77,56 +108,26 @@ public class ScreenCaptureService extends Service {
             captureHeight = metrics.heightPixels / 2;
             captureDensity = metrics.densityDpi / 2;
         } catch (Exception e) {
-            Log.e(TAG, "Display metrics failed", e);
-            captureWidth = 540;
-            captureHeight = 1200;
-            captureDensity = 210;
+            Log.w(TAG, "Display metrics failed, using defaults", e);
         }
 
-        statusLog = "화면: " + captureWidth + "x" + captureHeight;
-        Log.d(TAG, statusLog);
+        statusLog = "초기화 완료 (" + captureWidth + "x" + captureHeight + ")";
+        updateNotification(statusLog);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "Service onStartCommand");
-
         if (intent == null) {
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        // Start foreground FIRST before anything else
-        try {
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("YGODecks 트래커")
-                    .setContentText("듀얼을 감지하고 있습니다...")
-                    .setSmallIcon(android.R.drawable.ic_media_play)
-                    .setOngoing(true)
-                    .build();
-
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(NOTIFICATION_ID, notification,
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
-            } else {
-                startForeground(NOTIFICATION_ID, notification);
-            }
-            statusLog = "포그라운드 서비스 시작됨";
-            Log.d(TAG, statusLog);
-        } catch (Exception e) {
-            statusLog = "포그라운드 실패: " + e.getMessage();
-            Log.e(TAG, statusLog, e);
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-
-        // Get MediaProjection
         int resultCode = intent.getIntExtra("resultCode", -1);
         Intent data = intent.getParcelableExtra("data");
 
         if (data == null || resultCode == -1) {
             statusLog = "MediaProjection 데이터 없음";
-            Log.e(TAG, statusLog);
+            updateNotification(statusLog);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -137,17 +138,16 @@ public class ScreenCaptureService extends Service {
             mediaProjection = mgr.getMediaProjection(resultCode, data);
 
             if (mediaProjection == null) {
-                statusLog = "MediaProjection null";
-                Log.e(TAG, statusLog);
+                statusLog = "MediaProjection 획득 실패";
+                updateNotification(statusLog);
                 stopSelf();
                 return START_NOT_STICKY;
             }
 
-            statusLog = "캡처 시작 중...";
-            Log.d(TAG, statusLog);
             startCapture();
         } catch (Exception e) {
-            statusLog = "캡처 실패: " + e.getMessage();
+            statusLog = "캡처 시작 실패: " + e.getMessage();
+            updateNotification(statusLog);
             Log.e(TAG, statusLog, e);
             stopSelf();
             return START_NOT_STICKY;
@@ -157,37 +157,30 @@ public class ScreenCaptureService extends Service {
     }
 
     private void startCapture() {
-        try {
-            imageReader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2);
+        imageReader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2);
 
-            virtualDisplay = mediaProjection.createVirtualDisplay(
-                    "DuelTracker",
-                    captureWidth, captureHeight, captureDensity,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                    imageReader.getSurface(),
-                    null, captureHandler
-            );
+        virtualDisplay = mediaProjection.createVirtualDisplay(
+                "DuelTracker",
+                captureWidth, captureHeight, captureDensity,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader.getSurface(),
+                null, captureHandler
+        );
 
-            isCapturing = true;
+        isCapturing = true;
 
-            captureRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    if (!isCapturing) return;
-                    captureAndAnalyze();
-                    captureHandler.postDelayed(this, CAPTURE_INTERVAL_MS);
-                }
-            };
-            captureHandler.postDelayed(captureRunnable, 2000);
+        captureRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isCapturing) return;
+                captureAndAnalyze();
+                captureHandler.postDelayed(this, CAPTURE_INTERVAL_MS);
+            }
+        };
+        captureHandler.postDelayed(captureRunnable, 2000);
 
-            statusLog = "캡처 동작 중";
-            Log.d(TAG, statusLog);
-            updateNotification("감지 시작됨");
-        } catch (Exception e) {
-            statusLog = "캡처 시작 실패: " + e.getMessage();
-            Log.e(TAG, statusLog, e);
-            updateNotification(statusLog);
-        }
+        statusLog = "감지 중";
+        updateNotification("듀얼을 감지하고 있습니다");
     }
 
     private void updateNotification(String text) {
@@ -198,33 +191,25 @@ public class ScreenCaptureService extends Service {
                     .setSmallIcon(android.R.drawable.ic_media_play)
                     .setOngoing(true)
                     .build();
-            NotificationManager mgr = getSystemService(NotificationManager.class);
-            mgr.notify(NOTIFICATION_ID, notification);
-        } catch (Exception e) {
-            Log.e(TAG, "updateNotification failed", e);
-        }
+            getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification);
+        } catch (Exception ignored) {}
     }
 
     private void captureAndAnalyze() {
         if (imageReader == null) return;
 
-        Image image = null;
+        Image image;
         try {
             image = imageReader.acquireLatestImage();
         } catch (Exception e) {
-            Log.e(TAG, "acquireLatestImage failed", e);
             return;
         }
-
-        if (image == null) {
-            statusLog = "스캔 " + captureCount + "회 (이미지 없음)";
-            return;
-        }
+        if (image == null) return;
 
         captureCount++;
         statusLog = "스캔 " + captureCount + "회";
         if (captureCount % 3 == 0) {
-            updateNotification("감지 중... (" + captureCount + "회)");
+            updateNotification("감지 중 (" + captureCount + "회 스캔)");
         }
 
         try {
@@ -249,34 +234,28 @@ public class ScreenCaptureService extends Service {
 
             if (result != null) {
                 lastDetectionTime = System.currentTimeMillis();
-                final String overlayMsg;
-                final String notifMsg;
+                String msg = "";
 
                 switch (result.type) {
                     case COIN_TOSS:
                         lastCoinToss = result.value;
-                        overlayMsg = "코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면");
-                        notifMsg = overlayMsg;
+                        msg = "코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면");
                         break;
                     case FIRST_SECOND:
                         lastFirstSecond = result.value;
-                        overlayMsg = "first".equals(result.value) ? "선공" : "후공";
-                        notifMsg = "선후공: " + overlayMsg;
+                        msg = "first".equals(result.value) ? "선공" : "후공";
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
-                        overlayMsg = ("win".equals(result.value) ? "승리" : "패배") + " - 자동 기록됨";
-                        notifMsg = "결과: " + overlayMsg;
+                        msg = ("win".equals(result.value) ? "승리" : "패배");
                         break;
-                    default:
-                        overlayMsg = null;
-                        notifMsg = null;
                 }
 
-                if (overlayMsg != null) {
-                    statusLog = notifMsg;
+                statusLog = msg;
+                updateNotification(msg);
+                if (overlay != null) {
+                    final String overlayMsg = msg;
                     mainHandler.post(() -> overlay.show(overlayMsg));
-                    updateNotification(notifMsg);
                 }
             }
 
@@ -284,7 +263,7 @@ public class ScreenCaptureService extends Service {
             bitmap.recycle();
         } catch (Exception e) {
             statusLog = "분석 오류: " + e.getMessage();
-            Log.e(TAG, "Capture analysis error", e);
+            Log.e(TAG, statusLog, e);
         } finally {
             image.close();
         }
@@ -295,22 +274,10 @@ public class ScreenCaptureService extends Service {
         if (captureHandler != null && captureRunnable != null) {
             captureHandler.removeCallbacks(captureRunnable);
         }
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
-            virtualDisplay = null;
-        }
-        if (imageReader != null) {
-            imageReader.close();
-            imageReader = null;
-        }
-        if (mediaProjection != null) {
-            mediaProjection.stop();
-            mediaProjection = null;
-        }
-        if (captureThread != null) {
-            captureThread.quitSafely();
-            captureThread = null;
-        }
+        if (virtualDisplay != null) { virtualDisplay.release(); virtualDisplay = null; }
+        if (imageReader != null) { imageReader.close(); imageReader = null; }
+        if (mediaProjection != null) { mediaProjection.stop(); mediaProjection = null; }
+        if (captureThread != null) { captureThread.quitSafely(); captureThread = null; }
     }
 
     @Override
@@ -321,24 +288,11 @@ public class ScreenCaptureService extends Service {
         lastFirstSecond = null;
         lastDuelResult = null;
         lastDetectionTime = 0;
-        statusLog = "중지됨";
+        statusLog = "";
         super.onDestroy();
     }
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    private void createNotificationChannel() {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "듀얼 트래커",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        channel.setDescription("듀얼 자동 감지 서비스");
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(channel);
-    }
+    public IBinder onBind(Intent intent) { return null; }
 }
