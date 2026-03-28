@@ -5,6 +5,7 @@ import DuelTracker from "@/api/trackerApi";
 export default function Tracker() {
   const [isTracking, setIsTracking] = useState(false);
   const [coinToss, setCoinToss] = useState<string | null>(null);
+  const [firstSecond, setFirstSecond] = useState<string | null>(null);
   const [duelResult, setDuelResult] = useState<string | null>(null);
   const [lastTimestamp, setLastTimestamp] = useState(0);
   const [error, setError] = useState("");
@@ -21,6 +22,7 @@ export default function Tracker() {
     try {
       setError("");
       setCoinToss(null);
+      setFirstSecond(null);
       setDuelResult(null);
       await DuelTracker.startTracking();
       setIsTracking(true);
@@ -46,6 +48,7 @@ export default function Tracker() {
           if (result.timestamp > lastTimestamp) {
             setLastTimestamp(result.timestamp);
             if (result.coinToss) setCoinToss(result.coinToss);
+            if (result.firstSecond) setFirstSecond(result.firstSecond);
             if (result.duelResult) setDuelResult(result.duelResult);
           }
         } catch {}
@@ -57,7 +60,8 @@ export default function Tracker() {
     };
   }, [isTracking, isNative, lastTimestamp]);
 
-  const coinLabel = coinToss === "win" ? "앞면 (선공권)" : coinToss === "lose" ? "뒷면" : "-";
+  const coinLabel = coinToss === "win" ? "앞면" : coinToss === "lose" ? "뒷면" : "-";
+  const fsLabel = firstSecond === "first" ? "선공" : firstSecond === "second" ? "후공" : "-";
   const resultLabel = duelResult === "win" ? "승리" : duelResult === "lose" ? "패배" : "-";
 
   return (
@@ -108,18 +112,26 @@ export default function Tracker() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 space-y-4">
         <h2 className="font-semibold text-lg">감지된 정보</h2>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">코인토스</p>
-            <p className={`text-2xl font-bold mt-1 ${
+            <p className="text-xs text-gray-500 dark:text-gray-400">코인토스</p>
+            <p className={`text-xl font-bold mt-1 ${
               coinToss === "win" ? "text-blue-600" : coinToss === "lose" ? "text-red-500" : "text-gray-300 dark:text-gray-600"
             }`}>
               {coinLabel}
             </p>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">듀얼 결과</p>
-            <p className={`text-2xl font-bold mt-1 ${
+            <p className="text-xs text-gray-500 dark:text-gray-400">선/후공</p>
+            <p className={`text-xl font-bold mt-1 ${
+              firstSecond === "first" ? "text-blue-600" : firstSecond === "second" ? "text-orange-500" : "text-gray-300 dark:text-gray-600"
+            }`}>
+              {fsLabel}
+            </p>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">결과</p>
+            <p className={`text-xl font-bold mt-1 ${
               duelResult === "win" ? "text-blue-600" : duelResult === "lose" ? "text-red-500" : "text-gray-300 dark:text-gray-600"
             }`}>
               {resultLabel}

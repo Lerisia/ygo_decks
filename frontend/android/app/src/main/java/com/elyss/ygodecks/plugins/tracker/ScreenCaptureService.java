@@ -34,6 +34,7 @@ public class ScreenCaptureService extends Service {
     private static final long CAPTURE_INTERVAL_MS = 3000;
 
     public static volatile String lastCoinToss = null;
+    public static volatile String lastFirstSecond = null;
     public static volatile String lastDuelResult = null;
     public static volatile long lastDetectionTime = 0;
 
@@ -151,14 +152,20 @@ public class ScreenCaptureService extends Service {
             ScreenAnalyzer.AnalysisResult result = ScreenAnalyzer.analyze(cropped);
 
             if (result != null) {
-                if (result.type == ScreenAnalyzer.DetectionType.COIN_TOSS) {
-                    lastCoinToss = result.value;
-                    lastDetectionTime = System.currentTimeMillis();
-                    Log.d(TAG, "Coin toss detected: " + result.value);
-                } else if (result.type == ScreenAnalyzer.DetectionType.DUEL_RESULT) {
-                    lastDuelResult = result.value;
-                    lastDetectionTime = System.currentTimeMillis();
-                    Log.d(TAG, "Duel result detected: " + result.value);
+                lastDetectionTime = System.currentTimeMillis();
+                switch (result.type) {
+                    case COIN_TOSS:
+                        lastCoinToss = result.value;
+                        Log.d(TAG, "Coin toss detected: " + result.value);
+                        break;
+                    case FIRST_SECOND:
+                        lastFirstSecond = result.value;
+                        Log.d(TAG, "First/second detected: " + result.value);
+                        break;
+                    case DUEL_RESULT:
+                        lastDuelResult = result.value;
+                        Log.d(TAG, "Duel result detected: " + result.value);
+                        break;
                 }
             }
 
@@ -195,6 +202,7 @@ public class ScreenCaptureService extends Service {
     public void onDestroy() {
         stopCapture();
         lastCoinToss = null;
+        lastFirstSecond = null;
         lastDuelResult = null;
         lastDetectionTime = 0;
         super.onDestroy();

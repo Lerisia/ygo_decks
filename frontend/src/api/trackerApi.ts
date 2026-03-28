@@ -5,6 +5,7 @@ interface DuelTrackerPlugin {
   stopTracking(): Promise<{ stopped: boolean }>;
   getLatestResult(): Promise<{
     coinToss: string | null;
+    firstSecond: string | null;
     duelResult: string | null;
     timestamp: number;
   }>;

@@ -66,6 +66,7 @@ public class DuelTrackerPlugin extends Plugin {
     public void getLatestResult(PluginCall call) {
         JSObject ret = new JSObject();
         ret.put("coinToss", ScreenCaptureService.lastCoinToss);
+        ret.put("firstSecond", ScreenCaptureService.lastFirstSecond);
         ret.put("duelResult", ScreenCaptureService.lastDuelResult);
         ret.put("timestamp", ScreenCaptureService.lastDetectionTime);
         call.resolve(ret);
