@@ -13,7 +13,8 @@ function Info() {
   return (
     <div className="p-6 h-auto min-h-screen max-w-xl mx-auto text-gray-900 dark:text-white">
       <div className="text-center mb-8">
-        <img src="/images/logo_big.png" alt="YGO Decks" className="h-28 sm:hidden mx-auto mb-2" />
+        <img src="/images/logo_big.png" alt="YGO Decks" className="h-28 sm:hidden mx-auto mb-2 dark:hidden" />
+        <img src="/images/logo_big_dark.png" alt="YGO Decks" className="h-28 sm:hidden mx-auto mb-2 hidden dark:block" />
         <h1 className="text-2xl font-bold hidden sm:block">YGO Decks</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">유희왕 마스터 듀얼 전적 관리 및 덱 추천</p>
       </div>

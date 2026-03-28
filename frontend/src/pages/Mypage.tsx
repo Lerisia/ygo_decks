@@ -80,6 +80,15 @@ const Mypage = () => {
   const toggle = (section: string) =>
     setExpandedSection((prev) => (prev === section ? null : section));
 
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  const toggleDarkMode = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
   const inputClass = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
@@ -90,6 +99,16 @@ const Mypage = () => {
           <p className="font-medium">{email}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">닉네임</p>
           <p className="font-medium">{originalUsername}</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
+          <span className="font-semibold">다크 모드</span>
+          <button
+            onClick={toggleDarkMode}
+            className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? "bg-blue-600" : "bg-gray-300"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? "translate-x-6" : ""}`} />
+          </button>
         </div>
 
         <button

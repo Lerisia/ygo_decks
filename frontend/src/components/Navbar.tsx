@@ -2,10 +2,20 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isAuthenticated } from "../api/accountApi";
 import logo from "/images/logo_big.png";
+import logoDark from "/images/logo_big_dark.png";
 
 function Navbar() {
   const isLoggedIn = isAuthenticated();
   const isHome = useLocation().pathname === "/";
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -26,14 +36,14 @@ function Navbar() {
       {!isHome && (
         <div className="sm:hidden flex justify-center py-3">
           <Link to="/" className="hover:opacity-80 transition">
-            <img src={logo} alt="사이트 로고" className="h-12 object-contain" />
+            <img src={isDark ? logoDark : logo} alt="사이트 로고" className="h-12 object-contain" />
           </Link>
         </div>
       )}
       <div className="hidden sm:flex justify-center py-4">
         <div className="flex items-center space-x-8">
           <Link to="/" className="hover:opacity-80 transition shrink-0">
-            <img src={logo} alt="사이트 로고" className="h-24 object-contain" />
+            <img src={isDark ? logoDark : logo} alt="사이트 로고" className="h-24 object-contain" />
           </Link>
           <nav className="flex space-x-6 items-center">
             <Link to="/recommend" className="text-lg md:text-xl font-bold break-keep">
