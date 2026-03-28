@@ -49,6 +49,7 @@ public class ScreenCaptureService extends Service {
     private int screenHeight;
     private int screenDensity;
     private DetectionOverlay overlay;
+    private int captureCount = 0;
 
     @Override
     public void onCreate() {
@@ -82,6 +83,14 @@ public class ScreenCaptureService extends Service {
                 .build();
 
         startForeground(NOTIFICATION_ID, notification);
+
+        // Start floating widget
+        try {
+            Intent widgetIntent = new Intent(this, FloatingWidgetService.class);
+            startService(widgetIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Floating widget failed to start", e);
+        }
 
         int resultCode = intent.getIntExtra("resultCode", -1);
         Intent data = intent.getParcelableExtra("data");
@@ -130,11 +139,30 @@ public class ScreenCaptureService extends Service {
         Log.d(TAG, "Screen capture started");
     }
 
+    private void updateNotification(String text) {
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("YGODecks 트래커")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setOngoing(true)
+                .build();
+        NotificationManager mgr = getSystemService(NotificationManager.class);
+        mgr.notify(NOTIFICATION_ID, notification);
+    }
+
     private void captureAndAnalyze() {
         if (imageReader == null) return;
 
         Image image = imageReader.acquireLatestImage();
-        if (image == null) return;
+        if (image == null) {
+            Log.d(TAG, "No image available");
+            return;
+        }
+
+        captureCount++;
+        if (captureCount % 5 == 0) {
+            updateNotification("감지 중... (" + captureCount + "회 스캔)");
+        }
 
         try {
             Image.Plane[] planes = image.getPlanes();
@@ -208,6 +236,9 @@ public class ScreenCaptureService extends Service {
     public void onDestroy() {
         stopCapture();
         if (overlay != null) overlay.dismiss();
+        try {
+            stopService(new Intent(this, FloatingWidgetService.class));
+        } catch (Exception ignored) {}
         lastCoinToss = null;
         lastFirstSecond = null;
         lastDuelResult = null;

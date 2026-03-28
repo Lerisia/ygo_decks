@@ -29,6 +29,10 @@
             android:foregroundServiceType="mediaProjection"
             android:exported="false" />
 
+        <service
+            android:name=".plugins.tracker.FloatingWidgetService"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
