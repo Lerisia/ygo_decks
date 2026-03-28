@@ -238,50 +238,52 @@ public class ScreenAnalyzer {
     }
 
     /**
-     * Detect duel result (WIN/LOSE end screen).
-     * WIN: blue dominant, LOSE: red dominant.
+     * Detect duel result using OCR.
+     * VICTORY / DEFEAT text appears large in the center of the screen.
+     * Language-independent detection.
      */
     private static AnalysisResult detectDuelResult(Bitmap bitmap) {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
 
-        int sampleLeft = width / 4;
-        int sampleRight = width * 3 / 4;
-        int sampleTop = height / 3;
-        int sampleBottom = height * 2 / 3;
+        // Crop center area where VICTORY/DEFEAT text appears
+        int cropTop = height / 4;
+        int cropHeight = height / 2;
+        Bitmap centerArea = Bitmap.createBitmap(bitmap, 0, cropTop, width, cropHeight);
 
-        int blueCount = 0;
-        int redCount = 0;
-        int totalSamples = 0;
+        InputImage image = InputImage.fromBitmap(centerArea, 0);
 
-        for (int y = sampleTop; y < sampleBottom; y += 4) {
-            for (int x = sampleLeft; x < sampleRight; x += 4) {
-                int pixel = bitmap.getPixel(x, y);
-                float[] hsv = new float[3];
-                Color.colorToHSV(pixel, hsv);
+        AtomicReference<String> detected = new AtomicReference<>(null);
+        CountDownLatch latch = new CountDownLatch(1);
 
-                if (hsv[0] > 200 && hsv[0] < 250 && hsv[1] > 0.3 && hsv[2] > 0.3) {
-                    blueCount++;
-                }
-                if ((hsv[0] > 340 || hsv[0] < 20) && hsv[1] > 0.3 && hsv[2] > 0.3) {
-                    redCount++;
-                }
-                totalSamples++;
-            }
+        textRecognizer.process(image)
+                .addOnSuccessListener(result -> {
+                    String text = result.getText().toUpperCase();
+                    Log.d(TAG, "Duel OCR: " + text);
+                    if (text.contains("VICTORY")) {
+                        detected.set("win");
+                    } else if (text.contains("DEFEAT")) {
+                        detected.set("lose");
+                    }
+                    latch.countDown();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Duel OCR failed", e);
+                    latch.countDown();
+                });
+
+        try {
+            latch.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
-        if (totalSamples == 0) return null;
+        centerArea.recycle();
 
-        float blueRatio = (float) blueCount / totalSamples;
-        float redRatio = (float) redCount / totalSamples;
-
-        if (blueRatio > 0.25) {
-            return new AnalysisResult(DetectionType.DUEL_RESULT, "win");
+        String value = detected.get();
+        if (value != null) {
+            return new AnalysisResult(DetectionType.DUEL_RESULT, value);
         }
-        if (redRatio > 0.25) {
-            return new AnalysisResult(DetectionType.DUEL_RESULT, "lose");
-        }
-
         return null;
     }
 }
