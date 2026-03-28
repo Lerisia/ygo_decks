@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User
+from .models import User, BannedWord
 from deck.models import Deck
 
 class CustomUserAdmin(UserAdmin):
@@ -28,3 +28,8 @@ class CustomUserAdmin(UserAdmin):
     filter_horizontal = ('groups', 'user_permissions', 'owned_decks')
 
 admin.site.register(User, CustomUserAdmin)
+
+@admin.register(BannedWord)
+class BannedWordAdmin(admin.ModelAdmin):
+    list_display = ('word',)
+    search_fields = ('word',)

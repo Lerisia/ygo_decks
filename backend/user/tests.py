@@ -4,7 +4,8 @@ from django.test import TestCase
 from django.utils import timezone
 from django.core.management import call_command
 from rest_framework.test import APIClient
-from user.models import User
+from user.models import User, BannedWord
+from user.utils import contains_banned_word, sanitize_username
 from deck.models import Deck
 
 
@@ -120,6 +121,38 @@ class DeleteAccountTest(TestCase):
 
         call_command("cleanup_unverified_users")
         self.assertTrue(User.objects.filter(id=self.user.id).exists())
+
+
+class BannedWordTest(TestCase):
+    def setUp(self):
+        BannedWord.objects.create(word="바보")
+        BannedWord.objects.create(word="멍청")
+
+    def test_exact_match(self):
+        self.assertTrue(contains_banned_word("바보"))
+
+    def test_partial_match(self):
+        self.assertTrue(contains_banned_word("대바보왕"))
+
+    def test_case_insensitive(self):
+        BannedWord.objects.create(word="idiot")
+        self.assertTrue(contains_banned_word("IDIOT"))
+
+    def test_clean_word(self):
+        self.assertFalse(contains_banned_word("좋은닉네임"))
+
+    def test_sanitize_replaces_banned(self):
+        result = sanitize_username("대바보왕")
+        self.assertEqual(result, "불건전한닉네임")
+
+    def test_sanitize_keeps_clean(self):
+        result = sanitize_username("좋은닉네임")
+        self.assertEqual(result, "좋은닉네임")
+
+    def test_sanitize_increments_number(self):
+        User.objects.create_user(email="a@test.com", username="불건전한닉네임", password="pass1234")
+        result = sanitize_username("멍청이")
+        self.assertEqual(result, "불건전한닉네임1")
 
 
 class CleanupUnverifiedUsersTest(TestCase):

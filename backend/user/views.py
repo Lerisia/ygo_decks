@@ -15,6 +15,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from deck.models import Deck
 from .models import User
+from .utils import contains_banned_word
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -27,6 +28,9 @@ def change_username(request):
 
     if user.username == new_username:
         return Response({"message": "현재 닉네임과 동일합니다."}, status=status.HTTP_200_OK)
+
+    if contains_banned_word(new_username):
+        return Response({"error": "사용할 수 없는 닉네임입니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     if User.objects.filter(username=new_username).exists():
         return Response({"error": "이미 사용 중인 닉네임입니다."}, status=status.HTTP_400_BAD_REQUEST)

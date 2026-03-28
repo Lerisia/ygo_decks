@@ -25,7 +25,9 @@ class CustomRegisterSerializer(RegisterSerializer):
         return data
 
     def save(self, request):
+        from .utils import sanitize_username
         user = super().save(request)
+        user.username = sanitize_username(user.username)
         user.is_active = False
         user.save()
         return user
