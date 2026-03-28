@@ -120,6 +120,7 @@ public class DuelTrackerPlugin extends Plugin {
         ret.put("firstSecond", ScreenCaptureService.lastFirstSecond);
         ret.put("duelResult", ScreenCaptureService.lastDuelResult);
         ret.put("timestamp", ScreenCaptureService.lastDetectionTime);
+        ret.put("status", ScreenCaptureService.statusLog);
         call.resolve(ret);
     }
 }

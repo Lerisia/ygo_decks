@@ -8,6 +8,7 @@ interface DuelTrackerPlugin {
     firstSecond: string | null;
     duelResult: string | null;
     timestamp: number;
+    status: string;
   }>;
 }
 

@@ -30,7 +30,7 @@ export default function Tracker() {
       setError("");
       await t.startTracking();
     } catch (e: any) {
-      setError(e.message || "트래킹을 시작할 수 없습니다.");
+      setError("시작 실패: " + (e.message || JSON.stringify(e)));
     }
   };
 
@@ -142,6 +142,9 @@ export default function Tracker() {
           {t.isTracking && !t.pendingSave && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4 text-center">
               <p className="text-green-700 dark:text-green-300 text-sm">감지 중... 마스터 듀얼로 전환하세요.</p>
+              {t.nativeStatus && (
+                <p className="text-green-600 dark:text-green-400 text-xs mt-1 font-mono">{t.nativeStatus}</p>
+              )}
               {t.useRank && t.currentRank && (
                 <p className="text-green-600 dark:text-green-400 text-xs mt-1">
                   {getRankLabel(t.currentRank)} {t.currentWins !== null ? `${t.currentWins}승` : ""}

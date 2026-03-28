@@ -10,6 +10,7 @@ interface TrackerState {
   firstSecond: string | null;
   pendingSave: boolean;
   savedCount: number;
+  nativeStatus: string;
 
   selectedGroup: number | null;
   selectedDeck: number | null;
@@ -52,6 +53,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [firstSecond, setFirstSecond] = useState<string | null>(null);
   const [lastTimestamp, setLastTimestamp] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
+  const [nativeStatus, setNativeStatus] = useState("");
 
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [selectedDeck, setSelectedDeck] = useState<number | null>(null);
@@ -143,6 +145,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       pollRef.current = setInterval(async () => {
         try {
           const result = await DuelTracker.getLatestResult();
+          if (result.status) setNativeStatus(result.status);
           if (result.timestamp > lastTimestamp) {
             setLastTimestamp(result.timestamp);
             if (result.coinToss) setCoinToss(result.coinToss);
@@ -163,7 +166,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   return (
     <TrackerContext.Provider value={{
-      isTracking, coinToss, firstSecond, pendingSave, savedCount,
+      isTracking, coinToss, firstSecond, pendingSave, savedCount, nativeStatus,
       selectedGroup, selectedDeck, useRank, currentRank, currentWins,
       editCoin, editFS, editResult, previewRank, previewWins,
       startTracking, stopTracking,

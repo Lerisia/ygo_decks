@@ -37,6 +37,7 @@ public class ScreenCaptureService extends Service {
     public static volatile String lastFirstSecond = null;
     public static volatile String lastDuelResult = null;
     public static volatile long lastDetectionTime = 0;
+    public static volatile String statusLog = "초기화 중...";
 
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
@@ -77,7 +78,8 @@ public class ScreenCaptureService extends Service {
             screenDensity = 420;
         }
 
-        Log.d(TAG, "Screen: " + screenWidth + "x" + screenHeight + " density=" + screenDensity);
+        statusLog = "화면: " + screenWidth + "x" + screenHeight;
+        Log.d(TAG, statusLog);
     }
 
     @Override
@@ -104,9 +106,11 @@ public class ScreenCaptureService extends Service {
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
-            Log.d(TAG, "startForeground called successfully");
+            statusLog = "포그라운드 서비스 시작됨";
+            Log.d(TAG, statusLog);
         } catch (Exception e) {
-            Log.e(TAG, "startForeground failed", e);
+            statusLog = "포그라운드 실패: " + e.getMessage();
+            Log.e(TAG, statusLog, e);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -131,10 +135,12 @@ public class ScreenCaptureService extends Service {
                 return START_NOT_STICKY;
             }
 
-            Log.d(TAG, "MediaProjection obtained, starting capture");
+            statusLog = "MediaProjection 획득 완료, 캡처 시작";
+            Log.d(TAG, statusLog);
             startCapture();
         } catch (Exception e) {
-            Log.e(TAG, "Failed to start capture", e);
+            statusLog = "캡처 시작 실패: " + e.getMessage();
+            Log.e(TAG, statusLog, e);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -166,7 +172,8 @@ public class ScreenCaptureService extends Service {
             };
             handler.postDelayed(captureRunnable, CAPTURE_INTERVAL_MS);
 
-            Log.d(TAG, "Screen capture started successfully");
+            statusLog = "캡처 동작 중";
+            Log.d(TAG, statusLog);
             updateNotification("감지 시작됨");
         } catch (Exception e) {
             Log.e(TAG, "startCapture failed", e);
@@ -203,6 +210,7 @@ public class ScreenCaptureService extends Service {
         if (image == null) return;
 
         captureCount++;
+        statusLog = "스캔 " + captureCount + "회";
         if (captureCount % 5 == 0) {
             updateNotification("감지 중... (" + captureCount + "회 스캔)");
         }
