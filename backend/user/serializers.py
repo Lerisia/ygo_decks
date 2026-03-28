@@ -2,6 +2,7 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 
@@ -24,10 +25,14 @@ class CustomRegisterSerializer(RegisterSerializer):
         data = super().get_cleaned_data()
         return data
 
+    def validate_username(self, value):
+        from .utils import contains_banned_word
+        if contains_banned_word(value):
+            raise serializers.ValidationError("사용할 수 없는 닉네임입니다.")
+        return value
+
     def save(self, request):
-        from .utils import sanitize_username
         user = super().save(request)
-        user.username = sanitize_username(user.username)
         user.is_active = False
         user.save()
         return user
