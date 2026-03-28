@@ -1,6 +1,5 @@
 package com.elyss.ygodecks.plugins.tracker;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -10,24 +9,20 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
-
-import androidx.activity.result.ActivityResult;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import android.widget.Toast;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "DuelTracker")
 public class DuelTrackerPlugin extends Plugin {
 
     private static final String TAG = "DuelTracker";
-    private static final String CALLBACK_TAG = "screenCaptureResult";
-    private static final int NOTIFICATION_PERMISSION_CODE = 9001;
+    private static final int SCREEN_CAPTURE_REQUEST = 1001;
+    private PluginCall savedCall = null;
 
     @PluginMethod()
     public void startTracking(PluginCall call) {
@@ -38,63 +33,86 @@ public class DuelTrackerPlugin extends Plugin {
         }
 
         Log.d(TAG, "startTracking called");
+        Toast.makeText(activity, "트래커: 권한 요청 중...", Toast.LENGTH_SHORT).show();
 
-        // 1. Check notification permission (Android 13+)
+        // Check notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
+            if (activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Requesting notification permission");
-                ActivityCompat.requestPermissions(activity,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        NOTIFICATION_PERMISSION_CODE);
-                call.reject("Notification permission required. Please grant and try again.");
+                activity.requestPermissions(
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9001);
+                call.reject("알림 권한이 필요합니다. 권한을 허용한 후 다시 시도해주세요.");
                 return;
             }
         }
 
-        // 2. Check overlay permission
+        // Check overlay permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(activity)) {
-            Log.d(TAG, "Requesting overlay permission");
             Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + activity.getPackageName()));
             activity.startActivity(overlayIntent);
-            call.reject("Overlay permission required. Please grant and try again.");
+            call.reject("오버레이 권한이 필요합니다. 권한을 허용한 후 다시 시도해주세요.");
             return;
         }
 
-        // 3. Request screen capture
-        Log.d(TAG, "Requesting screen capture permission");
+        // Save call and request screen capture
+        savedCall = call;
         MediaProjectionManager mgr = (MediaProjectionManager)
                 activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-
         Intent intent = mgr.createScreenCaptureIntent();
-        startActivityForResult(call, intent, CALLBACK_TAG);
+
+        Log.d(TAG, "Launching screen capture intent");
+        Toast.makeText(activity, "트래커: 화면 공유 요청", Toast.LENGTH_SHORT).show();
+
+        activity.startActivityForResult(intent, SCREEN_CAPTURE_REQUEST);
     }
 
-    @ActivityCallback
-    private void screenCaptureResult(PluginCall call, ActivityResult result) {
-        if (call == null) return;
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
 
-        Log.d(TAG, "screenCaptureResult: resultCode=" + result.getResultCode());
+        Log.d(TAG, "handleOnActivityResult: requestCode=" + requestCode + " resultCode=" + resultCode);
 
-        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+        if (requestCode != SCREEN_CAPTURE_REQUEST) return;
+
+        Activity activity = getActivity();
+
+        if (resultCode == Activity.RESULT_OK && data != null) {
             try {
-                Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
-                serviceIntent.putExtra("resultCode", result.getResultCode());
-                serviceIntent.putExtra("data", result.getData());
-                getContext().startForegroundService(serviceIntent);
-                Log.d(TAG, "ScreenCaptureService started");
+                Toast.makeText(activity, "트래커: 서비스 시작 중...", Toast.LENGTH_SHORT).show();
 
-                JSObject ret = new JSObject();
-                ret.put("started", true);
-                call.resolve(ret);
+                Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
+                serviceIntent.putExtra("resultCode", resultCode);
+                serviceIntent.putExtra("data", data);
+                getContext().startForegroundService(serviceIntent);
+
+                Log.d(TAG, "Service started successfully");
+                Toast.makeText(activity, "트래커: 시작됨!", Toast.LENGTH_SHORT).show();
+
+                if (savedCall != null) {
+                    JSObject ret = new JSObject();
+                    ret.put("started", true);
+                    savedCall.resolve(ret);
+                    savedCall = null;
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start service", e);
-                call.reject("Failed to start tracking: " + e.getMessage());
+                String msg = "서비스 시작 실패: " + e.getMessage();
+                Toast.makeText(activity, msg, Toast.LENGTH_LONG).show();
+
+                if (savedCall != null) {
+                    savedCall.reject(msg);
+                    savedCall = null;
+                }
             }
         } else {
-            Log.w(TAG, "Screen capture permission denied");
-            call.reject("Screen capture permission denied");
+            Log.w(TAG, "Screen capture denied");
+            Toast.makeText(activity, "화면 공유가 거부되었습니다", Toast.LENGTH_SHORT).show();
+
+            if (savedCall != null) {
+                savedCall.reject("화면 공유가 거부되었습니다");
+                savedCall = null;
+            }
         }
     }
 
@@ -103,7 +121,6 @@ public class DuelTrackerPlugin extends Plugin {
         try {
             Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
             getContext().stopService(serviceIntent);
-            Log.d(TAG, "ScreenCaptureService stopped");
         } catch (Exception e) {
             Log.e(TAG, "Failed to stop service", e);
         }
