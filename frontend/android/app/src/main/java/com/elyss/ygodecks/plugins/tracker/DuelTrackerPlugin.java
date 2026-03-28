@@ -66,11 +66,11 @@ public class DuelTrackerPlugin extends Plugin {
 
         if (resultCode == Activity.RESULT_OK && data != null) {
             try {
-                Context ctx = appContext != null ? appContext : activity.getApplicationContext();
-                Intent serviceIntent = new Intent(ctx, ScreenCaptureService.class);
+                ScreenCaptureService.statusLog = "서비스 시작 요청됨";
+                Intent serviceIntent = new Intent(activity, ScreenCaptureService.class);
                 serviceIntent.putExtra("resultCode", resultCode);
                 serviceIntent.putExtra("data", data);
-                ctx.startForegroundService(serviceIntent);
+                activity.startForegroundService(serviceIntent);
 
                 if (savedCall != null) {
                     JSObject ret = new JSObject();

@@ -160,6 +160,9 @@ export default function Tracker() {
       )}
 
       {error && <p className="text-center text-red-500 mt-4 text-sm">{error}</p>}
+      {t.nativeStatus && (
+        <p className="text-center text-xs text-gray-400 mt-2 font-mono">네이티브: {t.nativeStatus}</p>
+      )}
     </div>
   );
 }
