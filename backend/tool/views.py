@@ -12,6 +12,18 @@ from datetime import timedelta, datetime
 from django.utils import timezone
 from django.utils.timezone import make_aware
 
+
+def _get_accessible_group(request, record_group_id):
+    group = RecordGroup.objects.filter(id=record_group_id, is_deleted=False).first()
+    if not group:
+        return None, Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    if group.is_public:
+        return group, None
+    if request.user.is_authenticated and group.user == request.user:
+        return group, None
+    return None, Response({"error": "접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_record_group(request):
@@ -42,6 +54,21 @@ def update_record_group_name(request, record_group_id):
     record_group.save()
 
     return Response({"record_group_id": record_group.id, "name": record_group.name}, status=status.HTTP_200_OK)
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_record_group_visibility(request, record_group_id):
+    user = request.user
+    group = RecordGroup.objects.filter(id=record_group_id, user=user, is_deleted=False).first()
+    if not group:
+        return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    is_public = request.data.get("is_public")
+    if is_public is not None:
+        group.is_public = is_public
+        group.save(update_fields=["is_public"])
+
+    return Response({"is_public": group.is_public})
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -155,13 +182,10 @@ def delete_match_record(request, match_id):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def get_record_group_statistics(request, record_group_id):
-    user = request.user
-    record_group = RecordGroup.objects.filter(id=record_group_id, user=user).first()
-
-    if not record_group:
-        return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    record_group, err = _get_accessible_group(request, record_group_id)
+    if err:
+        return err
 
     matches = record_group.matches.filter(is_deleted=False)
 
@@ -194,10 +218,9 @@ from .serializers import DeckShortSerializer
 
 @api_view(['GET'])
 def get_record_group_statistics_full(request, record_group_id):
-    record_group = RecordGroup.objects.filter(id=record_group_id).first()
-
-    if not record_group:
-        return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    record_group, err = _get_accessible_group(request, record_group_id)
+    if err:
+        return err
 
     matches = record_group.matches.filter(is_deleted=False)
 
@@ -429,9 +452,9 @@ from django.core.paginator import Paginator
 
 @api_view(["GET"])
 def get_record_group_matches(request, record_group_id):
-    record_group = RecordGroup.objects.filter(id=record_group_id).first()
-    if not record_group:
-        return Response({"error": "그룹을 찾을 수 없습니다."}, status=404)
+    record_group, err = _get_accessible_group(request, record_group_id)
+    if err:
+        return err
     page = int(request.GET.get("page", 1))
     page_size = int(request.GET.get("page_size", 10)) 
     deck_filter = request.GET.get("deck")
@@ -541,9 +564,9 @@ def recent_meta_deck_stats(request):
 
 @api_view(["GET"])
 def get_record_group_rank_history(request, record_group_id):
-    record_group = RecordGroup.objects.filter(id=record_group_id).first()
-    if not record_group:
-        return Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    record_group, err = _get_accessible_group(request, record_group_id)
+    if err:
+        return err
 
     matches = (
         record_group.matches

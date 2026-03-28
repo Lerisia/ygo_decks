@@ -207,6 +207,7 @@ class FullStatisticsTest(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(email="a@test.com", username="user1", password="pass1234")
+        self.client.force_authenticate(user=self.user)
         self.deck1 = _create_deck(name="덱A")
         self.deck2 = _create_deck(name="덱B")
         self.opp = _create_deck(name="상대")
@@ -275,6 +276,7 @@ class GetRecordGroupMatchesTest(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(email="a@test.com", username="user1", password="pass1234")
+        self.client.force_authenticate(user=self.user)
         self.deck = _create_deck(name="내덱")
         self.group = RecordGroup.objects.create(user=self.user, name="시즌1")
 
@@ -295,3 +297,67 @@ class GetRecordGroupMatchesTest(TestCase):
 
         resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
         self.assertEqual(len(resp.json()["matches"]), 1)
+
+
+class RecordGroupVisibilityTest(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(email="owner@test.com", username="owner", password="pass1234")
+        self.other = User.objects.create_user(email="other@test.com", username="other", password="pass1234")
+        self.deck = _create_deck(name="내덱")
+        self.group = RecordGroup.objects.create(user=self.owner, name="시즌1")
+        _create_match(self.group, self.deck, result="win")
+
+    def test_default_is_private(self):
+        self.assertFalse(self.group.is_public)
+
+    def test_owner_can_toggle_visibility(self):
+        client = APIClient()
+        client.force_authenticate(user=self.owner)
+        resp = client.patch(
+            f"/api/record-groups/{self.group.id}/update-visibility/",
+            {"is_public": True}, format="json"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.group.refresh_from_db()
+        self.assertTrue(self.group.is_public)
+
+    def test_non_owner_cannot_toggle_visibility(self):
+        client = APIClient()
+        client.force_authenticate(user=self.other)
+        resp = client.patch(
+            f"/api/record-groups/{self.group.id}/update-visibility/",
+            {"is_public": True}, format="json"
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_public_group_matches_accessible_without_auth(self):
+        self.group.is_public = True
+        self.group.save()
+        client = APIClient()
+        resp = client.get(f"/api/record-groups/{self.group.id}/matches/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()["matches"]), 1)
+
+    def test_private_group_matches_inaccessible_without_auth(self):
+        client = APIClient()
+        resp = client.get(f"/api/record-groups/{self.group.id}/matches/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_public_group_stats_accessible_without_auth(self):
+        self.group.is_public = True
+        self.group.save()
+        client = APIClient()
+        resp = client.get(f"/api/record-groups/{self.group.id}/statistics/")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_private_group_stats_inaccessible_by_other(self):
+        client = APIClient()
+        client.force_authenticate(user=self.other)
+        resp = client.get(f"/api/record-groups/{self.group.id}/statistics/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_owner_always_can_access_private(self):
+        client = APIClient()
+        client.force_authenticate(user=self.owner)
+        resp = client.get(f"/api/record-groups/{self.group.id}/matches/")
+        self.assertEqual(resp.status_code, 200)
