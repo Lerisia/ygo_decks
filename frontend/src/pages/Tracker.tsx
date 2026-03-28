@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useTracker } from "@/context/TrackerContext";
-import DuelTracker from "@/api/trackerApi";
 import { getUserRecordGroups } from "@/api/toolApi";
 import { getUserDecks, isAuthenticated } from "@/api/accountApi";
 import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/lib/rankUtils";
@@ -143,13 +142,13 @@ export default function Tracker() {
           {t.isTracking && !t.pendingSave && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4 text-center">
               <p className="text-green-700 dark:text-green-300 text-sm">감지 중... 마스터 듀얼로 전환하세요.</p>
-              {t.nativeStatus && (
-                <p className="text-green-600 dark:text-green-400 text-xs mt-1 font-mono">{t.nativeStatus}</p>
-              )}
               {t.useRank && t.currentRank && (
                 <p className="text-green-600 dark:text-green-400 text-xs mt-1">
                   {getRankLabel(t.currentRank)} {t.currentWins !== null ? `${t.currentWins}승` : ""}
                 </p>
+              )}
+              {t.nativeStatus && (
+                <p className="text-gray-400 text-xs mt-1">{t.nativeStatus}</p>
               )}
             </div>
           )}
@@ -161,27 +160,6 @@ export default function Tracker() {
       )}
 
       {error && <p className="text-center text-red-500 mt-4 text-sm">{error}</p>}
-
-      {t.isTracking && (
-        <div className="mt-4 space-y-2">
-          <button
-            onClick={async () => {
-              try {
-                const r = await DuelTracker.getLatestResult();
-                setError("수동확인: status=" + (r.status || "빈값") + " ts=" + r.timestamp);
-              } catch (e: any) {
-                setError("수동확인 에러: " + (e?.message || JSON.stringify(e)));
-              }
-            }}
-            className="w-full py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm"
-          >
-            수동 상태 확인
-          </button>
-          <p className="text-center text-xs text-gray-400 font-mono">
-            {t.nativeStatus || "(상태 없음)"}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
