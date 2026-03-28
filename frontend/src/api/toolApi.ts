@@ -194,8 +194,12 @@ export const getRecordGroupStatistics = async (recordGroupId: number) => {
 
 export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number) => {
   const params = deckId ? `?deck_id=${deckId}` : "";
+  const token = localStorage.getItem("access_token");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
   const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/statistics/full${params}`, {
     method: "GET",
+    headers,
   });
 
   if (!response.ok) {
@@ -206,10 +210,13 @@ export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId
 };
 
 export const getRecordGroupMatches = async (recordGroupId: number, page: number, pageSize: number) => {
-  let url = `/api/record-groups/${recordGroupId}/matches/?page=${page}&page_size=${pageSize}`;
+  const url = `/api/record-groups/${recordGroupId}/matches/?page=${page}&page_size=${pageSize}`;
+  const token = localStorage.getItem("access_token");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
   const response = await fetch(url, {
     method: "GET",
+    headers,
   });
 
   if (!response.ok) {
