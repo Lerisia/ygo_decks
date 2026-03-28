@@ -276,9 +276,7 @@ public class ScreenCaptureService extends Service {
         if (overlay != null) overlay.dismiss();
         lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
         lastDetectionTime = 0;
-        if (statusLog == null || !statusLog.startsWith("오류")) {
-            statusLog = "서비스 종료됨";
-        }
+        statusLog = "종료:" + statusLog;
         super.onDestroy();
     }
 }
