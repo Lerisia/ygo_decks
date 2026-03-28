@@ -85,13 +85,18 @@ class DeleteAccountTest(TestCase):
         self.assertFalse(self.user.is_active)
         self.assertTrue(self.user.pending_deletion)
 
-    def test_deactivated_user_cannot_login(self):
+    def test_pending_deletion_user_can_login_and_reactivate(self):
         self.user.is_active = False
         self.user.pending_deletion = True
+        self.user.deletion_requested_at = timezone.now()
         self.user.save()
         client = APIClient()
         resp = client.post("/api/token/", {"email": "del@test.com", "password": "pass1234"}, format="json")
-        self.assertNotEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
+        self.assertFalse(self.user.pending_deletion)
+        self.assertIsNone(self.user.deletion_requested_at)
 
     def test_unauthenticated_cannot_delete(self):
         client = APIClient()

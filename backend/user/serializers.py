@@ -44,6 +44,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise AuthenticationFailed("Invalid credentials.")
 
         if not user.is_active:
-            raise AuthenticationFailed("Email not verified.")
+            if user.pending_deletion:
+                user.is_active = True
+                user.pending_deletion = False
+                user.deletion_requested_at = None
+                user.save(update_fields=["is_active", "pending_deletion", "deletion_requested_at"])
+            else:
+                raise AuthenticationFailed("Email not verified.")
 
         return super().validate(attrs)
