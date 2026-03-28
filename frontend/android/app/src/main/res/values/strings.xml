@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">YGODecks</string>
+    <string name="title_activity_main">YGODecks</string>
+    <string name="package_name">com.elyss.ygodecks</string>
+    <string name="custom_url_scheme">com.elyss.ygodecks</string>
+</resources>
