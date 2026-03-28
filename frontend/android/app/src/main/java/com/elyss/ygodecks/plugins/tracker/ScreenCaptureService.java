@@ -58,8 +58,13 @@ public class ScreenCaptureService extends Service {
     public IBinder onBind(Intent intent) { return null; }
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        statusLog = "onCreate 진입";
+    }
+
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand");
         statusLog = "onStartCommand 진입";
 
         // Step 1: Notification channel
@@ -270,7 +275,10 @@ public class ScreenCaptureService extends Service {
         if (captureThread != null) captureThread.quitSafely();
         if (overlay != null) overlay.dismiss();
         lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
-        lastDetectionTime = 0; statusLog = "";
+        lastDetectionTime = 0;
+        if (statusLog == null || !statusLog.startsWith("오류")) {
+            statusLog = "서비스 종료됨";
+        }
         super.onDestroy();
     }
 }
