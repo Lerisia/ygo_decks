@@ -240,6 +240,26 @@ class FullStatisticsTest(TestCase):
         self.assertEqual(len(custom_b), 1)
         self.assertEqual(custom_b[0]["total_games"], 1)
 
+    def test_deck_id_filter(self):
+        _create_match(self.group, self.deck1, self.opp, result="win")
+        _create_match(self.group, self.deck1, self.opp, result="win")
+        _create_match(self.group, self.deck2, self.opp, result="lose")
+
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/", {"deck_id": self.deck1.id})
+        data = resp.json()
+        self.assertEqual(data["basic"]["total_games"], 2)
+        self.assertAlmostEqual(data["basic"]["overall_win_rate"], 100.0)
+
+    def test_deck_id_filter_excludes_other_deck(self):
+        _create_match(self.group, self.deck1, self.opp, result="win")
+        _create_match(self.group, self.deck2, self.opp, result="lose")
+
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/", {"deck_id": self.deck2.id})
+        data = resp.json()
+        self.assertEqual(data["basic"]["total_games"], 1)
+        self.assertEqual(len(data["my_deck_stats"]), 1)
+        self.assertEqual(data["my_deck_stats"][0]["deck"]["name"], "덱B")
+
     def test_my_deck_stats_win_rate(self):
         _create_match(self.group, self.deck1, self.opp, result="win")
         _create_match(self.group, self.deck1, self.opp, result="win")

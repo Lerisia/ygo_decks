@@ -111,22 +111,27 @@ const StatisticsPage = () => {
   const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"basic" | "deck" | "rankChange">("basic");
   const [rankSubTab, setRankSubTab] = useState<"rank" | "score">("rank");
+  const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
+  const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [statsRes, rankRes] = await Promise.all([
-          getRecordGroupStatisticsFull(Number(recordGroupId)),
+          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId),
           getRecordGroupRankHistory(Number(recordGroupId)),
         ]);
         setStats(statsRes);
         setRankHistory(rankRes.matches || []);
+        if (deckFilterOptions.length === 0 && statsRes.my_deck_stats) {
+          setDeckFilterOptions(statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean));
+        }
       } catch (err) {
         console.error("통계 데이터를 불러오지 못했습니다", err);
       }
     };
     fetchData();
-  }, [recordGroupId]);
+  }, [recordGroupId, selectedDeckId]);
 
   if (!stats) return <div className="p-6">로딩 중...</div>;
 
@@ -164,6 +169,37 @@ const StatisticsPage = () => {
       label: `${m.score}점`,
     }));
 
+  const niceStep = (range: number) => {
+    if (range <= 20) return 5;
+    if (range <= 100) return 10;
+    if (range <= 500) return 50;
+    return 100;
+  };
+
+  const xTicks = (data: { index: number }[]) => {
+    if (data.length === 0) return undefined;
+    const max = Math.max(...data.map((d) => d.index));
+    const step = niceStep(max);
+    const ticks: number[] = [];
+    for (let v = 0; v <= max; v += step) ticks.push(v);
+    if (ticks[ticks.length - 1] < max) ticks.push(Math.ceil(max / step) * step);
+    return ticks;
+  };
+
+  const scoreTicks = (() => {
+    if (scoreData.length === 0) return { ticks: [], domain: [0, 100] as [number, number] };
+    const values = scoreData.map((d) => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const step = range <= 300 ? 50 : range <= 500 ? 100 : range <= 5000 ? 500 : 1000;
+    const lo = Math.floor(min / step) * step;
+    const hi = Math.ceil(max / step) * step;
+    const ticks: number[] = [];
+    for (let v = lo; v <= hi; v += step) ticks.push(v);
+    return { ticks, domain: [lo, hi] as [number, number] };
+  })();
+
   // Y축에 표시할 랭크 틱 계산
   const rankTicks = (() => {
     if (rankData.length === 0) return [];
@@ -192,11 +228,27 @@ const StatisticsPage = () => {
         ← {stats.record_group_name}
       </button>
 
-      <div className="flex justify-center gap-4 mb-6 border-b dark:border-gray-700 pb-2">
+      <div className="flex justify-center gap-4 mb-4 border-b dark:border-gray-700 pb-2">
         <button onClick={() => setActiveTab("basic")} className={tabClass("basic")}>요약</button>
-        <button onClick={() => setActiveTab("deck")} className={tabClass("deck")}>덱별 통계</button>
+        <button onClick={() => setActiveTab("deck")} className={tabClass("deck")}>상대별 통계</button>
         <button onClick={() => setActiveTab("rankChange")} className={tabClass("rankChange")}>랭크 변화</button>
       </div>
+
+      {deckFilterOptions.length > 1 && (
+        <div className="flex items-center gap-2 mb-6">
+          <label className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">내 덱</label>
+          <select
+            value={selectedDeckId ?? ""}
+            onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
+            className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="">전체</option>
+            {deckFilterOptions.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {activeTab === "basic" && (
         <div className="space-y-8">
@@ -425,6 +477,7 @@ const StatisticsPage = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
                     dataKey="index"
+                    ticks={xTicks(rankData)}
                     tick={{ fontSize: 12 }}
                     label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
                   />
@@ -464,11 +517,13 @@ const StatisticsPage = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
                     dataKey="index"
+                    ticks={xTicks(scoreData)}
                     tick={{ fontSize: 12 }}
                     label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
                   />
                   <YAxis
-                    domain={["dataMin - 50", "dataMax + 50"]}
+                    domain={scoreTicks.domain}
+                    ticks={scoreTicks.ticks}
                     tick={{ fontSize: 12 }}
                     width={50}
                   />

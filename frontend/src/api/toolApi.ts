@@ -173,8 +173,9 @@ export const getRecordGroupStatistics = async (recordGroupId: number) => {
   return response.json();
 };
 
-export const getRecordGroupStatisticsFull = async (recordGroupId: number) => {
-  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/statistics/full`, {
+export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number) => {
+  const params = deckId ? `?deck_id=${deckId}` : "";
+  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/statistics/full${params}`, {
     method: "GET",
   });
 

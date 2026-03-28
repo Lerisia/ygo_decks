@@ -201,6 +201,10 @@ def get_record_group_statistics_full(request, record_group_id):
 
     matches = record_group.matches.filter(is_deleted=False)
 
+    deck_id = request.GET.get("deck_id")
+    if deck_id:
+        matches = matches.filter(deck_id=deck_id)
+
     # ----------------------
     # 1) Basic statistics
     # ----------------------
