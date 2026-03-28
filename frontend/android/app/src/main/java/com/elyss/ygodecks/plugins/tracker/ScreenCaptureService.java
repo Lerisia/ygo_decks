@@ -44,125 +44,163 @@ public class ScreenCaptureService extends Service {
     private Handler handler;
     private Runnable captureRunnable;
     private boolean isCapturing = false;
+    private DetectionOverlay overlay;
+    private int captureCount = 0;
 
     private int screenWidth;
     private int screenHeight;
     private int screenDensity;
-    private DetectionOverlay overlay;
-    private int captureCount = 0;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "Service onCreate");
         createNotificationChannel();
         handler = new Handler(Looper.getMainLooper());
         overlay = new DetectionOverlay(this);
 
-        DisplayMetrics metrics = new DisplayMetrics();
-        WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-        wm.getDefaultDisplay().getRealMetrics(metrics);
+        try {
+            WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+            DisplayMetrics metrics = new DisplayMetrics();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                getDisplay().getRealMetrics(metrics);
+            } else {
+                wm.getDefaultDisplay().getRealMetrics(metrics);
+            }
+            screenWidth = metrics.widthPixels;
+            screenHeight = metrics.heightPixels;
+            screenDensity = metrics.densityDpi;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get display metrics, using defaults", e);
+            screenWidth = 1080;
+            screenHeight = 2400;
+            screenDensity = 420;
+        }
 
-        screenWidth = metrics.widthPixels;
-        screenHeight = metrics.heightPixels;
-        screenDensity = metrics.densityDpi;
         Log.d(TAG, "Screen: " + screenWidth + "x" + screenHeight + " density=" + screenDensity);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "Service onStartCommand");
+
         if (intent == null) {
+            Log.e(TAG, "Intent is null");
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("YGODecks 트래커")
-                .setContentText("듀얼을 감지하고 있습니다...")
-                .setSmallIcon(android.R.drawable.ic_media_play)
-                .setOngoing(true)
-                .build();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
-        }
-
-        // Start floating widget
         try {
-            Intent widgetIntent = new Intent(this, FloatingWidgetService.class);
-            startService(widgetIntent);
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("YGODecks 트래커")
+                    .setContentText("듀얼을 감지하고 있습니다...")
+                    .setSmallIcon(android.R.drawable.ic_media_play)
+                    .setOngoing(true)
+                    .build();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+            Log.d(TAG, "startForeground called successfully");
         } catch (Exception e) {
-            Log.w(TAG, "Floating widget failed to start", e);
+            Log.e(TAG, "startForeground failed", e);
+            stopSelf();
+            return START_NOT_STICKY;
         }
 
         int resultCode = intent.getIntExtra("resultCode", -1);
         Intent data = intent.getParcelableExtra("data");
 
         if (data == null || resultCode == -1) {
+            Log.e(TAG, "Invalid MediaProjection data");
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        MediaProjectionManager mgr = (MediaProjectionManager)
-                getSystemService(MEDIA_PROJECTION_SERVICE);
-        mediaProjection = mgr.getMediaProjection(resultCode, data);
+        try {
+            MediaProjectionManager mgr = (MediaProjectionManager)
+                    getSystemService(MEDIA_PROJECTION_SERVICE);
+            mediaProjection = mgr.getMediaProjection(resultCode, data);
 
-        if (mediaProjection == null) {
+            if (mediaProjection == null) {
+                Log.e(TAG, "MediaProjection is null");
+                stopSelf();
+                return START_NOT_STICKY;
+            }
+
+            Log.d(TAG, "MediaProjection obtained, starting capture");
+            startCapture();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start capture", e);
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        startCapture();
         return START_STICKY;
     }
 
     private void startCapture() {
-        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
+        try {
+            imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
 
-        virtualDisplay = mediaProjection.createVirtualDisplay(
-                "DuelTracker",
-                screenWidth, screenHeight, screenDensity,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(),
-                null, handler
-        );
+            virtualDisplay = mediaProjection.createVirtualDisplay(
+                    "DuelTracker",
+                    screenWidth, screenHeight, screenDensity,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    imageReader.getSurface(),
+                    null, handler
+            );
 
-        isCapturing = true;
+            isCapturing = true;
 
-        captureRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isCapturing) return;
-                captureAndAnalyze();
-                handler.postDelayed(this, CAPTURE_INTERVAL_MS);
-            }
-        };
-        handler.postDelayed(captureRunnable, CAPTURE_INTERVAL_MS);
+            captureRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (!isCapturing) return;
+                    captureAndAnalyze();
+                    handler.postDelayed(this, CAPTURE_INTERVAL_MS);
+                }
+            };
+            handler.postDelayed(captureRunnable, CAPTURE_INTERVAL_MS);
 
-        Log.d(TAG, "Screen capture started");
+            Log.d(TAG, "Screen capture started successfully");
+            updateNotification("감지 시작됨");
+        } catch (Exception e) {
+            Log.e(TAG, "startCapture failed", e);
+            updateNotification("캡처 시작 실패: " + e.getMessage());
+        }
     }
 
     private void updateNotification(String text) {
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("YGODecks 트래커")
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_media_play)
-                .setOngoing(true)
-                .build();
-        NotificationManager mgr = getSystemService(NotificationManager.class);
-        mgr.notify(NOTIFICATION_ID, notification);
+        try {
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("YGODecks 트래커")
+                    .setContentText(text)
+                    .setSmallIcon(android.R.drawable.ic_media_play)
+                    .setOngoing(true)
+                    .build();
+            NotificationManager mgr = getSystemService(NotificationManager.class);
+            mgr.notify(NOTIFICATION_ID, notification);
+        } catch (Exception e) {
+            Log.e(TAG, "updateNotification failed", e);
+        }
     }
 
     private void captureAndAnalyze() {
         if (imageReader == null) return;
 
-        Image image = imageReader.acquireLatestImage();
-        if (image == null) {
-            Log.d(TAG, "No image available");
+        Image image = null;
+        try {
+            image = imageReader.acquireLatestImage();
+        } catch (Exception e) {
+            Log.e(TAG, "acquireLatestImage failed", e);
             return;
         }
+
+        if (image == null) return;
 
         captureCount++;
         if (captureCount % 5 == 0) {
@@ -193,17 +231,17 @@ public class ScreenCaptureService extends Service {
                     case COIN_TOSS:
                         lastCoinToss = result.value;
                         overlay.show("코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면"));
-                        Log.d(TAG, "Coin toss detected: " + result.value);
+                        updateNotification("코인토스 감지: " + ("win".equals(result.value) ? "앞면" : "뒷면"));
                         break;
                     case FIRST_SECOND:
                         lastFirstSecond = result.value;
                         overlay.show("first".equals(result.value) ? "선공" : "후공");
-                        Log.d(TAG, "First/second detected: " + result.value);
+                        updateNotification("선후공 감지: " + ("first".equals(result.value) ? "선공" : "후공"));
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
                         overlay.show(("win".equals(result.value) ? "승리" : "패배") + " - 자동 기록됨");
-                        Log.d(TAG, "Duel result detected: " + result.value);
+                        updateNotification("듀얼 결과: " + ("win".equals(result.value) ? "승리" : "패배"));
                         break;
                 }
             }
@@ -211,7 +249,7 @@ public class ScreenCaptureService extends Service {
             if (cropped != bitmap) cropped.recycle();
             bitmap.recycle();
         } catch (Exception e) {
-            Log.e(TAG, "Capture error", e);
+            Log.e(TAG, "Capture analysis error", e);
         } finally {
             image.close();
         }
@@ -241,9 +279,6 @@ public class ScreenCaptureService extends Service {
     public void onDestroy() {
         stopCapture();
         if (overlay != null) overlay.dismiss();
-        try {
-            stopService(new Intent(this, FloatingWidgetService.class));
-        } catch (Exception ignored) {}
         lastCoinToss = null;
         lastFirstSecond = null;
         lastDuelResult = null;
