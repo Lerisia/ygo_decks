@@ -34,12 +34,8 @@ public class ScreenAnalyzer {
         }
     }
 
-    private static int stableFrameCount = 0;
-    private static String pendingResult = null;
-    private static DetectionType pendingType = null;
-    private static final int REQUIRED_STABLE_FRAMES = 2;
     private static long lastDetectionTime = 0;
-    private static final long COOLDOWN_MS = 10000;
+    private static final long COOLDOWN_MS = 5000;
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
@@ -47,41 +43,15 @@ public class ScreenAnalyzer {
             return null;
         }
 
-        // Run all OCR on the full screen at once
         AnalysisResult result = detectAllViaOCR(bitmap);
         if (result != null) {
-            return confirmResult(result);
+            lastDetectionTime = System.currentTimeMillis();
+            Log.d(TAG, "Detected: " + result.type + " = " + result.value);
         }
-
-        pendingResult = null;
-        pendingType = null;
-        stableFrameCount = 0;
-        return null;
-    }
-
-    private static AnalysisResult confirmResult(AnalysisResult candidate) {
-        if (candidate.type == pendingType && candidate.value.equals(pendingResult)) {
-            stableFrameCount++;
-            if (stableFrameCount >= REQUIRED_STABLE_FRAMES) {
-                pendingResult = null;
-                pendingType = null;
-                stableFrameCount = 0;
-                lastDetectionTime = System.currentTimeMillis();
-                Log.d(TAG, "Confirmed: " + candidate.type + " = " + candidate.value);
-                return candidate;
-            }
-        } else {
-            pendingType = candidate.type;
-            pendingResult = candidate.value;
-            stableFrameCount = 1;
-        }
-        return null;
+        return result;
     }
 
     public static void reset() {
-        stableFrameCount = 0;
-        pendingResult = null;
-        pendingType = null;
         lastDetectionTime = 0;
     }
 
