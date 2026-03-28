@@ -141,7 +141,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   // Global polling
   useEffect(() => {
-    if (isTracking && isNative && !pendingSave) {
+    if (isTracking && !pendingSave) {
+      setNativeStatus("폴링 시작됨" + (isNative ? " (네이티브)" : " (웹)"));
       pollRef.current = setInterval(async () => {
         try {
           const result = await DuelTracker.getLatestResult();

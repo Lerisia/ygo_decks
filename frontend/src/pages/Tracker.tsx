@@ -147,9 +147,9 @@ export default function Tracker() {
                   {getRankLabel(t.currentRank)} {t.currentWins !== null ? `${t.currentWins}승` : ""}
                 </p>
               )}
-              {t.nativeStatus && (
-                <p className="text-gray-400 text-xs mt-1">{t.nativeStatus}</p>
-              )}
+              <p className="text-gray-400 text-xs mt-1">
+                상태: {t.nativeStatus || "대기 중"}
+              </p>
             </div>
           )}
 
