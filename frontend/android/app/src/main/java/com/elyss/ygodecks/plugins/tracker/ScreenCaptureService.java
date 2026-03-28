@@ -49,108 +49,125 @@ public class ScreenCaptureService extends Service {
     private boolean isCapturing = false;
     private DetectionOverlay overlay;
     private int captureCount = 0;
-
     private int captureWidth = 540;
     private int captureHeight = 1200;
     private int captureDensity = 210;
 
+    @Nullable
     @Override
-    public void onCreate() {
-        super.onCreate();
+    public IBinder onBind(Intent intent) { return null; }
 
-        // Notification channel + startForeground FIRST, before anything else
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, "듀얼 트래커", NotificationManager.IMPORTANCE_LOW);
-        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand");
+        statusLog = "onStartCommand 진입";
 
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("YGODecks 트래커")
-                .setContentText("초기화 중...")
-                .setSmallIcon(android.R.drawable.ic_media_play)
-                .setOngoing(true)
-                .build();
-
+        // Step 1: Notification channel
         try {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID, "듀얼 트래커", NotificationManager.IMPORTANCE_DEFAULT);
+            getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            statusLog = "채널 생성됨";
+        } catch (Exception e) {
+            statusLog = "채널 실패: " + e;
+            Log.e(TAG, statusLog, e);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        // Step 2: startForeground
+        try {
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("YGODecks 트래커")
+                    .setContentText("시작됨")
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setOngoing(true)
+                    .build();
+
             if (Build.VERSION.SDK_INT >= 34) {
                 startForeground(NOTIFICATION_ID, notification,
                         android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
+            statusLog = "포그라운드 OK";
+            Log.d(TAG, statusLog);
         } catch (Exception e) {
-            statusLog = "startForeground 실패: " + e.getMessage();
+            statusLog = "포그라운드 실패: " + e;
             Log.e(TAG, statusLog, e);
             stopSelf();
-            return;
+            return START_NOT_STICKY;
         }
 
-        statusLog = "서비스 시작됨";
-        updateNotification(statusLog);
-
-        // Now safe to initialize everything else
-        mainHandler = new Handler(getMainLooper());
-
-        captureThread = new HandlerThread("DuelTrackerCapture");
-        captureThread.start();
-        captureHandler = new Handler(captureThread.getLooper());
-
-        try {
-            overlay = new DetectionOverlay(this);
-        } catch (Exception e) {
-            Log.w(TAG, "Overlay init failed", e);
-        }
-
-        try {
-            WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-            DisplayMetrics metrics = new DisplayMetrics();
-            wm.getDefaultDisplay().getRealMetrics(metrics);
-            captureWidth = metrics.widthPixels / 2;
-            captureHeight = metrics.heightPixels / 2;
-            captureDensity = metrics.densityDpi / 2;
-        } catch (Exception e) {
-            Log.w(TAG, "Display metrics failed, using defaults", e);
-        }
-
-        statusLog = "초기화 완료 (" + captureWidth + "x" + captureHeight + ")";
-        updateNotification(statusLog);
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+        // Step 3: Intent data
         if (intent == null) {
+            statusLog = "intent null";
             stopSelf();
             return START_NOT_STICKY;
         }
 
         int resultCode = intent.getIntExtra("resultCode", -1);
         Intent data = intent.getParcelableExtra("data");
-
         if (data == null || resultCode == -1) {
-            statusLog = "MediaProjection 데이터 없음";
+            statusLog = "데이터 없음";
             updateNotification(statusLog);
             stopSelf();
             return START_NOT_STICKY;
         }
 
+        // Step 4: MediaProjection
         try {
             MediaProjectionManager mgr = (MediaProjectionManager)
                     getSystemService(MEDIA_PROJECTION_SERVICE);
             mediaProjection = mgr.getMediaProjection(resultCode, data);
-
             if (mediaProjection == null) {
-                statusLog = "MediaProjection 획득 실패";
+                statusLog = "projection null";
                 updateNotification(statusLog);
                 stopSelf();
                 return START_NOT_STICKY;
             }
-
-            startCapture();
+            statusLog = "projection OK";
+            updateNotification(statusLog);
         } catch (Exception e) {
-            statusLog = "캡처 시작 실패: " + e.getMessage();
+            statusLog = "projection 실패: " + e;
             updateNotification(statusLog);
             Log.e(TAG, statusLog, e);
             stopSelf();
             return START_NOT_STICKY;
+        }
+
+        // Step 5: Init helpers
+        mainHandler = new Handler(getMainLooper());
+        captureThread = new HandlerThread("Capture");
+        captureThread.start();
+        captureHandler = new Handler(captureThread.getLooper());
+
+        try {
+            overlay = new DetectionOverlay(this);
+        } catch (Exception e) {
+            Log.w(TAG, "overlay init fail", e);
+        }
+
+        try {
+            WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+            DisplayMetrics m = new DisplayMetrics();
+            wm.getDefaultDisplay().getRealMetrics(m);
+            captureWidth = m.widthPixels / 2;
+            captureHeight = m.heightPixels / 2;
+            captureDensity = m.densityDpi / 2;
+        } catch (Exception e) {
+            Log.w(TAG, "metrics fail", e);
+        }
+
+        // Step 6: Start capture
+        try {
+            startCapture();
+            statusLog = "감지 중";
+            updateNotification("듀얼을 감지하고 있습니다");
+        } catch (Exception e) {
+            statusLog = "캡처 실패: " + e;
+            updateNotification(statusLog);
+            Log.e(TAG, statusLog, e);
         }
 
         return START_STICKY;
@@ -158,59 +175,40 @@ public class ScreenCaptureService extends Service {
 
     private void startCapture() {
         imageReader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2);
-
         virtualDisplay = mediaProjection.createVirtualDisplay(
-                "DuelTracker",
-                captureWidth, captureHeight, captureDensity,
+                "DuelTracker", captureWidth, captureHeight, captureDensity,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(),
-                null, captureHandler
-        );
-
+                imageReader.getSurface(), null, captureHandler);
         isCapturing = true;
-
-        captureRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isCapturing) return;
-                captureAndAnalyze();
-                captureHandler.postDelayed(this, CAPTURE_INTERVAL_MS);
-            }
+        captureRunnable = () -> {
+            if (!isCapturing) return;
+            captureAndAnalyze();
+            captureHandler.postDelayed(captureRunnable, CAPTURE_INTERVAL_MS);
         };
         captureHandler.postDelayed(captureRunnable, 2000);
-
-        statusLog = "감지 중";
-        updateNotification("듀얼을 감지하고 있습니다");
     }
 
     private void updateNotification(String text) {
         try {
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+            Notification n = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("YGODecks 트래커")
                     .setContentText(text)
-                    .setSmallIcon(android.R.drawable.ic_media_play)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setOngoing(true)
                     .build();
-            getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification);
+            getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, n);
         } catch (Exception ignored) {}
     }
 
     private void captureAndAnalyze() {
         if (imageReader == null) return;
-
         Image image;
-        try {
-            image = imageReader.acquireLatestImage();
-        } catch (Exception e) {
-            return;
-        }
+        try { image = imageReader.acquireLatestImage(); } catch (Exception e) { return; }
         if (image == null) return;
 
         captureCount++;
         statusLog = "스캔 " + captureCount + "회";
-        if (captureCount % 3 == 0) {
-            updateNotification("감지 중 (" + captureCount + "회 스캔)");
-        }
+        if (captureCount % 3 == 0) updateNotification("감지 중 (" + captureCount + "회)");
 
         try {
             Image.Plane[] planes = image.getPlanes();
@@ -220,22 +218,16 @@ public class ScreenCaptureService extends Service {
             int rowPadding = rowStride - pixelStride * captureWidth;
 
             Bitmap bitmap = Bitmap.createBitmap(
-                    captureWidth + rowPadding / pixelStride,
-                    captureHeight,
-                    Bitmap.Config.ARGB_8888
-            );
+                    captureWidth + rowPadding / pixelStride, captureHeight, Bitmap.Config.ARGB_8888);
             bitmap.copyPixelsFromBuffer(buffer);
 
             Bitmap cropped = (rowPadding > 0)
-                    ? Bitmap.createBitmap(bitmap, 0, 0, captureWidth, captureHeight)
-                    : bitmap;
+                    ? Bitmap.createBitmap(bitmap, 0, 0, captureWidth, captureHeight) : bitmap;
 
             ScreenAnalyzer.AnalysisResult result = ScreenAnalyzer.analyze(cropped);
-
             if (result != null) {
                 lastDetectionTime = System.currentTimeMillis();
                 String msg = "";
-
                 switch (result.type) {
                     case COIN_TOSS:
                         lastCoinToss = result.value;
@@ -247,15 +239,14 @@ public class ScreenCaptureService extends Service {
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
-                        msg = ("win".equals(result.value) ? "승리" : "패배");
+                        msg = "win".equals(result.value) ? "승리" : "패배";
                         break;
                 }
-
                 statusLog = msg;
                 updateNotification(msg);
                 if (overlay != null) {
-                    final String overlayMsg = msg;
-                    mainHandler.post(() -> overlay.show(overlayMsg));
+                    final String m = msg;
+                    mainHandler.post(() -> overlay.show(m));
                 }
             }
 
@@ -269,30 +260,17 @@ public class ScreenCaptureService extends Service {
         }
     }
 
-    private void stopCapture() {
-        isCapturing = false;
-        if (captureHandler != null && captureRunnable != null) {
-            captureHandler.removeCallbacks(captureRunnable);
-        }
-        if (virtualDisplay != null) { virtualDisplay.release(); virtualDisplay = null; }
-        if (imageReader != null) { imageReader.close(); imageReader = null; }
-        if (mediaProjection != null) { mediaProjection.stop(); mediaProjection = null; }
-        if (captureThread != null) { captureThread.quitSafely(); captureThread = null; }
-    }
-
     @Override
     public void onDestroy() {
-        stopCapture();
+        isCapturing = false;
+        if (captureHandler != null && captureRunnable != null) captureHandler.removeCallbacks(captureRunnable);
+        if (virtualDisplay != null) virtualDisplay.release();
+        if (imageReader != null) imageReader.close();
+        if (mediaProjection != null) mediaProjection.stop();
+        if (captureThread != null) captureThread.quitSafely();
         if (overlay != null) overlay.dismiss();
-        lastCoinToss = null;
-        lastFirstSecond = null;
-        lastDuelResult = null;
-        lastDetectionTime = 0;
-        statusLog = "";
+        lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
+        lastDetectionTime = 0; statusLog = "";
         super.onDestroy();
     }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) { return null; }
 }
