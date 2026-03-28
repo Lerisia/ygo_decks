@@ -141,6 +141,12 @@ def update_user_settings(request):
         user.use_custom_lookup = use_custom_lookup
         user.save()
 
+        if use_custom_lookup and user.owned_decks.exists():
+            try:
+                call_command("generate_lookup", user_id=user.id)
+            except Exception:
+                pass
+
     return Response({"message": "설정이 저장되었습니다.", "use_custom_lookup": user.use_custom_lookup})
 
 @api_view(["GET"])

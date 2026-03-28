@@ -1,7 +1,9 @@
 from datetime import timedelta
+from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 from django.core.management import call_command
+from rest_framework.test import APIClient
 from user.models import User
 from deck.models import Deck
 
@@ -45,6 +47,29 @@ class UserModelTest(TestCase):
         User.objects.create_user(email="a@test.com", username="same", password="pass1234")
         with self.assertRaises(Exception):
             User.objects.create_user(email="b@test.com", username="same", password="pass1234")
+
+
+class UpdateSettingsLUTTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="a@test.com", username="user1", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = Deck.objects.create(name="덱A", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.user.owned_decks.add(self.deck)
+
+    @patch("user.views.call_command")
+    def test_enabling_custom_lookup_triggers_lut_generation(self, mock_cmd):
+        resp = self.client.post("/api/user/update-settings/", {"use_custom_lookup": True}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        mock_cmd.assert_called_once_with("generate_lookup", user_id=self.user.id)
+
+    @patch("user.views.call_command")
+    def test_disabling_custom_lookup_does_not_trigger_lut(self, mock_cmd):
+        self.user.use_custom_lookup = True
+        self.user.save()
+        resp = self.client.post("/api/user/update-settings/", {"use_custom_lookup": False}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        mock_cmd.assert_not_called()
 
 
 class CleanupUnverifiedUsersTest(TestCase):
