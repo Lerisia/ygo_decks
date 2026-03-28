@@ -2,6 +2,7 @@ import os
 import random
 
 from django.conf import settings
+from django.utils import timezone
 from PIL import Image
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -110,15 +111,23 @@ def quiz_submit_score(request):
 
 @api_view(["GET"])
 def quiz_leaderboard(request):
-    top_records = (
-        QuizHighScore.objects
-        .select_related("user")
-        .order_by("-score")[:10]
-    )
+    now = timezone.now()
+    if now.year >= 2026 and now.month >= 5:
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        month_start = None
+
+    qs = QuizHighScore.objects.select_related("user")
+    if month_start:
+        qs = qs.filter(created_at__gte=month_start)
+
+    top_records = qs.order_by("-score")[:10]
 
     leaderboard = [
         {"username": r.user.username, "score": r.score, "streak": r.streak}
         for r in top_records
     ]
 
-    return Response({"leaderboard": leaderboard})
+    period = f"{now.year}.{now.month:02d}"
+
+    return Response({"leaderboard": leaderboard, "period": period})

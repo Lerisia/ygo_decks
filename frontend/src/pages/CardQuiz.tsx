@@ -27,6 +27,7 @@ function CardQuiz() {
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [period, setPeriod] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -61,6 +62,7 @@ function CardQuiz() {
     const res = await fetch("/api/quiz/leaderboard/");
     const data = await res.json();
     setLeaderboard(data.leaderboard || []);
+    setPeriod(data.period || "");
   }, []);
 
   const fetchNextCard = useCallback(async () => {
@@ -205,7 +207,7 @@ function CardQuiz() {
 
           {leaderboard.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold mb-3">리더보드</h2>
+              <h2 className="text-lg font-semibold mb-3">리더보드 ({period})</h2>
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
                 {leaderboard.map((entry, i) => (
                   <div
@@ -362,7 +364,7 @@ function CardQuiz() {
 
           {leaderboard.length > 0 && (
             <div className="mt-4">
-              <h2 className="text-lg font-semibold mb-3">리더보드</h2>
+              <h2 className="text-lg font-semibold mb-3">리더보드 ({period})</h2>
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
                 {leaderboard.map((entry, i) => (
                   <div

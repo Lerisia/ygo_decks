@@ -1,6 +1,7 @@
 import os
 import tempfile
 from datetime import timedelta
+from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.core.management import call_command
@@ -141,3 +142,28 @@ class QuizScoreAndLeaderboardTest(TestCase):
         self.assertEqual(data[0]["username"], "player1")
         self.assertEqual(data[0]["score"], 20)
         self.assertEqual(data[1]["username"], "player2")
+
+    def test_leaderboard_includes_period(self):
+        resp = self.client.get("/api/quiz/leaderboard/")
+        self.assertIn("period", resp.json())
+
+    @patch("card.quiz_views.timezone")
+    def test_leaderboard_excludes_old_month_scores_after_may(self, mock_tz):
+        from django.utils import timezone as real_tz
+        from datetime import datetime
+
+        fake_now = real_tz.make_aware(datetime(2026, 5, 15, 12, 0, 0))
+        mock_tz.now.return_value = fake_now
+
+        old = QuizHighScore.objects.create(user=self.user, score=99, streak=10)
+        old.created_at = real_tz.make_aware(datetime(2026, 4, 20, 12, 0, 0))
+        old.save(update_fields=["created_at"])
+
+        new = QuizHighScore.objects.create(user=self.user2, score=10, streak=2)
+        new.created_at = real_tz.make_aware(datetime(2026, 5, 10, 12, 0, 0))
+        new.save(update_fields=["created_at"])
+
+        resp = self.client.get("/api/quiz/leaderboard/")
+        data = resp.json()["leaderboard"]
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["username"], "player2")
