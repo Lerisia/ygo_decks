@@ -63,11 +63,7 @@ public class ScreenCaptureService extends Service {
         try {
             WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
             DisplayMetrics metrics = new DisplayMetrics();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                getDisplay().getRealMetrics(metrics);
-            } else {
-                wm.getDefaultDisplay().getRealMetrics(metrics);
-            }
+            wm.getDefaultDisplay().getRealMetrics(metrics);
             screenWidth = metrics.widthPixels;
             screenHeight = metrics.heightPixels;
             screenDensity = metrics.densityDpi;
