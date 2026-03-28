@@ -99,6 +99,9 @@ public class ScreenAnalyzer {
                 .addOnSuccessListener(result -> {
                     String text = result.getText();
                     String upper = text.toUpperCase();
+                    String preview = text.replace("\n", " ").trim();
+                    if (preview.length() > 80) preview = preview.substring(0, 80);
+                    ScreenCaptureService.statusLog = "OCR:" + (preview.isEmpty() ? "(빈텍스트)" : preview);
                     Log.d(TAG, "OCR full: " + text.replace("\n", " | "));
 
                     // Priority 1: Duel result
@@ -123,6 +126,7 @@ public class ScreenAnalyzer {
                     latch.countDown();
                 })
                 .addOnFailureListener(e -> {
+                    ScreenCaptureService.statusLog = "OCR실패:" + e.getMessage();
                     Log.e(TAG, "OCR failed", e);
                     latch.countDown();
                 });
