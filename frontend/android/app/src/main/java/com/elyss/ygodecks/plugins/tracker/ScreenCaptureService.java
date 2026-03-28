@@ -229,7 +229,6 @@ public class ScreenCaptureService extends Service {
 
         captureCount++;
         statusLog = "스캔 " + captureCount + "회";
-        if (captureCount % 3 == 0) updateNotification("감지 중 (" + captureCount + "회)");
 
         try {
             Image.Plane[] planes = image.getPlanes();
@@ -246,6 +245,13 @@ public class ScreenCaptureService extends Service {
                     ? Bitmap.createBitmap(bitmap, 0, 0, captureWidth, captureHeight) : bitmap;
 
             ScreenAnalyzer.AnalysisResult result = ScreenAnalyzer.analyze(cropped);
+
+            // Update persistent overlay with OCR status
+            if (overlay != null) {
+                final String s = statusLog;
+                mainHandler.post(() -> overlay.updateStatus(s));
+            }
+
             if (result != null) {
                 lastDetectionTime = System.currentTimeMillis();
                 String msg = "";

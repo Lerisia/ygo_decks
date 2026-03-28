@@ -12,11 +12,11 @@ import android.widget.TextView;
 
 public class DetectionOverlay {
 
-    private static final long DISPLAY_DURATION_MS = 2500;
     private final WindowManager windowManager;
     private final Context context;
     private final Handler handler;
-    private TextView currentView;
+    private TextView persistentView;
+    private TextView flashView;
 
     public DetectionOverlay(Context context) {
         this.context = context;
@@ -24,23 +24,68 @@ public class DetectionOverlay {
         this.handler = new Handler(Looper.getMainLooper());
     }
 
+    private int layoutType() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    /**
+     * Show persistent small text in top-left corner.
+     * Updates every capture with OCR status.
+     */
+    public void updateStatus(String text) {
+        handler.post(() -> {
+            if (persistentView == null) {
+                persistentView = new TextView(context);
+                persistentView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                persistentView.setTextColor(0xAAFFFFFF);
+                persistentView.setBackgroundColor(0x66000000);
+                persistentView.setPadding(12, 6, 12, 6);
+                persistentView.setMaxWidth(600);
+                persistentView.setMaxLines(2);
+
+                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        layoutType(),
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                        PixelFormat.TRANSLUCENT
+                );
+                params.gravity = Gravity.TOP | Gravity.START;
+                params.x = 8;
+                params.y = 40;
+
+                try {
+                    windowManager.addView(persistentView, params);
+                } catch (Exception e) {
+                    persistentView = null;
+                    return;
+                }
+            }
+            persistentView.setText(text);
+        });
+    }
+
+    /**
+     * Flash a detection result briefly in top-right corner.
+     */
     public void show(String message) {
         handler.post(() -> {
-            dismiss();
+            dismissFlash();
 
-            TextView tv = new TextView(context);
-            tv.setText(message);
-            tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-            tv.setTextColor(0xFFFFFFFF);
-            tv.setBackgroundColor(0xCC000000);
-            tv.setPadding(24, 12, 24, 12);
+            flashView = new TextView(context);
+            flashView.setText(message);
+            flashView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            flashView.setTextColor(0xFFFFFFFF);
+            flashView.setBackgroundColor(0xCC000000);
+            flashView.setPadding(24, 12, 24, 12);
 
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                            : WindowManager.LayoutParams.TYPE_PHONE,
+                    layoutType(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                             | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                     PixelFormat.TRANSLUCENT
@@ -50,23 +95,27 @@ public class DetectionOverlay {
             params.y = 80;
 
             try {
-                windowManager.addView(tv, params);
-                currentView = tv;
+                windowManager.addView(flashView, params);
             } catch (Exception e) {
-                // Overlay permission not granted
                 return;
             }
 
-            handler.postDelayed(this::dismiss, DISPLAY_DURATION_MS);
+            handler.postDelayed(this::dismissFlash, 2500);
         });
     }
 
+    private void dismissFlash() {
+        if (flashView != null) {
+            try { windowManager.removeView(flashView); } catch (Exception ignored) {}
+            flashView = null;
+        }
+    }
+
     public void dismiss() {
-        if (currentView != null) {
-            try {
-                windowManager.removeView(currentView);
-            } catch (Exception ignored) {}
-            currentView = null;
+        dismissFlash();
+        if (persistentView != null) {
+            try { windowManager.removeView(persistentView); } catch (Exception ignored) {}
+            persistentView = null;
         }
     }
 }
