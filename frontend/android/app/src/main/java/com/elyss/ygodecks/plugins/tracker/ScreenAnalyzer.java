@@ -75,21 +75,21 @@ public class ScreenAnalyzer {
                     Log.d(TAG, "OCR full: " + text.replace("\n", " | "));
 
                     // Priority 1: Duel result
-                    if (upper.contains("VICTORY")) {
+                    if (upper.contains("VICTORY") || upper.contains("VICTDRY") || upper.contains("VICTOR")) {
                         detected.set(new AnalysisResult(DetectionType.DUEL_RESULT, "win"));
-                    } else if (upper.contains("DEFEAT")) {
+                    } else if (upper.contains("DEFEAT") || upper.contains("DEFEA")) {
                         detected.set(new AnalysisResult(DetectionType.DUEL_RESULT, "lose"));
                     }
                     // Priority 2: First/second announcement
-                    else if (text.contains("당신이") && text.contains("선공")) {
+                    else if (text.contains("선공입니다") || text.contains("선공 입니다")) {
                         detected.set(new AnalysisResult(DetectionType.FIRST_SECOND, "first"));
-                    } else if (text.contains("당신이") && text.contains("후공")) {
+                    } else if (text.contains("후공입니다") || text.contains("후공 입니다")) {
                         detected.set(new AnalysisResult(DetectionType.FIRST_SECOND, "second"));
                     }
                     // Priority 3: Coin toss
-                    else if (text.contains("선택해주세요") || text.contains("선택해 주세요")) {
+                    else if (text.contains("선택해")) {
                         detected.set(new AnalysisResult(DetectionType.COIN_TOSS, "win"));
-                    } else if (text.contains("상대가") && text.contains("선택")) {
+                    } else if (text.contains("상대가")) {
                         detected.set(new AnalysisResult(DetectionType.COIN_TOSS, "lose"));
                     }
 
