@@ -72,6 +72,51 @@ class UpdateSettingsLUTTest(TestCase):
         mock_cmd.assert_not_called()
 
 
+class DeleteAccountTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="del@test.com", username="delme", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+
+    def test_delete_account_deactivates(self):
+        resp = self.client.delete("/api/delete-account/")
+        self.assertEqual(resp.status_code, 204)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+        self.assertTrue(self.user.pending_deletion)
+
+    def test_deactivated_user_cannot_login(self):
+        self.user.is_active = False
+        self.user.pending_deletion = True
+        self.user.save()
+        client = APIClient()
+        resp = client.post("/api/token/", {"email": "del@test.com", "password": "pass1234"}, format="json")
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_unauthenticated_cannot_delete(self):
+        client = APIClient()
+        resp = client.delete("/api/delete-account/")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_cleanup_deletes_expired_pending(self):
+        self.user.is_active = False
+        self.user.pending_deletion = True
+        self.user.deletion_requested_at = timezone.now() - timedelta(days=31)
+        self.user.save()
+
+        call_command("cleanup_unverified_users")
+        self.assertFalse(User.objects.filter(id=self.user.id).exists())
+
+    def test_cleanup_keeps_recent_pending(self):
+        self.user.is_active = False
+        self.user.pending_deletion = True
+        self.user.deletion_requested_at = timezone.now() - timedelta(days=5)
+        self.user.save()
+
+        call_command("cleanup_unverified_users")
+        self.assertTrue(User.objects.filter(id=self.user.id).exists())
+
+
 class CleanupUnverifiedUsersTest(TestCase):
     def test_deletes_old_inactive_users(self):
         old = User.objects.create_user(email="old@test.com", username="old", password="pass1234", is_active=False)

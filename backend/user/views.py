@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
+from django.utils import timezone
 from .serializers import CustomTokenObtainPairSerializer
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.password_validation import validate_password
@@ -148,6 +149,16 @@ def update_user_settings(request):
                 pass
 
     return Response({"message": "설정이 저장되었습니다.", "use_custom_lookup": user.use_custom_lookup})
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    user = request.user
+    user.is_active = False
+    user.pending_deletion = True
+    user.deletion_requested_at = timezone.now()
+    user.save(update_fields=["is_active", "pending_deletion", "deletion_requested_at"])
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

@@ -5,15 +5,28 @@ from user.models import User
 
 
 class Command(BaseCommand):
-    help = "Delete users who have not verified their email within 48 hours."
+    help = "Delete unverified users (48h) and pending deletion users (30d)."
 
     def handle(self, *args, **options):
-        cutoff = timezone.now() - timedelta(hours=48)
+        now = timezone.now()
+
         unverified = User.objects.filter(
             is_active=False,
             is_staff=False,
-            date_joined__lt=cutoff,
+            pending_deletion=False,
+            date_joined__lt=now - timedelta(hours=48),
         )
-        count = unverified.count()
+        unverified_count = unverified.count()
         unverified.delete()
-        self.stdout.write(f"Deleted {count} unverified user(s).")
+
+        pending = User.objects.filter(
+            pending_deletion=True,
+            deletion_requested_at__lt=now - timedelta(days=30),
+        )
+        pending_count = pending.count()
+        pending.delete()
+
+        self.stdout.write(
+            f"Deleted {unverified_count} unverified user(s), "
+            f"{pending_count} pending deletion user(s)."
+        )

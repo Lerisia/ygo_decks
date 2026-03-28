@@ -15,6 +15,8 @@ class User(AbstractUser):
     owned_decks = models.ManyToManyField(Deck, blank=True, related_name="owners")
     
     use_custom_lookup = models.BooleanField(default=False)
+    pending_deletion = models.BooleanField(default=False)
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.username

@@ -58,6 +58,23 @@ const Terms = () => {
       <h4 className="font-bold mt-4 mb-1">Your Rights</h4>
       <p>You may request deletion of your account and associated data by contacting us.</p>
 
+      <h3 className="text-lg font-bold mt-8 mb-2">Account Deletion — YGODecks</h3>
+      <p>You can delete your account from the <strong>My Page</strong> section within the app or website.</p>
+      <h4 className="font-bold mt-4 mb-1">How to Delete Your Account</h4>
+      <ol className="list-decimal pl-5">
+        <li>Log in to your account.</li>
+        <li>Go to <strong>My Page</strong>.</li>
+        <li>Tap <strong>"Delete Account"</strong>.</li>
+        <li>Your account will be deactivated immediately and permanently deleted after 30 days.</li>
+      </ol>
+      <h4 className="font-bold mt-4 mb-1">What Happens to Your Data</h4>
+      <ul className="list-disc pl-5">
+        <li><strong>Immediately deactivated:</strong> Your account becomes inaccessible and you are logged out.</li>
+        <li><strong>Deleted after 30 days:</strong> Email, username, owned deck settings, match records, and all associated data are permanently deleted.</li>
+        <li><strong>Already deleted on schedule:</strong> Uploaded images (deleted after 7 days).</li>
+      </ul>
+      <p className="mt-2">If you wish to cancel the deletion within 30 days, please contact us.</p>
+
       <h3 className="text-lg font-bold mt-8 mb-2">Contact</h3>
       <p>
         For any inquiries, please contact us at{" "}

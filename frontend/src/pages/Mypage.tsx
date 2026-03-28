@@ -217,6 +217,25 @@ const Mypage = () => {
           로그아웃
         </button>
 
+        <button
+          onClick={async () => {
+            if (!confirm("정말로 계정을 삭제하시겠습니까?\n30일간 유예 후 완전히 삭제됩니다.")) return;
+            const token = localStorage.getItem("access_token");
+            const res = await fetch("/api/delete-account/", {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+              localStorage.removeItem("access_token");
+              navigate("/");
+              setTimeout(() => window.location.reload(), 100);
+            }
+          }}
+          className="w-full py-3 text-gray-400 dark:text-gray-500 text-sm text-center"
+        >
+          계정 삭제
+        </button>
+
         {message && <p className="text-center text-sm text-gray-600 dark:text-gray-400">{message}</p>}
       </div>
     </div>
