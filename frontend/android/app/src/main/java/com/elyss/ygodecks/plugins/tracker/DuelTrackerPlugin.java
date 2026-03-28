@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -38,10 +37,6 @@ public class DuelTrackerPlugin extends Plugin {
             return;
         }
 
-        Log.d(TAG, "startTracking called");
-        Toast.makeText(activity, "트래커: 권한 확인 중...", Toast.LENGTH_SHORT).show();
-
-        // Check notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -52,7 +47,6 @@ public class DuelTrackerPlugin extends Plugin {
             }
         }
 
-        // Check overlay permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(activity)) {
             Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + activity.getPackageName()));
@@ -64,29 +58,19 @@ public class DuelTrackerPlugin extends Plugin {
         savedCall = call;
         MediaProjectionManager mgr = (MediaProjectionManager)
                 activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        Intent intent = mgr.createScreenCaptureIntent();
-
-        Toast.makeText(activity, "트래커: 화면 공유 요청", Toast.LENGTH_SHORT).show();
-        activity.startActivityForResult(intent, SCREEN_CAPTURE_REQUEST);
+        activity.startActivityForResult(mgr.createScreenCaptureIntent(), SCREEN_CAPTURE_REQUEST);
     }
 
     public static void handleScreenCaptureResult(Activity activity, int requestCode, int resultCode, Intent data) {
         if (requestCode != SCREEN_CAPTURE_REQUEST) return;
 
-        Log.d(TAG, "handleScreenCaptureResult: resultCode=" + resultCode);
-        Toast.makeText(activity, "트래커: 결과 수신 (code=" + resultCode + ")", Toast.LENGTH_SHORT).show();
-
         if (resultCode == Activity.RESULT_OK && data != null) {
             try {
                 Context ctx = appContext != null ? appContext : activity.getApplicationContext();
-
                 Intent serviceIntent = new Intent(ctx, ScreenCaptureService.class);
                 serviceIntent.putExtra("resultCode", resultCode);
                 serviceIntent.putExtra("data", data);
                 ctx.startForegroundService(serviceIntent);
-
-                Toast.makeText(activity, "트래커: 서비스 시작됨!", Toast.LENGTH_SHORT).show();
-                Log.d(TAG, "Service started");
 
                 if (savedCall != null) {
                     JSObject ret = new JSObject();
@@ -95,17 +79,13 @@ public class DuelTrackerPlugin extends Plugin {
                     savedCall = null;
                 }
             } catch (Exception e) {
-                String msg = "서비스 시작 실패: " + e.getMessage();
-                Log.e(TAG, msg, e);
-                Toast.makeText(activity, msg, Toast.LENGTH_LONG).show();
-
+                Log.e(TAG, "Failed to start service", e);
                 if (savedCall != null) {
-                    savedCall.reject(msg);
+                    savedCall.reject("서비스 시작 실패: " + e.getMessage());
                     savedCall = null;
                 }
             }
         } else {
-            Toast.makeText(activity, "화면 공유 거부됨", Toast.LENGTH_SHORT).show();
             if (savedCall != null) {
                 savedCall.reject("화면 공유가 거부되었습니다");
                 savedCall = null;
@@ -116,11 +96,8 @@ public class DuelTrackerPlugin extends Plugin {
     @PluginMethod()
     public void stopTracking(PluginCall call) {
         try {
-            Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
-            getContext().stopService(serviceIntent);
-        } catch (Exception e) {
-            Log.e(TAG, "Stop failed", e);
-        }
+            getContext().stopService(new Intent(getContext(), ScreenCaptureService.class));
+        } catch (Exception ignored) {}
         JSObject ret = new JSObject();
         ret.put("stopped", true);
         call.resolve(ret);

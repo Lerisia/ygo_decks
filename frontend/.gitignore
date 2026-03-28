@@ -30,3 +30,6 @@ android/build/
 android/local.properties
 android/*.jks
 android/capacitor-cordova-android-plugins/build/
+
+# Store assets
+store_*.png
