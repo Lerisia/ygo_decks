@@ -45,6 +45,23 @@ class LimitRegulationEntry(models.Model):
     def __str__(self):
         return f"{self.entry.name} - {self.card.name}: {self.get_regulation_status_display()}"
 
+class QuizHighScore(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='quiz_high_scores',
+    )
+    score = models.PositiveIntegerField()
+    streak = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-score', '-streak', 'created_at']
+
+    def __str__(self):
+        return f"{self.user.username}: {self.score}pts ({self.streak} streak)"
+
+
 class UploadRecord(models.Model):
     uploaded_image = models.ImageField(upload_to='uploads/')
     detected_at = models.DateTimeField(auto_now_add=True)

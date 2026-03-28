@@ -23,6 +23,8 @@ import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import DeckScanner from "./pages/DeckScanner";
+import CardQuiz from "./pages/CardQuiz";
+import Playground from "./pages/Playground";
 
 function App() {
   const { pathname } = useLocation();
@@ -49,8 +51,10 @@ function App() {
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />
           <Route path="/record-groups/:recordGroupId/statistics" element={<RecordGroupStatistics />} />
-          <Route path="/deck-scanner" element={<DeckScanner />} />    
+          <Route path="/deck-scanner" element={<DeckScanner />} />
           <Route path="/card-detector" element={<DeckScanner />} />
+          <Route path="/playground" element={<Playground />} />
+          <Route path="/card-quiz" element={<CardQuiz />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

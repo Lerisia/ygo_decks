@@ -68,6 +68,13 @@ function Navbar() {
               {moreOpen && (
                 <div className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
                   <Link
+                    to="/playground"
+                    className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    🎮 놀이터
+                  </Link>
+                  <Link
                     to={isLoggedIn ? "/mypage/mydecks" : "/login"}
                     className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     onClick={() => setMoreOpen(false)}

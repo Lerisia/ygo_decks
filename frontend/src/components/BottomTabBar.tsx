@@ -11,6 +11,7 @@ const mainTabs = [
 
 const moreTabs = [
   { to: "/", icon: "🏠", label: "홈" },
+  { to: "/playground", icon: "🎮", label: "놀이터" },
   { to: "/mypage/mydecks", icon: "🃏", label: "보유 덱", auth: true },
   { to: "/terms", icon: "📄", label: "이용약관" },
 ];

@@ -69,7 +69,14 @@ class LimitRegulationAdmin(admin.ModelAdmin):
 
     get_total_cards.short_description = "num_cards"
     
-from .models import UploadRecord, CardDetection
+from .models import QuizHighScore, UploadRecord, CardDetection
+
+@admin.register(QuizHighScore)
+class QuizHighScoreAdmin(admin.ModelAdmin):
+    list_display = ('user', 'score', 'streak', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('user__username',)
+    ordering = ('-score',)
 
 class CardDetectionInline(admin.TabularInline):
     model = CardDetection
