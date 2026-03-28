@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import './App.css'
 import Navbar from "./components/Navbar";
 import BottomTabBar from "./components/BottomTabBar";
+import TrackerBanner from "./components/TrackerBanner";
+import TrackerConfirmModal from "./components/TrackerConfirmModal";
 import Recommend from './pages/Recommend'
 import QuestionPage from "./pages/QuestionPage";
 import ResultPage from "./pages/ResultPage";
@@ -36,6 +38,7 @@ function App() {
 
   return (
     <div>
+      <TrackerBanner />
       <Navbar />
       <Routes>
           <Route path="/" element={<Info />} />
@@ -67,6 +70,7 @@ function App() {
       </Routes>
       <Footer />
       <BottomTabBar />
+      <TrackerConfirmModal />
       <div className="sm:hidden h-16" />
     </div>
   );
