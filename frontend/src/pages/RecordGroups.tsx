@@ -205,14 +205,14 @@ const RecordGroups = () => {
 
   return (
     <div className="p-6 min-h-screen">
-      <h1 className="text-2xl font-bold mb-4">시트 관리</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-4">시트 관리</h1>
       {metaStats?.length > 0 ? (
         <div className="mb-6">
-          <div className="text-sm text-gray-800 dark:text-gray-200">
-            자주 출현하는 덱: <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="text-sm md:text-base text-gray-800 dark:text-gray-200">
+            자주 출현하는 덱: <div className="grid grid-cols-3 gap-2 md:gap-3 text-sm md:text-base mt-2">
             {metaStats.slice(0, 3).map((deck, idx) => (
-              <div key={deck.meta_deck_id} className="bg-white dark:bg-gray-800 shadow rounded p-2 text-center">
-                <div className="text-xl">
+              <div key={deck.meta_deck_id} className="bg-white dark:bg-gray-800 shadow rounded p-2.5 md:p-3 text-center">
+                <div className="text-2xl md:text-3xl">
                   {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
                 </div>
                 <div className="font-semibold">{deck.meta_deck_name}</div>
@@ -337,20 +337,20 @@ const RecordGroups = () => {
               <div className="text-2xl font-bold mb-1">
                 {group.overallWinRate.toFixed(1)}%
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              <p className="text-base md:text-lg text-gray-500 dark:text-gray-400 mb-3">
                 {group.totalGames}전 {wins}승 {losses}패
               </p>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+              <div className="grid grid-cols-3 gap-2 text-center text-sm md:text-base">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-2 md:py-2.5">
                   <p className="text-gray-500 dark:text-gray-400">선공률</p>
                   <p className="font-semibold">{group.firstRatio.toFixed(0)}%</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-2 md:py-2.5">
                   <p className="text-gray-500 dark:text-gray-400">선공 승</p>
                   <p className="font-semibold">{group.firstWinRate.toFixed(0)}%</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded py-1.5">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded py-2 md:py-2.5">
                   <p className="text-gray-500 dark:text-gray-400">후공 승</p>
                   <p className="font-semibold">{group.secondWinRate.toFixed(0)}%</p>
                 </div>

@@ -168,26 +168,26 @@ function CardQuiz() {
   const timerColor = timeLeft <= 5 ? "bg-red-500" : timeLeft <= 10 ? "bg-yellow-500" : "bg-green-500";
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-lg mx-auto">
+    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/playground")}
         className="text-lg font-semibold hover:text-blue-600 mb-4"
       >
         ← 놀이터
       </button>
-      <h1 className="text-2xl font-bold text-center mb-6">화질구지 퀴즈</h1>
+      <h1 className="text-2xl md:text-4xl font-bold text-center mb-6">화질구지 퀴즈</h1>
 
       {!card && !gameOver && (
         <div className="text-center space-y-6">
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400 md:text-lg">
             저화질 카드 일러스트를 보고 이름을 맞춰보세요!
           </p>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-sm text-left space-y-1">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 md:p-6 text-base md:text-base text-left space-y-1.5 md:space-y-2">
             <p>• 4개의 선택지 중 정답을 고르세요</p>
             <p>• 제한시간 {INITIAL_TIME}초</p>
             <p>• 해상도를 올릴수록 획득 점수가 줄어듭니다</p>
-            <p className="text-xs text-gray-400 mt-2">
-              8×8: 4점 → 12×12: 3점 → 16×16: 2점 → 24×24: 1점
+            <p className="text-sm text-gray-400 mt-2">
+              8×8: 4점 → 10×10: 3점 → 12×12: 2점 → 16×16: 1점
             </p>
             <p>• 틀리거나 시간 초과 시 게임 오버!</p>
           </div>
@@ -210,7 +210,7 @@ function CardQuiz() {
                 {leaderboard.map((entry, i) => (
                   <div
                     key={i}
-                    className={`flex justify-between px-4 py-2 text-sm ${
+                    className={`flex justify-between px-4 py-2.5 text-base ${
                       i === 0 ? "bg-yellow-50 dark:bg-yellow-900/20 font-bold" : ""
                     } ${i > 0 ? "border-t border-gray-100 dark:border-gray-700" : ""}`}
                   >
@@ -229,7 +229,7 @@ function CardQuiz() {
 
       {card && !gameOver && (
         <div className="space-y-4">
-          <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex justify-between text-base text-gray-500 dark:text-gray-400">
             <span>연승: <span className="font-bold text-blue-500">{streak}</span></span>
             <span className={`font-bold ${isCorrect ? "text-green-500" : timeLeft <= 5 ? "text-red-500" : ""}`}>
               {isCorrect ? `정답! +${SCORE_MAP[currentRes]}점` : `${timeLeft}초`}
@@ -248,13 +248,13 @@ function CardQuiz() {
             <img
               src={isCorrect ? card.images["original"] : card.images[currentRes]}
               alt="quiz card"
-              className="w-40 h-40 sm:w-48 sm:h-48 object-contain rounded-lg border dark:border-gray-700 transition-all duration-300"
+              className="w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56 object-contain rounded-lg border dark:border-gray-700 transition-all duration-300"
               style={isCorrect ? {} : { imageRendering: "pixelated" }}
             />
           </div>
 
           <div className="text-center">
-            <span className="text-xs text-gray-400">
+            <span className="text-sm text-gray-400">
               {isCorrect ? correctAnswer : `현재 해상도: ${currentRes} (${currentPoints}점)`}
             </span>
           </div>
@@ -265,7 +265,7 @@ function CardQuiz() {
               <button
                 onClick={handleReveal}
                 disabled={!canReveal}
-                className={`w-full py-2 rounded-lg text-sm transition ${
+                className={`w-full py-2 rounded-lg text-base transition ${
                   canReveal
                     ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                     : "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
@@ -280,7 +280,7 @@ function CardQuiz() {
 
           <div className="grid grid-cols-1 gap-2">
             {card.choices.map((choice) => {
-              let btnClass = "w-full py-3 px-4 rounded-lg text-sm font-medium transition text-left ";
+              let btnClass = "w-full py-3 md:py-4 px-4 rounded-lg text-base font-medium transition text-left ";
               if (isCorrect !== null) {
                 if (choice === lastAnswer && !isCorrect) {
                   btnClass += "bg-red-500 text-white";
@@ -322,7 +322,7 @@ function CardQuiz() {
                 className="w-32 h-32 mx-auto rounded-lg border dark:border-gray-700"
                 style={{ imageRendering: "pixelated" }}
               />
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-base text-gray-500 dark:text-gray-400">
                 정답: <span className="font-semibold text-gray-900 dark:text-white">{correctAnswer}</span>
               </p>
             </div>
@@ -332,7 +332,7 @@ function CardQuiz() {
             <p className="text-lg">
               최종 점수: <span className="font-bold text-2xl text-blue-500">{score}</span>점
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-base text-gray-500 dark:text-gray-400">
               연속 {streak}문제 정답
             </p>
           </div>
@@ -367,7 +367,7 @@ function CardQuiz() {
                 {leaderboard.map((entry, i) => (
                   <div
                     key={i}
-                    className={`flex justify-between px-4 py-2 text-sm ${
+                    className={`flex justify-between px-4 py-2.5 text-base ${
                       i === 0 ? "bg-yellow-50 dark:bg-yellow-900/20 font-bold" : ""
                     } ${i > 0 ? "border-t border-gray-100 dark:border-gray-700" : ""}`}
                   >

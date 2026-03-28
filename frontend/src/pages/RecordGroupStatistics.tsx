@@ -82,9 +82,9 @@ const getOppDeckName = (entry: { deck: DeckInfo | null; custom_name?: string | n
   entry.deck?.name || entry.custom_name || "모름/기타";
 
 const StatCard = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-    <p className="text-lg font-bold">{value}</p>
+  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 md:p-4 text-center">
+    <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+    <p className="text-lg md:text-xl font-bold">{value}</p>
   </div>
 );
 
@@ -214,7 +214,7 @@ const StatisticsPage = () => {
   })();
 
   const tabClass = (tab: string) =>
-    `px-4 py-2 font-semibold ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
+    `px-4 py-2 font-semibold md:text-lg ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
 
   const subTabClass = (tab: string) =>
     `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
@@ -254,7 +254,7 @@ const StatisticsPage = () => {
         <div className="space-y-8">
           {/* 전적 요약 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">전적</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">전적</h2>
             <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <StatCard label="총 게임" value={stats.basic.total_games} />
               <StatCard label="승률" value={`${stats.basic.overall_win_rate.toFixed(1)}%`} />
@@ -265,7 +265,7 @@ const StatisticsPage = () => {
 
           {/* 선후공 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">선후공</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">선후공</h2>
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <StatCard label="선공 비율" value={`${stats.basic.first_ratio.toFixed(1)}%`} />
               <StatCard label="선공 승률" value={`${stats.basic.first_win_rate.toFixed(1)}%`} />
@@ -275,7 +275,7 @@ const StatisticsPage = () => {
 
           {/* 코인토스 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">코인토스</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">코인토스</h2>
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <StatCard label="코인 승률" value={`${stats.basic.coin_toss_win_rate.toFixed(1)}%`} />
               <StatCard label="앞면 시 승률" value={`${stats.basic.coin_toss_win_win_rate.toFixed(1)}%`} />
@@ -285,7 +285,7 @@ const StatisticsPage = () => {
 
           {/* 내 덱 사용 비율 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱 사용 비율</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱 사용 비율</h2>
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart style={{ overflow: 'visible' }}>
@@ -324,7 +324,7 @@ const StatisticsPage = () => {
 
           {/* 상대 덱 비율 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱 비율</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱 비율</h2>
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart style={{ overflow: 'visible' }}>
@@ -372,7 +372,7 @@ const StatisticsPage = () => {
 
           {/* 내 덱 별 승률 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱별 승률</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱별 승률</h2>
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b dark:border-gray-700">
@@ -394,7 +394,7 @@ const StatisticsPage = () => {
 
           {/* 상대 덱 별 승률 */}
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱별 승률</h2>
+            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱별 승률</h2>
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b dark:border-gray-700">
