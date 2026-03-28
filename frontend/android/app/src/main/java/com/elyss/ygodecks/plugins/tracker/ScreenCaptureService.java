@@ -112,9 +112,14 @@ public class ScreenCaptureService extends Service {
         }
 
         int resultCode = intent.getIntExtra("resultCode", -1);
-        Intent data = intent.getParcelableExtra("data");
+        Intent data;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            data = intent.getParcelableExtra("data", Intent.class);
+        } else {
+            data = intent.getParcelableExtra("data");
+        }
         if (data == null || resultCode == -1) {
-            statusLog = "데이터 없음";
+            statusLog = "데이터 없음 rc=" + resultCode + " data=" + (data == null ? "null" : "ok");
             updateNotification(statusLog);
             stopSelf();
             return START_NOT_STICKY;
