@@ -22,6 +22,7 @@ public class DuelTrackerPlugin extends Plugin {
     private static final String TAG = "DuelTracker";
     public static final int SCREEN_CAPTURE_REQUEST = 1001;
     private static PluginCall savedCall = null;
+    public static String pluginStatus = "";
 
     @PluginMethod()
     public void startTracking(PluginCall call) {
@@ -46,6 +47,7 @@ public class DuelTrackerPlugin extends Plugin {
         }
 
         savedCall = call;
+        pluginStatus = "화면공유 요청 중";
         MediaProjectionManager mgr = (MediaProjectionManager)
                 activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         activity.startActivityForResult(mgr.createScreenCaptureIntent(), SCREEN_CAPTURE_REQUEST);
@@ -56,6 +58,7 @@ public class DuelTrackerPlugin extends Plugin {
 
         if (resultCode == Activity.RESULT_OK && data != null) {
             try {
+                pluginStatus = "서비스 시작 요청";
                 ScreenCaptureService.statusLog = "서비스 시작 중";
                 Intent serviceIntent = new Intent(activity, ScreenCaptureService.class);
                 serviceIntent.putExtra("resultCode", resultCode);
@@ -99,7 +102,11 @@ public class DuelTrackerPlugin extends Plugin {
         ret.put("firstSecond", ScreenCaptureService.lastFirstSecond);
         ret.put("duelResult", ScreenCaptureService.lastDuelResult);
         ret.put("timestamp", ScreenCaptureService.lastDetectionTime);
-        ret.put("status", ScreenCaptureService.statusLog);
+        String status = ScreenCaptureService.statusLog;
+        if (status == null || status.isEmpty()) {
+            status = "svc:empty|plug:" + pluginStatus;
+        }
+        ret.put("status", status);
         call.resolve(ret);
     }
 }
