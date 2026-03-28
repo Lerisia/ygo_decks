@@ -630,11 +630,12 @@ const RecordGroupDetailPage = () => {
 }, [matches, owned_decks]);
 
   const handleRegisterMatch = async () => {
-    if (!newMatch.deck || !newMatch.opponent_deck) return;
+    if (!newMatch.deck) return;
+    const oppDeck = newMatch.opponent_deck || "null";
     try {
       await addMatchToRecordGroup(Number(recordGroupId), {
         deck: Number(newMatch.deck),
-        opponent_deck: newMatch.opponent_deck === "null" ? null : Number(newMatch.opponent_deck),
+        opponent_deck: oppDeck === "null" ? null : Number(oppDeck),
         opponent_deck_name: newMatch.opponent_deck_name || null,
         coin_toss_result: newMatch.coin_toss_result as "win" | "lose",
         first_or_second: newMatch.first_or_second as "first" | "second",
