@@ -91,6 +91,25 @@ export const updateMatchRecord = async (
   return response.json();
 };
 
+export const updateRecordGroupVisibility = async (recordGroupId: number, isPublic: boolean) => {
+  const token = localStorage.getItem("access_token");
+  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/update-visibility/`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ is_public: isPublic }),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`API 요청 실패: ${response.status}`);
+  }
+
+  return response.json();
+};
+
 export const deleteRecordGroup = async (recordGroupId: number) => {
   const token = localStorage.getItem("access_token");
   const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/delete/`, {

@@ -508,7 +508,13 @@ def get_record_group_matches(request, record_group_id):
         for match in current_page
     ]
 
-    return Response({"matches": data, "total_pages": paginator.num_pages, "record_group_name": record_group.name})
+    return Response({
+        "matches": data,
+        "total_pages": paginator.num_pages,
+        "record_group_name": record_group.name,
+        "is_public": record_group.is_public,
+        "is_owner": request.user.is_authenticated and record_group.user == request.user,
+    })
 
 RANK_RANGE = [
     "diamond5", "diamond4", "diamond3", "diamond2", "diamond1",

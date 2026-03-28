@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
-         updateRecordGroupName, updateMatchRecord } from "@/api/toolApi";
+         updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility } from "@/api/toolApi";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -297,6 +297,9 @@ const RecordGroupDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [useRankOrScore, setUseRankOrScore] = useState("none");
   const [editingMatch, setEditingMatch] = useState<any | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
 
   const RANK_OPTIONS = [
@@ -373,7 +376,9 @@ const RecordGroupDetailPage = () => {
       const response = await getRecordGroupMatches(Number(recordGroupId), page, pageSize)
       setMatches(response.matches);
       setTotalPages(response.total_pages);
-      setRecordGroupName(response.record_group_name); 
+      setRecordGroupName(response.record_group_name);
+      setIsPublic(response.is_public);
+      setIsOwner(response.is_owner);
     } catch (error) {
       console.error("게임 데이터를 불러오지 못했습니다:", error);
     }
@@ -735,7 +740,37 @@ const RecordGroupDetailPage = () => {
           통계
         </a>
       </div>
-      <div className="p-4 border rounded-lg shadow bg-white dark:bg-gray-800 mb-6 max-w-2xl w-full mx-auto">
+      {isOwner && (
+        <div className="flex items-center gap-3 mb-4 text-sm">
+          <button
+            onClick={async () => {
+              const next = !isPublic;
+              await updateRecordGroupVisibility(Number(recordGroupId), next);
+              setIsPublic(next);
+            }}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+              isPublic
+                ? "bg-green-500 text-white hover:bg-green-600"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+            }`}
+          >
+            {isPublic ? "공개 중" : "비공개"}
+          </button>
+          {isPublic && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/record-groups/${recordGroupId}`);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 2000);
+              }}
+              className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg font-semibold hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
+            >
+              {copiedLink ? "복사됨!" : "링크 복사"}
+            </button>
+          )}
+        </div>
+      )}
+      {isOwner && <div className="p-4 border rounded-lg shadow bg-white dark:bg-gray-800 mb-6 max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold">기록 등록</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -959,8 +994,8 @@ const RecordGroupDetailPage = () => {
             기록 추가
           </button>
         </div>
-      </div>
-      
+      </div>}
+
       <div className="flex justify-end gap-4 mb-4">
         <select
           value={pageSize}
