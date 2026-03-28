@@ -234,7 +234,7 @@ export const EditMatchModal = ({
             </div>
           )}
 
-          {useRankOrScore === "score" && (
+          {["rating", "duelist_cup", "other"].includes(useRankOrScore) && (
             <div>
               <label className={labelClass}>점수</label>
               <input name="score" value={form.score} onChange={handleChange} type="number" className={selectClass} />
@@ -278,6 +278,7 @@ const RecordGroupDetailPage = () => {
     rank: string;
     wins: number | null;
     score: string;
+    score_type: string;
     notes: string;
   }
   const [newMatch, setNewMatch] = useState<MatchForm>({
@@ -290,6 +291,7 @@ const RecordGroupDetailPage = () => {
     rank: "",
     wins: null,
     score: "",
+    score_type: "",
     notes: "",
   });
   const [decks, setDecks] = useState<DeckData[]>([]);
@@ -610,13 +612,14 @@ const RecordGroupDetailPage = () => {
         first_or_second: newMatch.first_or_second as "first" | "second",
         result: newMatch.result as "win" | "lose",
         score: Number(newMatch.score),
+        score_type: newMatch.score_type || null,
         rank: newMatch.rank,
         wins: newMatch.wins,
         notes: newMatch.notes
       });
       await loadMatches();
       setNewMatch({ deck: "", opponent_deck: "", opponent_deck_name: "", first_or_second: "first",
-                    coin_toss_result: "win", result: "win", rank: "", wins: null, score: "", notes: "" });
+                    coin_toss_result: "win", result: "win", rank: "", wins: null, score: "", score_type: "", notes: "" });
     } catch (error) {
       console.error("기록 추가 실패:", error);
     }
@@ -716,7 +719,9 @@ const RecordGroupDetailPage = () => {
   const rankTypeOptions = [
     { value: "none", label: "입력 안 함" },
     { value: "rank", label: "랭크" },
-    { value: "score", label: "점수" },
+    { value: "rating", label: "레이팅" },
+    { value: "duelist_cup", label: "듀얼리스트 컵" },
+    { value: "other", label: "기타" },
   ];
 
   const rankOptions = RANK_OPTIONS.map((r) => ({
@@ -911,7 +916,12 @@ const RecordGroupDetailPage = () => {
                 onChange={(selected) => {
                   const value = selected?.value || "none";
                   setUseRankOrScore(value);
-                  setNewMatch((prev) => ({ ...prev, rank: "", score: "" }));
+                  setNewMatch((prev) => ({
+                    ...prev,
+                    rank: "",
+                    score: "",
+                    score_type: ["rating", "duelist_cup", "other"].includes(value) ? value : "",
+                  }));
                 }}
                 styles={customSelectStyles}
                 menuPortalTarget={typeof window !== "undefined" ? document.body : null}
@@ -965,13 +975,16 @@ const RecordGroupDetailPage = () => {
               </div>
               </>
              )}
-            {useRankOrScore === "score" && (
+            {["rating", "duelist_cup", "other"].includes(useRankOrScore) && (
               <div>
                 <label className="block text-sm font-medium text-left">점수</label>
                 <input
                   type="number"
                   className="p-2 border rounded bg-white text-black dark:bg-gray-800 dark:text-white w-full"
-                  placeholder="예: 1612 (레이팅) / 23738 (듀얼리스트 컵)"
+                  placeholder={
+                    useRankOrScore === "rating" ? "예: 1612" :
+                    useRankOrScore === "duelist_cup" ? "예: 23738" : "점수 입력"
+                  }
                   value={newMatch.score}
                   onChange={(e) =>
                     setNewMatch((prev) => ({ ...prev, score: e.target.value }))

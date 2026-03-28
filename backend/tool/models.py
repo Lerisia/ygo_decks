@@ -92,10 +92,22 @@ class MatchRecord(models.Model):
         help_text="-3부터 4 사이의 승수만 입력 가능합니다. -4면 강등, +5면 승급입니다."
     )
     
+    SCORE_TYPE_CHOICES = [
+        ("rating", "레이팅"),
+        ("duelist_cup", "듀얼리스트 컵"),
+        ("other", "기타"),
+    ]
+
     score = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="숫자로 된 점수 (레이팅, 듀얼리스트 컵, 이벤트 전용)"
+        help_text="숫자로 된 점수"
+    )
+    score_type = models.CharField(
+        max_length=20,
+        choices=SCORE_TYPE_CHOICES,
+        blank=True,
+        null=True,
     )
 
     notes = models.TextField(blank=True, null=True)

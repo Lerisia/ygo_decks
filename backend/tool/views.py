@@ -107,6 +107,7 @@ def add_match_to_record_group(request, record_group_id):
         rank=data.get("rank"),
         wins=data.get("wins"),
         score=data.get("score"),
+        score_type=data.get("score_type") or None,
     )
     # Check it has only 1 field between rank and score
     try:
@@ -143,7 +144,7 @@ def update_match_record(request, match_id):
 
     updatable_fields = [
         "deck", "opponent_deck", "opponent_deck_name", "first_or_second",
-        "coin_toss_result", "result", "rank", "wins", "score", "notes"
+        "coin_toss_result", "result", "rank", "wins", "score", "score_type", "notes"
     ]
     
     fk_fields = {"deck", "opponent_deck"}
@@ -502,6 +503,7 @@ def get_record_group_matches(request, record_group_id):
             "rank": match.rank,
             "wins": match.wins,
             "score": match.score,
+            "score_type": match.score_type,
             "notes": match.notes,
             "opponent_deck_name": match.opponent_deck_name,
         }
@@ -532,8 +534,9 @@ def recent_meta_deck_stats(request):
         opponent_deck__isnull=False,
         opponent_deck__name__isnull=False,
         created_at__gte=time_threshold,
-        rank__in=RANK_RANGE,
         is_deleted=False,
+    ).filter(
+        Q(rank__in=RANK_RANGE) | Q(score_type__in=["rating", "duelist_cup"])
     )
 
     total_matches = qs.count()

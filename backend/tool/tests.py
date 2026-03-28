@@ -117,6 +117,25 @@ class MatchRecordCRUDTest(TestCase):
         match.refresh_from_db()
         self.assertTrue(match.is_deleted)
 
+    def test_add_match_with_score_type(self):
+        resp = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": self.deck.id,
+            "opponent_deck": self.opp_deck.id,
+            "first_or_second": "first",
+            "result": "win",
+            "coin_toss_result": "win",
+            "score": 1612,
+            "score_type": "rating",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201)
+        match = MatchRecord.objects.get(id=resp.json()["match_id"])
+        self.assertEqual(match.score_type, "rating")
+        self.assertEqual(match.score, 1612)
+
+    def test_score_type_default_is_null(self):
+        match = _create_match(self.group, self.deck)
+        self.assertIsNone(match.score_type)
+
     def test_add_match_with_custom_opponent_name(self):
         resp = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
             "deck": self.deck.id,
