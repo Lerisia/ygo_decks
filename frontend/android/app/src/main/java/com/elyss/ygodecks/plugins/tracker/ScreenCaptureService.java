@@ -158,17 +158,17 @@ public class ScreenCaptureService extends Service {
                 switch (result.type) {
                     case COIN_TOSS:
                         lastCoinToss = result.value;
-                        overlay.show("🎲 코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면"));
+                        overlay.show("코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면"));
                         Log.d(TAG, "Coin toss detected: " + result.value);
                         break;
                     case FIRST_SECOND:
                         lastFirstSecond = result.value;
-                        overlay.show("⚔️ " + ("first".equals(result.value) ? "선공" : "후공"));
+                        overlay.show("first".equals(result.value) ? "선공" : "후공");
                         Log.d(TAG, "First/second detected: " + result.value);
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
-                        overlay.show("🏆 " + ("win".equals(result.value) ? "승리" : "패배") + " — 자동 기록됨");
+                        overlay.show(("win".equals(result.value) ? "승리" : "패배") + " - 자동 기록됨");
                         Log.d(TAG, "Duel result detected: " + result.value);
                         break;
                 }
