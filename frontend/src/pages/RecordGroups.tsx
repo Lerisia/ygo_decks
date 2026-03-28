@@ -230,10 +230,10 @@ const RecordGroups = () => {
           {showMetaStats && (
             <div className="mt-2 p-4 bg-white dark:bg-gray-800 shadow rounded">
               <p className="text-xs text-gray-700 dark:text-gray-300">
-                ※ 지난 일주일간 랭크(다이아 이상) · 레이팅 · 듀얼리스트 컵 전적 기반
+                ※ 최근 1주일 · 다이아 이상 / 레이팅 / 듀컵 기반
               </p>
               <p className="text-xs text-gray-700 dark:text-gray-300">
-                ※ 셀렉션 팩 출시 시 초기화
+                ※ 월초 셀렉션 팩 출시 시 초기화
               </p>
               <p className="text-xs text-gray-700 dark:text-gray-300 mb-3 font-medium">
                 총 집계 게임 수: {totalMatches.toLocaleString()}
