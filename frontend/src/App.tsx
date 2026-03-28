@@ -28,6 +28,7 @@ import Playground from "./pages/Playground";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
+import Tracker from "./pages/Tracker";
 
 function App() {
   const { pathname } = useLocation();
@@ -61,6 +62,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
+          <Route path="/tracker" element={<Tracker />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
