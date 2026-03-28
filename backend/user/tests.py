@@ -123,6 +123,22 @@ class DeleteAccountTest(TestCase):
         self.assertTrue(User.objects.filter(id=self.user.id).exists())
 
 
+class PasswordResetTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="reset@test.com", username="resetuser", password="oldpass1234")
+        self.user.is_active = True
+        self.user.save()
+
+    def test_request_reset_sends_email(self):
+        resp = self.client.post("/api/password-reset/", {"email": "reset@test.com"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_request_reset_nonexistent_email_still_200(self):
+        resp = self.client.post("/api/password-reset/", {"email": "noone@test.com"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+
 class BannedWordTest(TestCase):
     def setUp(self):
         BannedWord.objects.create(word="바보")

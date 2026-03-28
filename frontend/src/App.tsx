@@ -25,6 +25,8 @@ import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import DeckScanner from "./pages/DeckScanner";
 import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   const { pathname } = useLocation();
@@ -55,6 +57,8 @@ function App() {
           <Route path="/card-detector" element={<DeckScanner />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/card-quiz" element={<CardQuiz />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

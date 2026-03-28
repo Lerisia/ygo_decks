@@ -164,6 +164,57 @@ def delete_account(request):
     user.save(update_fields=["is_active", "pending_deletion", "deletion_requested_at"])
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+@api_view(["POST"])
+def request_password_reset(request):
+    from django.contrib.auth.tokens import default_token_generator
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    email = request.data.get("email")
+    if not email:
+        return Response({"message": "이메일을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email, is_active=True)
+    except User.DoesNotExist:
+        return Response({"message": "비밀번호 재설정 링크가 발송되었습니다."})
+
+    token = default_token_generator.make_token(user)
+    reset_url = f"https://ygodecks.com/reset-password?uid={user.pk}&token={token}"
+
+    send_mail(
+        subject="[YGODecks] 비밀번호 재설정",
+        message=f"아래 링크를 클릭하여 비밀번호를 재설정하세요.\n\n{reset_url}\n\n이 링크는 일정 시간 후 만료됩니다.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=True,
+    )
+
+    return Response({"message": "비밀번호 재설정 링크가 발송되었습니다."})
+
+@api_view(["POST"])
+def confirm_password_reset(request):
+    from django.contrib.auth.tokens import default_token_generator
+
+    uid = request.data.get("uid")
+    token = request.data.get("token")
+    new_password = request.data.get("new_password")
+
+    if not all([uid, token, new_password]):
+        return Response({"error": "필수 항목이 누락되었습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(pk=uid)
+    except User.DoesNotExist:
+        return Response({"error": "유효하지 않은 링크입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not default_token_generator.check_token(user, token):
+        return Response({"error": "만료되었거나 유효하지 않은 링크입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    return Response({"message": "비밀번호가 변경되었습니다."})
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def is_admin(request):

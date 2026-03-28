@@ -2,7 +2,8 @@ from django.urls import path, include
 from dj_rest_auth.registration.views import VerifyEmailView
 from .views import CustomRegisterView, CustomConfirmEmailView, CustomTokenObtainPairView, \
      check_email_exists, check_username_exists, change_username, change_password, get_user_info, \
-     get_user_decks, update_user_decks, update_user_settings, is_admin, delete_account
+     get_user_decks, update_user_decks, update_user_settings, is_admin, delete_account, \
+     request_password_reset, confirm_password_reset
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 urlpatterns = [
@@ -21,4 +22,6 @@ urlpatterns = [
     path("user/update-settings/", update_user_settings, name="update-user-settings"),
     path("is_admin/", is_admin, name="is_admin"),
     path("delete-account/", delete_account, name="delete-account"),
+    path("password-reset/", request_password_reset, name="password-reset"),
+    path("password-reset/confirm/", confirm_password_reset, name="password-reset-confirm"),
 ]

@@ -67,6 +67,12 @@ const Login = () => {
                     회원가입
                 </button>
             </p>
+            <button
+                onClick={() => navigate("/forgot-password")}
+                className="mt-2 text-sm text-gray-400 dark:text-gray-500 hover:underline"
+            >
+                비밀번호를 잊으셨나요?
+            </button>
         </div>
     );
 };
