@@ -184,24 +184,25 @@ export default function DeckDetail() {
           }));
           return (
             <div className="mt-4 relative">
-              <ResponsiveContainer width="100%" height={250}>
-                <RadarChart data={data}>
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart data={data} outerRadius="75%">
                   <PolarGrid />
                   <PolarAngleAxis
                     dataKey="stat"
                     tick={({ x, y, payload, index }: any) => {
-                      const raw = data[index]?.raw;
-                      return (
-                        <g>
-                          <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className={`text-xs ${hasStats ? "fill-current" : "fill-gray-400"}`}>
+                      if (!hasStats) {
+                        return (
+                          <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-gray-400" style={{ fontSize: 15 }}>
                             {payload.value}
                           </text>
-                          {hasStats && (
-                            <text x={x} y={y + 14} textAnchor="middle" className={`text-xs font-bold ${raw != null ? "fill-blue-500" : "fill-gray-400"}`}>
-                              {raw != null ? raw : "N/A"}
-                            </text>
-                          )}
-                        </g>
+                        );
+                      }
+                      const raw = data[index]?.raw;
+                      const display = raw != null ? `${payload.value} ${raw}` : `${payload.value} -`;
+                      return (
+                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current" style={{ fontSize: 15, fontWeight: 600 }}>
+                          {display}
+                        </text>
                       );
                     }}
                   />

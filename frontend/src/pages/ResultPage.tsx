@@ -105,29 +105,25 @@ function ResultPage() {
       )}
 
       <div className="mt-6 mx-auto relative">
-        <ResponsiveContainer width="100%" height={280}>
-          <RadarChart data={hasStats ? chartData : statLabels.map(({ label }) => ({ stat: label, value: 0 }))}>
+        <ResponsiveContainer width="100%" height={320}>
+          <RadarChart data={hasStats ? chartData : statLabels.map(({ label }) => ({ stat: label, value: 0 }))} outerRadius="75%">
             <PolarGrid />
             <PolarAngleAxis
               dataKey="stat"
               tick={({ x, y, payload, index }: any) => {
                 if (!hasStats) {
                   return (
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-gray-400 text-xs">
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-gray-400" style={{ fontSize: 15 }}>
                       {payload.value}
                     </text>
                   );
                 }
                 const raw = chartData[index]?.raw;
+                const display = raw != null ? `${payload.value} ${raw}` : `${payload.value} -`;
                 return (
-                  <g>
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current text-xs">
-                      {payload.value}
-                    </text>
-                    <text x={x} y={y + 14} textAnchor="middle" className={`text-xs font-bold ${raw != null ? "fill-blue-500" : "fill-gray-400"}`}>
-                      {raw != null ? raw : "N/A"}
-                    </text>
-                  </g>
+                  <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current" style={{ fontSize: 15, fontWeight: 600 }}>
+                    {display}
+                  </text>
                 );
               }}
             />
