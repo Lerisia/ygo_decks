@@ -42,6 +42,7 @@ type MatchRecord = {
   rank: string | null;
   wins: number | null;
   score: number | null;
+  score_type: string | null;
   notes: string;
 };
 
@@ -584,10 +585,12 @@ const RecordGroupDetailPage = () => {
         score: "",
       }));
     } else if (lastMatch.score) {
-      setUseRankOrScore("score");
+      const st = lastMatch.score_type || "rating";
+      setUseRankOrScore(st);
       setNewMatch((prev) => ({
         ...prev,
         score: String(lastMatch.score),
+        score_type: st,
         rank: "",
       }));
     } else {

@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .models import RecordGroup, MatchRecord
+from .models import RecordGroup, MatchRecord, SiteConfig
 from deck.models import Deck
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser
@@ -525,7 +525,8 @@ RANK_RANGE = [
 
 @api_view(["GET"])
 def recent_meta_deck_stats(request):
-    reset_time = make_aware(datetime(2025, 12, 5, 16, 50, 0))
+    reset_str = SiteConfig.get("meta_stats_reset_time", "2025-12-05T16:50:00")
+    reset_time = make_aware(datetime.fromisoformat(reset_str))
     one_week_ago = timezone.now() - timedelta(days=7)
     time_threshold = max(reset_time, one_week_ago)  # 둘 중 더 최근 시각
 

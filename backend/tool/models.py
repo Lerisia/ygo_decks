@@ -131,3 +131,18 @@ class MatchRecord(models.Model):
 
     def __str__(self):
         return f"{self.record_group} - {self.deck} vs {self.opponent_deck} ({self.result})"
+
+
+class SiteConfig(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    value = models.TextField()
+
+    def __str__(self):
+        return f"{self.key}: {self.value}"
+
+    @classmethod
+    def get(cls, key, default=None):
+        try:
+            return cls.objects.get(key=key).value
+        except cls.DoesNotExist:
+            return default

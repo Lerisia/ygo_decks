@@ -230,7 +230,7 @@ const RecordGroups = () => {
           {showMetaStats && (
             <div className="mt-2 p-4 bg-white dark:bg-gray-800 shadow rounded">
               <p className="text-xs text-gray-700 dark:text-gray-300">
-                ※ 지난 일주일간 다이아 ~ 마스터 구간의 전적 기반
+                ※ 지난 일주일간 랭크(다이아 이상) · 레이팅 · 듀얼리스트 컵 전적 기반
               </p>
               <p className="text-xs text-gray-700 dark:text-gray-300">
                 ※ 셀렉션 팩 출시 시 초기화
