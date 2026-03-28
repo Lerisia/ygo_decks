@@ -1,9 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { isAuthenticated, isAdmin } from "@/api/accountApi";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
+
+interface DeckStats {
+  consistency: number;
+  breakthrough: number;
+  interruption: number;
+  recovery: number;
+  deck_space: number;
+}
 
 interface Deck {
   id: number;
@@ -17,6 +26,7 @@ interface Deck {
   performance_tags: string[];
   aesthetic_tags: string[];
   wiki_content: string | null;
+  stats?: DeckStats;
 }
 
 // Showdown 설정 - 테이블, 자동 링크, 할 일 목록 등을 지원
@@ -157,6 +167,26 @@ export default function DeckDetail() {
             </tr>
           </tbody>
         </table>
+
+        {deck.stats && Object.values(deck.stats).some((v) => v > 0) && (
+          <div className="mt-4">
+            <ResponsiveContainer width="100%" height={250}>
+              <RadarChart
+                data={[
+                  { stat: "안정성", value: deck.stats.consistency },
+                  { stat: "돌파력", value: deck.stats.breakthrough },
+                  { stat: "견제력", value: deck.stats.interruption },
+                  { stat: "복구력", value: deck.stats.recovery },
+                  { stat: "덱 스페이스", value: deck.stats.deck_space },
+                ]}
+              >
+                <PolarGrid />
+                <PolarAngleAxis dataKey="stat" tick={{ fontSize: 12 }} />
+                <Radar dataKey="value" fill="#3b82f6" fillOpacity={0.4} stroke="#3b82f6" />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
       
       {/* 본문 섹션 */}

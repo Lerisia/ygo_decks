@@ -81,6 +81,11 @@ class Deck(models.Model):
     summoning_methods = models.ManyToManyField(SummoningMethod)
     performance_tags = models.ManyToManyField(PerformanceTag)
     aesthetic_tags = models.ManyToManyField(AestheticTag)
+    stat_consistency = models.PositiveSmallIntegerField(null=True, blank=True, help_text="안정성 (0~10)")
+    stat_breakthrough = models.PositiveSmallIntegerField(null=True, blank=True, help_text="돌파력 (0~10)")
+    stat_interruption = models.PositiveSmallIntegerField(null=True, blank=True, help_text="견제력 (0~10)")
+    stat_recovery = models.PositiveSmallIntegerField(null=True, blank=True, help_text="복구력 (0~10)")
+    stat_deck_space = models.PositiveSmallIntegerField(null=True, blank=True, help_text="덱 스페이스 (0~10)")
     num_views = models.PositiveIntegerField(default=0)
     
 

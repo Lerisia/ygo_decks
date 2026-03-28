@@ -168,6 +168,13 @@ def get_deck_data(request, deck_id):
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
         "description": deck.description,
         "wiki_content": deck.wiki_content,
+        "stats": {
+            "consistency": deck.stat_consistency,
+            "breakthrough": deck.stat_breakthrough,
+            "interruption": deck.stat_interruption,
+            "recovery": deck.stat_recovery,
+            "deck_space": deck.stat_deck_space,
+        },
     }
 
     return Response(deck_data)

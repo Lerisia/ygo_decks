@@ -139,6 +139,29 @@ class GetDeckDataTest(TestCase):
         resp = self.client.get("/api/deck/99999/")
         self.assertEqual(resp.status_code, 404)
 
+    def test_deck_stats_in_response(self):
+        deck = _create_deck(
+            name="스탯덱",
+            stat_consistency=4,
+            stat_breakthrough=3,
+            stat_interruption=5,
+            stat_recovery=2,
+            stat_deck_space=3,
+        )
+        resp = self.client.get(f"/api/deck/{deck.id}/")
+        data = resp.json()
+        self.assertEqual(data["stats"]["consistency"], 4)
+        self.assertEqual(data["stats"]["breakthrough"], 3)
+        self.assertEqual(data["stats"]["interruption"], 5)
+        self.assertEqual(data["stats"]["recovery"], 2)
+        self.assertEqual(data["stats"]["deck_space"], 3)
+
+    def test_deck_stats_default_to_null(self):
+        resp = self.client.get(f"/api/deck/{self.deck.id}/")
+        data = resp.json()
+        for key in ["consistency", "breakthrough", "interruption", "recovery", "deck_space"]:
+            self.assertIsNone(data["stats"][key])
+
 
 class GetTagsTest(TestCase):
     def setUp(self):
