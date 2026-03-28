@@ -1,9 +1,9 @@
 const Terms = () => {
   return (
     <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto text-gray-800 dark:text-gray-200 leading-relaxed">
-      <h2 className="text-2xl font-bold text-center mb-6">Terms of Use</h2>
+      <h2 className="text-2xl font-bold text-center mb-6">Terms of Use & Privacy Policy</h2>
 
-      <p>This website provides deck recommendations and analysis for Yu-Gi-Oh! Master Duel.</p>
+      <p>This website and app ("YGODecks") provides deck recommendations, match record tracking, and analysis for Yu-Gi-Oh! Master Duel.</p>
       <p>All content and functionality are intended for personal, non-commercial use only.</p>
 
       <h3 className="text-lg font-bold mt-6 mb-2">Prohibited Commercial Use</h3>
@@ -25,9 +25,42 @@ const Terms = () => {
         <li>Reporting unauthorized sites to hosting providers.</li>
       </ul>
 
-      <h3 className="text-lg font-bold mt-6 mb-2">Contact</h3>
+      <h3 className="text-lg font-bold mt-8 mb-2">Privacy Policy</h3>
+
+      <h4 className="font-bold mt-4 mb-1">Information We Collect</h4>
+      <ul className="list-disc pl-5">
+        <li><strong>Account information:</strong> Email address and username when you register.</li>
+        <li><strong>Match records:</strong> Game results, deck choices, and related statistics you voluntarily submit.</li>
+        <li><strong>Uploaded images:</strong> Card or deck list images submitted for AI analysis, automatically deleted after 7 days.</li>
+      </ul>
+
+      <h4 className="font-bold mt-4 mb-1">How We Use Your Information</h4>
+      <ul className="list-disc pl-5">
+        <li>To provide personalized deck recommendations and match statistics.</li>
+        <li>To generate aggregated, anonymous meta-deck statistics.</li>
+        <li>To improve the service.</li>
+      </ul>
+
+      <h4 className="font-bold mt-4 mb-1">What We Do NOT Do</h4>
+      <ul className="list-disc pl-5">
+        <li>We do not sell, share, or transfer your personal data to third parties.</li>
+        <li>We do not use cookies for advertising or tracking purposes.</li>
+        <li>We do not collect location data, contacts, or device identifiers.</li>
+      </ul>
+
+      <h4 className="font-bold mt-4 mb-1">Data Retention</h4>
+      <ul className="list-disc pl-5">
+        <li>Account data is retained as long as your account exists.</li>
+        <li>Uploaded images are automatically deleted after 7 days.</li>
+        <li>Unverified accounts are deleted after 48 hours.</li>
+      </ul>
+
+      <h4 className="font-bold mt-4 mb-1">Your Rights</h4>
+      <p>You may request deletion of your account and associated data by contacting us.</p>
+
+      <h3 className="text-lg font-bold mt-8 mb-2">Contact</h3>
       <p>
-        If you wish to request permission for any usage beyond personal use, please contact us at{" "}
+        For any inquiries, please contact us at{" "}
         <a href="mailto:rlawodus96@gmail.com" className="text-blue-500 hover:underline">rlawodus96@gmail.com</a>.
       </p>
     </div>
