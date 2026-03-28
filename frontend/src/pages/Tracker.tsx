@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useTracker } from "@/context/TrackerContext";
+import DuelTracker from "@/api/trackerApi";
 import { getUserRecordGroups } from "@/api/toolApi";
 import { getUserDecks, isAuthenticated } from "@/api/accountApi";
 import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/lib/rankUtils";
@@ -160,8 +161,26 @@ export default function Tracker() {
       )}
 
       {error && <p className="text-center text-red-500 mt-4 text-sm">{error}</p>}
-      {t.nativeStatus && (
-        <p className="text-center text-xs text-gray-400 mt-2 font-mono">네이티브: {t.nativeStatus}</p>
+
+      {t.isTracking && (
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={async () => {
+              try {
+                const r = await DuelTracker.getLatestResult();
+                setError("수동확인: status=" + (r.status || "빈값") + " ts=" + r.timestamp);
+              } catch (e: any) {
+                setError("수동확인 에러: " + (e?.message || JSON.stringify(e)));
+              }
+            }}
+            className="w-full py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm"
+          >
+            수동 상태 확인
+          </button>
+          <p className="text-center text-xs text-gray-400 font-mono">
+            {t.nativeStatus || "(상태 없음)"}
+          </p>
+        </div>
       )}
     </div>
   );

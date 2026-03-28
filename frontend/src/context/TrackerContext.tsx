@@ -158,7 +158,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
               );
             }
           }
-        } catch {}
+        } catch (e: any) {
+          setNativeStatus("폴링 에러: " + (e?.message || JSON.stringify(e)));
+        }
       }, 2000);
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
