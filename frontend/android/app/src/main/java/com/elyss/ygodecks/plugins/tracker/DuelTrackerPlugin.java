@@ -21,8 +21,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class DuelTrackerPlugin extends Plugin {
 
     private static final String TAG = "DuelTracker";
-    private static final int SCREEN_CAPTURE_REQUEST = 1001;
-    private PluginCall savedCall = null;
+    public static final int SCREEN_CAPTURE_REQUEST = 1001;
+    private static PluginCall savedCall = null;
+    private static Context appContext = null;
+
+    @Override
+    public void load() {
+        appContext = getContext();
+    }
 
     @PluginMethod()
     public void startTracking(PluginCall call) {
@@ -33,7 +39,7 @@ public class DuelTrackerPlugin extends Plugin {
         }
 
         Log.d(TAG, "startTracking called");
-        Toast.makeText(activity, "트래커: 권한 요청 중...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(activity, "트래커: 권한 확인 중...", Toast.LENGTH_SHORT).show();
 
         // Check notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -41,7 +47,7 @@ public class DuelTrackerPlugin extends Plugin {
                     != PackageManager.PERMISSION_GRANTED) {
                 activity.requestPermissions(
                         new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9001);
-                call.reject("알림 권한이 필요합니다. 권한을 허용한 후 다시 시도해주세요.");
+                call.reject("알림 권한이 필요합니다.");
                 return;
             }
         }
@@ -51,43 +57,36 @@ public class DuelTrackerPlugin extends Plugin {
             Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + activity.getPackageName()));
             activity.startActivity(overlayIntent);
-            call.reject("오버레이 권한이 필요합니다. 권한을 허용한 후 다시 시도해주세요.");
+            call.reject("오버레이 권한이 필요합니다.");
             return;
         }
 
-        // Save call and request screen capture
         savedCall = call;
         MediaProjectionManager mgr = (MediaProjectionManager)
                 activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         Intent intent = mgr.createScreenCaptureIntent();
 
-        Log.d(TAG, "Launching screen capture intent");
         Toast.makeText(activity, "트래커: 화면 공유 요청", Toast.LENGTH_SHORT).show();
-
         activity.startActivityForResult(intent, SCREEN_CAPTURE_REQUEST);
     }
 
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-
-        Log.d(TAG, "handleOnActivityResult: requestCode=" + requestCode + " resultCode=" + resultCode);
-
+    public static void handleScreenCaptureResult(Activity activity, int requestCode, int resultCode, Intent data) {
         if (requestCode != SCREEN_CAPTURE_REQUEST) return;
 
-        Activity activity = getActivity();
+        Log.d(TAG, "handleScreenCaptureResult: resultCode=" + resultCode);
+        Toast.makeText(activity, "트래커: 결과 수신 (code=" + resultCode + ")", Toast.LENGTH_SHORT).show();
 
         if (resultCode == Activity.RESULT_OK && data != null) {
             try {
-                Toast.makeText(activity, "트래커: 서비스 시작 중...", Toast.LENGTH_SHORT).show();
+                Context ctx = appContext != null ? appContext : activity.getApplicationContext();
 
-                Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
+                Intent serviceIntent = new Intent(ctx, ScreenCaptureService.class);
                 serviceIntent.putExtra("resultCode", resultCode);
                 serviceIntent.putExtra("data", data);
-                getContext().startForegroundService(serviceIntent);
+                ctx.startForegroundService(serviceIntent);
 
-                Log.d(TAG, "Service started successfully");
-                Toast.makeText(activity, "트래커: 시작됨!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "트래커: 서비스 시작됨!", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "Service started");
 
                 if (savedCall != null) {
                     JSObject ret = new JSObject();
@@ -96,8 +95,8 @@ public class DuelTrackerPlugin extends Plugin {
                     savedCall = null;
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to start service", e);
                 String msg = "서비스 시작 실패: " + e.getMessage();
+                Log.e(TAG, msg, e);
                 Toast.makeText(activity, msg, Toast.LENGTH_LONG).show();
 
                 if (savedCall != null) {
@@ -106,9 +105,7 @@ public class DuelTrackerPlugin extends Plugin {
                 }
             }
         } else {
-            Log.w(TAG, "Screen capture denied");
-            Toast.makeText(activity, "화면 공유가 거부되었습니다", Toast.LENGTH_SHORT).show();
-
+            Toast.makeText(activity, "화면 공유 거부됨", Toast.LENGTH_SHORT).show();
             if (savedCall != null) {
                 savedCall.reject("화면 공유가 거부되었습니다");
                 savedCall = null;
@@ -122,9 +119,8 @@ public class DuelTrackerPlugin extends Plugin {
             Intent serviceIntent = new Intent(getContext(), ScreenCaptureService.class);
             getContext().stopService(serviceIntent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to stop service", e);
+            Log.e(TAG, "Stop failed", e);
         }
-
         JSObject ret = new JSObject();
         ret.put("stopped", true);
         call.resolve(ret);
