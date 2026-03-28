@@ -141,6 +141,8 @@ function CardQuiz() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-ignore
   const handleSubmitScore = async () => {
     const token = localStorage.getItem("access_token");
     if (!token) return;
@@ -189,6 +191,11 @@ function CardQuiz() {
             </p>
             <p>• 틀리거나 시간 초과 시 게임 오버!</p>
           </div>
+          {!isLoggedIn && (
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+              로그인하지 않으면 리더보드에 기록이 남지 않습니다
+            </p>
+          )}
           <button
             onClick={startGame}
             className="w-full py-3 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition"
