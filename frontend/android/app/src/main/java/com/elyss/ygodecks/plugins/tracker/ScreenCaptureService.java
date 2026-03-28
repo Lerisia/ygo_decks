@@ -31,7 +31,7 @@ public class ScreenCaptureService extends Service {
     private static final String TAG = "DuelTracker";
     private static final String CHANNEL_ID = "duel_tracker_channel";
     private static final int NOTIFICATION_ID = 1001;
-    private static final long CAPTURE_INTERVAL_MS = 2000;
+    private static final long CAPTURE_INTERVAL_MS = 1000;
 
     public static volatile String lastCoinToss = null;
     public static volatile String lastFirstSecond = null;
