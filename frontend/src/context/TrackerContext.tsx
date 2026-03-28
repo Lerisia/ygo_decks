@@ -145,7 +145,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       pollRef.current = setInterval(async () => {
         try {
           const result = await DuelTracker.getLatestResult();
-          if (result.status) setNativeStatus(result.status);
+          setNativeStatus(result.status || "(폴링 중 - status 비어있음)");
           if (result.timestamp > lastTimestamp) {
             setLastTimestamp(result.timestamp);
             if (result.coinToss) setCoinToss(result.coinToss);

@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -67,10 +68,14 @@ public class DuelTrackerPlugin extends Plugin {
         if (resultCode == Activity.RESULT_OK && data != null) {
             try {
                 ScreenCaptureService.statusLog = "서비스 시작 요청됨";
+                Toast.makeText(activity, "서비스 시작 요청", Toast.LENGTH_SHORT).show();
+
                 Intent serviceIntent = new Intent(activity, ScreenCaptureService.class);
                 serviceIntent.putExtra("resultCode", resultCode);
                 serviceIntent.putExtra("data", data);
                 activity.startForegroundService(serviceIntent);
+
+                Toast.makeText(activity, "startForegroundService 호출됨", Toast.LENGTH_SHORT).show();
 
                 if (savedCall != null) {
                     JSObject ret = new JSObject();
