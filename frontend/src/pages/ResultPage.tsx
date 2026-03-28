@@ -94,6 +94,7 @@ function ResultPage() {
 
   return (
     <div className="min-h-screen px-4 py-6 max-w-lg mx-auto">
+      <p className="text-center text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">당신에게 어울리는 덱은</p>
       <h1 className="text-3xl font-extrabold text-center">{result?.name}</h1>
 
       {result?.cover_image && (
