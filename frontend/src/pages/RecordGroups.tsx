@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import {
   deleteRecordGroup,
   getUserRecordGroups,
@@ -206,6 +207,15 @@ const RecordGroups = () => {
   return (
     <div className="p-6 min-h-screen">
       <h1 className="text-2xl md:text-3xl font-bold mb-4">시트 관리</h1>
+
+      {Capacitor.isNativePlatform() && isLoggedIn && (
+        <button
+          onClick={() => navigate("/tracker")}
+          className="w-full mb-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow"
+        >
+          듀얼 트래커 시작
+        </button>
+      )}
       {metaStats?.length > 0 ? (
         <div className="mb-6">
           <div className="text-sm md:text-base text-gray-800 dark:text-gray-200">
