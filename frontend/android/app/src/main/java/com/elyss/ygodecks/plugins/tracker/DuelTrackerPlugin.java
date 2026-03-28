@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.media.projection.MediaProjectionManager;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
 
 import androidx.activity.result.ActivityResult;
 
@@ -24,6 +27,15 @@ public class DuelTrackerPlugin extends Plugin {
         Activity activity = getActivity();
         if (activity == null) {
             call.reject("Activity not available");
+            return;
+        }
+
+        // Check overlay permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(activity)) {
+            Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + activity.getPackageName()));
+            activity.startActivity(overlayIntent);
+            call.reject("Overlay permission required. Please grant and try again.");
             return;
         }
 
