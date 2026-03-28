@@ -6,14 +6,39 @@ import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
 
+const isDark = () => document.documentElement.classList.contains("dark");
+
 const customSelectStyles = {
-  placeholder: (provided: any) => ({
+  control: (provided: any) => ({
     ...provided,
-    textAlign: "left",
+    backgroundColor: isDark() ? "#374151" : "#fff",
+    borderColor: isDark() ? "#4b5563" : "#d1d5db",
+    color: isDark() ? "#fff" : "#000",
+  }),
+  menu: (provided: any) => ({
+    ...provided,
+    backgroundColor: isDark() ? "#374151" : "#fff",
+  }),
+  option: (provided: any, state: any) => ({
+    ...provided,
+    backgroundColor: state.isFocused
+      ? (isDark() ? "#4b5563" : "#e5e7eb")
+      : (isDark() ? "#374151" : "#fff"),
+    color: isDark() ? "#fff" : "#000",
   }),
   singleValue: (provided: any) => ({
     ...provided,
     textAlign: "left",
+    color: isDark() ? "#fff" : "#000",
+  }),
+  placeholder: (provided: any) => ({
+    ...provided,
+    textAlign: "left",
+    color: isDark() ? "#9ca3af" : "#6b7280",
+  }),
+  input: (provided: any) => ({
+    ...provided,
+    color: isDark() ? "#fff" : "#000",
   }),
 };
 
@@ -129,7 +154,7 @@ export const EditMatchModal = ({
     }
   };
 
-  const selectClass = "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const selectClass = "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelClass = "block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1";
 
   return (
