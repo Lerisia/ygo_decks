@@ -1,7 +1,6 @@
 package com.elyss.ygodecks.plugins.tracker;
 
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.util.Log;
 
 import com.google.mlkit.vision.common.InputImage;
@@ -48,25 +47,10 @@ public class ScreenAnalyzer {
             return null;
         }
 
-        // 1. Check for first/second announcement (cyan banner)
-        if (hasCyanBanner(bitmap)) {
-            AnalysisResult fsResult = detectFirstSecond(bitmap);
-            if (fsResult != null) {
-                return confirmResult(fsResult);
-            }
-            return null;
-        }
-
-        // 2. Check duel result (WIN/LOSE)
-        AnalysisResult duelResult = detectDuelResult(bitmap);
-        if (duelResult != null) {
-            return confirmResult(duelResult);
-        }
-
-        // 3. Check coin toss
-        AnalysisResult coinResult = detectCoinToss(bitmap);
-        if (coinResult != null) {
-            return confirmResult(coinResult);
+        // Run all OCR on the full screen at once
+        AnalysisResult result = detectAllViaOCR(bitmap);
+        if (result != null) {
+            return confirmResult(result);
         }
 
         pendingResult = null;
@@ -102,62 +86,40 @@ public class ScreenAnalyzer {
     }
 
     /**
-     * Detect the cyan/teal horizontal banner that appears during
-     * first/second player announcement.
+     * Single OCR pass on the full screen.
+     * Detects all events from one text recognition result.
      */
-    private static boolean hasCyanBanner(Bitmap bitmap) {
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-        int bannerY = height / 2;
-        int cyanCount = 0;
-        int samples = 0;
+    private static AnalysisResult detectAllViaOCR(Bitmap bitmap) {
+        InputImage image = InputImage.fromBitmap(bitmap, 0);
 
-        for (int x = width / 4; x < width * 3 / 4; x += 4) {
-            for (int y = bannerY - 20; y < bannerY + 20; y += 4) {
-                if (y < 0 || y >= height) continue;
-                int pixel = bitmap.getPixel(x, y);
-                float[] hsv = new float[3];
-                Color.colorToHSV(pixel, hsv);
-
-                // Cyan/teal: hue 170-200, saturated, medium-bright
-                if (hsv[0] > 170 && hsv[0] < 200 && hsv[1] > 0.3 && hsv[2] > 0.3) {
-                    cyanCount++;
-                }
-                samples++;
-            }
-        }
-
-        float ratio = samples > 0 ? (float) cyanCount / samples : 0;
-        return ratio > 0.15;
-    }
-
-    /**
-     * Use ML Kit OCR to detect "선공" or "후공" text.
-     * Only called when cyan banner is detected.
-     */
-    private static AnalysisResult detectFirstSecond(Bitmap bitmap) {
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        // Crop the banner area (center horizontal strip)
-        int cropTop = Math.max(0, height / 2 - height / 8);
-        int cropHeight = Math.min(height / 4, height - cropTop);
-        Bitmap bannerArea = Bitmap.createBitmap(bitmap, 0, cropTop, width, cropHeight);
-
-        InputImage image = InputImage.fromBitmap(bannerArea, 0);
-
-        AtomicReference<String> detectedText = new AtomicReference<>(null);
+        AtomicReference<AnalysisResult> detected = new AtomicReference<>(null);
         CountDownLatch latch = new CountDownLatch(1);
 
         textRecognizer.process(image)
                 .addOnSuccessListener(result -> {
                     String text = result.getText();
-                    Log.d(TAG, "OCR text: " + text);
-                    if (text.contains("선공")) {
-                        detectedText.set("first");
-                    } else if (text.contains("후공")) {
-                        detectedText.set("second");
+                    String upper = text.toUpperCase();
+                    Log.d(TAG, "OCR full: " + text.replace("\n", " | "));
+
+                    // Priority 1: Duel result
+                    if (upper.contains("VICTORY")) {
+                        detected.set(new AnalysisResult(DetectionType.DUEL_RESULT, "win"));
+                    } else if (upper.contains("DEFEAT")) {
+                        detected.set(new AnalysisResult(DetectionType.DUEL_RESULT, "lose"));
                     }
+                    // Priority 2: First/second announcement
+                    else if (text.contains("당신이") && text.contains("선공")) {
+                        detected.set(new AnalysisResult(DetectionType.FIRST_SECOND, "first"));
+                    } else if (text.contains("당신이") && text.contains("후공")) {
+                        detected.set(new AnalysisResult(DetectionType.FIRST_SECOND, "second"));
+                    }
+                    // Priority 3: Coin toss
+                    else if (text.contains("선택해주세요") || text.contains("선택해 주세요")) {
+                        detected.set(new AnalysisResult(DetectionType.COIN_TOSS, "win"));
+                    } else if (text.contains("상대가") && text.contains("선택")) {
+                        detected.set(new AnalysisResult(DetectionType.COIN_TOSS, "lose"));
+                    }
+
                     latch.countDown();
                 })
                 .addOnFailureListener(e -> {
@@ -166,125 +128,11 @@ public class ScreenAnalyzer {
                 });
 
         try {
-            latch.await(2, TimeUnit.SECONDS);
+            latch.await(3, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
 
-        bannerArea.recycle();
-
-        String value = detectedText.get();
-        if (value != null) {
-            return new AnalysisResult(DetectionType.FIRST_SECOND, value);
-        }
-        return null;
-    }
-
-    /**
-     * Detect coin toss result via OCR.
-     *
-     * Coin toss LOSE: "대전 상대가 선공 / 후공을 선택하고 있습니다"
-     *   → Opponent chooses = we lost the coin toss
-     *
-     * Coin toss WIN: Player sees selection buttons (선공/후공 선택)
-     *   → Detected separately when "당신이 선공/후공입니다" appears
-     *   → If we detect first/second without prior coin loss, coin was won
-     *
-     * So we only need to detect the "상대가 선택" text here.
-     */
-    private static AnalysisResult detectCoinToss(Bitmap bitmap) {
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        // The text appears in the lower-center area
-        int cropTop = height / 2;
-        int cropHeight = height / 3;
-        if (cropTop + cropHeight > height) cropHeight = height - cropTop;
-
-        Bitmap textArea = Bitmap.createBitmap(bitmap, 0, cropTop, width, cropHeight);
-        InputImage image = InputImage.fromBitmap(textArea, 0);
-
-        AtomicReference<String> detected = new AtomicReference<>(null);
-        CountDownLatch latch = new CountDownLatch(1);
-
-        textRecognizer.process(image)
-                .addOnSuccessListener(result -> {
-                    String text = result.getText();
-                    Log.d(TAG, "Coin OCR: " + text);
-                    if (text.contains("선택해주세요") || text.contains("선택해 주세요")) {
-                        detected.set("win");
-                    } else if (text.contains("상대가") && text.contains("선택")) {
-                        detected.set("lose");
-                    }
-                    latch.countDown();
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Coin OCR failed", e);
-                    latch.countDown();
-                });
-
-        try {
-            latch.await(2, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        textArea.recycle();
-
-        String value = detected.get();
-        if (value != null) {
-            return new AnalysisResult(DetectionType.COIN_TOSS, value);
-        }
-        return null;
-    }
-
-    /**
-     * Detect duel result using OCR.
-     * VICTORY / DEFEAT text appears large in the center of the screen.
-     * Language-independent detection.
-     */
-    private static AnalysisResult detectDuelResult(Bitmap bitmap) {
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        // Crop center area where VICTORY/DEFEAT text appears
-        int cropTop = height / 4;
-        int cropHeight = height / 2;
-        Bitmap centerArea = Bitmap.createBitmap(bitmap, 0, cropTop, width, cropHeight);
-
-        InputImage image = InputImage.fromBitmap(centerArea, 0);
-
-        AtomicReference<String> detected = new AtomicReference<>(null);
-        CountDownLatch latch = new CountDownLatch(1);
-
-        textRecognizer.process(image)
-                .addOnSuccessListener(result -> {
-                    String text = result.getText().toUpperCase();
-                    Log.d(TAG, "Duel OCR: " + text);
-                    if (text.contains("VICTORY")) {
-                        detected.set("win");
-                    } else if (text.contains("DEFEAT")) {
-                        detected.set("lose");
-                    }
-                    latch.countDown();
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Duel OCR failed", e);
-                    latch.countDown();
-                });
-
-        try {
-            latch.await(2, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        centerArea.recycle();
-
-        String value = detected.get();
-        if (value != null) {
-            return new AnalysisResult(DetectionType.DUEL_RESULT, value);
-        }
-        return null;
+        return detected.get();
     }
 }
