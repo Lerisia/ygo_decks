@@ -81,20 +81,32 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
-                // Wait for bright game board (skip dark loading/transition screens)
-                if (!isScreenBright(bitmap, w, h)) {
-                    ScreenCaptureService.statusLog = "보드 로딩 대기";
-                    break;
-                }
-                // Detect turn button color for first/second
-                TurnColor turn = detectTurnButtonColor(bitmap, w, h);
-                if (turn != TurnColor.NONE) {
-                    String val = (turn == TurnColor.BLUE) ? "first" : "second";
-                    detectionSummary += " | " + (turn == TurnColor.BLUE ? "선공" : "후공");
-                    ScreenCaptureService.statusLog = detectionSummary;
-                    currentState = State.IN_DUEL;
-                    lastDetectionTime = now;
-                    return new AnalysisResult(DetectionType.FIRST_SECOND, val);
+                // Look for cyan banner with 선공/후공 text
+                if (hasCyanBanner(bitmap, w, h)) {
+                    ScreenCaptureService.statusLog = "배너 감지 → OCR";
+                    int bannerTop = Math.max(0, (int)(h * 0.4));
+                    int bannerH = Math.min((int)(h * 0.25), h - bannerTop);
+                    Bitmap banner = Bitmap.createBitmap(bitmap, 0, bannerTop, w, bannerH);
+                    String text = runOCR(banner);
+                    banner.recycle();
+
+                    if (text != null) {
+                        ScreenCaptureService.statusLog = "배너OCR:" + text.replace("\n", " ");
+                        if (text.contains("선공")) {
+                            detectionSummary += " | 선공";
+                            ScreenCaptureService.statusLog = detectionSummary;
+                            currentState = State.IN_DUEL;
+                            lastDetectionTime = now;
+                            return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
+                        }
+                        if (text.contains("후공")) {
+                            detectionSummary += " | 후공";
+                            ScreenCaptureService.statusLog = detectionSummary;
+                            currentState = State.IN_DUEL;
+                            lastDetectionTime = now;
+                            return new AnalysisResult(DetectionType.FIRST_SECOND, "second");
+                        }
+                    }
                 }
                 ScreenCaptureService.statusLog = "선후공 대기 중";
                 break;
@@ -262,6 +274,33 @@ public class ScreenAnalyzer {
         if (redRatio > 0.1 && redRatio > blueRatio * 3) return TurnColor.RED;
 
         return TurnColor.NONE;
+    }
+
+    // === FIRST/SECOND DETECTION ===
+
+    /**
+     * Detect cyan/teal horizontal banner in the center of screen.
+     * This banner appears during "당신이 선공/후공입니다" announcement.
+     */
+    private static boolean hasCyanBanner(Bitmap bmp, int w, int h) {
+        int cyanCount = 0;
+        int samples = 0;
+        int bannerY = h / 2;
+        int step = Math.max(w / 40, 1);
+
+        for (int x = w / 4; x < w * 3 / 4; x += step) {
+            for (int y = bannerY - h / 15; y < bannerY + h / 15; y += step) {
+                if (y < 0 || y >= h) continue;
+                float[] hsv = new float[3];
+                Color.colorToHSV(bmp.getPixel(x, y), hsv);
+                if (hsv[0] > 160 && hsv[0] < 210 && hsv[1] > 0.2 && hsv[2] > 0.25) {
+                    cyanCount++;
+                }
+                samples++;
+            }
+        }
+
+        return samples > 0 && (float) cyanCount / samples > 0.1;
     }
 
     // === VICTORY/DEFEAT DETECTION (OCR) ===
