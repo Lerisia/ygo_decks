@@ -297,8 +297,8 @@ public class ScreenAnalyzer {
         if (samples == 0) return null;
         float ratio = (float) brightNeutral / samples;
 
-        // Normal gameplay: ratio < 0.03. Result screen: ratio > 0.06
-        if (ratio < 0.05) return null;
+        // Normal gameplay: ratio < 0.05. Result screen with large text: ratio > 0.15
+        if (ratio < 0.15) return null;
 
         ScreenCaptureService.statusLog = String.format("결과화면? %.1f%%", ratio * 100);
 
