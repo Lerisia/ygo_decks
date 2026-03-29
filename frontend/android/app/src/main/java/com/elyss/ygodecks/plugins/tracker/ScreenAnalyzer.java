@@ -155,7 +155,7 @@ public class ScreenAnalyzer {
     private static CoinResult detectCoinWithEffects(Bitmap bmp, int w, int h) {
         int cx = w / 2;
         int cy = h / 2;
-        int radius = Math.min(w, h) / 8;
+        int radius = Math.min(w, h) / 14;
         int step = Math.max(radius / 10, 1);
 
         int goldCount = 0;
