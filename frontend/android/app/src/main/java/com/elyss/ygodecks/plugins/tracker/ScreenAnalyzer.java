@@ -34,15 +34,9 @@ public class ScreenAnalyzer {
     private static State currentState = State.WAITING_COIN;
     private static long lastDetectionTime = 0;
     private static boolean onCoinScreen = false;
-    private static CoinResult lastCoinValue = CoinResult.NONE;
-    private static int coinStableCount = 0;
-    private static final int COIN_STABLE_REQUIRED = 2;
-    private static int spinToResultTransitions = 0;
-    private static boolean wasSpinning = false;
+    private static CoinResult lastSeenCoinResult = CoinResult.NONE;
     private static float maxGold = 0;
     private static float maxDark = 0;
-    private static long coinDetectedTime = 0;
-    private static final long BOARD_MIN_DELAY_MS = 5000;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
@@ -58,51 +52,30 @@ public class ScreenAnalyzer {
                 CoinResult coin = detectCoinWithEffects(bitmap, w, h);
 
                 if (coin == CoinResult.NONE) {
+                    // Left coin screen - if we had a result, confirm it
+                    if (onCoinScreen && lastSeenCoinResult != CoinResult.NONE) {
+                        String val = (lastSeenCoinResult == CoinResult.GOLD) ? "win" : "lose";
+                        detectionSummary = "코인:" + (lastSeenCoinResult == CoinResult.GOLD ? "앞" : "뒤");
+                        ScreenCaptureService.statusLog = detectionSummary;
+                        onCoinScreen = false;
+                        lastSeenCoinResult = CoinResult.NONE;
+                        currentState = State.WAITING_FIRST_SECOND;
+                        lastDetectionTime = now;
+                        return new AnalysisResult(DetectionType.COIN_TOSS, val);
+                    }
                     onCoinScreen = false;
-                    lastCoinValue = CoinResult.NONE;
-                    coinStableCount = 0;
+                    lastSeenCoinResult = CoinResult.NONE;
                     break;
                 }
 
                 onCoinScreen = true;
 
-                if (coin == CoinResult.SPINNING) {
-                    wasSpinning = true;
-                    lastCoinValue = CoinResult.NONE;
-                    coinStableCount = 0;
-                } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
-                    // Track spin→result transitions
-                    if (wasSpinning) {
-                        spinToResultTransitions++;
-                        wasSpinning = false;
-                    }
-
-                    if (coin == lastCoinValue) {
-                        coinStableCount++;
-                    } else {
-                        lastCoinValue = coin;
-                        coinStableCount = 1;
-                    }
-
-                    ScreenCaptureService.statusLog = (coin == CoinResult.GOLD ? "금색" : "검정")
-                            + " 전환:" + spinToResultTransitions
-                            + " (" + coinStableCount + "/" + COIN_STABLE_REQUIRED + ")";
-
-                    // Only accept on 2nd+ transition (1st is the initial flash)
-                    if (coinStableCount >= COIN_STABLE_REQUIRED && spinToResultTransitions >= 2) {
-                        String val = (coin == CoinResult.GOLD) ? "win" : "lose";
-                        detectionSummary = "코인:" + (coin == CoinResult.GOLD ? "앞" : "뒤");
-                        ScreenCaptureService.statusLog = detectionSummary;
-                        onCoinScreen = false;
-                        lastCoinValue = CoinResult.NONE;
-                        coinStableCount = 0;
-                        spinToResultTransitions = 0;
-                        wasSpinning = false;
-                        coinDetectedTime = System.currentTimeMillis();
-                        currentState = State.WAITING_FIRST_SECOND;
-                        lastDetectionTime = now;
-                        return new AnalysisResult(DetectionType.COIN_TOSS, val);
-                    }
+                if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
+                    lastSeenCoinResult = coin;
+                    ScreenCaptureService.statusLog = "코인: " +
+                            (coin == CoinResult.GOLD ? "금색" : "검정") + " (대기)";
+                } else {
+                    ScreenCaptureService.statusLog = "코인 회전 중";
                 }
                 break;
             }
@@ -144,11 +117,7 @@ public class ScreenAnalyzer {
         currentState = State.WAITING_COIN;
         lastDetectionTime = 0;
         onCoinScreen = false;
-        lastCoinValue = CoinResult.NONE;
-        coinStableCount = 0;
-        spinToResultTransitions = 0;
-        wasSpinning = false;
-        coinDetectedTime = 0;
+        lastSeenCoinResult = CoinResult.NONE;
         maxGold = 0;
         maxDark = 0;
         detectionSummary = "";
