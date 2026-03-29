@@ -108,16 +108,6 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
-                // Wait minimum time, then check brightness
-                long elapsed = now - coinDetectedTime;
-                if (elapsed < BOARD_MIN_DELAY_MS) {
-                    ScreenCaptureService.statusLog = "대기 " + ((BOARD_MIN_DELAY_MS - elapsed) / 1000) + "초";
-                    break;
-                }
-                if (!isScreenBright(bitmap, w, h)) {
-                    ScreenCaptureService.statusLog = "보드 로딩 대기 중";
-                    break;
-                }
                 // Detect turn button color for first/second
                 TurnColor turn = detectTurnButtonColor(bitmap, w, h);
                 if (turn != TurnColor.NONE) {
