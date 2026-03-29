@@ -210,8 +210,8 @@ public class ScreenAnalyzer {
         // Gold present with purple = front face (win)
         if (goldRatio > 0.10) return CoinResult.GOLD;
 
-        // No gold = back face (black coin has no warm tones)
-        if (goldRatio < 0.03) return CoinResult.BLACK;
+        // Back face: no gold AND high dark ratio (solid black coin, not just dark background)
+        if (goldRatio < 0.03 && darkRatio > 0.40) return CoinResult.BLACK;
 
         // Purple present but can't determine yet (still spinning)
         return CoinResult.SPINNING;
