@@ -165,17 +165,18 @@ public class ScreenAnalyzer {
         ScreenCaptureService.statusLog = String.format("코인 P:%.0f%% G:%.0f%% D:%.0f%%",
                 purpleRatio * 100, goldRatio * 100, darkRatio * 100);
 
-        // Coin is spinning (purple effects visible)
-        if (purpleRatio > 0.10) return CoinResult.SPINNING;
+        // Not on coin screen (no purple effects)
+        if (purpleRatio < 0.05) return CoinResult.NONE;
 
-        // Coin has landed - purple must be nearly gone (animation fully done)
-        if (purpleRatio > 0.03) return CoinResult.NONE;
+        // Purple present = we're on coin toss screen
+        // Gold present with purple = front face (win)
+        if (goldRatio > 0.10) return CoinResult.GOLD;
 
-        // Strict thresholds - coin face fills center when stopped
-        if (goldRatio > 0.20) return CoinResult.GOLD;
-        if (darkRatio > 0.45) return CoinResult.BLACK;
+        // No gold + dark center + purple = back face (lose)
+        if (goldRatio < 0.03 && darkRatio > 0.30) return CoinResult.BLACK;
 
-        return CoinResult.NONE;
+        // Purple present but can't determine yet (still spinning)
+        return CoinResult.SPINNING;
     }
 
     /**
