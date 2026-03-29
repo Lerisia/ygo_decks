@@ -544,8 +544,7 @@ def recent_meta_deck_stats(request):
 
     # 상대 덱 집계
     opp_stats = qs.values(
-        deck_id=F("opponent_deck_id"),
-        deck_name=F("opponent_deck__name"),
+        "opponent_deck_id", "opponent_deck__name",
     ).annotate(
         count=Count("id"),
         wins=Count("id", filter=Q(result="lose")),
@@ -553,8 +552,7 @@ def recent_meta_deck_stats(request):
 
     # 내 덱 집계
     player_stats = qs.values(
-        deck_id=F("deck_id"),
-        deck_name=F("deck__name"),
+        "deck_id", "deck__name",
     ).annotate(
         count=Count("id"),
         wins=Count("id", filter=Q(result="win")),
@@ -563,15 +561,15 @@ def recent_meta_deck_stats(request):
     # 합산
     combined = {}
     for stat in opp_stats:
-        did = stat["deck_id"]
-        combined[did] = {"deck_id": did, "deck_name": stat["deck_name"], "count": stat["count"], "wins": stat["wins"]}
+        did = stat["opponent_deck_id"]
+        combined[did] = {"deck_id": did, "deck_name": stat["opponent_deck__name"], "count": stat["count"], "wins": stat["wins"]}
     for stat in player_stats:
         did = stat["deck_id"]
         if did in combined:
             combined[did]["count"] += stat["count"]
             combined[did]["wins"] += stat["wins"]
         else:
-            combined[did] = {"deck_id": did, "deck_name": stat["deck_name"], "count": stat["count"], "wins": stat["wins"]}
+            combined[did] = {"deck_id": did, "deck_name": stat["deck__name"], "count": stat["count"], "wins": stat["wins"]}
 
     total_appearances = total_matches * 2
     results = []
