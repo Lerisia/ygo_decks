@@ -59,32 +59,22 @@ public class ScreenAnalyzer {
             }
         }
 
-        // Step 2: Check for cyan banner (first/second announcement)
-        if (hasCyanBanner(bitmap, w, h)) {
-            ScreenCaptureService.statusLog = "청록 배너 감지 → OCR";
-            int bannerTop = Math.max(0, (int)(h * 0.4));
-            int bannerH = Math.min((int)(h * 0.2), h - bannerTop);
-            Bitmap banner = Bitmap.createBitmap(bitmap, 0, bannerTop, w, bannerH);
-            AnalysisResult r = ocrForFirstSecond(banner);
-            banner.recycle();
-            if (r != null) {
-                lastDetectionTime = now;
-                return r;
-            }
+        // Step 2: Check turn button color for first/second (blue = first, red = second)
+        TurnColor turnColor = detectTurnButtonColor(bitmap, w, h);
+        if (turnColor != TurnColor.NONE) {
+            String value = (turnColor == TurnColor.BLUE) ? "first" : "second";
+            ScreenCaptureService.statusLog = "턴버튼: " + (turnColor == TurnColor.BLUE ? "파랑(선공)" : "빨강(후공)");
+            lastDetectionTime = now;
+            return new AnalysisResult(DetectionType.FIRST_SECOND, value);
         }
 
-        // Step 3: Check for coin toss screen (lower half text)
-        // OCR the lower portion for "선택해" or "상대가"
-        if (hasGameUI(bitmap, w, h)) {
-            int cropTop = (int)(h * 0.45);
-            int cropH = Math.min((int)(h * 0.25), h - cropTop);
-            Bitmap lower = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
-            AnalysisResult r = ocrForCoinToss(lower);
-            lower.recycle();
-            if (r != null) {
-                lastDetectionTime = now;
-                return r;
-            }
+        // Step 3: Check coin toss by center color (gold = win, black = lose)
+        CoinColor coinColor = detectCoinColor(bitmap, w, h);
+        if (coinColor != CoinColor.NONE) {
+            String value = (coinColor == CoinColor.GOLD) ? "win" : "lose";
+            ScreenCaptureService.statusLog = "코인감지: " + (coinColor == CoinColor.GOLD ? "금색(앞)" : "검정(뒤)");
+            lastDetectionTime = now;
+            return new AnalysisResult(DetectionType.COIN_TOSS, value);
         }
 
         ScreenCaptureService.statusLog = "스캔 중";
@@ -123,51 +113,108 @@ public class ScreenAnalyzer {
         return ratio > 0.08;
     }
 
-    /**
-     * Check for cyan/teal horizontal banner in the middle of screen.
-     */
-    private static boolean hasCyanBanner(Bitmap bmp, int w, int h) {
-        int cyanCount = 0;
-        int samples = 0;
-        int bannerY = h / 2;
-        int step = Math.max(w / 50, 1);
+    private enum TurnColor { NONE, BLUE, RED }
 
-        for (int x = w / 4; x < w * 3 / 4; x += step) {
-            for (int y = bannerY - h / 20; y < bannerY + h / 20; y += step) {
-                if (y < 0 || y >= h) continue;
+    /**
+     * Detect turn button color on the right side of the game board.
+     * Blue = player's turn (first), Red = opponent's turn (second).
+     * Only meaningful on Turn 1 (game start).
+     * The turn indicator is roughly at x: 70-90%, y: 40-55% of screen.
+     */
+    private static TurnColor detectTurnButtonColor(Bitmap bmp, int w, int h) {
+        int startX = (int)(w * 0.7);
+        int endX = (int)(w * 0.92);
+        int startY = (int)(h * 0.38);
+        int endY = (int)(h * 0.58);
+        int step = Math.max((endX - startX) / 15, 1);
+
+        int blueCount = 0;
+        int redCount = 0;
+        int samples = 0;
+
+        for (int y = startY; y < endY; y += step) {
+            for (int x = startX; x < endX; x += step) {
+                if (x >= w || y >= h) continue;
                 float[] hsv = new float[3];
                 Color.colorToHSV(bmp.getPixel(x, y), hsv);
-                if (hsv[0] > 160 && hsv[0] < 210 && hsv[1] > 0.25 && hsv[2] > 0.3) {
-                    cyanCount++;
+
+                // Blue/cyan hue (180-240), saturated
+                if (hsv[0] > 180 && hsv[0] < 240 && hsv[1] > 0.3 && hsv[2] > 0.3) {
+                    blueCount++;
+                }
+                // Red hue (340-360 or 0-20), saturated
+                if ((hsv[0] > 340 || hsv[0] < 20) && hsv[1] > 0.3 && hsv[2] > 0.3) {
+                    redCount++;
                 }
                 samples++;
             }
         }
 
-        float ratio = samples > 0 ? (float) cyanCount / samples : 0;
-        return ratio > 0.12;
+        if (samples == 0) return TurnColor.NONE;
+
+        float blueRatio = (float) blueCount / samples;
+        float redRatio = (float) redCount / samples;
+
+        // Need a meaningful amount of blue or red
+        if (blueRatio > 0.15 && blueRatio > redRatio * 2) return TurnColor.BLUE;
+        if (redRatio > 0.15 && redRatio > blueRatio * 2) return TurnColor.RED;
+
+        return TurnColor.NONE;
     }
 
-    /**
-     * Check if screen looks like game UI (dark background with UI elements).
-     * Simple heuristic to avoid running OCR on random screens.
-     */
-    private static boolean hasGameUI(Bitmap bmp, int w, int h) {
-        int darkCount = 0;
-        int samples = 0;
-        int step = Math.max(w / 20, 1);
+    private enum CoinColor { NONE, GOLD, BLACK }
 
-        for (int y = 0; y < h; y += step * 3) {
-            for (int x = 0; x < w; x += step * 3) {
+    /**
+     * Detect coin toss result by center color.
+     * Gold/warm center = front face (win), very dark center = back face (lose).
+     * Ignore if purple/pink effects present (still spinning).
+     */
+    private static CoinColor detectCoinColor(Bitmap bmp, int w, int h) {
+        int cx = w / 2;
+        int cy = h / 2;
+        int radius = Math.min(w, h) / 8;
+        int step = Math.max(radius / 10, 1);
+
+        int goldCount = 0;
+        int darkCount = 0;
+        int purpleCount = 0;
+        int samples = 0;
+
+        for (int y = cy - radius; y < cy + radius; y += step) {
+            for (int x = cx - radius; x < cx + radius; x += step) {
+                if (x < 0 || x >= w || y < 0 || y >= h) continue;
                 float[] hsv = new float[3];
                 Color.colorToHSV(bmp.getPixel(x, y), hsv);
-                if (hsv[2] < 0.3) darkCount++;
+
+                // Gold/warm: hue 20-60, saturated, bright
+                if (hsv[0] > 15 && hsv[0] < 65 && hsv[1] > 0.25 && hsv[2] > 0.4) {
+                    goldCount++;
+                }
+                // Very dark (coin back)
+                if (hsv[2] < 0.1) {
+                    darkCount++;
+                }
+                // Purple/pink effects (spinning)
+                if (hsv[0] > 250 && hsv[0] < 340 && hsv[1] > 0.3 && hsv[2] > 0.3) {
+                    purpleCount++;
+                }
                 samples++;
             }
         }
 
-        float ratio = samples > 0 ? (float) darkCount / samples : 0;
-        return ratio > 0.4;
+        if (samples == 0) return CoinColor.NONE;
+
+        float purpleRatio = (float) purpleCount / samples;
+        float goldRatio = (float) goldCount / samples;
+        float darkRatio = (float) darkCount / samples;
+
+        // Still spinning
+        if (purpleRatio > 0.15) return CoinColor.NONE;
+
+        if (goldRatio > 0.2) return CoinColor.GOLD;
+        if (darkRatio > 0.5) return CoinColor.BLACK;
+
+        return CoinColor.NONE;
     }
 
     /**
@@ -191,37 +238,6 @@ public class ScreenAnalyzer {
     /**
      * OCR small cropped banner for 선공/후공.
      */
-    private static AnalysisResult ocrForFirstSecond(Bitmap crop) {
-        String text = runOCR(crop);
-        if (text == null) return null;
-        ScreenCaptureService.statusLog = "배너OCR:" + text.replace("\n", " ").substring(0, Math.min(40, text.length()));
-
-        if (text.contains("선공입니다") || text.contains("선공 입니다") || text.contains("선공입")) {
-            return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
-        }
-        if (text.contains("후공입니다") || text.contains("후공 입니다") || text.contains("후공입")) {
-            return new AnalysisResult(DetectionType.FIRST_SECOND, "second");
-        }
-        return null;
-    }
-
-    /**
-     * OCR small cropped region for coin toss.
-     */
-    private static AnalysisResult ocrForCoinToss(Bitmap crop) {
-        String text = runOCR(crop);
-        if (text == null) return null;
-        ScreenCaptureService.statusLog = "코인OCR:" + text.replace("\n", " ").substring(0, Math.min(40, text.length()));
-
-        if (text.contains("선택해")) {
-            return new AnalysisResult(DetectionType.COIN_TOSS, "win");
-        }
-        if (text.contains("상대가")) {
-            return new AnalysisResult(DetectionType.COIN_TOSS, "lose");
-        }
-        return null;
-    }
-
     /**
      * Run ML Kit OCR on a bitmap and return text.
      */
