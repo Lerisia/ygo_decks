@@ -71,6 +71,11 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
+                // Only check turn button when game board is loaded (bright screen)
+                if (!isScreenBright(bitmap, w, h)) {
+                    ScreenCaptureService.statusLog = "보드 로딩 대기 중";
+                    break;
+                }
                 // Detect turn button color for first/second
                 TurnColor turn = detectTurnButtonColor(bitmap, w, h);
                 if (turn != TurnColor.NONE) {
@@ -165,6 +170,26 @@ public class ScreenAnalyzer {
         if (darkRatio > 0.5) return CoinResult.BLACK;
 
         return CoinResult.NONE;
+    }
+
+    /**
+     * Check if screen is bright overall (game board loaded vs dark coin toss / loading screen).
+     */
+    private static boolean isScreenBright(Bitmap bmp, int w, int h) {
+        int brightCount = 0;
+        int samples = 0;
+        int step = Math.max(w / 20, 1);
+
+        for (int y = h / 4; y < h * 3 / 4; y += step * 2) {
+            for (int x = w / 4; x < w * 3 / 4; x += step * 2) {
+                float[] hsv = new float[3];
+                Color.colorToHSV(bmp.getPixel(x, y), hsv);
+                if (hsv[2] > 0.35) brightCount++;
+                samples++;
+            }
+        }
+
+        return samples > 0 && (float) brightCount / samples > 0.4;
     }
 
     // === TURN BUTTON DETECTION ===
