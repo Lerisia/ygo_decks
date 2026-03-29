@@ -33,8 +33,10 @@ public class ScreenAnalyzer {
 
     private static State currentState = State.WAITING_COIN;
     private static long lastDetectionTime = 0;
-    private static int spinningFrames = 0;
-    private static final int MIN_SPINNING_FRAMES = 6;
+    private static boolean onCoinScreen = false;
+    private static CoinResult lastCoinValue = CoinResult.NONE;
+    private static int coinStableCount = 0;
+    private static final int COIN_STABLE_REQUIRED = 3;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
@@ -48,25 +50,45 @@ public class ScreenAnalyzer {
         switch (currentState) {
             case WAITING_COIN: {
                 CoinResult coin = detectCoinWithEffects(bitmap, w, h);
-                if (coin == CoinResult.SPINNING) {
-                    spinningFrames++;
-                    ScreenCaptureService.statusLog = "코인 회전 중 (" + spinningFrames + ")";
-                } else if (coin == CoinResult.GOLD && spinningFrames >= MIN_SPINNING_FRAMES) {
-                    spinningFrames = 0;
-                    detectionSummary = "코인:앞";
-                    ScreenCaptureService.statusLog = detectionSummary;
-                    currentState = State.WAITING_FIRST_SECOND;
-                    lastDetectionTime = now;
-                    return new AnalysisResult(DetectionType.COIN_TOSS, "win");
-                } else if (coin == CoinResult.BLACK && spinningFrames >= MIN_SPINNING_FRAMES) {
-                    spinningFrames = 0;
-                    detectionSummary = "코인:뒤";
-                    ScreenCaptureService.statusLog = detectionSummary;
-                    currentState = State.WAITING_FIRST_SECOND;
-                    lastDetectionTime = now;
-                    return new AnalysisResult(DetectionType.COIN_TOSS, "lose");
-                } else {
+
+                if (coin == CoinResult.NONE) {
+                    onCoinScreen = false;
+                    lastCoinValue = CoinResult.NONE;
+                    coinStableCount = 0;
                     ScreenCaptureService.statusLog = "코인 대기 중";
+                    break;
+                }
+
+                onCoinScreen = true;
+
+                if (coin == CoinResult.SPINNING) {
+                    // Coin is alternating - reset stability
+                    lastCoinValue = CoinResult.NONE;
+                    coinStableCount = 0;
+                    ScreenCaptureService.statusLog = "코인 회전 중";
+                } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
+                    // Gold or black detected - check stability
+                    if (coin == lastCoinValue) {
+                        coinStableCount++;
+                    } else {
+                        lastCoinValue = coin;
+                        coinStableCount = 1;
+                    }
+
+                    ScreenCaptureService.statusLog = (coin == CoinResult.GOLD ? "금색" : "검정")
+                            + " (" + coinStableCount + "/" + COIN_STABLE_REQUIRED + ")";
+
+                    if (coinStableCount >= COIN_STABLE_REQUIRED) {
+                        String val = (coin == CoinResult.GOLD) ? "win" : "lose";
+                        detectionSummary = "코인:" + (coin == CoinResult.GOLD ? "앞" : "뒤");
+                        ScreenCaptureService.statusLog = detectionSummary;
+                        onCoinScreen = false;
+                        lastCoinValue = CoinResult.NONE;
+                        coinStableCount = 0;
+                        currentState = State.WAITING_FIRST_SECOND;
+                        lastDetectionTime = now;
+                        return new AnalysisResult(DetectionType.COIN_TOSS, val);
+                    }
                 }
                 break;
             }
@@ -112,7 +134,9 @@ public class ScreenAnalyzer {
     public static void reset() {
         currentState = State.WAITING_COIN;
         lastDetectionTime = 0;
-        spinningFrames = 0;
+        onCoinScreen = false;
+        lastCoinValue = CoinResult.NONE;
+        coinStableCount = 0;
         detectionSummary = "";
     }
 
