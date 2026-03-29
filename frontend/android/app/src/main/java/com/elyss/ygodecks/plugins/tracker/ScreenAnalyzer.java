@@ -110,7 +110,9 @@ public class ScreenAnalyzer {
                         }
                     }
                 }
-                ScreenCaptureService.statusLog = "선후공 대기 중";
+                // Show cyan detection ratio for debugging
+                int cyanDbg = countCyanRatio(bitmap, w, h);
+                ScreenCaptureService.statusLog = "선후공 대기 (청록:" + cyanDbg + "%)";
                 break;
             }
 
@@ -279,6 +281,22 @@ public class ScreenAnalyzer {
     }
 
     // === FIRST/SECOND DETECTION ===
+
+    private static int countCyanRatio(Bitmap bmp, int w, int h) {
+        int cyanCount = 0, samples = 0;
+        int bannerY = h / 2;
+        int step = Math.max(w / 40, 1);
+        for (int x = w / 4; x < w * 3 / 4; x += step) {
+            for (int y = bannerY - h / 15; y < bannerY + h / 15; y += step) {
+                if (y < 0 || y >= h) continue;
+                float[] hsv = new float[3];
+                Color.colorToHSV(bmp.getPixel(x, y), hsv);
+                if (hsv[0] > 160 && hsv[0] < 210 && hsv[1] > 0.2 && hsv[2] > 0.25) cyanCount++;
+                samples++;
+            }
+        }
+        return samples > 0 ? (int)((float) cyanCount / samples * 100) : 0;
+    }
 
     /**
      * Detect cyan/teal horizontal banner in the center of screen.
