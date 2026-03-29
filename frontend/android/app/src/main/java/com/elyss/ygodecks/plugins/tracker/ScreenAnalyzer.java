@@ -20,7 +20,7 @@ public class ScreenAnalyzer {
             TextRecognition.getClient(new KoreanTextRecognizerOptions.Builder().build());
 
     public enum DetectionType { COIN_TOSS, FIRST_SECOND, DUEL_RESULT }
-    public enum State { WAITING_COIN, WAITING_FIRST_SECOND, IN_DUEL }
+    public enum State { WAITING_MATCH_START, IN_DUEL }
 
     public static class AnalysisResult {
         public DetectionType type;
@@ -31,101 +31,91 @@ public class ScreenAnalyzer {
         }
     }
 
-    private static State currentState = State.WAITING_COIN;
+    private static State currentState = State.WAITING_MATCH_START;
     private static long lastDetectionTime = 0;
-    private static boolean onCoinScreen = false;
-    private static CoinResult lastSeenCoinResult = CoinResult.NONE;
-    private static float maxGold = 0;
-    private static float maxDark = 0;
     public static String detectionSummary = "";
+
+    // Coin tracking - continuously updated, confirmed when first/second is detected
+    private enum CoinResult { NONE, GOLD, BLACK }
+    private static CoinResult lastSeenCoin = CoinResult.NONE;
+
+    // Pending first/second to return on next poll
+    public static String pendingFirstSecond = null;
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
-        long cooldown = 500;
-        if (now - lastDetectionTime < cooldown) return null;
+        if (now - lastDetectionTime < 500) return null;
 
         int w = bitmap.getWidth();
         int h = bitmap.getHeight();
 
+        // Return pending first/second from previous detection
+        if (pendingFirstSecond != null) {
+            String fs = pendingFirstSecond;
+            pendingFirstSecond = null;
+            lastDetectionTime = now;
+            return new AnalysisResult(DetectionType.FIRST_SECOND, fs);
+        }
+
         switch (currentState) {
-            case WAITING_COIN: {
-                CoinResult coin = detectCoinWithEffects(bitmap, w, h);
+            case WAITING_MATCH_START: {
+                // 1. Continuously track coin color (gold/black)
+                updateCoinColor(bitmap, w, h);
 
-                if (coin == CoinResult.NONE) {
-                    // Left coin screen - if we had a result after spinning, confirm it
-                    if (onCoinScreen && lastSeenCoinResult != CoinResult.NONE
-                            && lastSeenCoinResult != CoinResult.SPINNING) {
-                        String val = (lastSeenCoinResult == CoinResult.GOLD) ? "win" : "lose";
-                        detectionSummary = "코인:" + (lastSeenCoinResult == CoinResult.GOLD ? "앞" : "뒤");
-                        ScreenCaptureService.statusLog = detectionSummary;
-                        onCoinScreen = false;
-                        lastSeenCoinResult = CoinResult.NONE;
-                        currentState = State.WAITING_FIRST_SECOND;
-                        lastDetectionTime = now;
-                        return new AnalysisResult(DetectionType.COIN_TOSS, val);
-                    }
-                    onCoinScreen = false;
-                    lastSeenCoinResult = CoinResult.NONE;
-                    break;
-                }
-
-                onCoinScreen = true;
-
-                if (coin == CoinResult.SPINNING) {
-                    lastSeenCoinResult = CoinResult.NONE;
-                    // P/G/D values already set in detectCoinWithEffects, don't overwrite
-                } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
-                    lastSeenCoinResult = coin;
-                    ScreenCaptureService.statusLog = "코인: " +
-                            (coin == CoinResult.GOLD ? "금색" : "검정") + " (대기)";
-                }
-                break;
-            }
-
-            case WAITING_FIRST_SECOND: {
-                // OCR center-lower area for 선공/후공 text
+                // 2. Try OCR for 선공/후공 - when found, confirm coin + first/second
                 int cropTop = (int)(h * 0.4);
-                int cropH = (int)(h * 0.35);
-                Bitmap center = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
-                String text = runOCR(center);
-                center.recycle();
+                int cropH = Math.min((int)(h * 0.35), h - cropTop);
+                Bitmap textArea = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
+                String text = runOCR(textArea);
+                textArea.recycle();
+
+                String coinStr = lastSeenCoin == CoinResult.GOLD ? "앞" :
+                                 lastSeenCoin == CoinResult.BLACK ? "뒤" : "?";
 
                 if (text != null) {
                     String preview = text.replace("\n", " ").trim();
                     if (preview.length() > 30) preview = preview.substring(0, 30);
-                    ScreenCaptureService.statusLog = "선후OCR:" + preview;
+                    ScreenCaptureService.statusLog = "코인:" + coinStr + " OCR:" + preview;
 
-                    if (text.contains("선공") || text.contains("선 공") || text.contains("선콩")
-                            || (text.contains("선") && text.contains("입니다"))) {
-                        detectionSummary += " | 선공";
-                        ScreenCaptureService.statusLog = detectionSummary;
-                        currentState = State.IN_DUEL;
-                        lastDetectionTime = now;
-                        return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
+                    String fsValue = null;
+                    // Exclude selection screen ("선공 / 후공을 선택해주세요")
+                    if (!text.contains("선택")) {
+                        if (text.contains("입니다") && (text.contains("선공") || text.contains("선 공") || text.contains("선"))) {
+                            fsValue = "first";
+                        } else if (text.contains("입니다") && (text.contains("후공") || text.contains("후 공") || text.contains("후"))) {
+                            fsValue = "second";
+                        }
                     }
-                    if (text.contains("후공") || text.contains("후 공") || text.contains("후콩")
-                            || (text.contains("후") && text.contains("입니다"))) {
-                        detectionSummary += " | 후공";
+
+                    if (fsValue != null) {
+                        // Confirm coin at this moment + transition to duel
+                        String coinVal = (lastSeenCoin == CoinResult.GOLD) ? "win" : "lose";
+                        detectionSummary = "코인:" + coinStr + " | " +
+                                ("first".equals(fsValue) ? "선공" : "후공");
                         ScreenCaptureService.statusLog = detectionSummary;
+
+                        pendingFirstSecond = fsValue;
                         currentState = State.IN_DUEL;
+                        lastSeenCoin = CoinResult.NONE;
                         lastDetectionTime = now;
-                        return new AnalysisResult(DetectionType.FIRST_SECOND, "second");
+                        return new AnalysisResult(DetectionType.COIN_TOSS, coinVal);
                     }
                 } else {
-                    ScreenCaptureService.statusLog = "선후공 대기 중";
+                    ScreenCaptureService.statusLog = "대기 코인:" + coinStr;
                 }
                 break;
             }
 
             case IN_DUEL: {
-                // OCR center crop for VICTORY/DEFEAT
+                // OCR for VICTORY/DEFEAT
                 Bitmap center = Bitmap.createBitmap(bitmap, w / 6, h / 4, w * 2 / 3, h / 3);
                 AnalysisResult r = ocrForDuelResult(center);
                 center.recycle();
                 if (r != null) {
                     detectionSummary += " | " + ("win".equals(r.value) ? "승리" : "패배");
                     ScreenCaptureService.statusLog = detectionSummary;
-                    currentState = State.WAITING_COIN;
+                    currentState = State.WAITING_MATCH_START;
+                    detectionSummary = "";
                     lastDetectionTime = now;
                     return r;
                 }
@@ -138,27 +128,16 @@ public class ScreenAnalyzer {
     }
 
     public static void reset() {
-        currentState = State.WAITING_COIN;
+        currentState = State.WAITING_MATCH_START;
         lastDetectionTime = 0;
-        onCoinScreen = false;
-        lastSeenCoinResult = CoinResult.NONE;
-        maxGold = 0;
-        maxDark = 0;
+        lastSeenCoin = CoinResult.NONE;
+        pendingFirstSecond = null;
         detectionSummary = "";
     }
 
-    // === COIN TOSS DETECTION ===
+    // === COIN COLOR TRACKING ===
 
-    private enum CoinResult { NONE, SPINNING, GOLD, BLACK }
-
-    /**
-     * Detect coin toss state:
-     * - SPINNING: purple effects in center (coin toss screen confirmed)
-     * - GOLD: no purple, gold center (front face = win)
-     * - BLACK: no purple, dark center (back face = lose), only valid after SPINNING seen
-     * - NONE: not a coin toss screen
-     */
-    private static CoinResult detectCoinWithEffects(Bitmap bmp, int w, int h) {
+    private static void updateCoinColor(Bitmap bmp, int w, int h) {
         int cx = w / 2;
         int cy = h / 2;
         int radius = Math.min(w, h) / 14;
@@ -188,143 +167,23 @@ public class ScreenAnalyzer {
             }
         }
 
-        if (samples == 0) return CoinResult.NONE;
+        if (samples == 0) return;
 
         float purpleRatio = (float) purpleCount / samples;
         float goldRatio = (float) goldCount / samples;
         float darkRatio = (float) darkCount / samples;
 
-        if (purpleRatio > 0.05) {
-            if (goldRatio > maxGold) maxGold = goldRatio;
-            if (darkRatio > maxDark) maxDark = darkRatio;
+        // Only update when on coin screen (purple present)
+        if (purpleRatio < 0.05) return;
+
+        if (goldRatio > 0.10) {
+            lastSeenCoin = CoinResult.GOLD;
+        } else if (goldRatio < 0.03 && darkRatio > 0.10) {
+            lastSeenCoin = CoinResult.BLACK;
         }
-
-        ScreenCaptureService.statusLog = String.format("P:%.0f G:%.0f D:%.0f 최대G:%.0f D:%.0f",
-                purpleRatio * 100, goldRatio * 100, darkRatio * 100, maxGold * 100, maxDark * 100);
-
-        // Not on coin screen (no purple effects)
-        if (purpleRatio < 0.05) return CoinResult.NONE;
-
-        // Purple present = we're on coin toss screen
-        // Gold present with purple = front face (win)
-        if (goldRatio > 0.10) return CoinResult.GOLD;
-
-        // Back face: no gold AND high dark ratio (solid black coin, not just dark background)
-        if (goldRatio < 0.03 && darkRatio > 0.10) return CoinResult.BLACK;
-
-        // Purple present but can't determine yet (still spinning)
-        return CoinResult.SPINNING;
     }
 
-    /**
-     * Check if screen is bright overall (game board loaded vs dark coin toss / loading screen).
-     */
-    private static boolean isScreenBright(Bitmap bmp, int w, int h) {
-        int brightCount = 0;
-        int samples = 0;
-        int step = Math.max(w / 20, 1);
-
-        for (int y = h / 4; y < h * 3 / 4; y += step * 2) {
-            for (int x = w / 4; x < w * 3 / 4; x += step * 2) {
-                float[] hsv = new float[3];
-                Color.colorToHSV(bmp.getPixel(x, y), hsv);
-                if (hsv[2] > 0.35) brightCount++;
-                samples++;
-            }
-        }
-
-        return samples > 0 && (float) brightCount / samples > 0.2;
-    }
-
-    // === TURN BUTTON DETECTION ===
-
-    private enum TurnColor { NONE, BLUE, RED }
-
-    private static TurnColor detectTurnButtonColor(Bitmap bmp, int w, int h) {
-        // Scan right portion of screen for turn indicator
-        int startX = (int)(w * 0.65);
-        int endX = (int)(w * 0.95);
-        int startY = (int)(h * 0.35);
-        int endY = (int)(h * 0.6);
-        int step = Math.max((endX - startX) / 20, 1);
-
-        int blueCount = 0;
-        int redCount = 0;
-        int samples = 0;
-
-        for (int y = startY; y < endY; y += step) {
-            for (int x = startX; x < endX; x += step) {
-                if (x >= w || y >= h) continue;
-                float[] hsv = new float[3];
-                Color.colorToHSV(bmp.getPixel(x, y), hsv);
-
-                if (hsv[0] > 190 && hsv[0] < 240 && hsv[1] > 0.4 && hsv[2] > 0.35) {
-                    blueCount++;
-                }
-                if ((hsv[0] > 340 || hsv[0] < 15) && hsv[1] > 0.4 && hsv[2] > 0.35) {
-                    redCount++;
-                }
-                samples++;
-            }
-        }
-
-        if (samples == 0) return TurnColor.NONE;
-
-        float blueRatio = (float) blueCount / samples;
-        float redRatio = (float) redCount / samples;
-
-        ScreenCaptureService.statusLog = String.format("턴탐색 B:%.0f%% R:%.0f%%", blueRatio * 100, redRatio * 100);
-
-        if (blueRatio > 0.1 && blueRatio > redRatio * 3) return TurnColor.BLUE;
-        if (redRatio > 0.1 && redRatio > blueRatio * 3) return TurnColor.RED;
-
-        return TurnColor.NONE;
-    }
-
-    // === FIRST/SECOND DETECTION ===
-
-    private static int countCyanRatio(Bitmap bmp, int w, int h) {
-        int cyanCount = 0, samples = 0;
-        int bannerY = h / 2;
-        int step = Math.max(w / 40, 1);
-        for (int x = w / 4; x < w * 3 / 4; x += step) {
-            for (int y = bannerY - h / 15; y < bannerY + h / 15; y += step) {
-                if (y < 0 || y >= h) continue;
-                float[] hsv = new float[3];
-                Color.colorToHSV(bmp.getPixel(x, y), hsv);
-                if (hsv[0] > 160 && hsv[0] < 210 && hsv[1] > 0.2 && hsv[2] > 0.25) cyanCount++;
-                samples++;
-            }
-        }
-        return samples > 0 ? (int)((float) cyanCount / samples * 100) : 0;
-    }
-
-    /**
-     * Detect cyan/teal horizontal banner in the center of screen.
-     * This banner appears during "당신이 선공/후공입니다" announcement.
-     */
-    private static boolean hasCyanBanner(Bitmap bmp, int w, int h) {
-        int cyanCount = 0;
-        int samples = 0;
-        int bannerY = h / 2;
-        int step = Math.max(w / 40, 1);
-
-        for (int x = w / 4; x < w * 3 / 4; x += step) {
-            for (int y = bannerY - h / 15; y < bannerY + h / 15; y += step) {
-                if (y < 0 || y >= h) continue;
-                float[] hsv = new float[3];
-                Color.colorToHSV(bmp.getPixel(x, y), hsv);
-                if (hsv[0] > 160 && hsv[0] < 210 && hsv[1] > 0.2 && hsv[2] > 0.25) {
-                    cyanCount++;
-                }
-                samples++;
-            }
-        }
-
-        return samples > 0 && (float) cyanCount / samples > 0.1;
-    }
-
-    // === VICTORY/DEFEAT DETECTION (OCR) ===
+    // === VICTORY/DEFEAT OCR ===
 
     private static AnalysisResult ocrForDuelResult(Bitmap crop) {
         String text = runOCR(crop);
