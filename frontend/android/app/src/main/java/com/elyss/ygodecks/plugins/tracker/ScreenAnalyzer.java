@@ -37,8 +37,12 @@ public class ScreenAnalyzer {
     private static CoinResult lastCoinValue = CoinResult.NONE;
     private static int coinStableCount = 0;
     private static final int COIN_STABLE_REQUIRED = 2;
+    private static int spinToResultTransitions = 0;
+    private static boolean wasSpinning = false;
     private static float maxGold = 0;
     private static float maxDark = 0;
+    private static long coinDetectedTime = 0;
+    private static final long BOARD_MIN_DELAY_MS = 5000;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
@@ -63,10 +67,16 @@ public class ScreenAnalyzer {
                 onCoinScreen = true;
 
                 if (coin == CoinResult.SPINNING) {
+                    wasSpinning = true;
                     lastCoinValue = CoinResult.NONE;
                     coinStableCount = 0;
                 } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
-                    // Gold or black detected - check stability
+                    // Track spin→result transitions
+                    if (wasSpinning) {
+                        spinToResultTransitions++;
+                        wasSpinning = false;
+                    }
+
                     if (coin == lastCoinValue) {
                         coinStableCount++;
                     } else {
@@ -75,15 +85,20 @@ public class ScreenAnalyzer {
                     }
 
                     ScreenCaptureService.statusLog = (coin == CoinResult.GOLD ? "금색" : "검정")
+                            + " 전환:" + spinToResultTransitions
                             + " (" + coinStableCount + "/" + COIN_STABLE_REQUIRED + ")";
 
-                    if (coinStableCount >= COIN_STABLE_REQUIRED) {
+                    // Only accept on 2nd+ transition (1st is the initial flash)
+                    if (coinStableCount >= COIN_STABLE_REQUIRED && spinToResultTransitions >= 2) {
                         String val = (coin == CoinResult.GOLD) ? "win" : "lose";
                         detectionSummary = "코인:" + (coin == CoinResult.GOLD ? "앞" : "뒤");
                         ScreenCaptureService.statusLog = detectionSummary;
                         onCoinScreen = false;
                         lastCoinValue = CoinResult.NONE;
                         coinStableCount = 0;
+                        spinToResultTransitions = 0;
+                        wasSpinning = false;
+                        coinDetectedTime = System.currentTimeMillis();
                         currentState = State.WAITING_FIRST_SECOND;
                         lastDetectionTime = now;
                         return new AnalysisResult(DetectionType.COIN_TOSS, val);
@@ -93,7 +108,12 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
-                // Only check turn button when game board is loaded (bright screen)
+                // Wait minimum time, then check brightness
+                long elapsed = now - coinDetectedTime;
+                if (elapsed < BOARD_MIN_DELAY_MS) {
+                    ScreenCaptureService.statusLog = "대기 " + ((BOARD_MIN_DELAY_MS - elapsed) / 1000) + "초";
+                    break;
+                }
                 if (!isScreenBright(bitmap, w, h)) {
                     ScreenCaptureService.statusLog = "보드 로딩 대기 중";
                     break;
@@ -136,6 +156,9 @@ public class ScreenAnalyzer {
         onCoinScreen = false;
         lastCoinValue = CoinResult.NONE;
         coinStableCount = 0;
+        spinToResultTransitions = 0;
+        wasSpinning = false;
+        coinDetectedTime = 0;
         maxGold = 0;
         maxDark = 0;
         detectionSummary = "";
