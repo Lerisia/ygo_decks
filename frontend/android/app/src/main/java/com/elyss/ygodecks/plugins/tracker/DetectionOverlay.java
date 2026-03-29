@@ -142,10 +142,16 @@ public class DetectionOverlay {
         summaryRow.addView(countdownView);
 
         TextView editBtn = new TextView(context);
-        editBtn.setText("  수정");
-        editBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        editBtn.setText("수정");
+        editBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         editBtn.setTextColor(ACCENT_BLUE);
+        editBtn.setBackground(roundedBg(0xFF333333, 6));
+        editBtn.setPadding(dp(12), dp(8), dp(12), dp(8));
         editBtn.setOnClickListener(v -> toggleEditMode());
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        editLp.leftMargin = dp(8);
+        editBtn.setLayoutParams(editLp);
         summaryRow.addView(editBtn);
 
         resultLayout.addView(summaryRow);
@@ -220,6 +226,15 @@ public class DetectionOverlay {
         searchInput.setBackground(roundedBg(0xFF333333, 6));
         searchInput.setPadding(dp(10), dp(6), dp(10), dp(6));
         searchInput.setSingleLine(true);
+        searchInput.setFocusable(false);
+        searchInput.setOnClickListener(v -> {
+            enableFocusable();
+            searchInput.setFocusableInTouchMode(true);
+            searchInput.setFocusable(true);
+            searchInput.requestFocus();
+            InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT);
+        });
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
@@ -272,6 +287,7 @@ public class DetectionOverlay {
         );
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.y = 0;
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 
         try {
             windowManager.addView(rootLayout, params);
@@ -347,9 +363,9 @@ public class DetectionOverlay {
             editLayout.setVisibility(View.VISIBLE);
             updateEditButtons();
             searchInput.setText("");
+            searchInput.setFocusable(false);
             searchResults.removeAllViews();
             isEditMode = true;
-            // Allow keyboard input
             enableFocusable();
         } else {
             editLayout.setVisibility(View.GONE);
@@ -366,14 +382,15 @@ public class DetectionOverlay {
     private void enableFocusable() {
         if (rootLayout == null) return;
         WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
-        params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        // Remove NOT_FOCUSABLE to receive keyboard, add NOT_TOUCH_MODAL so touches outside pass through
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
         try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
     }
 
     private void disableFocusable() {
         if (rootLayout == null) return;
         WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
-        params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
     }
 
@@ -422,7 +439,7 @@ public class DetectionOverlay {
         matches.sort((a, b) -> a[1] - b[1]);
         int shown = 0;
         for (int[] m : matches) {
-            if (shown >= 4) break;
+            if (shown >= 3) break;
             final int idx = m[0];
             final int deckId = ids[idx];
             final String deckName = names[idx];
@@ -443,8 +460,10 @@ public class DetectionOverlay {
                 selectedDeckLabel.setText("vs " + deckName);
                 selectedDeckLabel.setVisibility(View.VISIBLE);
                 searchInput.setText("");
+                searchInput.setFocusable(false);
                 searchResults.removeAllViews();
                 hideKeyboard();
+                disableFocusable();
             });
             searchResults.addView(btn);
             shown++;

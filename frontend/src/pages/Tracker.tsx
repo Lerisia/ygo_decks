@@ -27,7 +27,7 @@ export default function Tracker() {
   const loadLastMatch = async (groupId: number) => {
     try {
       const data = await getRecordGroupMatches(groupId, 1, 1);
-      const matches = data.results || data;
+      const matches = data.matches || data.results || [];
       if (matches.length > 0) {
         const last = matches[0];
         if (last.deck?.id) {
