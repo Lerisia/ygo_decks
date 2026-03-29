@@ -1,4 +1,4 @@
-package com.elyss.ygo_decks.plugins.tracker;
+package com.elyss.ygodecks.plugins.tracker;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
