@@ -38,8 +38,7 @@ public class ScreenAnalyzer {
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
-        // Short cooldown for coin→first/second, longer for duel result
-        long cooldown = (currentState == State.IN_DUEL) ? 3000 : 500;
+        long cooldown = 500;
         if (now - lastDetectionTime < cooldown) return null;
 
         int w = bitmap.getWidth();
