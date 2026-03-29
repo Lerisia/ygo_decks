@@ -86,16 +86,14 @@ public class ScreenAnalyzer {
             }
 
             case IN_DUEL: {
-                // Try OCR for VICTORY/DEFEAT on center crop every frame
-                Bitmap center = Bitmap.createBitmap(bitmap, w / 6, h / 4, w * 2 / 3, h / 3);
-                AnalysisResult r = ocrForDuelResult(center);
-                center.recycle();
-                if (r != null) {
-                    detectionSummary += " | " + ("win".equals(r.value) ? "승리" : "패배");
+                // Detect result screen by large gray/white text over game board
+                String resultVal = detectResultScreen(bitmap, w, h);
+                if (resultVal != null) {
+                    detectionSummary += " | " + ("win".equals(resultVal) ? "승리" : "패배");
                     ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_COIN;
                     lastDetectionTime = now;
-                    return r;
+                    return new AnalysisResult(DetectionType.DUEL_RESULT, resultVal);
                 }
                 ScreenCaptureService.statusLog = "듀얼 중";
                 break;
@@ -216,53 +214,72 @@ public class ScreenAnalyzer {
 
     // === VICTORY/DEFEAT DETECTION ===
 
-    private static boolean hasBrightCenter(Bitmap bmp, int w, int h) {
-        int brightCount = 0;
+    /**
+     * Detect result screen by checking for large neutral/bright text in center.
+     * Normal gameplay has green/brown game board. Result screen overlays large
+     * metallic gray/white text (VICTORY or DEFEAT).
+     *
+     * Returns "win" or "lose" if result screen detected, null otherwise.
+     * Distinguishes by checking bottom-left area for golden crown (winner indicator).
+     */
+    private static String detectResultScreen(Bitmap bmp, int w, int h) {
+        // Check center area for unusual amount of bright neutral pixels
+        int brightNeutral = 0;
         int samples = 0;
-        int startY = (int)(h * 0.3);
+        int startY = (int)(h * 0.25);
         int endY = (int)(h * 0.55);
-        int step = Math.max(w / 40, 1);
+        int step = Math.max(w / 50, 1);
 
         for (int y = startY; y < endY; y += step) {
-            for (int x = w / 4; x < w * 3 / 4; x += step) {
+            for (int x = w / 6; x < w * 5 / 6; x += step) {
                 int pixel = bmp.getPixel(x, y);
-                if (Color.red(pixel) > 200 && Color.green(pixel) > 200 && Color.blue(pixel) > 200) {
-                    brightCount++;
+                int r = Color.red(pixel);
+                int g = Color.green(pixel);
+                int b = Color.blue(pixel);
+
+                // Bright and neutral (gray/white) - not strongly colored
+                // The metallic text has R≈G≈B and values > 150
+                if (r > 150 && g > 150 && b > 150) {
+                    int maxDiff = Math.max(Math.abs(r - g), Math.max(Math.abs(r - b), Math.abs(g - b)));
+                    if (maxDiff < 50) {
+                        brightNeutral++;
+                    }
                 }
                 samples++;
             }
         }
 
-        return samples > 0 && (float) brightCount / samples > 0.1;
-    }
+        if (samples == 0) return null;
+        float ratio = (float) brightNeutral / samples;
 
-    private static AnalysisResult ocrForDuelResult(Bitmap crop) {
-        String text = runOCR(crop);
-        if (text == null) return null;
-        String upper = text.toUpperCase();
-        ScreenCaptureService.statusLog = "결과OCR:" + upper.substring(0, Math.min(30, upper.length()));
+        // Normal gameplay: ratio < 0.03. Result screen: ratio > 0.06
+        if (ratio < 0.05) return null;
 
-        if (upper.contains("VICTORY") || upper.contains("VICTOR") || upper.contains("ICTORY")) {
-            return new AnalysisResult(DetectionType.DUEL_RESULT, "win");
+        ScreenCaptureService.statusLog = String.format("결과화면? %.1f%%", ratio * 100);
+
+        // Detected result screen. Now determine win or lose.
+        // Check bottom-left area for golden crown/trophy (appears on winner's side)
+        int crownGold = 0;
+        int crownSamples = 0;
+        int crownStep = Math.max(w / 60, 1);
+
+        // Left player area: bottom-left quarter
+        for (int y = (int)(h * 0.7); y < (int)(h * 0.9); y += crownStep) {
+            for (int x = 0; x < (int)(w * 0.2); x += crownStep) {
+                if (x >= w || y >= h) continue;
+                float[] hsv = new float[3];
+                Color.colorToHSV(bmp.getPixel(x, y), hsv);
+                // Gold/yellow crown
+                if (hsv[0] > 30 && hsv[0] < 55 && hsv[1] > 0.4 && hsv[2] > 0.5) {
+                    crownGold++;
+                }
+                crownSamples++;
+            }
         }
-        if (upper.contains("DEFEAT") || upper.contains("DEFEA") || upper.contains("EFEAT")) {
-            return new AnalysisResult(DetectionType.DUEL_RESULT, "lose");
-        }
-        return null;
-    }
 
-    private static String runOCR(Bitmap bitmap) {
-        InputImage image = InputImage.fromBitmap(bitmap, 0);
-        AtomicReference<String> result = new AtomicReference<>(null);
-        CountDownLatch latch = new CountDownLatch(1);
+        float crownRatio = crownSamples > 0 ? (float) crownGold / crownSamples : 0;
 
-        textRecognizer.process(image)
-                .addOnSuccessListener(r -> { result.set(r.getText()); latch.countDown(); })
-                .addOnFailureListener(e -> { Log.e(TAG, "OCR failed", e); latch.countDown(); });
-
-        try { latch.await(2, TimeUnit.SECONDS); }
-        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-
-        return result.get();
+        // Crown on left = we won. No crown on left = we lost.
+        return crownRatio > 0.03 ? "win" : "lose";
     }
 }
