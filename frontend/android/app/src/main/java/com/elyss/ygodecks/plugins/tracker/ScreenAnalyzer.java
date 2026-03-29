@@ -37,6 +37,8 @@ public class ScreenAnalyzer {
     private static CoinResult lastCoinValue = CoinResult.NONE;
     private static int coinStableCount = 0;
     private static final int COIN_STABLE_REQUIRED = 2;
+    private static float maxGold = 0;
+    private static float maxDark = 0;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
@@ -137,6 +139,8 @@ public class ScreenAnalyzer {
         onCoinScreen = false;
         lastCoinValue = CoinResult.NONE;
         coinStableCount = 0;
+        maxGold = 0;
+        maxDark = 0;
         detectionSummary = "";
     }
 
@@ -187,8 +191,13 @@ public class ScreenAnalyzer {
         float goldRatio = (float) goldCount / samples;
         float darkRatio = (float) darkCount / samples;
 
-        ScreenCaptureService.statusLog = String.format("코인 P:%.0f%% G:%.0f%% D:%.0f%%",
-                purpleRatio * 100, goldRatio * 100, darkRatio * 100);
+        if (purpleRatio > 0.05) {
+            if (goldRatio > maxGold) maxGold = goldRatio;
+            if (darkRatio > maxDark) maxDark = darkRatio;
+        }
+
+        ScreenCaptureService.statusLog = String.format("P:%.0f G:%.0f D:%.0f 최대G:%.0f D:%.0f",
+                purpleRatio * 100, goldRatio * 100, darkRatio * 100, maxGold * 100, maxDark * 100);
 
         // Not on coin screen (no purple effects)
         if (purpleRatio < 0.05) return CoinResult.NONE;
