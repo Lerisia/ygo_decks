@@ -162,6 +162,9 @@ public class ScreenAnalyzer {
         float goldRatio = (float) goldCount / samples;
         float darkRatio = (float) darkCount / samples;
 
+        ScreenCaptureService.statusLog = String.format("코인 P:%.0f%% G:%.0f%% D:%.0f%%",
+                purpleRatio * 100, goldRatio * 100, darkRatio * 100);
+
         // Coin is spinning (purple effects visible)
         if (purpleRatio > 0.15) return CoinResult.SPINNING;
 
