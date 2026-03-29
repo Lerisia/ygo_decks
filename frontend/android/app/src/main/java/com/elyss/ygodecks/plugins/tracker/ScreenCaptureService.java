@@ -39,6 +39,12 @@ public class ScreenCaptureService extends Service {
     public static volatile long lastDetectionTime = 0;
     public static volatile String statusLog = "";
 
+    // Overlay action fields (set by DetectionOverlay, consumed by JS polling)
+    public static volatile String overlayAction = null;  // "save" or "dismiss"
+    public static volatile String overlayCoin = null;
+    public static volatile String overlayFS = null;
+    public static volatile String overlayResult = null;
+
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -267,14 +273,17 @@ public class ScreenCaptureService extends Service {
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
                         msg = "win".equals(result.value) ? "승리" : "패배";
+                        // Show interactive overlay with all detected values
+                        if (overlay != null) {
+                            final String c = lastCoinToss;
+                            final String f = lastFirstSecond;
+                            final String r = result.value;
+                            mainHandler.post(() -> overlay.showResult(c, f, r));
+                        }
                         break;
                 }
                 statusLog = msg;
                 updateNotification(msg);
-                if (overlay != null) {
-                    final String m = msg;
-                    mainHandler.post(() -> overlay.show(m));
-                }
             }
 
             if (cropped != bitmap) cropped.recycle();
@@ -298,6 +307,7 @@ public class ScreenCaptureService extends Service {
         if (overlay != null) overlay.dismiss();
         lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
         lastDetectionTime = 0;
+        overlayAction = null; overlayCoin = null; overlayFS = null; overlayResult = null;
         statusLog = "종료:" + statusLog;
         super.onDestroy();
     }

@@ -542,56 +542,54 @@ def recent_meta_deck_stats(request):
 
     total_matches = qs.count()
 
-    qs = qs.annotate(
-        meta_deck_id=F("opponent_deck_id"),
-        meta_deck_name=F("opponent_deck__name")
-    )
-
-    deck_stats = qs.values(
-        "meta_deck_id", "meta_deck_name"
+    # 상대 덱 집계
+    opp_stats = qs.values(
+        deck_id=F("opponent_deck_id"),
+        deck_name=F("opponent_deck__name"),
     ).annotate(
         count=Count("id"),
-        wins=Count("id", filter=Q(result="lose"))
+        wins=Count("id", filter=Q(result="lose")),
     )
 
+    # 내 덱 집계
+    player_stats = qs.values(
+        deck_id=F("deck_id"),
+        deck_name=F("deck__name"),
+    ).annotate(
+        count=Count("id"),
+        wins=Count("id", filter=Q(result="win")),
+    )
+
+    # 합산
+    combined = {}
+    for stat in opp_stats:
+        did = stat["deck_id"]
+        combined[did] = {"deck_id": did, "deck_name": stat["deck_name"], "count": stat["count"], "wins": stat["wins"]}
+    for stat in player_stats:
+        did = stat["deck_id"]
+        if did in combined:
+            combined[did]["count"] += stat["count"]
+            combined[did]["wins"] += stat["wins"]
+        else:
+            combined[did] = {"deck_id": did, "deck_name": stat["deck_name"], "count": stat["count"], "wins": stat["wins"]}
+
+    total_appearances = total_matches * 2
     results = []
-    for stat in deck_stats:
-        percent = stat["count"] / total_matches * 100 if total_matches > 0 else 0
+    for stat in combined.values():
+        percent = stat["count"] / total_appearances * 100 if total_appearances > 0 else 0
         win_rate = stat["wins"] / stat["count"] * 100 if stat["count"] > 0 else 0
         results.append({
-            "meta_deck_id": stat["meta_deck_id"],
-            "meta_deck_name": stat["meta_deck_name"],
+            "meta_deck_id": stat["deck_id"],
+            "meta_deck_name": stat["deck_name"],
             "appearance_percent": round(percent, 1),
             "win_rate": round(win_rate, 1),
         })
 
     results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
 
-    player_deck_stats = qs.values(
-        player_deck_id=F("deck_id"),
-        player_deck_name=F("deck__name"),
-    ).annotate(
-        count=Count("id"),
-        wins=Count("id", filter=Q(result="win")),
-    )
-
-    player_results = []
-    for stat in player_deck_stats:
-        percent = stat["count"] / total_matches * 100 if total_matches > 0 else 0
-        win_rate = stat["wins"] / stat["count"] * 100 if stat["count"] > 0 else 0
-        player_results.append({
-            "deck_id": stat["player_deck_id"],
-            "deck_name": stat["player_deck_name"],
-            "appearance_percent": round(percent, 1),
-            "win_rate": round(win_rate, 1),
-        })
-
-    player_results = sorted(player_results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
-
     return Response({
         "total_matches": total_matches,
         "meta_decks": results,
-        "player_decks": player_results,
     }, status=status.HTTP_200_OK)
 
 @api_view(["GET"])

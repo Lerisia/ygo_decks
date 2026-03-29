@@ -8,7 +8,6 @@ import {
   getRecordGroupStatistics,
   getMetaDeckStats,
   MetaDeckStat,
-  PlayerDeckStat,
 } from "@/api/toolApi";
 import { getDeckData } from "@/api/deckApi";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -114,7 +113,6 @@ const RecordGroups = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [metaStats, setMetaStats] = useState<MetaDeckStat[]>([]);
-  const [playerDeckStats, setPlayerDeckStats] = useState<PlayerDeckStat[]>([]);
   const [showMetaStats, setShowMetaStats] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
   const [totalMatches, setTotalMatches] = useState<number>(0);
@@ -164,7 +162,6 @@ const RecordGroups = () => {
     getMetaDeckStats()
       .then((data) => {
         setMetaStats(data.meta_decks || []);
-        setPlayerDeckStats(data.player_decks || []);
         setTotalMatches(data.total_matches || 0);
       })
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));

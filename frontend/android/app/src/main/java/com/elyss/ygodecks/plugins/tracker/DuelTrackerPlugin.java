@@ -107,6 +107,25 @@ public class DuelTrackerPlugin extends Plugin {
             status = "svc:empty|plug:" + pluginStatus;
         }
         ret.put("status", status);
+
+        // Overlay action (consumed once)
+        String action = ScreenCaptureService.overlayAction;
+        if (action != null) {
+            ret.put("overlayAction", action);
+            ret.put("overlayCoin", ScreenCaptureService.overlayCoin);
+            ret.put("overlayFS", ScreenCaptureService.overlayFS);
+            ret.put("overlayResult", ScreenCaptureService.overlayResult);
+            // Clear after consumption
+            ScreenCaptureService.overlayAction = null;
+            ScreenCaptureService.overlayCoin = null;
+            ScreenCaptureService.overlayFS = null;
+            ScreenCaptureService.overlayResult = null;
+            // Also clear detection state for next match
+            ScreenCaptureService.lastCoinToss = null;
+            ScreenCaptureService.lastFirstSecond = null;
+            ScreenCaptureService.lastDuelResult = null;
+        }
+
         call.resolve(ret);
     }
 }

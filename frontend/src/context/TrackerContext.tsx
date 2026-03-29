@@ -18,7 +18,6 @@ interface TrackerState {
   currentRank: string;
   currentWins: number | null;
 
-  // Post-duel editable values
   editCoin: string | null;
   editFS: string | null;
   editResult: string | null;
@@ -75,6 +74,18 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const fsRef = useRef(firstSecond);
   coinRef.current = coinToss;
   fsRef.current = firstSecond;
+
+  // Refs for overlay save (need current values in async callback)
+  const selectedGroupRef = useRef(selectedGroup);
+  const selectedDeckRef = useRef(selectedDeck);
+  const useRankRef = useRef(useRank);
+  const currentRankRef = useRef(currentRank);
+  const currentWinsRef = useRef(currentWins);
+  selectedGroupRef.current = selectedGroup;
+  selectedDeckRef.current = selectedDeck;
+  useRankRef.current = useRank;
+  currentRankRef.current = currentRank;
+  currentWinsRef.current = currentWins;
 
   const resetDetection = () => {
     setCoinToss(null);
@@ -134,6 +145,40 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     resetDetection();
   };
 
+  // Save from overlay (uses refs for current values)
+  const saveFromOverlay = async (coin: string | null, fs: string | null, result: string | null) => {
+    const group = selectedGroupRef.current;
+    const deck = selectedDeckRef.current;
+    if (!group || !deck || !result) return;
+
+    try {
+      await addMatchToRecordGroup(group, {
+        deck: deck,
+        opponent_deck: null,
+        coin_toss_result: (coin === "win" ? "win" : "lose") as "win" | "lose",
+        first_or_second: (fs === "first" ? "first" : "second") as "first" | "second",
+        result: result as "win" | "lose",
+        rank: useRankRef.current ? currentRankRef.current : undefined,
+        wins: useRankRef.current ? currentWinsRef.current : undefined,
+      });
+
+      setSavedCount((c) => c + 1);
+
+      if (useRankRef.current && currentRankRef.current) {
+        const { nextRank, nextWins } = getNextRankAndWins(
+          currentRankRef.current, currentWinsRef.current, result as "win" | "lose"
+        );
+        setCurrentRank(nextRank);
+        setCurrentWins(nextWins);
+      }
+
+      resetDetection();
+      setPendingSave(false);
+    } catch (e) {
+      console.error("Overlay save failed:", e);
+    }
+  };
+
   const dismissConfirmation = () => {
     setPendingSave(false);
     resetDetection();
@@ -141,17 +186,30 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   // Global polling
   useEffect(() => {
-    if (isTracking && !pendingSave) {
+    if (isTracking) {
       setNativeStatus("폴링 시작됨" + (isNative ? " (네이티브)" : " (웹)"));
       pollRef.current = setInterval(async () => {
         try {
           const result = await DuelTracker.getLatestResult();
           setNativeStatus(result.status || "(폴링 중 - status 비어있음)");
+
+          // Handle overlay actions (save/dismiss from floating UI)
+          if (result.overlayAction === "save") {
+            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null);
+            return;
+          }
+          if (result.overlayAction === "dismiss") {
+            resetDetection();
+            setPendingSave(false);
+            return;
+          }
+
+          // Normal detection polling
           if (result.timestamp > lastTimestamp) {
             setLastTimestamp(result.timestamp);
             if (result.coinToss) setCoinToss(result.coinToss);
             if (result.firstSecond) setFirstSecond(result.firstSecond);
-            if (result.duelResult) {
+            if (result.duelResult && !pendingSave) {
               onDuelDetected(
                 result.coinToss || coinRef.current,
                 result.firstSecond || fsRef.current,

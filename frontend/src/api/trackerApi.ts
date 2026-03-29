@@ -9,6 +9,10 @@ interface DuelTrackerPlugin {
     duelResult: string | null;
     timestamp: number;
     status: string;
+    overlayAction?: string | null;
+    overlayCoin?: string | null;
+    overlayFS?: string | null;
+    overlayResult?: string | null;
   }>;
 }
 
