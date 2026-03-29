@@ -70,12 +70,14 @@ public class ScreenAnalyzer {
 
                 onCoinScreen = true;
 
-                if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
+                if (coin == CoinResult.SPINNING) {
+                    // Reset during spinning so initial flash doesn't persist
+                    lastSeenCoinResult = CoinResult.NONE;
+                    ScreenCaptureService.statusLog = "코인 회전 중";
+                } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
                     lastSeenCoinResult = coin;
                     ScreenCaptureService.statusLog = "코인: " +
                             (coin == CoinResult.GOLD ? "금색" : "검정") + " (대기)";
-                } else {
-                    ScreenCaptureService.statusLog = "코인 회전 중";
                 }
                 break;
             }
@@ -204,8 +206,8 @@ public class ScreenAnalyzer {
         // Gold present with purple = front face (win)
         if (goldRatio > 0.10) return CoinResult.GOLD;
 
-        // No gold + dark center + purple = back face (lose)
-        if (goldRatio < 0.06 && darkRatio > 0.25) return CoinResult.BLACK;
+        // No gold = back face (black coin has no warm tones)
+        if (goldRatio < 0.03) return CoinResult.BLACK;
 
         // Purple present but can't determine yet (still spinning)
         return CoinResult.SPINNING;
