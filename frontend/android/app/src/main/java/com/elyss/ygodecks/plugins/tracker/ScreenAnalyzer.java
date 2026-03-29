@@ -79,11 +79,12 @@ public class ScreenAnalyzer {
 
                     String fsValue = null;
                     // Exclude selection screen ("선공 / 후공을 선택해주세요")
-                    if (!text.contains("선택")) {
-                        if (text.contains("입니다") && (text.contains("선공") || text.contains("선 공") || text.contains("선"))) {
-                            fsValue = "first";
-                        } else if (text.contains("입니다") && (text.contains("후공") || text.contains("후 공") || text.contains("후"))) {
+                    if (!text.contains("선택") && text.contains("입니다")) {
+                        // Check 후공 first - "선" is more prone to OCR noise
+                        if (text.contains("후공") || text.contains("후 공")) {
                             fsValue = "second";
+                        } else if (text.contains("선공") || text.contains("선 공")) {
+                            fsValue = "first";
                         }
                     }
 
