@@ -178,7 +178,7 @@ public class ScreenAnalyzer {
                 if (hsv[0] > 15 && hsv[0] < 75 && hsv[1] > 0.15 && hsv[2] > 0.4) {
                     goldCount++;
                 }
-                if (hsv[2] < 0.12) {
+                if (hsv[2] < 0.25) {
                     darkCount++;
                 }
                 if (hsv[0] > 250 && hsv[0] < 340 && hsv[1] > 0.25 && hsv[2] > 0.25) {
