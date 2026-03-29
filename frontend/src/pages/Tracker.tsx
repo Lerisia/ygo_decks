@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useTracker } from "@/context/TrackerContext";
-import { getUserRecordGroups } from "@/api/toolApi";
+import { getUserRecordGroups, getRecordGroupMatches } from "@/api/toolApi";
 import { getUserDecks, isAuthenticated } from "@/api/accountApi";
 import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/utils/rankUtils";
 
@@ -23,6 +23,33 @@ export default function Tracker() {
     getUserRecordGroups().then(setGroups).catch(() => {});
     getUserDecks().then((data) => { if (data.owned_decks) setMyDecks(data.owned_decks); }).catch(() => {});
   }, [isLoggedIn]);
+
+  const loadLastMatch = async (groupId: number) => {
+    try {
+      const data = await getRecordGroupMatches(groupId, 1, 1);
+      const matches = data.results || data;
+      if (matches.length > 0) {
+        const last = matches[0];
+        if (last.deck?.id) {
+          t.setSelectedDeck(last.deck.id);
+        }
+        if (last.rank) {
+          t.setCurrentRank(last.rank);
+          t.setCurrentWins(last.wins ?? 0);
+          t.setTrackingMode("rank");
+          t.setUseRank(true);
+        } else if (last.score && last.score_type === "rating") {
+          t.setTrackingMode("rating");
+          t.setUseRank(false);
+        }
+      }
+    } catch {}
+  };
+
+  const handleGroupChange = (groupId: number | null) => {
+    t.setSelectedGroup(groupId);
+    if (groupId) loadLastMatch(groupId);
+  };
 
   const handleStart = async () => {
     if (!t.selectedGroup || !t.selectedDeck) { setError("시트와 덱을 선택해주세요."); return; }
@@ -65,7 +92,7 @@ export default function Tracker() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-3 space-y-3">
             <div>
               <label className="block text-sm font-semibold mb-1">기록할 시트</label>
-              <select value={t.selectedGroup || ""} onChange={(e) => t.setSelectedGroup(Number(e.target.value) || null)} disabled={t.isTracking}
+              <select value={t.selectedGroup || ""} onChange={(e) => handleGroupChange(Number(e.target.value) || null)} disabled={t.isTracking}
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-sm">
                 <option value="">선택</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
