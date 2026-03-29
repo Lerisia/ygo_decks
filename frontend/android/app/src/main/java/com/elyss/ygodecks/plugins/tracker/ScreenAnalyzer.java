@@ -81,6 +81,11 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
+                // Wait for bright game board (skip dark loading/transition screens)
+                if (!isScreenBright(bitmap, w, h)) {
+                    ScreenCaptureService.statusLog = "보드 로딩 대기";
+                    break;
+                }
                 // Detect turn button color for first/second
                 TurnColor turn = detectTurnButtonColor(bitmap, w, h);
                 if (turn != TurnColor.NONE) {
@@ -211,7 +216,7 @@ public class ScreenAnalyzer {
             }
         }
 
-        return samples > 0 && (float) brightCount / samples > 0.4;
+        return samples > 0 && (float) brightCount / samples > 0.2;
     }
 
     // === TURN BUTTON DETECTION ===
