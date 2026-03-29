@@ -187,6 +187,8 @@ public class ScreenAnalyzer {
         float blueRatio = (float) blueCount / samples;
         float redRatio = (float) redCount / samples;
 
+        ScreenCaptureService.statusLog = String.format("턴탐색 B:%.0f%% R:%.0f%%", blueRatio * 100, redRatio * 100);
+
         if (blueRatio > 0.1 && blueRatio > redRatio * 3) return TurnColor.BLUE;
         if (redRatio > 0.1 && redRatio > blueRatio * 3) return TurnColor.RED;
 
