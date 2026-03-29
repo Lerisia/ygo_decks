@@ -162,9 +162,9 @@ public class ScreenCaptureService extends Service {
             WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
             DisplayMetrics m = new DisplayMetrics();
             wm.getDefaultDisplay().getRealMetrics(m);
-            captureWidth = m.widthPixels / 3;
-            captureHeight = m.heightPixels / 3;
-            captureDensity = m.densityDpi / 3;
+            captureWidth = m.widthPixels;
+            captureHeight = m.heightPixels;
+            captureDensity = m.densityDpi;
         } catch (Exception e) {
             Log.w(TAG, "metrics fail", e);
         }
