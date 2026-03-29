@@ -169,7 +169,7 @@ public class ScreenAnalyzer {
                 float[] hsv = new float[3];
                 Color.colorToHSV(bmp.getPixel(x, y), hsv);
 
-                if (hsv[0] > 20 && hsv[0] < 55 && hsv[1] > 0.4 && hsv[2] > 0.5) {
+                if (hsv[0] > 15 && hsv[0] < 75 && hsv[1] > 0.15 && hsv[2] > 0.4) {
                     goldCount++;
                 }
                 if (hsv[2] < 0.05) {
