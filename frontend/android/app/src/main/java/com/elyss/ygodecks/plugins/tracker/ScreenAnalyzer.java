@@ -72,9 +72,8 @@ public class ScreenAnalyzer {
                 onCoinScreen = true;
 
                 if (coin == CoinResult.SPINNING) {
-                    // Reset during spinning so initial flash doesn't persist
                     lastSeenCoinResult = CoinResult.NONE;
-                    ScreenCaptureService.statusLog = "코인 회전 중";
+                    // P/G/D values already set in detectCoinWithEffects, don't overwrite
                 } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
                     lastSeenCoinResult = coin;
                     ScreenCaptureService.statusLog = "코인: " +
@@ -211,7 +210,7 @@ public class ScreenAnalyzer {
         if (goldRatio > 0.10) return CoinResult.GOLD;
 
         // Back face: no gold AND high dark ratio (solid black coin, not just dark background)
-        if (goldRatio < 0.03 && darkRatio > 0.40) return CoinResult.BLACK;
+        if (goldRatio < 0.03 && darkRatio > 0.20) return CoinResult.BLACK;
 
         // Purple present but can't determine yet (still spinning)
         return CoinResult.SPINNING;
