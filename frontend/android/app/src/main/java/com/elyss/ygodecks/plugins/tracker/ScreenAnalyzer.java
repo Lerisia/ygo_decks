@@ -33,12 +33,14 @@ public class ScreenAnalyzer {
 
     private static State currentState = State.WAITING_COIN;
     private static long lastDetectionTime = 0;
-    private static final long COOLDOWN_MS = 3000;
     private static boolean coinScreenSeen = false;
+    public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
-        if (now - lastDetectionTime < COOLDOWN_MS) return null;
+        // Short cooldown for coin→first/second, longer for duel result
+        long cooldown = (currentState == State.IN_DUEL) ? 3000 : 500;
+        if (now - lastDetectionTime < cooldown) return null;
 
         int w = bitmap.getWidth();
         int h = bitmap.getHeight();
@@ -51,13 +53,15 @@ public class ScreenAnalyzer {
                     ScreenCaptureService.statusLog = "코인 회전 중...";
                 } else if (coin == CoinResult.GOLD && coinScreenSeen) {
                     coinScreenSeen = false;
-                    ScreenCaptureService.statusLog = "코인: 앞면";
+                    detectionSummary = "코인:앞";
+                    ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_FIRST_SECOND;
                     lastDetectionTime = now;
                     return new AnalysisResult(DetectionType.COIN_TOSS, "win");
                 } else if (coin == CoinResult.BLACK && coinScreenSeen) {
                     coinScreenSeen = false;
-                    ScreenCaptureService.statusLog = "코인: 뒷면";
+                    detectionSummary = "코인:뒤";
+                    ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_FIRST_SECOND;
                     lastDetectionTime = now;
                     return new AnalysisResult(DetectionType.COIN_TOSS, "lose");
@@ -72,7 +76,8 @@ public class ScreenAnalyzer {
                 TurnColor turn = detectTurnButtonColor(bitmap, w, h);
                 if (turn != TurnColor.NONE) {
                     String val = (turn == TurnColor.BLUE) ? "first" : "second";
-                    ScreenCaptureService.statusLog = "선후공: " + (turn == TurnColor.BLUE ? "선공" : "후공");
+                    detectionSummary += " | " + (turn == TurnColor.BLUE ? "선공" : "후공");
+                    ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.IN_DUEL;
                     lastDetectionTime = now;
                     return new AnalysisResult(DetectionType.FIRST_SECOND, val);
@@ -87,6 +92,8 @@ public class ScreenAnalyzer {
                 AnalysisResult r = ocrForDuelResult(center);
                 center.recycle();
                 if (r != null) {
+                    detectionSummary += " | " + ("win".equals(r.value) ? "승리" : "패배");
+                    ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_COIN;
                     lastDetectionTime = now;
                     return r;
@@ -103,6 +110,7 @@ public class ScreenAnalyzer {
         currentState = State.WAITING_COIN;
         lastDetectionTime = 0;
         coinScreenSeen = false;
+        detectionSummary = "";
     }
 
     // === COIN TOSS DETECTION ===
