@@ -5,6 +5,7 @@ import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
+import { getNextRankState } from "@/utils/rankUtils";
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
@@ -522,66 +523,6 @@ const RecordGroupDetailPage = () => {
     return [];
   };
 
-  const getUpperRank = (currentRank: string): string => {
-    const index = RANK_OPTIONS.findIndex((r) => r.value === currentRank);
-    if (index < 0 || index === RANK_OPTIONS.length - 1) return currentRank;
-    return RANK_OPTIONS[index + 1].value;
-  };
-  
-  const getLowerRank = (currentRank: string): string => {
-    const index = RANK_OPTIONS.findIndex((r) => r.value === currentRank);
-    if (index <= 0) return currentRank;
-    return RANK_OPTIONS[index - 1].value;
-  };
-
-  const getNextRankAndWins = (
-    rank: string,
-    currentWins: number | null,
-    result: "win" | "lose"
-  ): { nextRank: string; nextWins: number | null } => {
-    if (rank === "master1") return { nextRank: rank, nextWins: null };
-  
-    if (rank === "rookie2" || rank === "rookie1") {
-      const next = getUpperRank(rank);
-      return { nextRank: next, nextWins: 0 };
-    }
-  
-    const options = getValidWinOptions(rank).map((o) => o.value);
-    const max = Math.max(...options);
-    const min = Math.min(...options);
-
-    if (currentWins === null) {
-      return { nextRank: rank, nextWins: null };
-    }
-  
-    let newWins = result === "win" ? currentWins + 1 : currentWins - 1;
-  
-    if (currentWins < 0 && result === "win") {
-      newWins = 1;
-    }
- 
-    if (
-      result === "lose" &&
-      (
-        (currentWins === -2 && !options.includes(-3)) ||
-        currentWins === -3
-      )
-    ) {
-      const next = getLowerRank(rank);
-      return { nextRank: next, nextWins: 0 };
-    } 
-  
-    if (newWins > max) {
-      const next = getUpperRank(rank);
-      return { nextRank: next, nextWins: 0 };
-    }
-  
-    if (newWins < min) {
-      newWins = min;
-    }
-  
-    return { nextRank: rank, nextWins: newWins };
-  };
   
   
  useEffect(() => {
@@ -598,15 +539,15 @@ const RecordGroupDetailPage = () => {
 
     if (lastMatch.rank) {
       setUseRankOrScore("rank");
-      const { nextRank, nextWins } = getNextRankAndWins(
+      const next = getNextRankState(
         lastMatch.rank,
         lastMatch.wins ?? null,
         lastMatch.result === "win" ? "win" : "lose"
       );
       setNewMatch((prev) => ({
         ...prev,
-        rank: nextRank,
-        wins: nextWins,
+        rank: next.rank,
+        wins: next.wins,
         score: "",
       }));
     } else if (lastMatch.score) {
@@ -926,13 +867,13 @@ const RecordGroupDetailPage = () => {
                         const updated = { ...prev, result: opt.value };
                         if (matches.length > 0 && matches[0].rank && useRankOrScore === "rank") {
                           const lastMatch = matches[0];
-                          const { nextRank, nextWins } = getNextRankAndWins(
+                          const next = getNextRankState(
                             lastMatch.rank!,
                             lastMatch.wins ?? null,
                             opt.value as "win" | "lose"
                           );
-                          updated.rank = nextRank;
-                          updated.wins = nextWins;
+                          updated.rank = next.rank;
+                          updated.wins = next.wins;
                         }
                         return updated;
                       });
