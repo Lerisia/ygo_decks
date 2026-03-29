@@ -47,6 +47,10 @@ public class ScreenCaptureService extends Service {
     public static volatile int overlayOpponentDeckId = -1;
     public static volatile String lastRatingScore = null;
 
+    // Rank display (set by JS)
+    public static volatile String currentRankDisplay = null;
+    public static volatile String previewRankDisplay = null;
+
     // Deck list for overlay search
     public static int[] deckIds = new int[0];
     public static String[] deckNames = new String[0];

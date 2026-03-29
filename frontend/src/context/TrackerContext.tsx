@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import DuelTracker from "@/api/trackerApi";
 import { addMatchToRecordGroup } from "@/api/toolApi";
 import { getAllDecks } from "@/api/deckApi";
-import { getNextRankAndWins } from "@/lib/rankUtils";
+import { getNextRankAndWins, getRankLabel } from "@/lib/rankUtils";
 
 interface TrackerState {
   isTracking: boolean;
@@ -104,6 +104,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     await DuelTracker.startTracking();
     // Send tracking mode to native
     await DuelTracker.setTrackingMode({ mode: trackingMode });
+    // Send current rank display
+    if (useRank && currentRank) {
+      const label = getRankLabel(currentRank);
+      const winsStr = currentWins !== null ? ` ${currentWins}승` : "";
+      await DuelTracker.setRankDisplay({ current: label + winsStr });
+    }
     // Send deck list to native for overlay search
     try {
       const data = await getAllDecks();
@@ -130,6 +136,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       const { nextRank, nextWins } = getNextRankAndWins(currentRank, currentWins, result as "win" | "lose");
       setPreviewRank(nextRank);
       setPreviewWins(nextWins);
+      // Send rank preview to native overlay
+      const curLabel = getRankLabel(currentRank) + (currentWins !== null ? ` ${currentWins}승` : "");
+      const preLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
+      DuelTracker.setRankDisplay({ current: curLabel, preview: preLabel }).catch(() => {});
     }
 
     setPendingSave(true);
@@ -189,6 +199,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         );
         setCurrentRank(nextRank);
         setCurrentWins(nextWins);
+        // Update native overlay with new current rank
+        const newLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
+        DuelTracker.setRankDisplay({ current: newLabel, preview: "" }).catch(() => {});
       }
 
       resetDetection();

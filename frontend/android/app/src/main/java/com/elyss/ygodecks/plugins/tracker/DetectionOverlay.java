@@ -33,6 +33,7 @@ public class DetectionOverlay {
     private TextView countdownView;
 
     private TextView coinLabel, fsLabel, resultLabel;
+    private TextView rankChangeView;
 
     private LinearLayout editLayout;
     private TextView coinWinBtn, coinLoseBtn;
@@ -148,6 +149,14 @@ public class DetectionOverlay {
         summaryRow.addView(editBtn);
 
         resultLayout.addView(summaryRow);
+
+        // --- Rank change display ---
+        rankChangeView = new TextView(context);
+        rankChangeView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        rankChangeView.setGravity(Gravity.CENTER);
+        rankChangeView.setVisibility(View.GONE);
+        rankChangeView.setPadding(0, dp(2), 0, dp(2));
+        resultLayout.addView(rankChangeView);
 
         // --- Opponent deck display (shown in summary when selected) ---
         selectedDeckLabel = new TextView(context);
@@ -516,7 +525,7 @@ public class DetectionOverlay {
     // === UI helpers ===
 
     private void updateSummaryLabels() {
-        coinLabel.setText("win".equals(currentCoin) ? "앞" : "뒤");
+        coinLabel.setText("win".equals(currentCoin) ? "앞면" : "뒷면");
         coinLabel.setTextColor("win".equals(currentCoin) ? 0xFFFFD700 : TEXT_WHITE);
         fsLabel.setText("first".equals(currentFS) ? "선공" : "후공");
         fsLabel.setTextColor(ACCENT_BLUE);
@@ -526,6 +535,34 @@ public class DetectionOverlay {
         }
         resultLabel.setText(rText);
         resultLabel.setTextColor("win".equals(currentResult) ? ACCENT_GREEN : ACCENT_RED);
+
+        // Rank change
+        String cur = ScreenCaptureService.currentRankDisplay;
+        String preview = ScreenCaptureService.previewRankDisplay;
+        if (cur != null && !cur.isEmpty()) {
+            rankChangeView.setVisibility(View.VISIBLE);
+            if (preview != null && !preview.isEmpty() && !preview.equals(cur)) {
+                rankChangeView.setText(cur + " → " + preview);
+            } else {
+                rankChangeView.setText(cur);
+            }
+            // Color based on rank tier
+            rankChangeView.setTextColor(getRankColor(preview != null ? preview : cur));
+        } else {
+            rankChangeView.setVisibility(View.GONE);
+        }
+    }
+
+    private static int getRankColor(String rankDisplay) {
+        if (rankDisplay == null) return TEXT_WHITE;
+        if (rankDisplay.startsWith("루키")) return 0xFF90EE90;   // light green
+        if (rankDisplay.startsWith("브론즈")) return 0xFFCD853F; // brown/peru
+        if (rankDisplay.startsWith("실버")) return 0xFFC0C0C0;   // silver/gray
+        if (rankDisplay.startsWith("골드")) return 0xFFDAA520;    // dark gold
+        if (rankDisplay.startsWith("플래티넘") || rankDisplay.startsWith("플레티넘")) return 0xFF50C878; // green
+        if (rankDisplay.startsWith("다이아")) return 0xFFB39DDB;  // light purple
+        if (rankDisplay.startsWith("마스터")) return 0xFFFFD700;  // bright gold
+        return TEXT_WHITE;
     }
 
     private void updateEditButtons() {

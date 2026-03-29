@@ -91,6 +91,16 @@ public class DuelTrackerPlugin extends Plugin {
     }
 
     @PluginMethod()
+    public void setRankDisplay(PluginCall call) {
+        ScreenCaptureService.currentRankDisplay = call.getString("current");
+        ScreenCaptureService.previewRankDisplay = call.getString("preview");
+        // Update overlay if visible
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod()
     public void setTrackingMode(PluginCall call) {
         String mode = call.getString("mode", "none");
         ScreenAnalyzer.trackingMode = mode;

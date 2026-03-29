@@ -921,9 +921,22 @@ const RecordGroupDetailPage = () => {
                 {resultOptions.map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() =>
-                      setNewMatch((prev) => ({ ...prev, result: opt.value }))
-                    }
+                    onClick={() => {
+                      setNewMatch((prev) => {
+                        const updated = { ...prev, result: opt.value };
+                        if (matches.length > 0 && matches[0].rank && useRankOrScore === "rank") {
+                          const lastMatch = matches[0];
+                          const { nextRank, nextWins } = getNextRankAndWins(
+                            lastMatch.rank!,
+                            lastMatch.wins ?? null,
+                            opt.value as "win" | "lose"
+                          );
+                          updated.rank = nextRank;
+                          updated.wins = nextWins;
+                        }
+                        return updated;
+                      });
+                    }}
                     className={`flex-1 px-2 py-1.5 rounded border text-sm ${
                       newMatch.result === opt.value
                         ? "bg-blue-500 text-white"

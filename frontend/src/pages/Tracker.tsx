@@ -76,7 +76,7 @@ export default function Tracker() {
               <label className="block text-sm font-semibold mb-1">트래킹 모드</label>
               <div className="flex gap-2">
                 {[
-                  { value: "none", label: "미기록" },
+                  { value: "none", label: "프리 매치" },
                   { value: "rank", label: "랭크" },
                   { value: "rating", label: "레이팅" },
                 ].map((m) => (
