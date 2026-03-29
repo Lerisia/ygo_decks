@@ -36,7 +36,7 @@ public class ScreenAnalyzer {
     private static boolean onCoinScreen = false;
     private static CoinResult lastCoinValue = CoinResult.NONE;
     private static int coinStableCount = 0;
-    private static final int COIN_STABLE_REQUIRED = 3;
+    private static final int COIN_STABLE_REQUIRED = 2;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
