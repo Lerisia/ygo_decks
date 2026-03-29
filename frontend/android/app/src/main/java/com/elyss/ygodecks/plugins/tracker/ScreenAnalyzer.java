@@ -96,14 +96,16 @@ public class ScreenAnalyzer {
                     if (preview.length() > 30) preview = preview.substring(0, 30);
                     ScreenCaptureService.statusLog = "선후OCR:" + preview;
 
-                    if (text.contains("선공")) {
+                    if (text.contains("선공") || text.contains("선 공") || text.contains("선콩")
+                            || (text.contains("선") && text.contains("입니다"))) {
                         detectionSummary += " | 선공";
                         ScreenCaptureService.statusLog = detectionSummary;
                         currentState = State.IN_DUEL;
                         lastDetectionTime = now;
                         return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
                     }
-                    if (text.contains("후공")) {
+                    if (text.contains("후공") || text.contains("후 공") || text.contains("후콩")
+                            || (text.contains("후") && text.contains("입니다"))) {
                         detectionSummary += " | 후공";
                         ScreenCaptureService.statusLog = detectionSummary;
                         currentState = State.IN_DUEL;
