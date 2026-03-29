@@ -57,17 +57,14 @@ public class ScreenAnalyzer {
                     onCoinScreen = false;
                     lastCoinValue = CoinResult.NONE;
                     coinStableCount = 0;
-                    ScreenCaptureService.statusLog = "코인 대기 중";
                     break;
                 }
 
                 onCoinScreen = true;
 
                 if (coin == CoinResult.SPINNING) {
-                    // Coin is alternating - reset stability
                     lastCoinValue = CoinResult.NONE;
                     coinStableCount = 0;
-                    ScreenCaptureService.statusLog = "코인 회전 중";
                 } else if (coin == CoinResult.GOLD || coin == CoinResult.BLACK) {
                     // Gold or black detected - check stability
                     if (coin == lastCoinValue) {
