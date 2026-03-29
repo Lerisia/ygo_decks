@@ -33,7 +33,8 @@ public class ScreenAnalyzer {
 
     private static State currentState = State.WAITING_COIN;
     private static long lastDetectionTime = 0;
-    private static boolean coinScreenSeen = false;
+    private static int spinningFrames = 0;
+    private static final int MIN_SPINNING_FRAMES = 6;
     public static String detectionSummary = "";
 
     public static AnalysisResult analyze(Bitmap bitmap) {
@@ -48,17 +49,17 @@ public class ScreenAnalyzer {
             case WAITING_COIN: {
                 CoinResult coin = detectCoinWithEffects(bitmap, w, h);
                 if (coin == CoinResult.SPINNING) {
-                    coinScreenSeen = true;
-                    ScreenCaptureService.statusLog = "코인 회전 중...";
-                } else if (coin == CoinResult.GOLD && coinScreenSeen) {
-                    coinScreenSeen = false;
+                    spinningFrames++;
+                    ScreenCaptureService.statusLog = "코인 회전 중 (" + spinningFrames + ")";
+                } else if (coin == CoinResult.GOLD && spinningFrames >= MIN_SPINNING_FRAMES) {
+                    spinningFrames = 0;
                     detectionSummary = "코인:앞";
                     ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_FIRST_SECOND;
                     lastDetectionTime = now;
                     return new AnalysisResult(DetectionType.COIN_TOSS, "win");
-                } else if (coin == CoinResult.BLACK && coinScreenSeen) {
-                    coinScreenSeen = false;
+                } else if (coin == CoinResult.BLACK && spinningFrames >= MIN_SPINNING_FRAMES) {
+                    spinningFrames = 0;
                     detectionSummary = "코인:뒤";
                     ScreenCaptureService.statusLog = detectionSummary;
                     currentState = State.WAITING_FIRST_SECOND;
@@ -111,7 +112,7 @@ public class ScreenAnalyzer {
     public static void reset() {
         currentState = State.WAITING_COIN;
         lastDetectionTime = 0;
-        coinScreenSeen = false;
+        spinningFrames = 0;
         detectionSummary = "";
     }
 
