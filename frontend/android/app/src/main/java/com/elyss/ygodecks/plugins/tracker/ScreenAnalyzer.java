@@ -172,7 +172,7 @@ public class ScreenAnalyzer {
                 if (hsv[0] > 15 && hsv[0] < 75 && hsv[1] > 0.15 && hsv[2] > 0.4) {
                     goldCount++;
                 }
-                if (hsv[2] < 0.05) {
+                if (hsv[2] < 0.12) {
                     darkCount++;
                 }
                 if (hsv[0] > 250 && hsv[0] < 340 && hsv[1] > 0.25 && hsv[2] > 0.25) {
@@ -204,7 +204,7 @@ public class ScreenAnalyzer {
         if (goldRatio > 0.10) return CoinResult.GOLD;
 
         // No gold + dark center + purple = back face (lose)
-        if (goldRatio < 0.03 && darkRatio > 0.30) return CoinResult.BLACK;
+        if (goldRatio < 0.06 && darkRatio > 0.25) return CoinResult.BLACK;
 
         // Purple present but can't determine yet (still spinning)
         return CoinResult.SPINNING;
