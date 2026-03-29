@@ -52,8 +52,9 @@ public class ScreenAnalyzer {
                 CoinResult coin = detectCoinWithEffects(bitmap, w, h);
 
                 if (coin == CoinResult.NONE) {
-                    // Left coin screen - if we had a result, confirm it
-                    if (onCoinScreen && lastSeenCoinResult != CoinResult.NONE) {
+                    // Left coin screen - if we had a result after spinning, confirm it
+                    if (onCoinScreen && lastSeenCoinResult != CoinResult.NONE
+                            && lastSeenCoinResult != CoinResult.SPINNING) {
                         String val = (lastSeenCoinResult == CoinResult.GOLD) ? "win" : "lose";
                         detectionSummary = "코인:" + (lastSeenCoinResult == CoinResult.GOLD ? "앞" : "뒤");
                         ScreenCaptureService.statusLog = detectionSummary;
@@ -83,36 +84,35 @@ public class ScreenAnalyzer {
             }
 
             case WAITING_FIRST_SECOND: {
-                // Look for cyan banner with 선공/후공 text
-                if (hasCyanBanner(bitmap, w, h)) {
-                    ScreenCaptureService.statusLog = "배너 감지 → OCR";
-                    int bannerTop = Math.max(0, (int)(h * 0.4));
-                    int bannerH = Math.min((int)(h * 0.25), h - bannerTop);
-                    Bitmap banner = Bitmap.createBitmap(bitmap, 0, bannerTop, w, bannerH);
-                    String text = runOCR(banner);
-                    banner.recycle();
+                // OCR center-lower area for 선공/후공 text
+                int cropTop = (int)(h * 0.4);
+                int cropH = (int)(h * 0.35);
+                Bitmap center = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
+                String text = runOCR(center);
+                center.recycle();
 
-                    if (text != null) {
-                        ScreenCaptureService.statusLog = "배너OCR:" + text.replace("\n", " ");
-                        if (text.contains("선공")) {
-                            detectionSummary += " | 선공";
-                            ScreenCaptureService.statusLog = detectionSummary;
-                            currentState = State.IN_DUEL;
-                            lastDetectionTime = now;
-                            return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
-                        }
-                        if (text.contains("후공")) {
-                            detectionSummary += " | 후공";
-                            ScreenCaptureService.statusLog = detectionSummary;
-                            currentState = State.IN_DUEL;
-                            lastDetectionTime = now;
-                            return new AnalysisResult(DetectionType.FIRST_SECOND, "second");
-                        }
+                if (text != null) {
+                    String preview = text.replace("\n", " ").trim();
+                    if (preview.length() > 30) preview = preview.substring(0, 30);
+                    ScreenCaptureService.statusLog = "선후OCR:" + preview;
+
+                    if (text.contains("선공")) {
+                        detectionSummary += " | 선공";
+                        ScreenCaptureService.statusLog = detectionSummary;
+                        currentState = State.IN_DUEL;
+                        lastDetectionTime = now;
+                        return new AnalysisResult(DetectionType.FIRST_SECOND, "first");
                     }
+                    if (text.contains("후공")) {
+                        detectionSummary += " | 후공";
+                        ScreenCaptureService.statusLog = detectionSummary;
+                        currentState = State.IN_DUEL;
+                        lastDetectionTime = now;
+                        return new AnalysisResult(DetectionType.FIRST_SECOND, "second");
+                    }
+                } else {
+                    ScreenCaptureService.statusLog = "선후공 대기 중";
                 }
-                // Show cyan detection ratio for debugging
-                int cyanDbg = countCyanRatio(bitmap, w, h);
-                ScreenCaptureService.statusLog = "선후공 대기 (청록:" + cyanDbg + "%)";
                 break;
             }
 
