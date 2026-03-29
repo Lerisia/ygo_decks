@@ -166,11 +166,14 @@ public class ScreenAnalyzer {
                 purpleRatio * 100, goldRatio * 100, darkRatio * 100);
 
         // Coin is spinning (purple effects visible)
-        if (purpleRatio > 0.15) return CoinResult.SPINNING;
+        if (purpleRatio > 0.10) return CoinResult.SPINNING;
 
-        // Coin has landed
-        if (goldRatio > 0.25) return CoinResult.GOLD;
-        if (darkRatio > 0.5) return CoinResult.BLACK;
+        // Coin has landed - purple must be nearly gone (animation fully done)
+        if (purpleRatio > 0.03) return CoinResult.NONE;
+
+        // Strict thresholds - coin face fills center when stopped
+        if (goldRatio > 0.20) return CoinResult.GOLD;
+        if (darkRatio > 0.45) return CoinResult.BLACK;
 
         return CoinResult.NONE;
     }
