@@ -104,11 +104,15 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     await DuelTracker.startTracking();
     // Send tracking mode to native
     await DuelTracker.setTrackingMode({ mode: trackingMode });
-    // Send current rank display
+    // Send current rank to native
     if (useRank && currentRank) {
       const label = getRankLabel(currentRank);
       const winsStr = currentWins !== null ? ` ${currentWins}승` : "";
-      await DuelTracker.setRankDisplay({ current: label + winsStr });
+      await DuelTracker.setRankDisplay({
+        current: label + winsStr,
+        rankValue: currentRank,
+        winsValue: currentWins ?? 0,
+      });
     }
     // Send deck list to native for overlay search
     try {
@@ -194,7 +198,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         setCurrentWins(nextWins);
         // Update native overlay with new current rank
         const newLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
-        DuelTracker.setRankDisplay({ current: newLabel, preview: "" }).catch(() => {});
+        DuelTracker.setRankDisplay({ current: newLabel, rankValue: nextRank, winsValue: nextWins ?? 0 }).catch(() => {});
       }
 
       resetDetection();
@@ -234,17 +238,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           setLastTimestamp(result.timestamp);
           if (result.coinToss) setCoinToss(result.coinToss);
           if (result.firstSecond) setFirstSecond(result.firstSecond);
-          if (result.duelResult) {
-            // Send rank preview to overlay (don't set pendingSave — overlay handles save)
-            if (useRankRef.current && currentRankRef.current) {
-              const { rank: nextRank, wins: nextWins } = getNextRankState(
-                currentRankRef.current, currentWinsRef.current, result.duelResult as "win" | "lose"
-              );
-              const curLabel = getRankLabel(currentRankRef.current) + (currentWinsRef.current !== null ? ` ${currentWinsRef.current}승` : "");
-              const preLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
-              DuelTracker.setRankDisplay({ current: curLabel, preview: preLabel }).catch(() => {});
-            }
-          }
+          // duelResult is handled by native overlay directly
         }
       } catch (e: any) {
         setNativeStatus("폴링 에러: " + (e?.message || JSON.stringify(e)));

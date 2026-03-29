@@ -16,6 +16,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -27,29 +28,28 @@ public class DetectionOverlay {
     private final Context context;
     private final Handler handler;
 
+    // Main overlay
     private LinearLayout rootLayout;
     private TextView statusView;
     private LinearLayout resultLayout;
     private TextView countdownView;
-
     private TextView coinLabel, fsLabel, resultLabel;
     private TextView rankChangeView;
-
     private LinearLayout editLayout;
     private TextView coinWinBtn, coinLoseBtn;
     private TextView fsFirstBtn, fsSecondBtn;
     private TextView resultWinBtn, resultLoseBtn;
     private TextView saveBtn, dismissBtn;
+    private TextView selectedDeckLabel;
 
-    // Deck search
-    private LinearLayout searchLayout;
+    // Search overlay (separate window)
+    private LinearLayout searchRoot;
     private EditText searchInput;
     private LinearLayout searchResults;
-    private int selectedOpponentDeckId = -1;
-    private TextView selectedDeckLabel;
 
     private boolean isExpanded = false;
     private boolean isEditMode = false;
+    private int selectedOpponentDeckId = -1;
 
     private int countdownSeconds = 0;
     private Runnable countdownRunnable;
@@ -57,6 +57,7 @@ public class DetectionOverlay {
     private String currentCoin = null;
     private String currentFS = null;
     private String currentResult = null;
+    private String currentRatingScore = null;
 
     private static final int BG_COLOR = 0xE6222222;
     private static final int ACCENT_BLUE = 0xFF3B82F6;
@@ -66,7 +67,6 @@ public class DetectionOverlay {
     private static final int TEXT_DIM = 0xFF999999;
     private static final int BTN_INACTIVE = 0xFF444444;
 
-    // Korean chosung table
     private static final char[] CHOSUNG = {
         'ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ',
         'ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'
@@ -105,7 +105,7 @@ public class DetectionOverlay {
         rootLayout.setPadding(dp(14), dp(8), dp(14), dp(8));
         rootLayout.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        // --- Status pill ---
+        // Status pill
         statusView = new TextView(context);
         statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         statusView.setTextColor(TEXT_DIM);
@@ -113,7 +113,7 @@ public class DetectionOverlay {
         statusView.setText("대기 중");
         rootLayout.addView(statusView);
 
-        // --- Result layout ---
+        // Result layout
         resultLayout = new LinearLayout(context);
         resultLayout.setOrientation(LinearLayout.VERTICAL);
         resultLayout.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -156,7 +156,7 @@ public class DetectionOverlay {
 
         resultLayout.addView(summaryRow);
 
-        // --- Rank change display ---
+        // Rank change
         rankChangeView = new TextView(context);
         rankChangeView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         rankChangeView.setGravity(Gravity.CENTER);
@@ -164,7 +164,7 @@ public class DetectionOverlay {
         rankChangeView.setPadding(0, dp(2), 0, dp(2));
         resultLayout.addView(rankChangeView);
 
-        // --- Opponent deck display (shown in summary when selected) ---
+        // Opponent deck label
         selectedDeckLabel = new TextView(context);
         selectedDeckLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         selectedDeckLabel.setTextColor(0xFFAABBCC);
@@ -172,7 +172,7 @@ public class DetectionOverlay {
         selectedDeckLabel.setVisibility(View.GONE);
         resultLayout.addView(selectedDeckLabel);
 
-        // --- Edit layout ---
+        // Edit layout
         editLayout = new LinearLayout(context);
         editLayout.setOrientation(LinearLayout.VERTICAL);
         editLayout.setVisibility(View.GONE);
@@ -214,41 +214,16 @@ public class DetectionOverlay {
         editLayout.addView(resRow);
         editLayout.addView(makeSpacer(6));
 
-        // --- Deck search ---
-        searchLayout = new LinearLayout(context);
-        searchLayout.setOrientation(LinearLayout.VERTICAL);
-
-        searchInput = new EditText(context);
-        searchInput.setHint("상대 덱 검색 (초성 가능)");
-        searchInput.setHintTextColor(0xFF666666);
-        searchInput.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        searchInput.setTextColor(TEXT_WHITE);
-        searchInput.setBackground(roundedBg(0xFF333333, 6));
-        searchInput.setPadding(dp(10), dp(6), dp(10), dp(6));
-        searchInput.setSingleLine(true);
-        searchInput.setFocusable(false);
-        searchInput.setOnClickListener(v -> {
-            enableFocusable();
-            searchInput.setFocusableInTouchMode(true);
-            searchInput.setFocusable(true);
-            searchInput.requestFocus();
-            InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) imm.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT);
-        });
-        searchInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) {
-                onSearchChanged(s.toString());
-            }
-        });
-        searchLayout.addView(searchInput);
-
-        searchResults = new LinearLayout(context);
-        searchResults.setOrientation(LinearLayout.VERTICAL);
-        searchLayout.addView(searchResults);
-
-        editLayout.addView(searchLayout);
+        // Search button (opens separate search overlay)
+        TextView searchBtn = new TextView(context);
+        searchBtn.setText("상대 덱 검색");
+        searchBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        searchBtn.setTextColor(ACCENT_BLUE);
+        searchBtn.setBackground(roundedBg(0xFF333333, 6));
+        searchBtn.setPadding(dp(12), dp(6), dp(12), dp(6));
+        searchBtn.setGravity(Gravity.CENTER);
+        searchBtn.setOnClickListener(v -> openSearchOverlay());
+        editLayout.addView(searchBtn);
         editLayout.addView(makeSpacer(6));
 
         // Action buttons
@@ -260,12 +235,14 @@ public class DetectionOverlay {
         saveBtn.setOnClickListener(v -> {
             syncOverlayValues();
             ScreenCaptureService.overlayAction = "save";
+            closeSearchOverlay();
             collapseToStatus("저장 완료");
         });
 
         dismissBtn = makeActionBtn("무시", 0xFF666666);
         dismissBtn.setOnClickListener(v -> {
             ScreenCaptureService.overlayAction = "dismiss";
+            closeSearchOverlay();
             collapseToStatus("무시됨");
         });
 
@@ -277,22 +254,102 @@ public class DetectionOverlay {
         resultLayout.addView(editLayout);
         rootLayout.addView(resultLayout);
 
-        // Window params - FLAG_NOT_FOCUSABLE so keyboard works only when we request it
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 layoutType(),
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        params.x = 0;
         params.y = 0;
-        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 
         try {
             windowManager.addView(rootLayout, params);
         } catch (Exception e) {
             rootLayout = null;
+        }
+    }
+
+    // === Search overlay (separate window on the right) ===
+
+    private void openSearchOverlay() {
+        if (searchRoot != null) return;
+
+        searchRoot = new LinearLayout(context);
+        searchRoot.setOrientation(LinearLayout.VERTICAL);
+        searchRoot.setBackground(roundedBg(BG_COLOR, 10));
+        searchRoot.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+        searchInput = new EditText(context);
+        searchInput.setHint("초성 검색");
+        searchInput.setHintTextColor(0xFF666666);
+        searchInput.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        searchInput.setTextColor(TEXT_WHITE);
+        searchInput.setBackground(roundedBg(0xFF333333, 6));
+        searchInput.setPadding(dp(8), dp(6), dp(8), dp(6));
+        searchInput.setSingleLine(true);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) { onSearchChanged(s.toString()); }
+        });
+        searchRoot.addView(searchInput);
+
+        searchResults = new LinearLayout(context);
+        searchResults.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView scroll = new ScrollView(context);
+        scroll.addView(searchResults);
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(120));
+        scroll.setLayoutParams(scrollLp);
+        searchRoot.addView(scroll);
+
+        // Close button
+        TextView closeBtn = new TextView(context);
+        closeBtn.setText("닫기");
+        closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        closeBtn.setTextColor(TEXT_DIM);
+        closeBtn.setGravity(Gravity.CENTER);
+        closeBtn.setPadding(0, dp(4), 0, 0);
+        closeBtn.setOnClickListener(v -> closeSearchOverlay());
+        searchRoot.addView(closeBtn);
+
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                dp(180),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                layoutType(),
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT
+        );
+        params.gravity = Gravity.TOP | Gravity.END;
+        params.x = dp(8);
+        params.y = dp(60);
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
+
+        try {
+            windowManager.addView(searchRoot, params);
+            searchInput.requestFocus();
+            handler.postDelayed(() -> {
+                InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT);
+            }, 200);
+        } catch (Exception e) {
+            searchRoot = null;
+        }
+    }
+
+    private void closeSearchOverlay() {
+        if (searchRoot != null) {
+            InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && searchInput != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+            try { windowManager.removeView(searchRoot); } catch (Exception ignored) {}
+            searchRoot = null;
+            searchInput = null;
+            searchResults = null;
         }
     }
 
@@ -304,11 +361,12 @@ public class DetectionOverlay {
             if (rootLayout == null) return;
             if (!isExpanded) {
                 statusView.setText(text);
+            } else {
+                // Refresh rank display while expanded (JS updates statics async)
+                updateSummaryLabels();
             }
         });
     }
-
-    private String currentRatingScore = null;
 
     public void showResult(String coin, String fs, String result) {
         showResultWithRating(coin, fs, result, null);
@@ -352,7 +410,6 @@ public class DetectionOverlay {
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
             editLayout.setVisibility(View.GONE);
-            hideKeyboard();
         });
     }
 
@@ -362,47 +419,20 @@ public class DetectionOverlay {
             countdownView.setText("수정 중");
             editLayout.setVisibility(View.VISIBLE);
             updateEditButtons();
-            searchInput.setText("");
-            searchInput.setFocusable(false);
-            searchResults.removeAllViews();
             isEditMode = true;
-            enableFocusable();
         } else {
             editLayout.setVisibility(View.GONE);
+            closeSearchOverlay();
             isEditMode = false;
             updateSummaryLabels();
-            hideKeyboard();
-            disableFocusable();
             startCountdown(5);
         }
-    }
-
-    // === Keyboard / Focus management ===
-
-    private void enableFocusable() {
-        if (rootLayout == null) return;
-        WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
-        // Remove NOT_FOCUSABLE to receive keyboard, add NOT_TOUCH_MODAL so touches outside pass through
-        params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
-        try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
-    }
-
-    private void disableFocusable() {
-        if (rootLayout == null) return;
-        WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
-        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
-    }
-
-    private void hideKeyboard() {
-        if (searchInput == null) return;
-        InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
     }
 
     // === Deck search ===
 
     private void onSearchChanged(String query) {
+        if (searchResults == null) return;
         searchResults.removeAllViews();
         if (query.isEmpty()) return;
 
@@ -414,32 +444,26 @@ public class DetectionOverlay {
         String chosungQuery = extractChosung(query);
         boolean isChosungOnly = isAllChosung(query);
 
-        List<int[]> matches = new ArrayList<>(); // [index, priority]
+        List<int[]> matches = new ArrayList<>();
 
         for (int i = 0; i < names.length && matches.size() < 20; i++) {
-            String name = names[i];
-            String lowerName = name.toLowerCase();
-
-            // Exact substring match (highest priority)
+            String lowerName = names[i].toLowerCase();
             if (lowerName.contains(lowerQuery)) {
                 matches.add(new int[]{i, 0});
                 continue;
             }
-
-            // Chosung match
             if (isChosungOnly && chosungQuery.length() > 0) {
-                String nameChosung = extractChosung(name);
+                String nameChosung = extractChosung(names[i]);
                 if (nameChosung.contains(chosungQuery)) {
                     matches.add(new int[]{i, 1});
                 }
             }
         }
 
-        // Sort by priority then show top 4
         matches.sort((a, b) -> a[1] - b[1]);
         int shown = 0;
         for (int[] m : matches) {
-            if (shown >= 3) break;
+            if (shown >= 5) break;
             final int idx = m[0];
             final int deckId = ids[idx];
             final String deckName = names[idx];
@@ -449,7 +473,7 @@ public class DetectionOverlay {
             btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
             btn.setTextColor(TEXT_WHITE);
             btn.setBackground(roundedBg(0xFF383838, 4));
-            btn.setPadding(dp(10), dp(6), dp(10), dp(6));
+            btn.setPadding(dp(8), dp(6), dp(8), dp(6));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             lp.topMargin = dp(2);
@@ -459,26 +483,21 @@ public class DetectionOverlay {
                 ScreenCaptureService.overlayOpponentDeckId = deckId;
                 selectedDeckLabel.setText("vs " + deckName);
                 selectedDeckLabel.setVisibility(View.VISIBLE);
-                searchInput.setText("");
-                searchInput.setFocusable(false);
-                searchResults.removeAllViews();
-                hideKeyboard();
-                disableFocusable();
+                closeSearchOverlay();
             });
             searchResults.addView(btn);
             shown++;
         }
     }
 
-    // === Korean chosung utilities ===
+    // === Korean chosung ===
 
     private static String extractChosung(String text) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c >= 0xAC00 && c <= 0xD7A3) {
-                int idx = (c - 0xAC00) / (21 * 28);
-                sb.append(CHOSUNG[idx]);
+                sb.append(CHOSUNG[(c - 0xAC00) / (21 * 28)]);
             } else if (isChosungChar(c)) {
                 sb.append(c);
             }
@@ -511,6 +530,7 @@ public class DetectionOverlay {
                 if (countdownSeconds <= 0) {
                     syncOverlayValues();
                     ScreenCaptureService.overlayAction = "save";
+                    closeSearchOverlay();
                     collapseToStatus("자동 저장됨");
                 } else {
                     updateCountdownText();
@@ -555,7 +575,6 @@ public class DetectionOverlay {
         resultLabel.setText(rText);
         resultLabel.setTextColor("win".equals(currentResult) ? ACCENT_GREEN : ACCENT_RED);
 
-        // Rank change
         String cur = ScreenCaptureService.currentRankDisplay;
         String preview = ScreenCaptureService.previewRankDisplay;
         if (cur != null && !cur.isEmpty()) {
@@ -565,8 +584,7 @@ public class DetectionOverlay {
             } else {
                 rankChangeView.setText(cur);
             }
-            // Color based on rank tier
-            rankChangeView.setTextColor(getRankColor(preview != null ? preview : cur));
+            rankChangeView.setTextColor(getRankColor(preview != null && !preview.isEmpty() ? preview : cur));
         } else {
             rankChangeView.setVisibility(View.GONE);
         }
@@ -574,13 +592,13 @@ public class DetectionOverlay {
 
     private static int getRankColor(String rankDisplay) {
         if (rankDisplay == null) return TEXT_WHITE;
-        if (rankDisplay.startsWith("루키")) return 0xFF90EE90;   // light green
-        if (rankDisplay.startsWith("브론즈")) return 0xFFCD853F; // brown/peru
-        if (rankDisplay.startsWith("실버")) return 0xFFC0C0C0;   // silver/gray
-        if (rankDisplay.startsWith("골드")) return 0xFFDAA520;    // dark gold
-        if (rankDisplay.startsWith("플래티넘") || rankDisplay.startsWith("플레티넘")) return 0xFF50C878; // green
-        if (rankDisplay.startsWith("다이아")) return 0xFFB39DDB;  // light purple
-        if (rankDisplay.startsWith("마스터")) return 0xFFFFD700;  // bright gold
+        if (rankDisplay.startsWith("루키")) return 0xFF90EE90;
+        if (rankDisplay.startsWith("브론즈")) return 0xFFCD853F;
+        if (rankDisplay.startsWith("실버")) return 0xFFC0C0C0;
+        if (rankDisplay.startsWith("골드")) return 0xFFDAA520;
+        if (rankDisplay.startsWith("플래티넘") || rankDisplay.startsWith("플레티넘")) return 0xFF50C878;
+        if (rankDisplay.startsWith("다이아")) return 0xFFB39DDB;
+        if (rankDisplay.startsWith("마스터")) return 0xFFFFD700;
         return TEXT_WHITE;
     }
 
@@ -618,9 +636,9 @@ public class DetectionOverlay {
         return tv;
     }
 
-    private View makeSpacer(int widthDp) {
+    private View makeSpacer(int sizeDp) {
         View v = new View(context);
-        v.setLayoutParams(new LinearLayout.LayoutParams(dp(widthDp), dp(widthDp)));
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp)));
         return v;
     }
 
@@ -664,7 +682,7 @@ public class DetectionOverlay {
 
     public void dismiss() {
         stopCountdown();
-        hideKeyboard();
+        closeSearchOverlay();
         if (rootLayout != null) {
             try { windowManager.removeView(rootLayout); } catch (Exception ignored) {}
             rootLayout = null;

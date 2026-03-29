@@ -4,7 +4,7 @@ interface DuelTrackerPlugin {
   startTracking(): Promise<{ started: boolean }>;
   stopTracking(): Promise<{ stopped: boolean }>;
   setTrackingMode(options: { mode: string }): Promise<{ mode: string }>;
-  setRankDisplay(options: { current?: string; preview?: string }): Promise<{ ok: boolean }>;
+  setRankDisplay(options: { current?: string; preview?: string; rankValue?: string; winsValue?: number }): Promise<{ ok: boolean }>;
   setDeckList(options: { decks: { id: number; name: string }[] }): Promise<{ count: number }>;
   getLatestResult(): Promise<{
     coinToss: string | null;

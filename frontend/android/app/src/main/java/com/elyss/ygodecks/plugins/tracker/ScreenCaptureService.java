@@ -47,7 +47,9 @@ public class ScreenCaptureService extends Service {
     public static volatile int overlayOpponentDeckId = -1;
     public static volatile String lastRatingScore = null;
 
-    // Rank display (set by JS)
+    // Rank state (set by JS, used by native for immediate calculation)
+    public static volatile String currentRankValue = null;  // e.g. "gold5"
+    public static volatile int currentWinsValue = 0;
     public static volatile String currentRankDisplay = null;
     public static volatile String previewRankDisplay = null;
 
@@ -272,6 +274,13 @@ public class ScreenCaptureService extends Service {
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
+                        // Calculate rank change immediately
+                        if (currentRankValue != null && !currentRankValue.isEmpty()) {
+                            boolean isWin = "win".equals(result.value);
+                            String[] next = RankCalculator.getNextRankState(currentRankValue, currentWinsValue, isWin);
+                            currentRankDisplay = RankCalculator.formatDisplay(next[0], Integer.parseInt(next[1]));
+                            previewRankDisplay = null;
+                        }
                         // In rating mode, don't show overlay yet — wait for score
                         if (!"rating".equals(ScreenAnalyzer.trackingMode)) {
                             if (overlay != null) {
@@ -284,13 +293,12 @@ public class ScreenCaptureService extends Service {
                         break;
                     case RATING_SCORE:
                         lastRatingScore = result.value;
-                        // Now show overlay with rating score
                         if (overlay != null) {
-                            final String c = lastCoinToss;
-                            final String f = lastFirstSecond;
-                            final String r = lastDuelResult;
-                            final String score = result.value;
-                            mainHandler.post(() -> overlay.showResultWithRating(c, f, r, score));
+                            final String c2 = lastCoinToss;
+                            final String f2 = lastFirstSecond;
+                            final String r2 = lastDuelResult;
+                            final String score2 = result.value;
+                            mainHandler.post(() -> overlay.showResultWithRating(c2, f2, r2, score2));
                         }
                         break;
                 }

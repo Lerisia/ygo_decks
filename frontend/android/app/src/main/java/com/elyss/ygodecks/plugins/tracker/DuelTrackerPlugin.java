@@ -94,7 +94,11 @@ public class DuelTrackerPlugin extends Plugin {
     public void setRankDisplay(PluginCall call) {
         ScreenCaptureService.currentRankDisplay = call.getString("current");
         ScreenCaptureService.previewRankDisplay = call.getString("preview");
-        // Update overlay if visible
+        String rankValue = call.getString("rankValue");
+        if (rankValue != null) {
+            ScreenCaptureService.currentRankValue = rankValue;
+            ScreenCaptureService.currentWinsValue = call.getInt("winsValue", 0);
+        }
         JSObject ret = new JSObject();
         ret.put("ok", true);
         call.resolve(ret);
