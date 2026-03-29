@@ -45,6 +45,7 @@ public class ScreenCaptureService extends Service {
     public static volatile String overlayFS = null;
     public static volatile String overlayResult = null;
     public static volatile int overlayOpponentDeckId = -1;
+    public static volatile String lastRatingScore = null;
 
     // Deck list for overlay search
     public static int[] deckIds = new int[0];
@@ -267,12 +268,25 @@ public class ScreenCaptureService extends Service {
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
-                        // Show interactive overlay with all detected values
+                        // In rating mode, don't show overlay yet — wait for score
+                        if (!"rating".equals(ScreenAnalyzer.trackingMode)) {
+                            if (overlay != null) {
+                                final String c = lastCoinToss;
+                                final String f = lastFirstSecond;
+                                final String r = result.value;
+                                mainHandler.post(() -> overlay.showResult(c, f, r));
+                            }
+                        }
+                        break;
+                    case RATING_SCORE:
+                        lastRatingScore = result.value;
+                        // Now show overlay with rating score
                         if (overlay != null) {
                             final String c = lastCoinToss;
                             final String f = lastFirstSecond;
-                            final String r = result.value;
-                            mainHandler.post(() -> overlay.showResult(c, f, r));
+                            final String r = lastDuelResult;
+                            final String score = result.value;
+                            mainHandler.post(() -> overlay.showResultWithRating(c, f, r, score));
                         }
                         break;
                 }
@@ -298,6 +312,11 @@ public class ScreenCaptureService extends Service {
         ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
         String coinStr = lastCoinToss != null ? ("win".equals(lastCoinToss) ? "앞면" : "뒷면") : null;
         String fsStr = lastFirstSecond != null ? ("first".equals(lastFirstSecond) ? "선공" : "후공") : null;
+
+        if (state == ScreenAnalyzer.State.WAITING_RATING) {
+            String base = (coinStr != null && fsStr != null) ? coinStr + " / " + fsStr + "  " : "";
+            return base + "레이팅 대기 중...";
+        }
 
         if (state == ScreenAnalyzer.State.IN_DUEL) {
             if (coinStr != null && fsStr != null) {
@@ -325,7 +344,7 @@ public class ScreenCaptureService extends Service {
         lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
         lastDetectionTime = 0;
         overlayAction = null; overlayCoin = null; overlayFS = null; overlayResult = null;
-        overlayOpponentDeckId = -1;
+        overlayOpponentDeckId = -1; lastRatingScore = null;
         statusLog = "종료:" + statusLog;
         super.onDestroy();
     }

@@ -283,7 +283,13 @@ public class DetectionOverlay {
         });
     }
 
+    private String currentRatingScore = null;
+
     public void showResult(String coin, String fs, String result) {
+        showResultWithRating(coin, fs, result, null);
+    }
+
+    public void showResultWithRating(String coin, String fs, String result, String ratingScore) {
         handler.post(() -> {
             ensureRoot();
             if (rootLayout == null) return;
@@ -291,6 +297,7 @@ public class DetectionOverlay {
             currentCoin = coin;
             currentFS = fs;
             currentResult = result;
+            currentRatingScore = ratingScore;
             selectedOpponentDeckId = -1;
             syncOverlayValues();
 
@@ -514,6 +521,9 @@ public class DetectionOverlay {
         fsLabel.setText("first".equals(currentFS) ? "선공" : "후공");
         fsLabel.setTextColor(ACCENT_BLUE);
         String rText = "win".equals(currentResult) ? "승리" : "패배";
+        if (currentRatingScore != null) {
+            rText += " (" + currentRatingScore + ")";
+        }
         resultLabel.setText(rText);
         resultLabel.setTextColor("win".equals(currentResult) ? ACCENT_GREEN : ACCENT_RED);
     }

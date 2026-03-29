@@ -72,12 +72,29 @@ export default function Tracker() {
               </select>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={t.useRank} onChange={(e) => t.setUseRank(e.target.checked)} disabled={t.isTracking} className="w-4 h-4" />
-              <span className="text-sm font-semibold">랭크 기록</span>
-            </label>
+            <div>
+              <label className="block text-sm font-semibold mb-1">트래킹 모드</label>
+              <div className="flex gap-2">
+                {[
+                  { value: "none", label: "미기록" },
+                  { value: "rank", label: "랭크" },
+                  { value: "rating", label: "레이팅" },
+                ].map((m) => (
+                  <button key={m.value}
+                    onClick={() => { t.setTrackingMode(m.value); if (m.value === "rank") t.setUseRank(true); else t.setUseRank(false); }}
+                    disabled={t.isTracking}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg border transition ${
+                      t.trackingMode === m.value
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+                    } ${t.isTracking ? "opacity-50 cursor-not-allowed" : ""}`}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            {t.useRank && (
+            {t.trackingMode === "rank" && (
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">현재 랭크</label>

@@ -12,6 +12,8 @@ import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ScreenAnalyzer {
 
@@ -19,8 +21,8 @@ public class ScreenAnalyzer {
     private static final TextRecognizer textRecognizer =
             TextRecognition.getClient(new KoreanTextRecognizerOptions.Builder().build());
 
-    public enum DetectionType { COIN_TOSS, FIRST_SECOND, DUEL_RESULT }
-    public enum State { WAITING_MATCH_START, IN_DUEL }
+    public enum DetectionType { COIN_TOSS, FIRST_SECOND, DUEL_RESULT, RATING_SCORE }
+    public enum State { WAITING_MATCH_START, IN_DUEL, WAITING_RATING }
 
     public static class AnalysisResult {
         public DetectionType type;
@@ -35,12 +37,20 @@ public class ScreenAnalyzer {
     private static long lastDetectionTime = 0;
     public static String detectionSummary = "";
 
-    // Coin tracking - continuously updated, confirmed when first/second is detected
+    // Coin tracking
     private enum CoinResult { NONE, GOLD, BLACK }
     private static CoinResult lastSeenCoin = CoinResult.NONE;
 
     // Pending first/second to return on next poll
     public static String pendingFirstSecond = null;
+
+    // Tracking mode: "rank", "rating", "none"
+    public static String trackingMode = "none";
+
+    // Rating state
+    private static long waitingRatingStart = 0;
+    private static final long RATING_TIMEOUT_MS = 60_000;
+    private static String pendingDuelResult = null;
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
@@ -62,7 +72,7 @@ public class ScreenAnalyzer {
                 // 1. Continuously track coin color (gold/black)
                 updateCoinColor(bitmap, w, h);
 
-                // 2. Try OCR for 선공/후공 - when found, confirm coin + first/second
+                // 2. Try OCR for 선공/후공
                 int cropTop = (int)(h * 0.4);
                 int cropH = Math.min((int)(h * 0.35), h - cropTop);
                 Bitmap textArea = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
@@ -73,14 +83,8 @@ public class ScreenAnalyzer {
                                  lastSeenCoin == CoinResult.BLACK ? "뒤" : "?";
 
                 if (text != null) {
-                    String preview = text.replace("\n", " ").trim();
-                    if (preview.length() > 30) preview = preview.substring(0, 30);
-                    ScreenCaptureService.statusLog = "코인:" + coinStr + " OCR:" + preview;
-
                     String fsValue = null;
-                    // Exclude selection screen ("선공 / 후공을 선택해주세요")
                     if (!text.contains("선택") && text.contains("입니다")) {
-                        // Check 후공 first - "선" is more prone to OCR noise
                         if (text.contains("후공") || text.contains("후 공")) {
                             fsValue = "second";
                         } else if (text.contains("선공") || text.contains("선 공")) {
@@ -89,11 +93,9 @@ public class ScreenAnalyzer {
                     }
 
                     if (fsValue != null) {
-                        // Confirm coin at this moment + transition to duel
                         String coinVal = (lastSeenCoin == CoinResult.GOLD) ? "win" : "lose";
                         detectionSummary = "코인:" + coinStr + " | " +
                                 ("first".equals(fsValue) ? "선공" : "후공");
-                        ScreenCaptureService.statusLog = detectionSummary;
 
                         pendingFirstSecond = fsValue;
                         currentState = State.IN_DUEL;
@@ -101,31 +103,77 @@ public class ScreenAnalyzer {
                         lastDetectionTime = now;
                         return new AnalysisResult(DetectionType.COIN_TOSS, coinVal);
                     }
-                } else {
-                    ScreenCaptureService.statusLog = "대기 코인:" + coinStr;
                 }
                 break;
             }
 
             case IN_DUEL: {
-                // OCR for VICTORY/DEFEAT
                 Bitmap center = Bitmap.createBitmap(bitmap, w / 6, h / 4, w * 2 / 3, h / 3);
                 AnalysisResult r = ocrForDuelResult(center);
                 center.recycle();
                 if (r != null) {
                     detectionSummary += " | " + ("win".equals(r.value) ? "승리" : "패배");
-                    ScreenCaptureService.statusLog = detectionSummary;
-                    currentState = State.WAITING_MATCH_START;
-                    detectionSummary = "";
                     lastDetectionTime = now;
-                    return r;
+
+                    if ("rating".equals(trackingMode)) {
+                        // Don't return yet — wait for rating screen
+                        pendingDuelResult = r.value;
+                        currentState = State.WAITING_RATING;
+                        waitingRatingStart = now;
+                        return r;  // Still return DUEL_RESULT so service knows win/lose
+                    } else {
+                        currentState = State.WAITING_MATCH_START;
+                        detectionSummary = "";
+                        return r;
+                    }
                 }
-                ScreenCaptureService.statusLog = "듀얼 중";
+                break;
+            }
+
+            case WAITING_RATING: {
+                // Timeout check
+                if (now - waitingRatingStart > RATING_TIMEOUT_MS) {
+                    currentState = State.WAITING_MATCH_START;
+                    pendingDuelResult = null;
+                    detectionSummary = "";
+                    break;
+                }
+
+                // OCR the center area for rating screen
+                int cropTop = (int)(h * 0.3);
+                int cropH = Math.min((int)(h * 0.4), h - cropTop);
+                Bitmap ratingArea = Bitmap.createBitmap(bitmap, 0, cropTop, w, cropH);
+                String text = runOCR(ratingArea);
+                ratingArea.recycle();
+
+                if (text != null && (text.contains("레이팅") || text.contains("매치 결과"))) {
+                    // Parse the score — look for the last number (after >>> or last on line)
+                    String score = parseRatingScore(text);
+                    if (score != null) {
+                        currentState = State.WAITING_MATCH_START;
+                        pendingDuelResult = null;
+                        detectionSummary = "";
+                        lastDetectionTime = now;
+                        return new AnalysisResult(DetectionType.RATING_SCORE, score);
+                    }
+                }
                 break;
             }
         }
 
         return null;
+    }
+
+    // Parse the final rating score (integer part only)
+    private static String parseRatingScore(String text) {
+        // Look for numbers with optional decimal, take the last one (result score)
+        Pattern p = Pattern.compile("(\\d{3,5})\\.?\\d*");
+        Matcher m = p.matcher(text.replace(",", "").replace(" ", ""));
+        String lastMatch = null;
+        while (m.find()) {
+            lastMatch = m.group(1);
+        }
+        return lastMatch;
     }
 
     public static State getCurrentState() { return currentState; }
@@ -135,6 +183,7 @@ public class ScreenAnalyzer {
         lastDetectionTime = 0;
         lastSeenCoin = CoinResult.NONE;
         pendingFirstSecond = null;
+        pendingDuelResult = null;
         detectionSummary = "";
     }
 
@@ -176,7 +225,6 @@ public class ScreenAnalyzer {
         float goldRatio = (float) goldCount / samples;
         float darkRatio = (float) darkCount / samples;
 
-        // Only update when on coin screen (purple present)
         if (purpleRatio < 0.05) return;
 
         if (goldRatio > 0.10) {

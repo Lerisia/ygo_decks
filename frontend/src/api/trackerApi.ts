@@ -3,11 +3,13 @@ import { registerPlugin } from '@capacitor/core';
 interface DuelTrackerPlugin {
   startTracking(): Promise<{ started: boolean }>;
   stopTracking(): Promise<{ stopped: boolean }>;
+  setTrackingMode(options: { mode: string }): Promise<{ mode: string }>;
   setDeckList(options: { decks: { id: number; name: string }[] }): Promise<{ count: number }>;
   getLatestResult(): Promise<{
     coinToss: string | null;
     firstSecond: string | null;
     duelResult: string | null;
+    ratingScore: string | null;
     timestamp: number;
     status: string;
     overlayAction?: string | null;

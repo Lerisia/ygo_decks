@@ -15,6 +15,7 @@ interface TrackerState {
 
   selectedGroup: number | null;
   selectedDeck: number | null;
+  trackingMode: string; // "rank" | "rating" | "none"
   useRank: boolean;
   currentRank: string;
   currentWins: number | null;
@@ -29,6 +30,7 @@ interface TrackerState {
   stopTracking: () => Promise<void>;
   setSelectedGroup: (id: number | null) => void;
   setSelectedDeck: (id: number | null) => void;
+  setTrackingMode: (m: string) => void;
   setUseRank: (v: boolean) => void;
   setCurrentRank: (r: string) => void;
   setCurrentWins: (w: number | null) => void;
@@ -57,6 +59,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [selectedDeck, setSelectedDeck] = useState<number | null>(null);
+  const [trackingMode, setTrackingMode] = useState("none"); // "rank" | "rating" | "none"
   const [useRank, setUseRank] = useState(false);
   const [currentRank, setCurrentRank] = useState("");
   const [currentWins, setCurrentWins] = useState<number | null>(null);
@@ -99,6 +102,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const startTracking = async () => {
     if (!isNative) throw new Error("앱에서만 사용 가능");
     await DuelTracker.startTracking();
+    // Send tracking mode to native
+    await DuelTracker.setTrackingMode({ mode: trackingMode });
     // Send deck list to native for overlay search
     try {
       const data = await getAllDecks();
@@ -155,12 +160,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   };
 
   // Save from overlay (uses refs for current values)
-  const saveFromOverlay = async (coin: string | null, fs: string | null, result: string | null, opponentDeckId?: number) => {
+  const saveFromOverlay = async (coin: string | null, fs: string | null, result: string | null, opponentDeckId?: number, ratingScore?: string | null) => {
     const group = selectedGroupRef.current;
     const deck = selectedDeckRef.current;
     if (!group || !deck || !result) return;
 
     const oppDeck = (opponentDeckId && opponentDeckId > 0) ? opponentDeckId : null;
+    const score = ratingScore ? parseInt(ratingScore, 10) : undefined;
 
     try {
       await addMatchToRecordGroup(group, {
@@ -171,6 +177,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         result: result as "win" | "lose",
         rank: useRankRef.current ? currentRankRef.current : undefined,
         wins: useRankRef.current ? currentWinsRef.current : undefined,
+        score: score,
+        score_type: score ? "rating" : undefined,
       });
 
       setSavedCount((c) => c + 1);
@@ -206,7 +214,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
           // Handle overlay actions (save/dismiss from floating UI)
           if (result.overlayAction === "save") {
-            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null, result.overlayOpponentDeckId);
+            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null, result.overlayOpponentDeckId, result.ratingScore);
             return;
           }
           if (result.overlayAction === "dismiss") {
@@ -239,10 +247,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   return (
     <TrackerContext.Provider value={{
       isTracking, coinToss, firstSecond, pendingSave, savedCount, nativeStatus,
-      selectedGroup, selectedDeck, useRank, currentRank, currentWins,
+      selectedGroup, selectedDeck, trackingMode, useRank, currentRank, currentWins,
       editCoin, editFS, editResult, previewRank, previewWins,
       startTracking, stopTracking,
-      setSelectedGroup, setSelectedDeck, setUseRank, setCurrentRank, setCurrentWins,
+      setSelectedGroup, setSelectedDeck, setTrackingMode, setUseRank, setCurrentRank, setCurrentWins,
       setEditCoin, setEditFS, setEditResult,
       saveMatch, dismissConfirmation,
     }}>

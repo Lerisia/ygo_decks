@@ -91,6 +91,15 @@ public class DuelTrackerPlugin extends Plugin {
     }
 
     @PluginMethod()
+    public void setTrackingMode(PluginCall call) {
+        String mode = call.getString("mode", "none");
+        ScreenAnalyzer.trackingMode = mode;
+        JSObject ret = new JSObject();
+        ret.put("mode", mode);
+        call.resolve(ret);
+    }
+
+    @PluginMethod()
     public void setDeckList(PluginCall call) {
         try {
             JSArray list = call.getArray("decks");
@@ -127,6 +136,7 @@ public class DuelTrackerPlugin extends Plugin {
         ret.put("coinToss", ScreenCaptureService.lastCoinToss);
         ret.put("firstSecond", ScreenCaptureService.lastFirstSecond);
         ret.put("duelResult", ScreenCaptureService.lastDuelResult);
+        ret.put("ratingScore", ScreenCaptureService.lastRatingScore);
         ret.put("timestamp", ScreenCaptureService.lastDetectionTime);
         String status = ScreenCaptureService.statusLog;
         if (status == null || status.isEmpty()) {
@@ -152,6 +162,7 @@ public class DuelTrackerPlugin extends Plugin {
             ScreenCaptureService.lastCoinToss = null;
             ScreenCaptureService.lastFirstSecond = null;
             ScreenCaptureService.lastDuelResult = null;
+            ScreenCaptureService.lastRatingScore = null;
         }
 
         call.resolve(ret);
