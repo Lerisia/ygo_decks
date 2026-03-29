@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { useTracker } from "@/context/TrackerContext";
 import { getUserRecordGroups } from "@/api/toolApi";
 import { getUserDecks, isAuthenticated } from "@/api/accountApi";
-import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/lib/rankUtils";
+import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/utils/rankUtils";
 
 type RecordGroup = { id: number; name: string };
 type Deck = { id: number; name: string };

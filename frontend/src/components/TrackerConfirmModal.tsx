@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTracker } from "@/context/TrackerContext";
 import { getAllDecks } from "@/api/deckApi";
-import { getRankLabel } from "@/lib/rankUtils";
+import { getRankLabel } from "@/utils/rankUtils";
 
 type Deck = { id: number; name: string };
 

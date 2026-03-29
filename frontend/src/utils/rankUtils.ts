@@ -1,3 +1,38 @@
+export const RANK_OPTIONS = [
+  { value: "rookie2", label: "루키 2" },
+  { value: "rookie1", label: "루키 1" },
+  { value: "bronze5", label: "브론즈 5" },
+  { value: "bronze4", label: "브론즈 4" },
+  { value: "bronze3", label: "브론즈 3" },
+  { value: "bronze2", label: "브론즈 2" },
+  { value: "bronze1", label: "브론즈 1" },
+  { value: "silver5", label: "실버 5" },
+  { value: "silver4", label: "실버 4" },
+  { value: "silver3", label: "실버 3" },
+  { value: "silver2", label: "실버 2" },
+  { value: "silver1", label: "실버 1" },
+  { value: "gold5", label: "골드 5" },
+  { value: "gold4", label: "골드 4" },
+  { value: "gold3", label: "골드 3" },
+  { value: "gold2", label: "골드 2" },
+  { value: "gold1", label: "골드 1" },
+  { value: "platinum5", label: "플래티넘 5" },
+  { value: "platinum4", label: "플래티넘 4" },
+  { value: "platinum3", label: "플래티넘 3" },
+  { value: "platinum2", label: "플래티넘 2" },
+  { value: "platinum1", label: "플래티넘 1" },
+  { value: "diamond5", label: "다이아 5" },
+  { value: "diamond4", label: "다이아 4" },
+  { value: "diamond3", label: "다이아 3" },
+  { value: "diamond2", label: "다이아 2" },
+  { value: "diamond1", label: "다이아 1" },
+  { value: "master5", label: "마스터 5" },
+  { value: "master4", label: "마스터 4" },
+  { value: "master3", label: "마스터 3" },
+  { value: "master2", label: "마스터 2" },
+  { value: "master1", label: "마스터 1" },
+];
+
 export const RANK_ORDER = [
   "rookie2", "rookie1",
   "bronze5", "bronze4", "bronze3", "bronze2", "bronze1",
@@ -104,4 +139,28 @@ export function getNextRankState(
   }
 
   return { rank, wins: w };
+}
+
+export function getRankLabel(rank: string): string {
+  return RANK_OPTIONS.find((r) => r.value === rank)?.label || rank;
+}
+
+export function getValidWinOptions(rank: string): number[] {
+  if (!rank) return [];
+  const tier = getTier(rank);
+  if (tier === "rookie" || tier === "bronze") return [0];
+  if (tier === "silver") return [0, 1];
+  if (tier === "gold") return [0, 1, 2, 3];
+  if (tier === "platinum") {
+    return rank === "platinum5" ? [0, 1, 2, 3] : [-3, -2, -1, 0, 1, 2, 3];
+  }
+  if (tier === "diamond") {
+    return rank === "diamond5" ? [0, 1, 2, 3] : [-2, -1, 0, 1, 2, 3];
+  }
+  if (tier === "master") {
+    if (rank === "master1") return [];
+    if (rank === "master5") return [0, 1, 2, 3, 4];
+    return [-2, -1, 0, 1, 2, 3, 4];
+  }
+  return [];
 }

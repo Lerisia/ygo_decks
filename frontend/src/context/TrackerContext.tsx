@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import DuelTracker from "@/api/trackerApi";
 import { addMatchToRecordGroup } from "@/api/toolApi";
 import { getAllDecks } from "@/api/deckApi";
-import { getNextRankAndWins, getRankLabel } from "@/lib/rankUtils";
+import { getNextRankState, getRankLabel } from "@/utils/rankUtils";
 
 interface TrackerState {
   isTracking: boolean;
@@ -133,7 +133,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setEditResult(result);
 
     if (useRank && currentRank) {
-      const { nextRank, nextWins } = getNextRankAndWins(currentRank, currentWins, result as "win" | "lose");
+      const { rank: nextRank, wins: nextWins } = getNextRankState(currentRank, currentWins, result as "win" | "lose");
       setPreviewRank(nextRank);
       setPreviewWins(nextWins);
       // Send rank preview to native overlay
@@ -154,8 +154,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       coin_toss_result: (editCoin === "win" ? "win" : "lose") as "win" | "lose",
       first_or_second: (editFS === "first" ? "first" : "second") as "first" | "second",
       result: editResult as "win" | "lose",
-      rank: useRank ? currentRank : undefined,
-      wins: useRank ? currentWins : undefined,
+      rank: useRank ? previewRank || currentRank : undefined,
+      wins: useRank ? (previewRank ? previewWins : currentWins) : undefined,
     });
 
     setSavedCount((c) => c + 1);
@@ -178,6 +178,17 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const oppDeck = (opponentDeckId && opponentDeckId > 0) ? opponentDeckId : null;
     const score = ratingScore ? parseInt(ratingScore, 10) : undefined;
 
+    // Calculate result rank (post-match) for saving
+    let saveRank = currentRankRef.current;
+    let saveWins = currentWinsRef.current;
+    if (useRankRef.current && currentRankRef.current && result) {
+      const { rank: nextRank, wins: nextWins } = getNextRankState(
+        currentRankRef.current, currentWinsRef.current, result as "win" | "lose"
+      );
+      saveRank = nextRank;
+      saveWins = nextWins;
+    }
+
     try {
       await addMatchToRecordGroup(group, {
         deck: deck,
@@ -185,8 +196,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         coin_toss_result: (coin === "win" ? "win" : "lose") as "win" | "lose",
         first_or_second: (fs === "first" ? "first" : "second") as "first" | "second",
         result: result as "win" | "lose",
-        rank: useRankRef.current ? currentRankRef.current : undefined,
-        wins: useRankRef.current ? currentWinsRef.current : undefined,
+        rank: useRankRef.current ? saveRank : undefined,
+        wins: useRankRef.current ? saveWins : undefined,
         score: score,
         score_type: score ? "rating" : undefined,
       });
@@ -194,7 +205,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       setSavedCount((c) => c + 1);
 
       if (useRankRef.current && currentRankRef.current) {
-        const { nextRank, nextWins } = getNextRankAndWins(
+        const { rank: nextRank, wins: nextWins } = getNextRankState(
           currentRankRef.current, currentWinsRef.current, result as "win" | "lose"
         );
         setCurrentRank(nextRank);

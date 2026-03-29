@@ -1,6 +1,6 @@
 import { useTracker } from "@/context/TrackerContext";
 import { useNavigate } from "react-router-dom";
-import { getRankLabel } from "@/lib/rankUtils";
+import { getRankLabel } from "@/utils/rankUtils";
 
 export default function TrackerBanner() {
   const t = useTracker();
