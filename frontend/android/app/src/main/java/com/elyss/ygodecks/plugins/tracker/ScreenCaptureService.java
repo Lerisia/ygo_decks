@@ -44,6 +44,11 @@ public class ScreenCaptureService extends Service {
     public static volatile String overlayCoin = null;
     public static volatile String overlayFS = null;
     public static volatile String overlayResult = null;
+    public static volatile int overlayOpponentDeckId = -1;
+
+    // Deck list for overlay search
+    public static int[] deckIds = new int[0];
+    public static String[] deckNames = new String[0];
 
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
@@ -234,7 +239,6 @@ public class ScreenCaptureService extends Service {
         if (image == null) return;
 
         captureCount++;
-        statusLog = "스캔 " + captureCount + "회";
 
         try {
             Image.Plane[] planes = image.getPlanes();
@@ -252,27 +256,17 @@ public class ScreenCaptureService extends Service {
 
             ScreenAnalyzer.AnalysisResult result = ScreenAnalyzer.analyze(cropped);
 
-            // Update persistent overlay with OCR status
-            if (overlay != null) {
-                final String s = statusLog;
-                mainHandler.post(() -> overlay.updateStatus(s));
-            }
-
             if (result != null) {
                 lastDetectionTime = System.currentTimeMillis();
-                String msg = "";
                 switch (result.type) {
                     case COIN_TOSS:
                         lastCoinToss = result.value;
-                        msg = "코인토스: " + ("win".equals(result.value) ? "앞면" : "뒷면");
                         break;
                     case FIRST_SECOND:
                         lastFirstSecond = result.value;
-                        msg = "first".equals(result.value) ? "선공" : "후공";
                         break;
                     case DUEL_RESULT:
                         lastDuelResult = result.value;
-                        msg = "win".equals(result.value) ? "승리" : "패배";
                         // Show interactive overlay with all detected values
                         if (overlay != null) {
                             final String c = lastCoinToss;
@@ -282,8 +276,12 @@ public class ScreenCaptureService extends Service {
                         }
                         break;
                 }
-                statusLog = msg;
-                updateNotification(msg);
+            }
+
+            // Update overlay with user-friendly status
+            if (overlay != null) {
+                final String overlayText = buildOverlayStatus();
+                mainHandler.post(() -> overlay.updateStatus(overlayText));
             }
 
             if (cropped != bitmap) cropped.recycle();
@@ -294,6 +292,25 @@ public class ScreenCaptureService extends Service {
         } finally {
             image.close();
         }
+    }
+
+    private String buildOverlayStatus() {
+        ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
+        String coinStr = lastCoinToss != null ? ("win".equals(lastCoinToss) ? "앞면" : "뒷면") : null;
+        String fsStr = lastFirstSecond != null ? ("first".equals(lastFirstSecond) ? "선공" : "후공") : null;
+
+        if (state == ScreenAnalyzer.State.IN_DUEL) {
+            if (coinStr != null && fsStr != null) {
+                return coinStr + " / " + fsStr + "  게임 중";
+            }
+            return "게임 중";
+        }
+
+        // WAITING_MATCH_START
+        if (coinStr != null && fsStr != null) {
+            return coinStr + " / " + fsStr;
+        }
+        return "대기 중";
     }
 
     @Override
@@ -308,6 +325,7 @@ public class ScreenCaptureService extends Service {
         lastCoinToss = null; lastFirstSecond = null; lastDuelResult = null;
         lastDetectionTime = 0;
         overlayAction = null; overlayCoin = null; overlayFS = null; overlayResult = null;
+        overlayOpponentDeckId = -1;
         statusLog = "종료:" + statusLog;
         super.onDestroy();
     }

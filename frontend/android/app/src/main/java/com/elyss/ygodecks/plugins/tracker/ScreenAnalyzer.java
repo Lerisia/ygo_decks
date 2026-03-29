@@ -128,6 +128,8 @@ public class ScreenAnalyzer {
         return null;
     }
 
+    public static State getCurrentState() { return currentState; }
+
     public static void reset() {
         currentState = State.WAITING_MATCH_START;
         lastDetectionTime = 0;

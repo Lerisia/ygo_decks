@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, Re
 import { Capacitor } from "@capacitor/core";
 import DuelTracker from "@/api/trackerApi";
 import { addMatchToRecordGroup } from "@/api/toolApi";
+import { getAllDecks } from "@/api/deckApi";
 import { getNextRankAndWins } from "@/lib/rankUtils";
 
 interface TrackerState {
@@ -98,6 +99,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const startTracking = async () => {
     if (!isNative) throw new Error("앱에서만 사용 가능");
     await DuelTracker.startTracking();
+    // Send deck list to native for overlay search
+    try {
+      const data = await getAllDecks();
+      const decks = (data.decks || data).map((d: any) => ({ id: d.id, name: d.name }));
+      await DuelTracker.setDeckList({ decks });
+    } catch (e) {
+      console.warn("Failed to send deck list to native:", e);
+    }
     resetDetection();
     setIsTracking(true);
   };
@@ -146,15 +155,17 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   };
 
   // Save from overlay (uses refs for current values)
-  const saveFromOverlay = async (coin: string | null, fs: string | null, result: string | null) => {
+  const saveFromOverlay = async (coin: string | null, fs: string | null, result: string | null, opponentDeckId?: number) => {
     const group = selectedGroupRef.current;
     const deck = selectedDeckRef.current;
     if (!group || !deck || !result) return;
 
+    const oppDeck = (opponentDeckId && opponentDeckId > 0) ? opponentDeckId : null;
+
     try {
       await addMatchToRecordGroup(group, {
         deck: deck,
-        opponent_deck: null,
+        opponent_deck: oppDeck,
         coin_toss_result: (coin === "win" ? "win" : "lose") as "win" | "lose",
         first_or_second: (fs === "first" ? "first" : "second") as "first" | "second",
         result: result as "win" | "lose",
@@ -195,7 +206,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
           // Handle overlay actions (save/dismiss from floating UI)
           if (result.overlayAction === "save") {
-            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null);
+            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null, result.overlayOpponentDeckId);
             return;
           }
           if (result.overlayAction === "dismiss") {

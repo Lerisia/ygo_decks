@@ -10,11 +10,15 @@ import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "DuelTracker")
 public class DuelTrackerPlugin extends Plugin {
@@ -87,6 +91,28 @@ public class DuelTrackerPlugin extends Plugin {
     }
 
     @PluginMethod()
+    public void setDeckList(PluginCall call) {
+        try {
+            JSArray list = call.getArray("decks");
+            int len = list.length();
+            int[] ids = new int[len];
+            String[] names = new String[len];
+            for (int i = 0; i < len; i++) {
+                JSONObject obj = list.getJSONObject(i);
+                ids[i] = obj.getInt("id");
+                names[i] = obj.getString("name");
+            }
+            ScreenCaptureService.deckIds = ids;
+            ScreenCaptureService.deckNames = names;
+            JSObject ret = new JSObject();
+            ret.put("count", ids.length);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("덱 목록 설정 실패: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod()
     public void stopTracking(PluginCall call) {
         try { getContext().stopService(new Intent(getContext(), ScreenCaptureService.class)); }
         catch (Exception ignored) {}
@@ -115,11 +141,13 @@ public class DuelTrackerPlugin extends Plugin {
             ret.put("overlayCoin", ScreenCaptureService.overlayCoin);
             ret.put("overlayFS", ScreenCaptureService.overlayFS);
             ret.put("overlayResult", ScreenCaptureService.overlayResult);
+            ret.put("overlayOpponentDeckId", ScreenCaptureService.overlayOpponentDeckId);
             // Clear after consumption
             ScreenCaptureService.overlayAction = null;
             ScreenCaptureService.overlayCoin = null;
             ScreenCaptureService.overlayFS = null;
             ScreenCaptureService.overlayResult = null;
+            ScreenCaptureService.overlayOpponentDeckId = -1;
             // Also clear detection state for next match
             ScreenCaptureService.lastCoinToss = null;
             ScreenCaptureService.lastFirstSecond = null;

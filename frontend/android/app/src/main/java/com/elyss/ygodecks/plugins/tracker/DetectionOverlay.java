@@ -1,19 +1,25 @@
 package com.elyss.ygodecks.plugins.tracker;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class DetectionOverlay {
 
@@ -21,30 +27,32 @@ public class DetectionOverlay {
     private final Context context;
     private final Handler handler;
 
-    // Views
     private LinearLayout rootLayout;
-    private TextView statusView;        // Collapsed: status pill
-    private LinearLayout resultLayout;  // Expanded: result + edit UI
+    private TextView statusView;
+    private LinearLayout resultLayout;
     private TextView countdownView;
 
-    // Result display row
     private TextView coinLabel, fsLabel, resultLabel;
 
-    // Edit mode views
     private LinearLayout editLayout;
     private TextView coinWinBtn, coinLoseBtn;
     private TextView fsFirstBtn, fsSecondBtn;
     private TextView resultWinBtn, resultLoseBtn;
     private TextView saveBtn, dismissBtn;
 
+    // Deck search
+    private LinearLayout searchLayout;
+    private EditText searchInput;
+    private LinearLayout searchResults;
+    private int selectedOpponentDeckId = -1;
+    private TextView selectedDeckLabel;
+
     private boolean isExpanded = false;
     private boolean isEditMode = false;
 
-    // Countdown
     private int countdownSeconds = 0;
     private Runnable countdownRunnable;
 
-    // Current values (native-side, synced to ScreenCaptureService)
     private String currentCoin = null;
     private String currentFS = null;
     private String currentResult = null;
@@ -56,6 +64,12 @@ public class DetectionOverlay {
     private static final int TEXT_WHITE = 0xFFFFFFFF;
     private static final int TEXT_DIM = 0xFF999999;
     private static final int BTN_INACTIVE = 0xFF444444;
+
+    // Korean chosung table
+    private static final char[] CHOSUNG = {
+        'ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ',
+        'ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'
+    };
 
     public DetectionOverlay(Context context) {
         this.context = context;
@@ -74,11 +88,6 @@ public class DetectionOverlay {
                 TypedValue.COMPLEX_UNIT_DIP, value, context.getResources().getDisplayMetrics());
     }
 
-    private int sp(int value) {
-        return (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, value, context.getResources().getDisplayMetrics());
-    }
-
     private GradientDrawable roundedBg(int color, int radiusDp) {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(color);
@@ -95,28 +104,28 @@ public class DetectionOverlay {
         rootLayout.setPadding(dp(14), dp(8), dp(14), dp(8));
         rootLayout.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        // --- Status pill (collapsed) ---
+        // --- Status pill ---
         statusView = new TextView(context);
         statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         statusView.setTextColor(TEXT_DIM);
         statusView.setGravity(Gravity.CENTER);
-        statusView.setText("감지 중...");
+        statusView.setText("대기 중");
         rootLayout.addView(statusView);
 
-        // --- Result layout (expanded) ---
+        // --- Result layout ---
         resultLayout = new LinearLayout(context);
         resultLayout.setOrientation(LinearLayout.VERTICAL);
         resultLayout.setGravity(Gravity.CENTER_HORIZONTAL);
         resultLayout.setVisibility(View.GONE);
 
-        // Result summary row
+        // Summary row
         LinearLayout summaryRow = new LinearLayout(context);
         summaryRow.setOrientation(LinearLayout.HORIZONTAL);
         summaryRow.setGravity(Gravity.CENTER);
 
-        coinLabel = makeLabel("코인", 13);
-        fsLabel = makeLabel("선후공", 13);
-        resultLabel = makeLabel("결과", 15);
+        coinLabel = makeLabel("", 13);
+        fsLabel = makeLabel("", 13);
+        resultLabel = makeLabel("", 15);
         resultLabel.setTypeface(Typeface.DEFAULT_BOLD);
 
         summaryRow.addView(coinLabel);
@@ -131,7 +140,6 @@ public class DetectionOverlay {
         countdownView.setTextColor(TEXT_DIM);
         summaryRow.addView(countdownView);
 
-        // Edit button (tap summary to edit)
         TextView editBtn = new TextView(context);
         editBtn.setText("  수정");
         editBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
@@ -141,6 +149,14 @@ public class DetectionOverlay {
 
         resultLayout.addView(summaryRow);
 
+        // --- Opponent deck display (shown in summary when selected) ---
+        selectedDeckLabel = new TextView(context);
+        selectedDeckLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        selectedDeckLabel.setTextColor(0xFFAABBCC);
+        selectedDeckLabel.setGravity(Gravity.CENTER);
+        selectedDeckLabel.setVisibility(View.GONE);
+        resultLayout.addView(selectedDeckLabel);
+
         // --- Edit layout ---
         editLayout = new LinearLayout(context);
         editLayout.setOrientation(LinearLayout.VERTICAL);
@@ -148,10 +164,7 @@ public class DetectionOverlay {
         editLayout.setPadding(0, dp(6), 0, 0);
 
         // Coin row
-        LinearLayout coinRow = new LinearLayout(context);
-        coinRow.setOrientation(LinearLayout.HORIZONTAL);
-        coinRow.setGravity(Gravity.CENTER);
-        coinRow.addView(makeRowLabel("코인"));
+        LinearLayout coinRow = makeEditRow("코인");
         coinWinBtn = makeToggleBtn("앞 (승)");
         coinLoseBtn = makeToggleBtn("뒤 (패)");
         coinWinBtn.setOnClickListener(v -> { currentCoin = "win"; syncOverlayValues(); updateEditButtons(); });
@@ -160,14 +173,10 @@ public class DetectionOverlay {
         coinRow.addView(makeSpacer(4));
         coinRow.addView(coinLoseBtn);
         editLayout.addView(coinRow);
-
         editLayout.addView(makeSpacer(4));
 
-        // First/Second row
-        LinearLayout fsRow = new LinearLayout(context);
-        fsRow.setOrientation(LinearLayout.HORIZONTAL);
-        fsRow.setGravity(Gravity.CENTER);
-        fsRow.addView(makeRowLabel("순서"));
+        // FS row
+        LinearLayout fsRow = makeEditRow("순서");
         fsFirstBtn = makeToggleBtn("선공");
         fsSecondBtn = makeToggleBtn("후공");
         fsFirstBtn.setOnClickListener(v -> { currentFS = "first"; syncOverlayValues(); updateEditButtons(); });
@@ -176,14 +185,10 @@ public class DetectionOverlay {
         fsRow.addView(makeSpacer(4));
         fsRow.addView(fsSecondBtn);
         editLayout.addView(fsRow);
-
         editLayout.addView(makeSpacer(4));
 
         // Result row
-        LinearLayout resRow = new LinearLayout(context);
-        resRow.setOrientation(LinearLayout.HORIZONTAL);
-        resRow.setGravity(Gravity.CENTER);
-        resRow.addView(makeRowLabel("결과"));
+        LinearLayout resRow = makeEditRow("결과");
         resultWinBtn = makeToggleBtn("승리");
         resultLoseBtn = makeToggleBtn("패배");
         resultWinBtn.setOnClickListener(v -> { currentResult = "win"; syncOverlayValues(); updateEditButtons(); });
@@ -192,7 +197,34 @@ public class DetectionOverlay {
         resRow.addView(makeSpacer(4));
         resRow.addView(resultLoseBtn);
         editLayout.addView(resRow);
+        editLayout.addView(makeSpacer(6));
 
+        // --- Deck search ---
+        searchLayout = new LinearLayout(context);
+        searchLayout.setOrientation(LinearLayout.VERTICAL);
+
+        searchInput = new EditText(context);
+        searchInput.setHint("상대 덱 검색 (초성 가능)");
+        searchInput.setHintTextColor(0xFF666666);
+        searchInput.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        searchInput.setTextColor(TEXT_WHITE);
+        searchInput.setBackground(roundedBg(0xFF333333, 6));
+        searchInput.setPadding(dp(10), dp(6), dp(10), dp(6));
+        searchInput.setSingleLine(true);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) {
+                onSearchChanged(s.toString());
+            }
+        });
+        searchLayout.addView(searchInput);
+
+        searchResults = new LinearLayout(context);
+        searchResults.setOrientation(LinearLayout.VERTICAL);
+        searchLayout.addView(searchResults);
+
+        editLayout.addView(searchLayout);
         editLayout.addView(makeSpacer(6));
 
         // Action buttons
@@ -221,7 +253,7 @@ public class DetectionOverlay {
         resultLayout.addView(editLayout);
         rootLayout.addView(resultLayout);
 
-        // Add to window
+        // Window params - FLAG_NOT_FOCUSABLE so keyboard works only when we request it
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -230,7 +262,7 @@ public class DetectionOverlay {
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        params.y = dp(12);
+        params.y = 0;
 
         try {
             windowManager.addView(rootLayout, params);
@@ -259,25 +291,23 @@ public class DetectionOverlay {
             currentCoin = coin;
             currentFS = fs;
             currentResult = result;
+            selectedOpponentDeckId = -1;
             syncOverlayValues();
 
-            // Update summary labels
             updateSummaryLabels();
+            selectedDeckLabel.setVisibility(View.GONE);
 
-            // Switch to expanded
             statusView.setVisibility(View.GONE);
             resultLayout.setVisibility(View.VISIBLE);
             editLayout.setVisibility(View.GONE);
             isExpanded = true;
             isEditMode = false;
 
-            // Start countdown
             startCountdown(7);
         });
     }
 
     public void show(String message) {
-        // Legacy flash — redirect to status
         updateStatus(message);
     }
 
@@ -290,24 +320,147 @@ public class DetectionOverlay {
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
             editLayout.setVisibility(View.GONE);
+            hideKeyboard();
         });
     }
 
     private void toggleEditMode() {
         if (!isEditMode) {
-            // Enter edit mode — pause countdown
             stopCountdown();
             countdownView.setText("수정 중");
             editLayout.setVisibility(View.VISIBLE);
             updateEditButtons();
+            searchInput.setText("");
+            searchResults.removeAllViews();
             isEditMode = true;
+            // Allow keyboard input
+            enableFocusable();
         } else {
-            // Exit edit mode — resume countdown
             editLayout.setVisibility(View.GONE);
             isEditMode = false;
             updateSummaryLabels();
+            hideKeyboard();
+            disableFocusable();
             startCountdown(5);
         }
+    }
+
+    // === Keyboard / Focus management ===
+
+    private void enableFocusable() {
+        if (rootLayout == null) return;
+        WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
+        params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
+    }
+
+    private void disableFocusable() {
+        if (rootLayout == null) return;
+        WindowManager.LayoutParams params = (WindowManager.LayoutParams) rootLayout.getLayoutParams();
+        params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        try { windowManager.updateViewLayout(rootLayout, params); } catch (Exception ignored) {}
+    }
+
+    private void hideKeyboard() {
+        if (searchInput == null) return;
+        InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+    }
+
+    // === Deck search ===
+
+    private void onSearchChanged(String query) {
+        searchResults.removeAllViews();
+        if (query.isEmpty()) return;
+
+        int[] ids = ScreenCaptureService.deckIds;
+        String[] names = ScreenCaptureService.deckNames;
+        if (ids.length == 0) return;
+
+        String lowerQuery = query.toLowerCase();
+        String chosungQuery = extractChosung(query);
+        boolean isChosungOnly = isAllChosung(query);
+
+        List<int[]> matches = new ArrayList<>(); // [index, priority]
+
+        for (int i = 0; i < names.length && matches.size() < 20; i++) {
+            String name = names[i];
+            String lowerName = name.toLowerCase();
+
+            // Exact substring match (highest priority)
+            if (lowerName.contains(lowerQuery)) {
+                matches.add(new int[]{i, 0});
+                continue;
+            }
+
+            // Chosung match
+            if (isChosungOnly && chosungQuery.length() > 0) {
+                String nameChosung = extractChosung(name);
+                if (nameChosung.contains(chosungQuery)) {
+                    matches.add(new int[]{i, 1});
+                }
+            }
+        }
+
+        // Sort by priority then show top 4
+        matches.sort((a, b) -> a[1] - b[1]);
+        int shown = 0;
+        for (int[] m : matches) {
+            if (shown >= 4) break;
+            final int idx = m[0];
+            final int deckId = ids[idx];
+            final String deckName = names[idx];
+
+            TextView btn = new TextView(context);
+            btn.setText(deckName);
+            btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            btn.setTextColor(TEXT_WHITE);
+            btn.setBackground(roundedBg(0xFF383838, 4));
+            btn.setPadding(dp(10), dp(6), dp(10), dp(6));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(2);
+            btn.setLayoutParams(lp);
+            btn.setOnClickListener(v -> {
+                selectedOpponentDeckId = deckId;
+                ScreenCaptureService.overlayOpponentDeckId = deckId;
+                selectedDeckLabel.setText("vs " + deckName);
+                selectedDeckLabel.setVisibility(View.VISIBLE);
+                searchInput.setText("");
+                searchResults.removeAllViews();
+                hideKeyboard();
+            });
+            searchResults.addView(btn);
+            shown++;
+        }
+    }
+
+    // === Korean chosung utilities ===
+
+    private static String extractChosung(String text) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c >= 0xAC00 && c <= 0xD7A3) {
+                int idx = (c - 0xAC00) / (21 * 28);
+                sb.append(CHOSUNG[idx]);
+            } else if (isChosungChar(c)) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean isAllChosung(String text) {
+        if (text.isEmpty()) return false;
+        for (int i = 0; i < text.length(); i++) {
+            if (!isChosungChar(text.charAt(i))) return false;
+        }
+        return true;
+    }
+
+    private static boolean isChosungChar(char c) {
+        return c >= 0x3131 && c <= 0x314E;
     }
 
     // === Countdown ===
@@ -321,7 +474,6 @@ public class DetectionOverlay {
             public void run() {
                 countdownSeconds--;
                 if (countdownSeconds <= 0) {
-                    // Auto-save
                     syncOverlayValues();
                     ScreenCaptureService.overlayAction = "save";
                     collapseToStatus("자동 저장됨");
@@ -345,23 +497,22 @@ public class DetectionOverlay {
         countdownView.setText(countdownSeconds + "초");
     }
 
-    // === Sync values to service statics ===
+    // === Sync ===
 
     private void syncOverlayValues() {
         ScreenCaptureService.overlayCoin = currentCoin;
         ScreenCaptureService.overlayFS = currentFS;
         ScreenCaptureService.overlayResult = currentResult;
+        ScreenCaptureService.overlayOpponentDeckId = selectedOpponentDeckId;
     }
 
-    // === UI update helpers ===
+    // === UI helpers ===
 
     private void updateSummaryLabels() {
         coinLabel.setText("win".equals(currentCoin) ? "앞" : "뒤");
         coinLabel.setTextColor("win".equals(currentCoin) ? 0xFFFFD700 : TEXT_WHITE);
-
         fsLabel.setText("first".equals(currentFS) ? "선공" : "후공");
         fsLabel.setTextColor(ACCENT_BLUE);
-
         String rText = "win".equals(currentResult) ? "승리" : "패배";
         resultLabel.setText(rText);
         resultLabel.setTextColor("win".equals(currentResult) ? ACCENT_GREEN : ACCENT_RED);
@@ -381,7 +532,7 @@ public class DetectionOverlay {
         btn.setTextColor(active ? TEXT_WHITE : TEXT_DIM);
     }
 
-    // === View factory helpers ===
+    // === View factories ===
 
     private TextView makeLabel(String text, int textSizeSp) {
         TextView tv = new TextView(context);
@@ -403,17 +554,21 @@ public class DetectionOverlay {
 
     private View makeSpacer(int widthDp) {
         View v = new View(context);
-        v.setLayoutParams(new LinearLayout.LayoutParams(dp(widthDp), 1));
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(widthDp), dp(widthDp)));
         return v;
     }
 
-    private TextView makeRowLabel(String text) {
+    private LinearLayout makeEditRow(String label) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
         TextView tv = new TextView(context);
-        tv.setText(text);
+        tv.setText(label);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         tv.setTextColor(TEXT_DIM);
         tv.setWidth(dp(40));
-        return tv;
+        row.addView(tv);
+        return row;
     }
 
     private TextView makeToggleBtn(String text) {
@@ -443,6 +598,7 @@ public class DetectionOverlay {
 
     public void dismiss() {
         stopCountdown();
+        hideKeyboard();
         if (rootLayout != null) {
             try { windowManager.removeView(rootLayout); } catch (Exception ignored) {}
             rootLayout = null;
