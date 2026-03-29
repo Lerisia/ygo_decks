@@ -82,17 +82,14 @@ public class ScreenAnalyzer {
             }
 
             case IN_DUEL: {
-                // Only detect VICTORY/DEFEAT
-                if (hasBrightCenter(bitmap, w, h)) {
-                    ScreenCaptureService.statusLog = "밝은 중앙 → OCR";
-                    Bitmap center = Bitmap.createBitmap(bitmap, 0, h / 4, w, h / 2);
-                    AnalysisResult r = ocrForDuelResult(center);
-                    center.recycle();
-                    if (r != null) {
-                        currentState = State.WAITING_COIN;
-                        lastDetectionTime = now;
-                        return r;
-                    }
+                // Try OCR for VICTORY/DEFEAT on center crop every frame
+                Bitmap center = Bitmap.createBitmap(bitmap, w / 6, h / 4, w * 2 / 3, h / 3);
+                AnalysisResult r = ocrForDuelResult(center);
+                center.recycle();
+                if (r != null) {
+                    currentState = State.WAITING_COIN;
+                    lastDetectionTime = now;
+                    return r;
                 }
                 ScreenCaptureService.statusLog = "듀얼 중";
                 break;
