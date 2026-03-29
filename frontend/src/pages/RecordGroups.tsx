@@ -8,6 +8,7 @@ import {
   getRecordGroupStatistics,
   getMetaDeckStats,
   MetaDeckStat,
+  PlayerDeckStat,
 } from "@/api/toolApi";
 import { getDeckData } from "@/api/deckApi";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -113,6 +114,7 @@ const RecordGroups = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [metaStats, setMetaStats] = useState<MetaDeckStat[]>([]);
+  const [playerDeckStats, setPlayerDeckStats] = useState<PlayerDeckStat[]>([]);
   const [showMetaStats, setShowMetaStats] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
   const [totalMatches, setTotalMatches] = useState<number>(0);
@@ -162,6 +164,7 @@ const RecordGroups = () => {
     getMetaDeckStats()
       .then((data) => {
         setMetaStats(data.meta_decks || []);
+        setPlayerDeckStats(data.player_decks || []);
         setTotalMatches(data.total_matches || 0);
       })
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));
@@ -294,6 +297,46 @@ const RecordGroups = () => {
                   ))}
                 </div>
               </div>
+
+              {playerDeckStats.length > 0 && (
+                <>
+                  <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-6 mb-2">유저 사용 덱</h3>
+                  <div className="space-y-2">
+                    {playerDeckStats.map((deck, idx) => (
+                      <div
+                        key={deck.deck_id}
+                        className="flex items-center justify-between border-b pb-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-mono w-6 text-right">
+                            {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`}
+                          </span>
+                          <span className="font-medium text-gray-800 dark:text-gray-200">{deck.deck_name}</span>
+                        </div>
+                        <div className="text-right text-sm text-gray-600 dark:text-gray-400">
+                          <div>
+                            사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
+                          </div>
+                          <div>
+                            승률:{" "}
+                            <span
+                              className={`font-semibold ${
+                                deck.win_rate >= 55
+                                  ? "text-blue-600"
+                                  : deck.win_rate <= 45
+                                  ? "text-red-500"
+                                  : "text-gray-700 dark:text-gray-300"
+                              }`}
+                            >
+                              {deck.win_rate}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

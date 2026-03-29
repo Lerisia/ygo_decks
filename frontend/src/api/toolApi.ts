@@ -234,9 +234,17 @@ export type MetaDeckStat = {
   win_rate: number;
 };
 
+export type PlayerDeckStat = {
+  deck_id: number;
+  deck_name: string;
+  appearance_percent: number;
+  win_rate: number;
+};
+
 export type MetaDeckStatsResponse = {
   total_matches: number;
   meta_decks: MetaDeckStat[];
+  player_decks: PlayerDeckStat[];
 };
 
 export const getMetaDeckStats = async () => {

@@ -567,9 +567,31 @@ def recent_meta_deck_stats(request):
 
     results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
 
+    player_deck_stats = qs.values(
+        player_deck_id=F("deck_id"),
+        player_deck_name=F("deck__name"),
+    ).annotate(
+        count=Count("id"),
+        wins=Count("id", filter=Q(result="win")),
+    )
+
+    player_results = []
+    for stat in player_deck_stats:
+        percent = stat["count"] / total_matches * 100 if total_matches > 0 else 0
+        win_rate = stat["wins"] / stat["count"] * 100 if stat["count"] > 0 else 0
+        player_results.append({
+            "deck_id": stat["player_deck_id"],
+            "deck_name": stat["player_deck_name"],
+            "appearance_percent": round(percent, 1),
+            "win_rate": round(win_rate, 1),
+        })
+
+    player_results = sorted(player_results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
+
     return Response({
         "total_matches": total_matches,
-        "meta_decks": results
+        "meta_decks": results,
+        "player_decks": player_results,
     }, status=status.HTTP_200_OK)
 
 @api_view(["GET"])
