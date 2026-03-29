@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
 import DuelTracker from "@/api/trackerApi";
 import { addMatchToRecordGroup } from "@/api/toolApi";
@@ -68,8 +68,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [editCoin, setEditCoin] = useState<string | null>(null);
   const [editFS, setEditFS] = useState<string | null>(null);
   const [editResult, setEditResult] = useState<string | null>(null);
-  const [previewRank, setPreviewRank] = useState("");
-  const [previewWins, setPreviewWins] = useState<number | null>(null);
+  const [previewRank] = useState("");
+  const [previewWins] = useState<number | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isNative = Capacitor.isNativePlatform();
@@ -126,24 +126,6 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     await DuelTracker.stopTracking();
     setIsTracking(false);
   };
-
-  const onDuelDetected = useCallback((coin: string | null, fs: string | null, result: string) => {
-    setEditCoin(coin);
-    setEditFS(fs);
-    setEditResult(result);
-
-    if (useRank && currentRank) {
-      const { rank: nextRank, wins: nextWins } = getNextRankState(currentRank, currentWins, result as "win" | "lose");
-      setPreviewRank(nextRank);
-      setPreviewWins(nextWins);
-      // Send rank preview to native overlay
-      const curLabel = getRankLabel(currentRank) + (currentWins !== null ? ` ${currentWins}승` : "");
-      const preLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
-      DuelTracker.setRankDisplay({ current: curLabel, preview: preLabel }).catch(() => {});
-    }
-
-    setPendingSave(true);
-  }, [useRank, currentRank, currentWins]);
 
   const saveMatch = async (opponentDeckId: number | null) => {
     if (!selectedGroup || !selectedDeck || !editResult) return;
@@ -227,46 +209,49 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     resetDetection();
   };
 
-  // Global polling
+  // Global polling — always runs when tracking (overlay actions need it)
   useEffect(() => {
-    if (isTracking) {
-      setNativeStatus("폴링 시작됨" + (isNative ? " (네이티브)" : " (웹)"));
-      pollRef.current = setInterval(async () => {
-        try {
-          const result = await DuelTracker.getLatestResult();
-          setNativeStatus(result.status || "(폴링 중 - status 비어있음)");
+    if (!isTracking) return;
+    setNativeStatus("폴링 시작됨" + (isNative ? " (네이티브)" : " (웹)"));
+    pollRef.current = setInterval(async () => {
+      try {
+        const result = await DuelTracker.getLatestResult();
+        setNativeStatus(result.status || "(폴링 중)");
 
-          // Handle overlay actions (save/dismiss from floating UI)
-          if (result.overlayAction === "save") {
-            await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null, result.overlayOpponentDeckId, result.ratingScore);
-            return;
-          }
-          if (result.overlayAction === "dismiss") {
-            resetDetection();
-            setPendingSave(false);
-            return;
-          }
+        // Handle overlay actions (save/dismiss from floating UI)
+        if (result.overlayAction === "save") {
+          await saveFromOverlay(result.overlayCoin ?? null, result.overlayFS ?? null, result.overlayResult ?? null, result.overlayOpponentDeckId, result.ratingScore);
+          return;
+        }
+        if (result.overlayAction === "dismiss") {
+          resetDetection();
+          setPendingSave(false);
+          return;
+        }
 
-          // Normal detection polling
-          if (result.timestamp > lastTimestamp) {
-            setLastTimestamp(result.timestamp);
-            if (result.coinToss) setCoinToss(result.coinToss);
-            if (result.firstSecond) setFirstSecond(result.firstSecond);
-            if (result.duelResult && !pendingSave) {
-              onDuelDetected(
-                result.coinToss || coinRef.current,
-                result.firstSecond || fsRef.current,
-                result.duelResult
+        // Normal detection — send rank preview to overlay when duel result detected
+        if (result.timestamp > lastTimestamp) {
+          setLastTimestamp(result.timestamp);
+          if (result.coinToss) setCoinToss(result.coinToss);
+          if (result.firstSecond) setFirstSecond(result.firstSecond);
+          if (result.duelResult) {
+            // Send rank preview to overlay (don't set pendingSave — overlay handles save)
+            if (useRankRef.current && currentRankRef.current) {
+              const { rank: nextRank, wins: nextWins } = getNextRankState(
+                currentRankRef.current, currentWinsRef.current, result.duelResult as "win" | "lose"
               );
+              const curLabel = getRankLabel(currentRankRef.current) + (currentWinsRef.current !== null ? ` ${currentWinsRef.current}승` : "");
+              const preLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
+              DuelTracker.setRankDisplay({ current: curLabel, preview: preLabel }).catch(() => {});
             }
           }
-        } catch (e: any) {
-          setNativeStatus("폴링 에러: " + (e?.message || JSON.stringify(e)));
         }
-      }, 2000);
-    }
+      } catch (e: any) {
+        setNativeStatus("폴링 에러: " + (e?.message || JSON.stringify(e)));
+      }
+    }, 2000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [isTracking, isNative, lastTimestamp, pendingSave, onDuelDetected]);
+  }, [isTracking, isNative, lastTimestamp]);
 
   return (
     <TrackerContext.Provider value={{
