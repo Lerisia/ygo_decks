@@ -34,6 +34,7 @@ public class ScreenAnalyzer {
     private static State currentState = State.WAITING_COIN;
     private static long lastDetectionTime = 0;
     private static final long COOLDOWN_MS = 3000;
+    private static boolean coinScreenSeen = false;
 
     public static AnalysisResult analyze(Bitmap bitmap) {
         long now = System.currentTimeMillis();
@@ -44,16 +45,25 @@ public class ScreenAnalyzer {
 
         switch (currentState) {
             case WAITING_COIN: {
-                // Only detect coin toss here
-                CoinColor coin = detectCoinColor(bitmap, w, h);
-                if (coin != CoinColor.NONE) {
-                    String val = (coin == CoinColor.GOLD) ? "win" : "lose";
-                    ScreenCaptureService.statusLog = "코인: " + (coin == CoinColor.GOLD ? "앞면" : "뒷면");
+                CoinResult coin = detectCoinWithEffects(bitmap, w, h);
+                if (coin == CoinResult.SPINNING) {
+                    coinScreenSeen = true;
+                    ScreenCaptureService.statusLog = "코인 회전 중...";
+                } else if (coin == CoinResult.GOLD && coinScreenSeen) {
+                    coinScreenSeen = false;
+                    ScreenCaptureService.statusLog = "코인: 앞면";
                     currentState = State.WAITING_FIRST_SECOND;
                     lastDetectionTime = now;
-                    return new AnalysisResult(DetectionType.COIN_TOSS, val);
+                    return new AnalysisResult(DetectionType.COIN_TOSS, "win");
+                } else if (coin == CoinResult.BLACK && coinScreenSeen) {
+                    coinScreenSeen = false;
+                    ScreenCaptureService.statusLog = "코인: 뒷면";
+                    currentState = State.WAITING_FIRST_SECOND;
+                    lastDetectionTime = now;
+                    return new AnalysisResult(DetectionType.COIN_TOSS, "lose");
+                } else {
+                    ScreenCaptureService.statusLog = "코인 대기 중";
                 }
-                ScreenCaptureService.statusLog = "코인 대기 중";
                 break;
             }
 
@@ -95,17 +105,25 @@ public class ScreenAnalyzer {
     public static void reset() {
         currentState = State.WAITING_COIN;
         lastDetectionTime = 0;
+        coinScreenSeen = false;
     }
 
     // === COIN TOSS DETECTION ===
 
-    private enum CoinColor { NONE, GOLD, BLACK }
+    private enum CoinResult { NONE, SPINNING, GOLD, BLACK }
 
-    private static CoinColor detectCoinColor(Bitmap bmp, int w, int h) {
+    /**
+     * Detect coin toss state:
+     * - SPINNING: purple effects in center (coin toss screen confirmed)
+     * - GOLD: no purple, gold center (front face = win)
+     * - BLACK: no purple, dark center (back face = lose), only valid after SPINNING seen
+     * - NONE: not a coin toss screen
+     */
+    private static CoinResult detectCoinWithEffects(Bitmap bmp, int w, int h) {
         int cx = w / 2;
         int cy = h / 2;
-        int radius = Math.min(w, h) / 10;
-        int step = Math.max(radius / 8, 1);
+        int radius = Math.min(w, h) / 8;
+        int step = Math.max(radius / 10, 1);
 
         int goldCount = 0;
         int darkCount = 0;
@@ -118,36 +136,33 @@ public class ScreenAnalyzer {
                 float[] hsv = new float[3];
                 Color.colorToHSV(bmp.getPixel(x, y), hsv);
 
-                // Gold: hue 20-55, high saturation, bright
                 if (hsv[0] > 20 && hsv[0] < 55 && hsv[1] > 0.4 && hsv[2] > 0.5) {
                     goldCount++;
                 }
-                // Very dark (coin back) - must be truly black
                 if (hsv[2] < 0.05) {
                     darkCount++;
                 }
-                // Purple/pink effects (spinning) - ignore frame
-                if (hsv[0] > 260 && hsv[0] < 330 && hsv[1] > 0.3 && hsv[2] > 0.3) {
+                if (hsv[0] > 250 && hsv[0] < 340 && hsv[1] > 0.25 && hsv[2] > 0.25) {
                     purpleCount++;
                 }
                 samples++;
             }
         }
 
-        if (samples == 0) return CoinColor.NONE;
+        if (samples == 0) return CoinResult.NONE;
 
         float purpleRatio = (float) purpleCount / samples;
         float goldRatio = (float) goldCount / samples;
         float darkRatio = (float) darkCount / samples;
 
-        // Still spinning or not coin screen
-        if (purpleRatio > 0.1) return CoinColor.NONE;
+        // Coin is spinning (purple effects visible)
+        if (purpleRatio > 0.15) return CoinResult.SPINNING;
 
-        // Strict thresholds to avoid false positives
-        if (goldRatio > 0.3) return CoinColor.GOLD;
-        if (darkRatio > 0.6) return CoinColor.BLACK;
+        // Coin has landed
+        if (goldRatio > 0.25) return CoinResult.GOLD;
+        if (darkRatio > 0.5) return CoinResult.BLACK;
 
-        return CoinColor.NONE;
+        return CoinResult.NONE;
     }
 
     // === TURN BUTTON DETECTION ===
