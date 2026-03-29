@@ -219,7 +219,7 @@ const RecordGroups = () => {
       {metaStats?.length > 0 ? (
         <div className="mb-6">
           <div className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-            자주 출현하는 덱: <div className="grid grid-cols-3 gap-2 md:gap-3 text-sm md:text-base mt-2">
+            많이 사용된 덱: <div className="grid grid-cols-3 gap-2 md:gap-3 text-sm md:text-base mt-2">
             {metaStats.slice(0, 3).map((deck, idx) => (
               <div key={deck.meta_deck_id} className="bg-white dark:bg-gray-800 shadow rounded p-2.5 md:p-3 text-center">
                 <div className="text-2xl md:text-3xl">
@@ -273,7 +273,7 @@ const RecordGroups = () => {
                       </div>
                       <div className="text-right text-sm text-gray-600 dark:text-gray-400">
                         <div>
-                          출현률: <span className="font-semibold">{deck.appearance_percent}%</span>
+                          사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
                         </div>
                         <div>
                           승률:{" "}
@@ -295,45 +295,6 @@ const RecordGroups = () => {
                 </div>
               </div>
 
-              {playerDeckStats.length > 0 && (
-                <>
-                  <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-6 mb-2">유저 사용 덱</h3>
-                  <div className="space-y-2">
-                    {playerDeckStats.map((deck, idx) => (
-                      <div
-                        key={deck.deck_id}
-                        className="flex items-center justify-between border-b pb-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-mono w-6 text-right">
-                            {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`}
-                          </span>
-                          <span className="font-medium text-gray-800 dark:text-gray-200">{deck.deck_name}</span>
-                        </div>
-                        <div className="text-right text-sm text-gray-600 dark:text-gray-400">
-                          <div>
-                            사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
-                          </div>
-                          <div>
-                            승률:{" "}
-                            <span
-                              className={`font-semibold ${
-                                deck.win_rate >= 55
-                                  ? "text-blue-600"
-                                  : deck.win_rate <= 45
-                                  ? "text-red-500"
-                                  : "text-gray-700 dark:text-gray-300"
-                              }`}
-                            >
-                              {deck.win_rate}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
         </div>
