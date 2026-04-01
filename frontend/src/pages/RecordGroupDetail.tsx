@@ -466,35 +466,53 @@ const RecordGroupDetailPage = () => {
   if (!lastMatch || owned_decks.length === 0) return;
 
   const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
-  if (matchedDeck) {
-    setNewMatch((prev) => ({ ...prev, deck: String(matchedDeck.id) }));
-  }
+
+  const base: Partial<MatchForm> = {
+    deck: matchedDeck ? String(matchedDeck.id) : "",
+    opponent_deck: "",
+    opponent_deck_name: "",
+    first_or_second: "first",
+    coin_toss_result: "win",
+    result: "",
+    notes: "",
+  };
 
   if (lastMatch.rank) {
     setUseRankOrScore("rank");
     setNewMatch((prev) => ({
       ...prev,
+      ...base,
       rank: lastMatch.rank!,
       wins: lastMatch.wins,
       score: "",
+      score_type: "",
     }));
   } else if (lastMatch.score) {
     const st = lastMatch.score_type || "rating";
     setUseRankOrScore(st);
     setNewMatch((prev) => ({
       ...prev,
+      ...base,
       score: String(lastMatch.score),
       score_type: st,
       rank: "",
+      wins: null,
     }));
   } else {
     setUseRankOrScore("none");
-    setNewMatch((prev) => ({ ...prev, rank: "", score: "" }));
+    setNewMatch((prev) => ({
+      ...prev,
+      ...base,
+      rank: "",
+      score: "",
+      score_type: "",
+      wins: null,
+    }));
   }
 }, [lastMatch, owned_decks]);
 
   const handleRegisterMatch = async () => {
-    if (!newMatch.deck) return;
+    if (!newMatch.deck || !newMatch.result) return;
     const oppDeck = newMatch.opponent_deck || "null";
     try {
       await addMatchToRecordGroup(Number(recordGroupId), {
@@ -512,8 +530,6 @@ const RecordGroupDetailPage = () => {
       });
       await loadMatches();
       await loadLastMatch();
-      setNewMatch({ deck: "", opponent_deck: "", opponent_deck_name: "", first_or_second: "first",
-                    coin_toss_result: "win", result: "win", rank: "", wins: null, score: "", score_type: "", notes: "" });
     } catch (error) {
       console.error("기록 추가 실패:", error);
     }
