@@ -473,17 +473,18 @@ const RecordGroupDetailPage = () => {
     opponent_deck_name: "",
     first_or_second: "first",
     coin_toss_result: "win",
-    result: "",
+    result: "win",
     notes: "",
   };
 
   if (lastMatch.rank) {
     setUseRankOrScore("rank");
+    const next = getNextRankState(lastMatch.rank, lastMatch.wins ?? null, "win");
     setNewMatch((prev) => ({
       ...prev,
       ...base,
-      rank: lastMatch.rank!,
-      wins: lastMatch.wins,
+      rank: next.rank,
+      wins: next.wins,
       score: "",
       score_type: "",
     }));
@@ -512,7 +513,7 @@ const RecordGroupDetailPage = () => {
 }, [lastMatch, owned_decks]);
 
   const handleRegisterMatch = async () => {
-    if (!newMatch.deck || !newMatch.result) return;
+    if (!newMatch.deck) return;
     const oppDeck = newMatch.opponent_deck || "null";
     try {
       await addMatchToRecordGroup(Number(recordGroupId), {
