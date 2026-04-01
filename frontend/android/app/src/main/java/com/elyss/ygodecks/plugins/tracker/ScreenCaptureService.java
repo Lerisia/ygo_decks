@@ -277,9 +277,11 @@ public class ScreenCaptureService extends Service {
                         // Calculate rank change immediately
                         if (currentRankValue != null && !currentRankValue.isEmpty()) {
                             boolean isWin = "win".equals(result.value);
+                            String beforeDisplay = RankCalculator.formatDisplay(currentRankValue, currentWinsValue);
                             String[] next = RankCalculator.getNextRankState(currentRankValue, currentWinsValue, isWin);
-                            currentRankDisplay = RankCalculator.formatDisplay(next[0], Integer.parseInt(next[1]));
-                            previewRankDisplay = null;
+                            String afterDisplay = RankCalculator.formatDisplay(next[0], Integer.parseInt(next[1]));
+                            currentRankDisplay = beforeDisplay;
+                            previewRankDisplay = afterDisplay;
                         }
                         // In rating mode, don't show overlay yet — wait for score
                         if (!"rating".equals(ScreenAnalyzer.trackingMode)) {

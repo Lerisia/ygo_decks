@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -239,7 +240,7 @@ public class DetectionOverlay {
             collapseToStatus("저장 완료");
         });
 
-        dismissBtn = makeActionBtn("무시", 0xFF666666);
+        dismissBtn = makeActionBtn("폐기", 0xFF666666);
         dismissBtn.setOnClickListener(v -> {
             ScreenCaptureService.overlayAction = "dismiss";
             closeSearchOverlay();
@@ -291,6 +292,7 @@ public class DetectionOverlay {
         searchInput.setBackground(roundedBg(0xFF333333, 6));
         searchInput.setPadding(dp(8), dp(6), dp(8), dp(6));
         searchInput.setSingleLine(true);
+        searchInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}

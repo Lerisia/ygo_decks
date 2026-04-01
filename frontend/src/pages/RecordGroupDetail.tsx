@@ -5,7 +5,7 @@ import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
-import { getNextRankState } from "@/utils/rankUtils";
+import { getNextRankState, RANK_OPTIONS, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
@@ -80,25 +80,7 @@ type OptionType = {
 
 export const getValidWinOptions = (rank: string): { value: number; label: string }[] => {
   if (!rank) return [];
-
-  const onlyZero = [{ value: 0, label: "0승" }];
-  const zeroAndOne = [{ value: 0, label: "0승" }, { value: 1, label: "1승" },];
-  const zeroToThree = Array.from({ length: 4 }, (_, i) => ({ value: i, label: `${i}승` }));
-  const minusThreeToThree = Array.from({ length: 7 }, (_, i) => ({ value: i - 3, label: `${i - 3}승 ` }));
-  const minusTwoToThree = Array.from({ length: 6 }, (_, i) => ({ value: i - 2, label: `${i - 2}승` }));
-  const zeroToFour = Array.from({ length: 5 }, (_, i) => ({ value: i, label: `${i}승` }));
-  const minusTwoToFour = Array.from({ length: 7 }, (_, i) => ({ value: i - 2, label: `${i - 2}승` }));
-
-  if (rank.startsWith("rookie") || rank.startsWith("bronze")) return onlyZero;
-  if (rank.startsWith("silver")) return zeroAndOne;
-  if (rank.startsWith("gold") || rank === "platinum5" || rank === "diamond5") return zeroToThree;
-  if (rank.startsWith("platinum") && rank !== "platinum5") return minusThreeToThree;
-  if (rank.startsWith("diamond") && rank !== "diamond5") return minusTwoToThree;
-  if (rank === "master5") return zeroToFour;
-  if (["master4", "master3", "master2"].includes(rank)) return minusTwoToFour;
-  if (rank === "master1") return [];
-
-  return [];
+  return getValidWinOpts(rank).map((w) => ({ value: w, label: `${w}승` }));
 };
 
 export const EditMatchModal = ({
@@ -330,47 +312,9 @@ const RecordGroupDetailPage = () => {
   const [isOwner, setIsOwner] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
+  const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
 
-  const RANK_OPTIONS = [
-    { value: "rookie2", label: "루키 2" },
-    { value: "rookie1", label: "루키 1" },
-  
-    { value: "bronze5", label: "브론즈 5" },
-    { value: "bronze4", label: "브론즈 4" },
-    { value: "bronze3", label: "브론즈 3" },
-    { value: "bronze2", label: "브론즈 2" },
-    { value: "bronze1", label: "브론즈 1" },
-  
-    { value: "silver5", label: "실버 5" },
-    { value: "silver4", label: "실버 4" },
-    { value: "silver3", label: "실버 3" },
-    { value: "silver2", label: "실버 2" },
-    { value: "silver1", label: "실버 1" },
-  
-    { value: "gold5", label: "골드 5" },
-    { value: "gold4", label: "골드 4" },
-    { value: "gold3", label: "골드 3" },
-    { value: "gold2", label: "골드 2" },
-    { value: "gold1", label: "골드 1" },
-  
-    { value: "platinum5", label: "플래티넘 5" },
-    { value: "platinum4", label: "플래티넘 4" },
-    { value: "platinum3", label: "플래티넘 3" },
-    { value: "platinum2", label: "플래티넘 2" },
-    { value: "platinum1", label: "플래티넘 1" },
-  
-    { value: "diamond5", label: "다이아 5" },
-    { value: "diamond4", label: "다이아 4" },
-    { value: "diamond3", label: "다이아 3" },
-    { value: "diamond2", label: "다이아 2" },
-    { value: "diamond1", label: "다이아 1" },
-  
-    { value: "master5", label: "마스터 5" },
-    { value: "master4", label: "마스터 4" },
-    { value: "master3", label: "마스터 3" },
-    { value: "master2", label: "마스터 2" },
-    { value: "master1", label: "마스터 1" },
-  ];
+  // RANK_OPTIONS imported from utils/rankUtils
 
   const allOptions: OptionType[] = [
     { value: "null", label: "모름/기타", aliases: [] },
@@ -394,10 +338,19 @@ const RecordGroupDetailPage = () => {
     }
   };
 
+  const loadLastMatch = async () => {
+    try {
+      const data = await getRecordGroupMatches(Number(recordGroupId), 1, 1);
+      const list = data.matches || [];
+      if (list.length > 0) setLastMatch(list[0]);
+    } catch {}
+  };
+
   useEffect(() => {
     loadMatches();
     loadDecks();
     loadUserDecks();
+    loadLastMatch();
   }, [page, pageSize]);
 
   const loadMatches = async () => {
@@ -504,71 +457,41 @@ const RecordGroupDetailPage = () => {
   };
 
   const getValidWinOptions = (rank: string): { value: number; label: string }[] => {
-    if (!rank) return [];
-    const onlyZero = [{ value: 0, label: "0승 " }];
-    const zeroAndOne = [{ value: 0, label: "0승 " }, { value: 1, label: "1승 " },];
-    const zeroToThree = Array.from({ length: 4 }, (_, i) => ({ value: i, label: `${i}승 ` }));
-    const minusThreeToThree = Array.from({ length: 7 }, (_, i) => ({ value: i - 3, label: `${i - 3}승  ` }));
-    const minusTwoToThree = Array.from({ length: 6 }, (_, i) => ({ value: i - 2, label: `${i - 2}승 ` }));
-    const zeroToFour = Array.from({ length: 5 }, (_, i) => ({ value: i, label: `${i}승 ` }));
-    const minusTwoToFour = Array.from({ length: 7 }, (_, i) => ({ value: i - 2, label: `${i - 2}승 ` }));
-    if (rank.startsWith("rookie") || rank.startsWith("bronze")) return onlyZero;
-    if (rank.startsWith("silver")) return zeroAndOne;
-    if (rank.startsWith("gold") || rank === "platinum5" || rank === "diamond5") return zeroToThree;
-    if (rank.startsWith("platinum") && rank !== "platinum5") return minusThreeToThree;
-    if (rank.startsWith("diamond") && rank !== "diamond5") return minusTwoToThree;
-    if (rank === "master5") return zeroToFour;
-    if (["master4", "master3", "master2"].includes(rank)) return minusTwoToFour;
-    if (rank === "master1") return [];
-    return [];
+    return getValidWinOpts(rank).map((w) => ({ value: w, label: `${w}승` }));
   };
 
   
   
  useEffect(() => {
-  if (matches.length > 0 && owned_decks.length > 0) {
-    const lastMatch = matches[0];     
+  if (!lastMatch || owned_decks.length === 0) return;
 
-    const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
-    if (matchedDeck) {
-      setNewMatch((prev) => ({
-        ...prev,
-        deck: String(matchedDeck.id),
-      }));
-    }
-
-    if (lastMatch.rank) {
-      setUseRankOrScore("rank");
-      const next = getNextRankState(
-        lastMatch.rank,
-        lastMatch.wins ?? null,
-        lastMatch.result === "win" ? "win" : "lose"
-      );
-      setNewMatch((prev) => ({
-        ...prev,
-        rank: next.rank,
-        wins: next.wins,
-        score: "",
-      }));
-    } else if (lastMatch.score) {
-      const st = lastMatch.score_type || "rating";
-      setUseRankOrScore(st);
-      setNewMatch((prev) => ({
-        ...prev,
-        score: String(lastMatch.score),
-        score_type: st,
-        rank: "",
-      }));
-    } else {
-      setUseRankOrScore("none");
-      setNewMatch((prev) => ({
-        ...prev,
-        rank: "",
-        score: "",
-      }));
-    }
+  const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
+  if (matchedDeck) {
+    setNewMatch((prev) => ({ ...prev, deck: String(matchedDeck.id) }));
   }
-}, [matches, owned_decks]);
+
+  if (lastMatch.rank) {
+    setUseRankOrScore("rank");
+    setNewMatch((prev) => ({
+      ...prev,
+      rank: lastMatch.rank!,
+      wins: lastMatch.wins,
+      score: "",
+    }));
+  } else if (lastMatch.score) {
+    const st = lastMatch.score_type || "rating";
+    setUseRankOrScore(st);
+    setNewMatch((prev) => ({
+      ...prev,
+      score: String(lastMatch.score),
+      score_type: st,
+      rank: "",
+    }));
+  } else {
+    setUseRankOrScore("none");
+    setNewMatch((prev) => ({ ...prev, rank: "", score: "" }));
+  }
+}, [lastMatch, owned_decks]);
 
   const handleRegisterMatch = async () => {
     if (!newMatch.deck) return;
@@ -588,6 +511,7 @@ const RecordGroupDetailPage = () => {
         notes: newMatch.notes
       });
       await loadMatches();
+      await loadLastMatch();
       setNewMatch({ deck: "", opponent_deck: "", opponent_deck_name: "", first_or_second: "first",
                     coin_toss_result: "win", result: "win", rank: "", wins: null, score: "", score_type: "", notes: "" });
     } catch (error) {
@@ -865,10 +789,9 @@ const RecordGroupDetailPage = () => {
                     onClick={() => {
                       setNewMatch((prev) => {
                         const updated = { ...prev, result: opt.value };
-                        if (matches.length > 0 && matches[0].rank && useRankOrScore === "rank") {
-                          const lastMatch = matches[0];
+                        if (lastMatch?.rank && useRankOrScore === "rank") {
                           const next = getNextRankState(
-                            lastMatch.rank!,
+                            lastMatch.rank,
                             lastMatch.wins ?? null,
                             opt.value as "win" | "lose"
                           );

@@ -197,8 +197,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         setCurrentRank(nextRank);
         setCurrentWins(nextWins);
         // Update native overlay with new current rank
-        const newLabel = getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : "");
-        DuelTracker.setRankDisplay({ current: newLabel, rankValue: nextRank, winsValue: nextWins ?? 0 }).catch(() => {});
+        DuelTracker.setRankDisplay({
+          current: getRankLabel(nextRank) + (nextWins !== null ? ` ${nextWins}승` : ""),
+          rankValue: nextRank,
+          winsValue: nextWins ?? 0,
+        }).catch(() => {});
       }
 
       resetDetection();
