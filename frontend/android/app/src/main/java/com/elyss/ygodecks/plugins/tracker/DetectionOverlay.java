@@ -32,14 +32,11 @@ public class DetectionOverlay {
     // Main overlay
     private LinearLayout rootLayout;
     private TextView statusView;
-    private LinearLayout manualWaitingLayout;  // Manual controls: waiting state
-    private LinearLayout manualDuelLayout;     // Manual controls: in-duel state
     private TextView manualToggleBtn;
-    private TextView manualCoinWinBtn, manualCoinLoseBtn;
-    private TextView manualFsFirstBtn, manualFsSecondBtn;
+    private TextView cancelGameBtn;
+    private LinearLayout manualPanel;  // Dynamic content panel
     private boolean manualPanelOpen = false;
-    private String manualCoin = "win";
-    private String manualFS = "first";
+    private String manualCoin = null;  // null = not yet selected
     private LinearLayout resultLayout;
     private TextView countdownView;
     private TextView coinLabel, fsLabel, resultLabel;
@@ -141,76 +138,25 @@ public class DetectionOverlay {
 
         rootLayout.addView(statusRow);
 
-        // === Manual waiting controls ===
-        manualWaitingLayout = new LinearLayout(context);
-        manualWaitingLayout.setOrientation(LinearLayout.VERTICAL);
-        manualWaitingLayout.setGravity(Gravity.CENTER_HORIZONTAL);
-        manualWaitingLayout.setVisibility(View.GONE);
-        manualWaitingLayout.setPadding(0, dp(6), 0, 0);
+        // === Manual panel (dynamic content) ===
+        manualPanel = new LinearLayout(context);
+        manualPanel.setOrientation(LinearLayout.HORIZONTAL);
+        manualPanel.setGravity(Gravity.CENTER);
+        manualPanel.setVisibility(View.GONE);
+        manualPanel.setPadding(0, dp(6), 0, 0);
+        rootLayout.addView(manualPanel);
 
-        // Coin row
-        LinearLayout mCoinRow = new LinearLayout(context);
-        mCoinRow.setOrientation(LinearLayout.HORIZONTAL);
-        mCoinRow.setGravity(Gravity.CENTER);
-        TextView coinRowLabel = new TextView(context);
-        coinRowLabel.setText("코인 ");
-        coinRowLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        coinRowLabel.setTextColor(TEXT_DIM);
-        mCoinRow.addView(coinRowLabel);
-        manualCoinWinBtn = makeToggleBtn("앞면");
-        manualCoinLoseBtn = makeToggleBtn("뒷면");
-        manualCoinWinBtn.setOnClickListener(v -> { manualCoin = "win"; updateManualButtons(); });
-        manualCoinLoseBtn.setOnClickListener(v -> { manualCoin = "lose"; updateManualButtons(); });
-        mCoinRow.addView(manualCoinWinBtn);
-        mCoinRow.addView(makeSpacer(4));
-        mCoinRow.addView(manualCoinLoseBtn);
-        manualWaitingLayout.addView(mCoinRow);
-        manualWaitingLayout.addView(makeSpacer(4));
-
-        // FS row
-        LinearLayout mFsRow = new LinearLayout(context);
-        mFsRow.setOrientation(LinearLayout.HORIZONTAL);
-        mFsRow.setGravity(Gravity.CENTER);
-        TextView fsRowLabel = new TextView(context);
-        fsRowLabel.setText("순서 ");
-        fsRowLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        fsRowLabel.setTextColor(TEXT_DIM);
-        mFsRow.addView(fsRowLabel);
-        manualFsFirstBtn = makeToggleBtn("선공");
-        manualFsSecondBtn = makeToggleBtn("후공");
-        manualFsFirstBtn.setOnClickListener(v -> { manualFS = "first"; updateManualButtons(); });
-        manualFsSecondBtn.setOnClickListener(v -> { manualFS = "second"; updateManualButtons(); });
-        mFsRow.addView(manualFsFirstBtn);
-        mFsRow.addView(makeSpacer(4));
-        mFsRow.addView(manualFsSecondBtn);
-        manualWaitingLayout.addView(mFsRow);
-        manualWaitingLayout.addView(makeSpacer(6));
-
-        // Game start button
-        TextView gameStartBtn = makeActionBtn("게임 시작", ACCENT_BLUE);
-        gameStartBtn.setOnClickListener(v -> onManualGameStart());
-        manualWaitingLayout.addView(gameStartBtn);
-
-        rootLayout.addView(manualWaitingLayout);
-
-        // === Manual duel controls ===
-        manualDuelLayout = new LinearLayout(context);
-        manualDuelLayout.setOrientation(LinearLayout.HORIZONTAL);
-        manualDuelLayout.setGravity(Gravity.CENTER);
-        manualDuelLayout.setVisibility(View.GONE);
-        manualDuelLayout.setPadding(0, dp(6), 0, 0);
-
-        TextView manualWinBtn = makeActionBtn("승리", ACCENT_GREEN);
-        manualWinBtn.setOnClickListener(v -> onManualResult("win"));
-        manualDuelLayout.addView(manualWinBtn);
-
-        manualDuelLayout.addView(makeSpacer(10));
-
-        TextView manualLoseBtn = makeActionBtn("패배", ACCENT_RED);
-        manualLoseBtn.setOnClickListener(v -> onManualResult("lose"));
-        manualDuelLayout.addView(manualLoseBtn);
-
-        rootLayout.addView(manualDuelLayout);
+        // === Cancel game button (visible during IN_DUEL) ===
+        cancelGameBtn = new TextView(context);
+        cancelGameBtn.setText("취소");
+        cancelGameBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        cancelGameBtn.setTextColor(ACCENT_RED);
+        cancelGameBtn.setBackground(roundedBg(0xFF331111, 4));
+        cancelGameBtn.setPadding(dp(10), dp(4), dp(10), dp(4));
+        cancelGameBtn.setGravity(Gravity.CENTER);
+        cancelGameBtn.setVisibility(View.GONE);
+        cancelGameBtn.setOnClickListener(v -> onCancelGame());
+        rootLayout.addView(cancelGameBtn);
 
         // Result layout
         resultLayout = new LinearLayout(context);
@@ -461,8 +407,15 @@ public class DetectionOverlay {
             if (rootLayout == null) return;
             if (!isExpanded) {
                 statusView.setText(text);
+                // Show cancel button during in-duel (auto or manual)
+                ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
+                boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL) || manualMode;
+                cancelGameBtn.setVisibility(isDuel ? View.VISIBLE : View.GONE);
+                manualToggleBtn.setVisibility(View.VISIBLE);
             } else {
                 updateSummaryLabels();
+                manualToggleBtn.setVisibility(View.GONE);
+                cancelGameBtn.setVisibility(View.GONE);
             }
         });
     }
@@ -487,8 +440,9 @@ public class DetectionOverlay {
             selectedDeckLabel.setVisibility(View.GONE);
 
             statusView.setVisibility(View.GONE);
-            manualWaitingLayout.setVisibility(View.GONE);
-            manualDuelLayout.setVisibility(View.GONE);
+            manualPanel.setVisibility(View.GONE);
+            manualToggleBtn.setVisibility(View.GONE);
+            cancelGameBtn.setVisibility(View.GONE);
             resultLayout.setVisibility(View.VISIBLE);
             editLayout.setVisibility(View.GONE);
             isExpanded = true;
@@ -508,14 +462,13 @@ public class DetectionOverlay {
             isExpanded = false;
             isEditMode = false;
             manualMode = false;
-            manualPanelOpen = false;
-            if (manualToggleBtn != null) manualToggleBtn.setTextColor(TEXT_DIM);
+            closeManualPanel();
+            cancelGameBtn.setVisibility(View.GONE);
             statusView.setText(msg);
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
             editLayout.setVisibility(View.GONE);
-            manualWaitingLayout.setVisibility(View.GONE);
-            manualDuelLayout.setVisibility(View.GONE);
+            manualToggleBtn.setVisibility(View.VISIBLE);
         });
     }
 
@@ -538,45 +491,110 @@ public class DetectionOverlay {
     // === Manual controls ===
 
     private boolean manualMode = false;
+    private int manualStep = 0; // 0=closed, 1=coin, 2=fs (waiting) or 1=result (duel)
 
     private void toggleManualPanel() {
-        manualPanelOpen = !manualPanelOpen;
         if (manualPanelOpen) {
-            ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
-            boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL) || manualMode;
-            manualWaitingLayout.setVisibility(isDuel ? View.GONE : View.VISIBLE);
-            manualDuelLayout.setVisibility(isDuel ? View.VISIBLE : View.GONE);
-            if (!isDuel) updateManualButtons();
-            manualToggleBtn.setTextColor(ACCENT_BLUE);
+            closeManualPanel();
         } else {
-            manualWaitingLayout.setVisibility(View.GONE);
-            manualDuelLayout.setVisibility(View.GONE);
-            manualToggleBtn.setTextColor(TEXT_DIM);
+            openManualPanel();
         }
     }
 
-    private void updateManualButtons() {
-        setToggleState(manualCoinWinBtn, "win".equals(manualCoin));
-        setToggleState(manualCoinLoseBtn, "lose".equals(manualCoin));
-        setToggleState(manualFsFirstBtn, "first".equals(manualFS));
-        setToggleState(manualFsSecondBtn, "second".equals(manualFS));
+    private void openManualPanel() {
+        manualPanelOpen = true;
+        manualCoin = null;
+        manualToggleBtn.setTextColor(ACCENT_BLUE);
+
+        ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
+        boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL) || manualMode;
+
+        if (isDuel) {
+            showManualResultButtons();
+        } else {
+            showManualCoinButtons();
+        }
     }
 
-    private void onManualGameStart() {
+    private void closeManualPanel() {
+        manualPanelOpen = false;
+        manualPanel.setVisibility(View.GONE);
+        manualPanel.removeAllViews();
+        manualToggleBtn.setTextColor(TEXT_DIM);
+    }
+
+    private void showManualCoinButtons() {
+        manualPanel.removeAllViews();
+        manualPanel.setVisibility(View.VISIBLE);
+
+        TextView label = new TextView(context);
+        label.setText("코인 ");
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        label.setTextColor(TEXT_DIM);
+        manualPanel.addView(label);
+
+        TextView winBtn = makeToggleBtn("앞면");
+        winBtn.setOnClickListener(v -> { manualCoin = "win"; showManualFsButtons(); });
+        manualPanel.addView(winBtn);
+        manualPanel.addView(makeSpacer(4));
+
+        TextView loseBtn = makeToggleBtn("뒷면");
+        loseBtn.setOnClickListener(v -> { manualCoin = "lose"; showManualFsButtons(); });
+        manualPanel.addView(loseBtn);
+    }
+
+    private void showManualFsButtons() {
+        manualPanel.removeAllViews();
+
+        TextView label = new TextView(context);
+        label.setText("순서 ");
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        label.setTextColor(TEXT_DIM);
+        manualPanel.addView(label);
+
+        TextView firstBtn = makeToggleBtn("선공");
+        firstBtn.setOnClickListener(v -> onManualGameStart("first"));
+        manualPanel.addView(firstBtn);
+        manualPanel.addView(makeSpacer(4));
+
+        TextView secondBtn = makeToggleBtn("후공");
+        secondBtn.setOnClickListener(v -> onManualGameStart("second"));
+        manualPanel.addView(secondBtn);
+    }
+
+    private void showManualResultButtons() {
+        manualPanel.removeAllViews();
+        manualPanel.setVisibility(View.VISIBLE);
+
+        TextView winBtn = makeActionBtn("승리", ACCENT_GREEN);
+        winBtn.setOnClickListener(v -> onManualResult("win"));
+        manualPanel.addView(winBtn);
+        manualPanel.addView(makeSpacer(10));
+
+        TextView loseBtn = makeActionBtn("패배", ACCENT_RED);
+        loseBtn.setOnClickListener(v -> onManualResult("lose"));
+        manualPanel.addView(loseBtn);
+    }
+
+    private void onManualGameStart(String fs) {
         ScreenCaptureService.lastCoinToss = manualCoin;
-        ScreenCaptureService.lastFirstSecond = manualFS;
+        ScreenCaptureService.lastFirstSecond = fs;
         ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
         manualMode = true;
 
-        manualWaitingLayout.setVisibility(View.GONE);
-        manualDuelLayout.setVisibility(View.VISIBLE);
+        closeManualPanel();
 
         String coinStr = "win".equals(manualCoin) ? "앞면" : "뒷면";
-        String fsStr = "first".equals(manualFS) ? "선공" : "후공";
+        String fsStr = "first".equals(fs) ? "선공" : "후공";
         statusView.setText(coinStr + " / " + fsStr + "  게임 중");
+        cancelGameBtn.setVisibility(View.VISIBLE);
     }
 
     private void onManualResult(String result) {
+        closeManualPanel();
+
+        String coin = manualMode ? manualCoin : ScreenCaptureService.lastCoinToss;
+        String fs = manualMode ? ScreenCaptureService.lastFirstSecond : ScreenCaptureService.lastFirstSecond;
         manualMode = false;
 
         // Calculate rank
@@ -594,20 +612,19 @@ public class DetectionOverlay {
         ScreenCaptureService.lastDuelResult = result;
         ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
 
-        // Show result card
-        showResult(manualCoin, manualFS, result);
+        cancelGameBtn.setVisibility(View.GONE);
+        showResult(coin, fs, result);
     }
 
-    public void setManualPanelVisible(boolean waitingVisible, boolean duelVisible) {
-        handler.post(() -> {
-            ensureRoot();
-            if (rootLayout == null) return;
-            if (!isExpanded) {
-                manualWaitingLayout.setVisibility(waitingVisible ? View.VISIBLE : View.GONE);
-                manualDuelLayout.setVisibility(duelVisible ? View.VISIBLE : View.GONE);
-                if (waitingVisible) updateManualButtons();
-            }
-        });
+    private void onCancelGame() {
+        manualMode = false;
+        closeManualPanel();
+        cancelGameBtn.setVisibility(View.GONE);
+        statusView.setText("대기 중");
+        // Reset detection state
+        ScreenCaptureService.lastCoinToss = null;
+        ScreenCaptureService.lastFirstSecond = null;
+        ScreenCaptureService.lastDuelResult = null;
     }
 
     // === Deck search ===
