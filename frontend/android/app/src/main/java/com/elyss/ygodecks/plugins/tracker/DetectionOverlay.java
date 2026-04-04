@@ -32,6 +32,12 @@ public class DetectionOverlay {
     // Main overlay
     private LinearLayout rootLayout;
     private TextView statusView;
+    private LinearLayout manualWaitingLayout;  // Manual controls: waiting state
+    private LinearLayout manualDuelLayout;     // Manual controls: in-duel state
+    private TextView manualCoinWinBtn, manualCoinLoseBtn;
+    private TextView manualFsFirstBtn, manualFsSecondBtn;
+    private String manualCoin = "win";
+    private String manualFS = "first";
     private LinearLayout resultLayout;
     private TextView countdownView;
     private TextView coinLabel, fsLabel, resultLabel;
@@ -113,6 +119,82 @@ public class DetectionOverlay {
         statusView.setGravity(Gravity.CENTER);
         statusView.setText("대기 중");
         rootLayout.addView(statusView);
+
+        // === Manual waiting controls ===
+        manualWaitingLayout = new LinearLayout(context);
+        manualWaitingLayout.setOrientation(LinearLayout.VERTICAL);
+        manualWaitingLayout.setGravity(Gravity.CENTER_HORIZONTAL);
+        manualWaitingLayout.setVisibility(View.GONE);
+        manualWaitingLayout.setPadding(0, dp(4), 0, 0);
+
+        // Coin row
+        LinearLayout mCoinRow = new LinearLayout(context);
+        mCoinRow.setOrientation(LinearLayout.HORIZONTAL);
+        mCoinRow.setGravity(Gravity.CENTER);
+        manualCoinWinBtn = makeSmallToggle("앞면");
+        manualCoinLoseBtn = makeSmallToggle("뒷면");
+        manualCoinWinBtn.setOnClickListener(v -> { manualCoin = "win"; updateManualButtons(); });
+        manualCoinLoseBtn.setOnClickListener(v -> { manualCoin = "lose"; updateManualButtons(); });
+        mCoinRow.addView(manualCoinWinBtn);
+        mCoinRow.addView(makeSpacer(3));
+        mCoinRow.addView(manualCoinLoseBtn);
+        mCoinRow.addView(makeSpacer(6));
+        manualFsFirstBtn = makeSmallToggle("선공");
+        manualFsSecondBtn = makeSmallToggle("후공");
+        manualFsFirstBtn.setOnClickListener(v -> { manualFS = "first"; updateManualButtons(); });
+        manualFsSecondBtn.setOnClickListener(v -> { manualFS = "second"; updateManualButtons(); });
+        mCoinRow.addView(manualFsFirstBtn);
+        mCoinRow.addView(makeSpacer(3));
+        mCoinRow.addView(manualFsSecondBtn);
+        manualWaitingLayout.addView(mCoinRow);
+
+        manualWaitingLayout.addView(makeSpacer(4));
+
+        // Game start button
+        TextView gameStartBtn = new TextView(context);
+        gameStartBtn.setText("게임 시작");
+        gameStartBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        gameStartBtn.setTextColor(TEXT_WHITE);
+        gameStartBtn.setBackground(roundedBg(ACCENT_BLUE, 6));
+        gameStartBtn.setPadding(dp(16), dp(6), dp(16), dp(6));
+        gameStartBtn.setGravity(Gravity.CENTER);
+        gameStartBtn.setOnClickListener(v -> onManualGameStart());
+        manualWaitingLayout.addView(gameStartBtn);
+
+        rootLayout.addView(manualWaitingLayout);
+
+        // === Manual duel controls ===
+        manualDuelLayout = new LinearLayout(context);
+        manualDuelLayout.setOrientation(LinearLayout.HORIZONTAL);
+        manualDuelLayout.setGravity(Gravity.CENTER);
+        manualDuelLayout.setVisibility(View.GONE);
+        manualDuelLayout.setPadding(0, dp(4), 0, 0);
+
+        TextView manualWinBtn = new TextView(context);
+        manualWinBtn.setText("승리");
+        manualWinBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        manualWinBtn.setTextColor(TEXT_WHITE);
+        manualWinBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        manualWinBtn.setBackground(roundedBg(ACCENT_GREEN, 6));
+        manualWinBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
+        manualWinBtn.setGravity(Gravity.CENTER);
+        manualWinBtn.setOnClickListener(v -> onManualResult("win"));
+        manualDuelLayout.addView(manualWinBtn);
+
+        manualDuelLayout.addView(makeSpacer(8));
+
+        TextView manualLoseBtn = new TextView(context);
+        manualLoseBtn.setText("패배");
+        manualLoseBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        manualLoseBtn.setTextColor(TEXT_WHITE);
+        manualLoseBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        manualLoseBtn.setBackground(roundedBg(ACCENT_RED, 6));
+        manualLoseBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
+        manualLoseBtn.setGravity(Gravity.CENTER);
+        manualLoseBtn.setOnClickListener(v -> onManualResult("lose"));
+        manualDuelLayout.addView(manualLoseBtn);
+
+        rootLayout.addView(manualDuelLayout);
 
         // Result layout
         resultLayout = new LinearLayout(context);
@@ -363,8 +445,16 @@ public class DetectionOverlay {
             if (rootLayout == null) return;
             if (!isExpanded) {
                 statusView.setText(text);
+                // Show manual panels based on state (only if not manually controlling)
+                if (!manualMode) {
+                    ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
+                    boolean isWaiting = (state == ScreenAnalyzer.State.WAITING_MATCH_START);
+                    boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL);
+                    manualWaitingLayout.setVisibility(isWaiting ? View.VISIBLE : View.GONE);
+                    manualDuelLayout.setVisibility(isDuel ? View.VISIBLE : View.GONE);
+                    if (isWaiting) updateManualButtons();
+                }
             } else {
-                // Refresh rank display while expanded (JS updates statics async)
                 updateSummaryLabels();
             }
         });
@@ -390,6 +480,8 @@ public class DetectionOverlay {
             selectedDeckLabel.setVisibility(View.GONE);
 
             statusView.setVisibility(View.GONE);
+            manualWaitingLayout.setVisibility(View.GONE);
+            manualDuelLayout.setVisibility(View.GONE);
             resultLayout.setVisibility(View.VISIBLE);
             editLayout.setVisibility(View.GONE);
             isExpanded = true;
@@ -408,10 +500,13 @@ public class DetectionOverlay {
             stopCountdown();
             isExpanded = false;
             isEditMode = false;
+            manualMode = false;
             statusView.setText(msg);
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
             editLayout.setVisibility(View.GONE);
+            manualWaitingLayout.setVisibility(View.GONE);
+            manualDuelLayout.setVisibility(View.GONE);
         });
     }
 
@@ -429,6 +524,67 @@ public class DetectionOverlay {
             updateSummaryLabels();
             startCountdown(5);
         }
+    }
+
+    // === Manual controls ===
+
+    private boolean manualMode = false;
+
+    private void updateManualButtons() {
+        setToggleState(manualCoinWinBtn, "win".equals(manualCoin));
+        setToggleState(manualCoinLoseBtn, "lose".equals(manualCoin));
+        setToggleState(manualFsFirstBtn, "first".equals(manualFS));
+        setToggleState(manualFsSecondBtn, "second".equals(manualFS));
+    }
+
+    private void onManualGameStart() {
+        // Set coin + first/second in service statics
+        ScreenCaptureService.lastCoinToss = manualCoin;
+        ScreenCaptureService.lastFirstSecond = manualFS;
+        ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
+        manualMode = true;
+
+        // Switch to duel UI
+        manualWaitingLayout.setVisibility(View.GONE);
+        manualDuelLayout.setVisibility(View.VISIBLE);
+
+        String coinStr = "win".equals(manualCoin) ? "앞면" : "뒷면";
+        String fsStr = "first".equals(manualFS) ? "선공" : "후공";
+        statusView.setText(coinStr + " / " + fsStr + "  게임 중");
+    }
+
+    private void onManualResult(String result) {
+        manualMode = false;
+
+        // Calculate rank
+        String rankValue = ScreenCaptureService.currentRankValue;
+        int winsValue = ScreenCaptureService.currentWinsValue;
+        if (rankValue != null && !rankValue.isEmpty()) {
+            boolean isWin = "win".equals(result);
+            String beforeDisplay = RankCalculator.formatDisplay(rankValue, winsValue);
+            String[] next = RankCalculator.getNextRankState(rankValue, winsValue, isWin);
+            String afterDisplay = RankCalculator.formatDisplay(next[0], Integer.parseInt(next[1]));
+            ScreenCaptureService.currentRankDisplay = beforeDisplay;
+            ScreenCaptureService.previewRankDisplay = afterDisplay;
+        }
+
+        ScreenCaptureService.lastDuelResult = result;
+        ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
+
+        // Show result card
+        showResult(manualCoin, manualFS, result);
+    }
+
+    public void setManualPanelVisible(boolean waitingVisible, boolean duelVisible) {
+        handler.post(() -> {
+            ensureRoot();
+            if (rootLayout == null) return;
+            if (!isExpanded) {
+                manualWaitingLayout.setVisibility(waitingVisible ? View.VISIBLE : View.GONE);
+                manualDuelLayout.setVisibility(duelVisible ? View.VISIBLE : View.GONE);
+                if (waitingVisible) updateManualButtons();
+            }
+        });
     }
 
     // === Deck search ===
@@ -655,6 +811,17 @@ public class DetectionOverlay {
         tv.setWidth(dp(40));
         row.addView(tv);
         return row;
+    }
+
+    private TextView makeSmallToggle(String text) {
+        TextView tv = new TextView(context);
+        tv.setText(text);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        tv.setTextColor(TEXT_DIM);
+        tv.setBackground(roundedBg(BTN_INACTIVE, 4));
+        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
+        tv.setGravity(Gravity.CENTER);
+        return tv;
     }
 
     private TextView makeToggleBtn(String text) {
