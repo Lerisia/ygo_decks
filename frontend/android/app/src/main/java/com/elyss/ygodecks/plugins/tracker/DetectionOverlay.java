@@ -33,8 +33,7 @@ public class DetectionOverlay {
     private LinearLayout rootLayout;
     private TextView statusView;
     private TextView manualToggleBtn;
-    private TextView cancelGameBtn;
-    private LinearLayout manualPanel;  // Dynamic content panel
+    private LinearLayout manualPanel;
     private boolean manualPanelOpen = false;
     private String manualCoin = null;  // null = not yet selected
     private LinearLayout resultLayout;
@@ -146,17 +145,7 @@ public class DetectionOverlay {
         manualPanel.setPadding(0, dp(6), 0, 0);
         rootLayout.addView(manualPanel);
 
-        // === Cancel game button (visible during IN_DUEL) ===
-        cancelGameBtn = new TextView(context);
-        cancelGameBtn.setText("취소");
-        cancelGameBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        cancelGameBtn.setTextColor(ACCENT_RED);
-        cancelGameBtn.setBackground(roundedBg(0xFF331111, 4));
-        cancelGameBtn.setPadding(dp(10), dp(4), dp(10), dp(4));
-        cancelGameBtn.setGravity(Gravity.CENTER);
-        cancelGameBtn.setVisibility(View.GONE);
-        cancelGameBtn.setOnClickListener(v -> onCancelGame());
-        rootLayout.addView(cancelGameBtn);
+        // cancelGameBtn is now inside manual panel, no standalone button
 
         // Result layout
         resultLayout = new LinearLayout(context);
@@ -407,15 +396,10 @@ public class DetectionOverlay {
             if (rootLayout == null) return;
             if (!isExpanded) {
                 statusView.setText(text);
-                // Show cancel button during in-duel (auto or manual)
-                ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
-                boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL) || manualMode;
-                cancelGameBtn.setVisibility(isDuel ? View.VISIBLE : View.GONE);
                 manualToggleBtn.setVisibility(View.VISIBLE);
             } else {
                 updateSummaryLabels();
                 manualToggleBtn.setVisibility(View.GONE);
-                cancelGameBtn.setVisibility(View.GONE);
             }
         });
     }
@@ -442,7 +426,6 @@ public class DetectionOverlay {
             statusView.setVisibility(View.GONE);
             manualPanel.setVisibility(View.GONE);
             manualToggleBtn.setVisibility(View.GONE);
-            cancelGameBtn.setVisibility(View.GONE);
             resultLayout.setVisibility(View.VISIBLE);
             editLayout.setVisibility(View.GONE);
             isExpanded = true;
@@ -463,7 +446,6 @@ public class DetectionOverlay {
             isEditMode = false;
             manualMode = false;
             closeManualPanel();
-            cancelGameBtn.setVisibility(View.GONE);
             statusView.setText(msg);
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
@@ -569,11 +551,22 @@ public class DetectionOverlay {
         TextView winBtn = makeActionBtn("승리", ACCENT_GREEN);
         winBtn.setOnClickListener(v -> onManualResult("win"));
         manualPanel.addView(winBtn);
-        manualPanel.addView(makeSpacer(10));
+        manualPanel.addView(makeSpacer(8));
 
         TextView loseBtn = makeActionBtn("패배", ACCENT_RED);
         loseBtn.setOnClickListener(v -> onManualResult("lose"));
         manualPanel.addView(loseBtn);
+        manualPanel.addView(makeSpacer(8));
+
+        TextView cancelBtn = new TextView(context);
+        cancelBtn.setText("게임 중단");
+        cancelBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        cancelBtn.setTextColor(TEXT_DIM);
+        cancelBtn.setBackground(roundedBg(0xFF333333, 6));
+        cancelBtn.setPadding(dp(12), dp(8), dp(12), dp(8));
+        cancelBtn.setGravity(Gravity.CENTER);
+        cancelBtn.setOnClickListener(v -> onCancelGame());
+        manualPanel.addView(cancelBtn);
     }
 
     private void onManualGameStart(String fs) {
@@ -587,7 +580,6 @@ public class DetectionOverlay {
         String coinStr = "win".equals(manualCoin) ? "앞면" : "뒷면";
         String fsStr = "first".equals(fs) ? "선공" : "후공";
         statusView.setText(coinStr + " / " + fsStr + "  게임 중");
-        cancelGameBtn.setVisibility(View.VISIBLE);
     }
 
     private void onManualResult(String result) {
@@ -612,14 +604,12 @@ public class DetectionOverlay {
         ScreenCaptureService.lastDuelResult = result;
         ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
 
-        cancelGameBtn.setVisibility(View.GONE);
         showResult(coin, fs, result);
     }
 
     private void onCancelGame() {
         manualMode = false;
         closeManualPanel();
-        cancelGameBtn.setVisibility(View.GONE);
         statusView.setText("대기 중");
         // Reset detection state
         ScreenCaptureService.lastCoinToss = null;
