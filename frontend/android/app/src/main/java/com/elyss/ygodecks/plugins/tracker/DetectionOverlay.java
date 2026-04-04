@@ -269,6 +269,7 @@ public class DetectionOverlay {
         saveBtn.setOnClickListener(v -> {
             syncOverlayValues();
             ScreenCaptureService.overlayAction = "save";
+            clearDetectionState();
             closeSearchOverlay();
             collapseToStatus("저장 완료");
         });
@@ -276,8 +277,9 @@ public class DetectionOverlay {
         dismissBtn = makeActionBtn("폐기", 0xFF666666);
         dismissBtn.setOnClickListener(v -> {
             ScreenCaptureService.overlayAction = "dismiss";
+            clearDetectionState();
             closeSearchOverlay();
-            collapseToStatus("무시됨");
+            collapseToStatus("대기 중");
         });
 
         actionRow.addView(saveBtn);
@@ -718,6 +720,7 @@ public class DetectionOverlay {
                 if (countdownSeconds <= 0) {
                     syncOverlayValues();
                     ScreenCaptureService.overlayAction = "save";
+                    clearDetectionState();
                     closeSearchOverlay();
                     collapseToStatus("자동 저장됨");
                 } else {
@@ -738,6 +741,13 @@ public class DetectionOverlay {
 
     private void updateCountdownText() {
         countdownView.setText(countdownSeconds + "초");
+    }
+
+    private void clearDetectionState() {
+        ScreenCaptureService.lastCoinToss = null;
+        ScreenCaptureService.lastFirstSecond = null;
+        ScreenCaptureService.lastDuelResult = null;
+        ScreenAnalyzer.reset();
     }
 
     // === Sync ===
