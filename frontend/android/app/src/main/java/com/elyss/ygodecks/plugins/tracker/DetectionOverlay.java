@@ -34,8 +34,10 @@ public class DetectionOverlay {
     private TextView statusView;
     private LinearLayout manualWaitingLayout;  // Manual controls: waiting state
     private LinearLayout manualDuelLayout;     // Manual controls: in-duel state
+    private TextView manualToggleBtn;
     private TextView manualCoinWinBtn, manualCoinLoseBtn;
     private TextView manualFsFirstBtn, manualFsSecondBtn;
+    private boolean manualPanelOpen = false;
     private String manualCoin = "win";
     private String manualFS = "first";
     private LinearLayout resultLayout;
@@ -112,13 +114,32 @@ public class DetectionOverlay {
         rootLayout.setPadding(dp(14), dp(8), dp(14), dp(8));
         rootLayout.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        // Status pill
+        // Status row: status text + manual toggle button
+        LinearLayout statusRow = new LinearLayout(context);
+        statusRow.setOrientation(LinearLayout.HORIZONTAL);
+        statusRow.setGravity(Gravity.CENTER);
+
         statusView = new TextView(context);
         statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         statusView.setTextColor(TEXT_DIM);
-        statusView.setGravity(Gravity.CENTER);
         statusView.setText("대기 중");
-        rootLayout.addView(statusView);
+        statusRow.addView(statusView);
+
+        manualToggleBtn = new TextView(context);
+        manualToggleBtn.setText("수동");
+        manualToggleBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        manualToggleBtn.setTextColor(TEXT_DIM);
+        manualToggleBtn.setBackground(roundedBg(0xFF333333, 4));
+        manualToggleBtn.setPadding(dp(8), dp(3), dp(8), dp(3));
+        manualToggleBtn.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams toggleLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        toggleLp.leftMargin = dp(8);
+        manualToggleBtn.setLayoutParams(toggleLp);
+        manualToggleBtn.setOnClickListener(v -> toggleManualPanel());
+        statusRow.addView(manualToggleBtn);
+
+        rootLayout.addView(statusRow);
 
         // === Manual waiting controls ===
         manualWaitingLayout = new LinearLayout(context);
@@ -445,15 +466,6 @@ public class DetectionOverlay {
             if (rootLayout == null) return;
             if (!isExpanded) {
                 statusView.setText(text);
-                // Show manual panels based on state (only if not manually controlling)
-                if (!manualMode) {
-                    ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
-                    boolean isWaiting = (state == ScreenAnalyzer.State.WAITING_MATCH_START);
-                    boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL);
-                    manualWaitingLayout.setVisibility(isWaiting ? View.VISIBLE : View.GONE);
-                    manualDuelLayout.setVisibility(isDuel ? View.VISIBLE : View.GONE);
-                    if (isWaiting) updateManualButtons();
-                }
             } else {
                 updateSummaryLabels();
             }
@@ -501,6 +513,8 @@ public class DetectionOverlay {
             isExpanded = false;
             isEditMode = false;
             manualMode = false;
+            manualPanelOpen = false;
+            if (manualToggleBtn != null) manualToggleBtn.setTextColor(TEXT_DIM);
             statusView.setText(msg);
             statusView.setVisibility(View.VISIBLE);
             resultLayout.setVisibility(View.GONE);
@@ -530,6 +544,22 @@ public class DetectionOverlay {
 
     private boolean manualMode = false;
 
+    private void toggleManualPanel() {
+        manualPanelOpen = !manualPanelOpen;
+        if (manualPanelOpen) {
+            ScreenAnalyzer.State state = ScreenAnalyzer.getCurrentState();
+            boolean isDuel = (state == ScreenAnalyzer.State.IN_DUEL) || manualMode;
+            manualWaitingLayout.setVisibility(isDuel ? View.GONE : View.VISIBLE);
+            manualDuelLayout.setVisibility(isDuel ? View.VISIBLE : View.GONE);
+            if (!isDuel) updateManualButtons();
+            manualToggleBtn.setTextColor(ACCENT_BLUE);
+        } else {
+            manualWaitingLayout.setVisibility(View.GONE);
+            manualDuelLayout.setVisibility(View.GONE);
+            manualToggleBtn.setTextColor(TEXT_DIM);
+        }
+    }
+
     private void updateManualButtons() {
         setToggleState(manualCoinWinBtn, "win".equals(manualCoin));
         setToggleState(manualCoinLoseBtn, "lose".equals(manualCoin));
@@ -538,13 +568,11 @@ public class DetectionOverlay {
     }
 
     private void onManualGameStart() {
-        // Set coin + first/second in service statics
         ScreenCaptureService.lastCoinToss = manualCoin;
         ScreenCaptureService.lastFirstSecond = manualFS;
         ScreenCaptureService.lastDetectionTime = System.currentTimeMillis();
         manualMode = true;
 
-        // Switch to duel UI
         manualWaitingLayout.setVisibility(View.GONE);
         manualDuelLayout.setVisibility(View.VISIBLE);
 
