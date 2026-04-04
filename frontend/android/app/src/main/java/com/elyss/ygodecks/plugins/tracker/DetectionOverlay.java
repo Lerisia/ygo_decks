@@ -146,39 +146,48 @@ public class DetectionOverlay {
         manualWaitingLayout.setOrientation(LinearLayout.VERTICAL);
         manualWaitingLayout.setGravity(Gravity.CENTER_HORIZONTAL);
         manualWaitingLayout.setVisibility(View.GONE);
-        manualWaitingLayout.setPadding(0, dp(4), 0, 0);
+        manualWaitingLayout.setPadding(0, dp(6), 0, 0);
 
         // Coin row
         LinearLayout mCoinRow = new LinearLayout(context);
         mCoinRow.setOrientation(LinearLayout.HORIZONTAL);
         mCoinRow.setGravity(Gravity.CENTER);
-        manualCoinWinBtn = makeSmallToggle("앞면");
-        manualCoinLoseBtn = makeSmallToggle("뒷면");
+        TextView coinRowLabel = new TextView(context);
+        coinRowLabel.setText("코인 ");
+        coinRowLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        coinRowLabel.setTextColor(TEXT_DIM);
+        mCoinRow.addView(coinRowLabel);
+        manualCoinWinBtn = makeToggleBtn("앞면");
+        manualCoinLoseBtn = makeToggleBtn("뒷면");
         manualCoinWinBtn.setOnClickListener(v -> { manualCoin = "win"; updateManualButtons(); });
         manualCoinLoseBtn.setOnClickListener(v -> { manualCoin = "lose"; updateManualButtons(); });
         mCoinRow.addView(manualCoinWinBtn);
-        mCoinRow.addView(makeSpacer(3));
+        mCoinRow.addView(makeSpacer(4));
         mCoinRow.addView(manualCoinLoseBtn);
-        mCoinRow.addView(makeSpacer(6));
-        manualFsFirstBtn = makeSmallToggle("선공");
-        manualFsSecondBtn = makeSmallToggle("후공");
-        manualFsFirstBtn.setOnClickListener(v -> { manualFS = "first"; updateManualButtons(); });
-        manualFsSecondBtn.setOnClickListener(v -> { manualFS = "second"; updateManualButtons(); });
-        mCoinRow.addView(manualFsFirstBtn);
-        mCoinRow.addView(makeSpacer(3));
-        mCoinRow.addView(manualFsSecondBtn);
         manualWaitingLayout.addView(mCoinRow);
-
         manualWaitingLayout.addView(makeSpacer(4));
 
+        // FS row
+        LinearLayout mFsRow = new LinearLayout(context);
+        mFsRow.setOrientation(LinearLayout.HORIZONTAL);
+        mFsRow.setGravity(Gravity.CENTER);
+        TextView fsRowLabel = new TextView(context);
+        fsRowLabel.setText("순서 ");
+        fsRowLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        fsRowLabel.setTextColor(TEXT_DIM);
+        mFsRow.addView(fsRowLabel);
+        manualFsFirstBtn = makeToggleBtn("선공");
+        manualFsSecondBtn = makeToggleBtn("후공");
+        manualFsFirstBtn.setOnClickListener(v -> { manualFS = "first"; updateManualButtons(); });
+        manualFsSecondBtn.setOnClickListener(v -> { manualFS = "second"; updateManualButtons(); });
+        mFsRow.addView(manualFsFirstBtn);
+        mFsRow.addView(makeSpacer(4));
+        mFsRow.addView(manualFsSecondBtn);
+        manualWaitingLayout.addView(mFsRow);
+        manualWaitingLayout.addView(makeSpacer(6));
+
         // Game start button
-        TextView gameStartBtn = new TextView(context);
-        gameStartBtn.setText("게임 시작");
-        gameStartBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        gameStartBtn.setTextColor(TEXT_WHITE);
-        gameStartBtn.setBackground(roundedBg(ACCENT_BLUE, 6));
-        gameStartBtn.setPadding(dp(16), dp(6), dp(16), dp(6));
-        gameStartBtn.setGravity(Gravity.CENTER);
+        TextView gameStartBtn = makeActionBtn("게임 시작", ACCENT_BLUE);
         gameStartBtn.setOnClickListener(v -> onManualGameStart());
         manualWaitingLayout.addView(gameStartBtn);
 
@@ -189,29 +198,15 @@ public class DetectionOverlay {
         manualDuelLayout.setOrientation(LinearLayout.HORIZONTAL);
         manualDuelLayout.setGravity(Gravity.CENTER);
         manualDuelLayout.setVisibility(View.GONE);
-        manualDuelLayout.setPadding(0, dp(4), 0, 0);
+        manualDuelLayout.setPadding(0, dp(6), 0, 0);
 
-        TextView manualWinBtn = new TextView(context);
-        manualWinBtn.setText("승리");
-        manualWinBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        manualWinBtn.setTextColor(TEXT_WHITE);
-        manualWinBtn.setTypeface(Typeface.DEFAULT_BOLD);
-        manualWinBtn.setBackground(roundedBg(ACCENT_GREEN, 6));
-        manualWinBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
-        manualWinBtn.setGravity(Gravity.CENTER);
+        TextView manualWinBtn = makeActionBtn("승리", ACCENT_GREEN);
         manualWinBtn.setOnClickListener(v -> onManualResult("win"));
         manualDuelLayout.addView(manualWinBtn);
 
-        manualDuelLayout.addView(makeSpacer(8));
+        manualDuelLayout.addView(makeSpacer(10));
 
-        TextView manualLoseBtn = new TextView(context);
-        manualLoseBtn.setText("패배");
-        manualLoseBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        manualLoseBtn.setTextColor(TEXT_WHITE);
-        manualLoseBtn.setTypeface(Typeface.DEFAULT_BOLD);
-        manualLoseBtn.setBackground(roundedBg(ACCENT_RED, 6));
-        manualLoseBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
-        manualLoseBtn.setGravity(Gravity.CENTER);
+        TextView manualLoseBtn = makeActionBtn("패배", ACCENT_RED);
         manualLoseBtn.setOnClickListener(v -> onManualResult("lose"));
         manualDuelLayout.addView(manualLoseBtn);
 
@@ -839,17 +834,6 @@ public class DetectionOverlay {
         tv.setWidth(dp(40));
         row.addView(tv);
         return row;
-    }
-
-    private TextView makeSmallToggle(String text) {
-        TextView tv = new TextView(context);
-        tv.setText(text);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        tv.setTextColor(TEXT_DIM);
-        tv.setBackground(roundedBg(BTN_INACTIVE, 4));
-        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
-        tv.setGravity(Gravity.CENTER);
-        return tv;
     }
 
     private TextView makeToggleBtn(String text) {
