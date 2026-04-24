@@ -352,7 +352,7 @@ export default function TierListMaker() {
 
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
-      <div className="min-h-screen px-3 py-4 md:py-6 max-w-5xl mx-auto">
+      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">
@@ -385,7 +385,7 @@ export default function TierListMaker() {
           </button>
         </div>
 
-        <div ref={exportRef} className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow mb-4">
+        <div ref={exportRef} className="w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow mb-4">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -425,12 +425,12 @@ export default function TierListMaker() {
 
         <DropZone
           onDrop={onPoolDrop}
-          className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[160px]"
+          className="w-full p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[160px]"
         >
           <div className="text-sm text-gray-500 mb-3 font-medium">
             {filteredPool.length}개의 덱 · 드래그해서 티어로 이동
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-items-center">
             {filteredPool.map((d, idx) => (
               <DeckCard
                 key={d.id}
