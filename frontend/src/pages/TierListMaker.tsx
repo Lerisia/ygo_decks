@@ -461,7 +461,7 @@ export default function TierListMaker() {
 
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
-      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
+      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">
