@@ -61,17 +61,27 @@ function DeckCard({
   fromTierId,
   fromIndex,
   onDropOn,
+  onDropOutside,
+  size = "normal",
 }: {
   deck: Deck;
   fromTierId: string | null; // null = pool
   fromIndex: number;
   onDropOn?: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
+  onDropOutside?: (deckId: number) => void;
+  size?: "normal" | "export";
 }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
     item: { id: deck.id, from: { tierId: fromTierId, index: fromIndex } } as DragItem,
+    end: (item, monitor) => {
+      if (!monitor.didDrop() && onDropOutside) {
+        // Dropped outside any valid target — return to pool
+        onDropOutside(item.id);
+      }
+    },
     collect: (m) => ({ isDragging: m.isDragging() }),
-  }), [deck.id, fromTierId, fromIndex]);
+  }), [deck.id, fromTierId, fromIndex, onDropOutside]);
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ITEM_TYPE,
@@ -86,6 +96,22 @@ function DeckCard({
 
   const img = deck.cover_image_small || deck.cover_image || "/default_cover.png";
 
+  if (size === "export") {
+    return (
+      <div className="shrink-0" style={{ width: 96 }}>
+        <img
+          src={img}
+          alt={deck.name}
+          draggable={false}
+          className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300 shadow"
+        />
+        <div className="w-24 text-sm text-center truncate mt-1 text-gray-700 font-semibold">
+          {deck.name}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={(node) => { drag(drop(node)); }}
@@ -96,9 +122,9 @@ function DeckCard({
         src={img}
         alt={deck.name}
         draggable={false}
-        className={`w-16 md:w-20 h-16 md:h-20 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow`}
+        className={`w-20 md:w-24 h-20 md:h-24 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow`}
       />
-      <div className="w-16 md:w-20 text-xs text-center truncate mt-1 text-gray-700 dark:text-gray-300 font-medium">
+      <div className="w-20 md:w-24 text-xs md:text-sm text-center truncate mt-1 text-gray-700 dark:text-gray-300 font-medium">
         {deck.name}
       </div>
     </div>
@@ -142,6 +168,7 @@ function TierRow({
   decks,
   onDropToEnd,
   onDropOnDeck,
+  onDropOutside,
   onRename,
   onRemove,
   onMoveUp,
@@ -155,6 +182,7 @@ function TierRow({
   decks: Deck[];
   onDropToEnd: (item: DragItem) => void;
   onDropOnDeck: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
+  onDropOutside: (deckId: number) => void;
   onRename: (name: string) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -204,6 +232,7 @@ function TierRow({
             fromTierId={tier.id}
             fromIndex={idx}
             onDropOn={onDropOnDeck}
+            onDropOutside={onDropOutside}
           />
         ))}
       </DropZone>
@@ -230,6 +259,75 @@ function TierRow({
   );
 }
 
+// === Fixed-size export layout (landscape, for image save) ===
+function ExportView({
+  title,
+  tiers,
+  deckById,
+}: {
+  title: string;
+  tiers: Tier[];
+  deckById: Map<number, Deck>;
+}) {
+  return (
+    <div style={{ width: 1280, background: "#ffffff", color: "#111827" }}>
+      <div style={{
+        textAlign: "center",
+        fontSize: 32,
+        fontWeight: "bold",
+        padding: 16,
+        borderBottom: "2px solid #e5e7eb",
+      }}>
+        {title}
+      </div>
+      <div>
+        {tiers.map((tier, i) => (
+          <div
+            key={tier.id}
+            style={{
+              display: "flex",
+              borderBottom: "2px solid #e5e7eb",
+              minHeight: 140,
+            }}
+          >
+            <div
+              style={{
+                width: 110,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: getTierColor(i, tiers.length),
+              }}
+            >
+              <div style={{ color: "white", fontWeight: "bold", fontSize: 40, textAlign: "center" }}>
+                {tier.name || "?"}
+              </div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                padding: 12,
+                backgroundColor: "#f9fafb",
+                alignItems: "center",
+              }}
+            >
+              {tier.deckIds.map((id) => {
+                const d = deckById.get(id);
+                if (!d) return null;
+                return <DeckCard key={d.id} deck={d} fromTierId={tier.id} fromIndex={0} size="export" />;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // === Main page ===
 export default function TierListMaker() {
   const [allDecks, setAllDecks] = useState<Deck[]>([]);
@@ -238,7 +336,7 @@ export default function TierListMaker() {
     PRESETS["S-F"].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
   );
   const [title, setTitle] = useState("내 서열표");
-  const exportRef = useRef<HTMLDivElement>(null);
+  const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -330,13 +428,14 @@ export default function TierListMaker() {
   };
 
   const exportImage = async () => {
-    if (!exportRef.current) return;
+    if (!hiddenExportRef.current) return;
     setExporting(true);
     try {
-      const dataUrl = await toPng(exportRef.current, {
+      const dataUrl = await toPng(hiddenExportRef.current, {
         cacheBust: true,
-        backgroundColor: document.documentElement.classList.contains("dark") ? "#111827" : "#ffffff",
+        backgroundColor: "#ffffff",
         pixelRatio: 2,
+        width: 1280,
       });
       const link = document.createElement("a");
       link.download = `${title || "tier-list"}.png`;
@@ -385,7 +484,7 @@ export default function TierListMaker() {
           </button>
         </div>
 
-        <div ref={exportRef} className="w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow mb-4">
+        <div className="w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow mb-4">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -401,6 +500,7 @@ export default function TierListMaker() {
                 decks={tier.deckIds.map((id) => deckById.get(id)).filter(Boolean) as Deck[]}
                 onDropToEnd={onTierEndDrop(tier.id)}
                 onDropOnDeck={onDeckDrop}
+                onDropOutside={(deckId) => moveDeck(deckId, null, -1)}
                 onRename={(name) => renameTier(tier.id, name)}
                 onRemove={() => removeTier(tier.id)}
                 onMoveUp={() => moveTier(tier.id, -1)}
@@ -421,6 +521,13 @@ export default function TierListMaker() {
             placeholder="🔍 덱 검색..."
             className="w-full px-4 py-3 text-base border-2 rounded-lg bg-white dark:bg-gray-800"
           />
+        </div>
+
+        {/* Hidden fixed-size export view */}
+        <div style={{ position: "absolute", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
+          <div ref={hiddenExportRef}>
+            <ExportView title={title} tiers={tiers} deckById={deckById} />
+          </div>
         </div>
 
         <DropZone
