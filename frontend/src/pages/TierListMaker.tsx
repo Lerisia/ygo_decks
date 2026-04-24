@@ -230,7 +230,7 @@ function TierRow({
         className="flex-1 flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 items-center"
       >
         {decks.length === 0 && (
-          <span className="text-sm text-gray-400">여기로 덱을 끌어다 놓으세요</span>
+          <span className="text-sm text-gray-400">덱을 탭하거나 여기로 끌어다 놓으세요</span>
         )}
         {decks.map((d, idx) => (
           <DeckCard
@@ -602,7 +602,7 @@ export default function TierListMaker() {
           className="w-full p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[160px]"
         >
           <div className="text-sm text-gray-500 mb-3 font-medium">
-            {filteredPool.length}개의 덱 · 드래그해서 티어로 이동
+            {filteredPool.length}개의 덱 · 탭하거나 드래그해서 티어로 이동
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-items-center">
             {filteredPool.map((d, idx) => (
