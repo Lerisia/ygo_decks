@@ -107,6 +107,7 @@ function DeckCard({
           src={img}
           alt={deck.name}
           draggable={false}
+          crossOrigin="anonymous"
           className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300 shadow"
         />
         <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
@@ -441,19 +442,35 @@ export default function TierListMaker() {
     if (!hiddenExportRef.current) return;
     setExporting(true);
     try {
+      // Preload all images to avoid race conditions
+      const imgs = hiddenExportRef.current.querySelectorAll("img");
+      await Promise.all(
+        Array.from(imgs).map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete && img.naturalHeight > 0) {
+                resolve();
+              } else {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+              }
+            })
+        )
+      );
+
       const dataUrl = await toPng(hiddenExportRef.current, {
-        cacheBust: true,
         backgroundColor: "#ffffff",
         pixelRatio: 2,
         width: 1280,
+        skipFonts: true,
       });
       const link = document.createElement("a");
       link.download = `${title || "tier-list"}.png`;
       link.href = dataUrl;
       link.click();
-    } catch (e) {
+    } catch (e: any) {
       console.error("export failed", e);
-      alert("이미지 저장 실패");
+      alert("이미지 저장 실패: " + (e?.message || JSON.stringify(e)));
     } finally {
       setExporting(false);
     }
