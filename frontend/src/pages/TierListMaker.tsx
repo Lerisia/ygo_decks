@@ -181,8 +181,8 @@ function DeckCard({
         className={`box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
       />
       <div
-        className="text-[10px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none"
-        style={{ height: 18, paddingTop: 4 }}
+        className="text-[13px] text-center truncate text-gray-700 dark:text-gray-300 font-semibold leading-none flex items-center justify-center"
+        style={{ height: 18 }}
       >
         {deck.name}
       </div>
