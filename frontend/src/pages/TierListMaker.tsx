@@ -177,14 +177,14 @@ function DeckCard({
         src={img}
         alt={deck.name}
         draggable={false}
-        style={{ width: 80, height: 80, display: "block" }}
+        style={{ width: 80, height: 94, display: "block" }}
         className={`box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
       />
       <div
-        className="text-[11px] text-center text-gray-700 dark:text-gray-300 font-medium leading-tight px-0.5 flex-1 flex items-center justify-center overflow-hidden"
-        style={{ lineClamp: 2 }}
+        className="text-[10px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none"
+        style={{ height: 18, paddingTop: 4 }}
       >
-        <span className="line-clamp-2">{deck.name}</span>
+        {deck.name}
       </div>
     </div>
   );
