@@ -202,7 +202,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 h-[112px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[112px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
@@ -228,7 +228,7 @@ function TierRow({
 
       <DropZone
         onDrop={onDropToEnd}
-        className="flex-1 min-w-0 flex flex-nowrap gap-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 items-center overflow-x-auto"
+        className="flex-1 min-w-0 flex flex-wrap gap-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 items-center content-center"
       >
         {decks.length === 0 && (
           <span className="text-sm text-gray-400">덱을 탭하거나 여기로 끌어다 놓으세요</span>
