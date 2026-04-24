@@ -103,14 +103,16 @@ function DeckCard({
   const img = deck.cover_image_small || deck.cover_image || "/default_cover.png";
 
   if (size === "export") {
+    const exportWidth = showLabel ? 96 : 120;
+    const exportImgSize = showLabel ? "w-24 h-24" : "w-[120px] h-[120px]";
     return (
-      <div className="shrink-0" style={{ width: 96 }}>
+      <div className="shrink-0" style={{ width: exportWidth }}>
         <img
           src={img}
           alt={deck.name}
           draggable={false}
           crossOrigin="anonymous"
-          className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300 shadow"
+          className={`${exportImgSize} object-cover rounded-lg border-2 border-gray-300 shadow`}
         />
         {showLabel && (
           <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
@@ -121,27 +123,30 @@ function DeckCard({
     );
   }
 
+  const cardWidth = showLabel ? 80 : 96;
+  const imgSize = showLabel ? "w-20 h-20" : "w-24 h-24";
+
   return (
     <div
       ref={(node) => { drag(drop(node)); }}
-      onClick={() => onTap?.(deck.id)}
-      className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
-      style={{ width: 80 }}
-      title={deck.name}
-    >
-      <img
-        src={img}
-        alt={deck.name}
-        draggable={false}
-        className={`w-20 h-20 box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
-      />
-      {showLabel && (
-        <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
-          {deck.name}
-        </div>
-      )}
-    </div>
-  );
+        onClick={() => onTap?.(deck.id)}
+        className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+        style={{ width: cardWidth }}
+        title={deck.name}
+      >
+        <img
+          src={img}
+          alt={deck.name}
+          draggable={false}
+          className={`${imgSize} box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
+        />
+        {showLabel && (
+          <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
+            {deck.name}
+          </div>
+        )}
+      </div>
+    );
 }
 
 // === Drop zone (container — appends to end) ===
@@ -211,7 +216,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[104px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[108px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
@@ -360,7 +365,7 @@ export default function TierListMaker() {
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
