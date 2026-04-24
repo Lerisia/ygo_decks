@@ -16,37 +16,31 @@ type Deck = {
 type Tier = {
   id: string;
   name: string;
-  color: string;
   deckIds: number[];
 };
 
-const DEFAULT_COLORS = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#84cc16", "#22c55e", "#14b8a6", "#06b6d4",
-  "#3b82f6", "#8b5cf6", "#d946ef", "#ec4899",
-];
+const MAX_TIERS = 8;
 
-const PRESETS: Record<string, { name: string; color: string }[]> = {
-  "S-F": [
-    { name: "S", color: "#ef4444" },
-    { name: "A", color: "#f97316" },
-    { name: "B", color: "#eab308" },
-    { name: "C", color: "#84cc16" },
-    { name: "D", color: "#06b6d4" },
-    { name: "F", color: "#8b5cf6" },
-  ],
-  "1-5": [
-    { name: "1", color: "#ef4444" },
-    { name: "2", color: "#f97316" },
-    { name: "3", color: "#eab308" },
-    { name: "4", color: "#22c55e" },
-    { name: "5", color: "#3b82f6" },
-  ],
-  "상/중/하": [
-    { name: "상", color: "#ef4444" },
-    { name: "중", color: "#eab308" },
-    { name: "하", color: "#3b82f6" },
-  ],
+const COLOR_PALETTES: Record<number, string[]> = {
+  1: ["#ef4444"],
+  2: ["#ef4444", "#3b82f6"],
+  3: ["#ef4444", "#eab308", "#3b82f6"],
+  4: ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6"],
+  5: ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6"],
+  6: ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#8b5cf6"],
+  7: ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e", "#06b6d4", "#8b5cf6"],
+  8: ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6"],
+};
+
+const getTierColor = (index: number, total: number): string => {
+  const palette = COLOR_PALETTES[total] || COLOR_PALETTES[8];
+  return palette[Math.min(index, palette.length - 1)];
+};
+
+const PRESETS: Record<string, string[]> = {
+  "S-F": ["S", "A", "B", "C", "D", "F"],
+  "1-5": ["1", "2", "3", "4", "5"],
+  "상/중/하": ["상", "중", "하"],
 };
 
 const DnDBackends = {
@@ -58,56 +52,83 @@ const DnDBackends = {
 
 const ITEM_TYPE = "DECK";
 
+// Drag item payload
+type DragItem = { id: number; from: { tierId: string | null; index: number } };
+
 // === Draggable deck ===
-function DeckCard({ deck }: { deck: Deck }) {
+function DeckCard({
+  deck,
+  fromTierId,
+  fromIndex,
+  onDropOn,
+}: {
+  deck: Deck;
+  fromTierId: string | null; // null = pool
+  fromIndex: number;
+  onDropOn?: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
+}) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
-    item: { id: deck.id },
+    item: { id: deck.id, from: { tierId: fromTierId, index: fromIndex } } as DragItem,
     collect: (m) => ({ isDragging: m.isDragging() }),
-  }));
+  }), [deck.id, fromTierId, fromIndex]);
+
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: ITEM_TYPE,
+    canDrop: (item: DragItem) => item.id !== deck.id,
+    drop: (item: DragItem) => {
+      if (onDropOn && item.id !== deck.id) {
+        onDropOn(item, fromTierId, fromIndex);
+      }
+    },
+    collect: (m) => ({ isOver: m.isOver() && m.canDrop() }),
+  }), [deck.id, fromTierId, fromIndex, onDropOn]);
 
   const img = deck.cover_image_small || deck.cover_image || "/default_cover.png";
 
   return (
     <div
-      ref={drag as unknown as React.Ref<HTMLDivElement>}
-      className={`shrink-0 cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? "opacity-30" : ""}`}
-      style={{ width: 56 }}
+      ref={(node) => { drag(drop(node)); }}
+      className={`shrink-0 cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
       title={deck.name}
     >
       <img
         src={img}
         alt={deck.name}
         draggable={false}
-        className="w-14 h-14 object-cover rounded border border-gray-300 dark:border-gray-600"
+        className={`w-16 md:w-20 h-16 md:h-20 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow`}
       />
-      <div className="text-[10px] text-center truncate mt-0.5 text-gray-700 dark:text-gray-300">
+      <div className="w-16 md:w-20 text-xs text-center truncate mt-1 text-gray-700 dark:text-gray-300 font-medium">
         {deck.name}
       </div>
     </div>
   );
 }
 
-// === Drop zone ===
+// === Drop zone (container — appends to end) ===
 function DropZone({
   onDrop,
   children,
   className,
 }: {
-  onDrop: (deckId: number) => void;
+  onDrop: (item: DragItem) => void;
   children: React.ReactNode;
   className?: string;
 }) {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ITEM_TYPE,
-    drop: (item: { id: number }) => onDrop(item.id),
-    collect: (m) => ({ isOver: m.isOver() }),
+    drop: (item: DragItem, monitor) => {
+      // Only fire if a child didn't already handle it
+      if (monitor.didDrop()) return;
+      onDrop(item);
+    },
+    collect: (m) => ({ isOver: m.isOver({ shallow: true }) }),
   }));
 
   return (
     <div
       ref={drop as unknown as React.Ref<HTMLDivElement>}
-      className={`${className || ""} ${isOver ? "ring-2 ring-blue-400" : ""}`}
+      className={`${className || ""} ${isOver ? "ring-4 ring-blue-400" : ""}`}
     >
       {children}
     </div>
@@ -117,35 +138,38 @@ function DropZone({
 // === Tier row ===
 function TierRow({
   tier,
+  color,
   decks,
-  onDrop,
+  onDropToEnd,
+  onDropOnDeck,
   onRename,
-  onColorChange,
   onRemove,
   onMoveUp,
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  canRemove,
 }: {
   tier: Tier;
+  color: string;
   decks: Deck[];
-  onDrop: (deckId: number) => void;
+  onDropToEnd: (item: DragItem) => void;
+  onDropOnDeck: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
   onRename: (name: string) => void;
-  onColorChange: (color: string) => void;
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  canRemove: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [showColors, setShowColors] = useState(false);
 
   return (
-    <div className="flex border-b border-gray-300 dark:border-gray-700 min-h-[72px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[100px] md:min-h-[120px]">
       <div
-        className="flex flex-col items-center justify-center shrink-0 w-16 relative"
-        style={{ backgroundColor: tier.color }}
+        className="flex items-center justify-center shrink-0 w-20 md:w-24"
+        style={{ backgroundColor: color }}
       >
         {editing ? (
           <input
@@ -154,64 +178,53 @@ function TierRow({
             onChange={(e) => onRename(e.target.value)}
             onBlur={() => setEditing(false)}
             onKeyDown={(e) => { if (e.key === "Enter") setEditing(false); }}
-            className="w-12 text-center bg-white/20 text-white font-bold text-lg rounded px-1"
+            className="w-16 text-center bg-white/20 text-white font-bold text-2xl md:text-3xl rounded px-1"
           />
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="text-white font-bold text-lg tracking-wide"
+            className="text-white font-bold text-2xl md:text-3xl tracking-wide w-full h-full"
           >
             {tier.name || "?"}
           </button>
         )}
-        <button
-          onClick={() => setShowColors((s) => !s)}
-          className="text-[9px] text-white/80 mt-1 underline"
-        >
-          색
-        </button>
-        {showColors && (
-          <div className="absolute top-full left-0 z-10 bg-white dark:bg-gray-800 rounded shadow p-2 grid grid-cols-4 gap-1">
-            {DEFAULT_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => { onColorChange(c); setShowColors(false); }}
-                className="w-5 h-5 rounded border border-gray-300 dark:border-gray-600"
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       <DropZone
-        onDrop={onDrop}
-        className="flex-1 flex flex-wrap gap-1 p-2 bg-gray-50 dark:bg-gray-800 items-center"
+        onDrop={onDropToEnd}
+        className="flex-1 flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 items-center"
       >
         {decks.length === 0 && (
-          <span className="text-xs text-gray-400">여기로 덱을 끌어다 놓으세요</span>
+          <span className="text-sm text-gray-400">여기로 덱을 끌어다 놓으세요</span>
         )}
-        {decks.map((d) => <DeckCard key={d.id} deck={d} />)}
+        {decks.map((d, idx) => (
+          <DeckCard
+            key={d.id}
+            deck={d}
+            fromTierId={tier.id}
+            fromIndex={idx}
+            onDropOn={onDropOnDeck}
+          />
+        ))}
       </DropZone>
 
-      <div className="flex flex-col justify-center gap-0.5 px-1 bg-gray-100 dark:bg-gray-900 shrink-0">
+      <div className="flex flex-col justify-center gap-1 px-2 bg-gray-100 dark:bg-gray-900 shrink-0 w-10 md:w-12">
         <button
           onClick={onMoveUp}
           disabled={!canMoveUp}
-          className="text-xs text-gray-600 dark:text-gray-400 disabled:opacity-30 px-1"
-          title="위로"
+          className="text-base text-gray-600 dark:text-gray-400 disabled:opacity-30 py-1"
         >▲</button>
         <button
           onClick={onMoveDown}
           disabled={!canMoveDown}
-          className="text-xs text-gray-600 dark:text-gray-400 disabled:opacity-30 px-1"
-          title="아래로"
+          className="text-base text-gray-600 dark:text-gray-400 disabled:opacity-30 py-1"
         >▼</button>
-        <button
-          onClick={onRemove}
-          className="text-xs text-red-500 px-1"
-          title="삭제"
-        >✕</button>
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            className="text-base text-red-500 py-1"
+          >✕</button>
+        )}
       </div>
     </div>
   );
@@ -222,7 +235,7 @@ export default function TierListMaker() {
   const [allDecks, setAllDecks] = useState<Deck[]>([]);
   const [search, setSearch] = useState("");
   const [tiers, setTiers] = useState<Tier[]>(
-    PRESETS["S-F"].map((t, i) => ({ id: `t${i}-${Date.now()}`, name: t.name, color: t.color, deckIds: [] }))
+    PRESETS["S-F"].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
   );
   const [title, setTitle] = useState("내 서열표");
   const exportRef = useRef<HTMLDivElement>(null);
@@ -247,35 +260,57 @@ export default function TierListMaker() {
     return m;
   }, [allDecks]);
 
-  const removeDeckFromTiers = (deckId: number) => {
-    setTiers((prev) => prev.map((t) => ({ ...t, deckIds: t.deckIds.filter((id) => id !== deckId) })));
-  };
-
-  const onTierDrop = (tierId: string, deckId: number) => {
+  // Move deck: remove from source, insert at target (or append if targetIndex = -1)
+  const moveDeck = (deckId: number, targetTierId: string | null, targetIndex: number) => {
     setTiers((prev) => {
-      const cleaned = prev.map((t) => ({ ...t, deckIds: t.deckIds.filter((id) => id !== deckId) }));
-      return cleaned.map((t) => t.id === tierId ? { ...t, deckIds: [...t.deckIds, deckId] } : t);
+      const cleaned = prev.map((t) => ({
+        ...t,
+        deckIds: t.deckIds.filter((id) => id !== deckId),
+      }));
+      if (targetTierId === null) return cleaned; // moved to pool
+      return cleaned.map((t) => {
+        if (t.id !== targetTierId) return t;
+        const newIds = [...t.deckIds];
+        if (targetIndex < 0 || targetIndex >= newIds.length) {
+          newIds.push(deckId);
+        } else {
+          newIds.splice(targetIndex, 0, deckId);
+        }
+        return { ...t, deckIds: newIds };
+      });
     });
   };
 
-  const onPoolDrop = (deckId: number) => {
-    removeDeckFromTiers(deckId);
+  const onTierEndDrop = (tierId: string) => (item: DragItem) => {
+    moveDeck(item.id, tierId, -1);
+  };
+
+  const onDeckDrop = (item: DragItem, targetTierId: string | null, targetIndex: number) => {
+    // If same tier, adjust index for removal
+    if (item.from.tierId === targetTierId && item.from.index < targetIndex) {
+      moveDeck(item.id, targetTierId, targetIndex);
+    } else {
+      moveDeck(item.id, targetTierId, targetIndex);
+    }
+  };
+
+  const onPoolDrop = (item: DragItem) => {
+    moveDeck(item.id, null, -1);
   };
 
   const addTier = () => {
+    if (tiers.length >= MAX_TIERS) return;
     const idx = tiers.length;
-    const color = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-    setTiers([...tiers, { id: `t${Date.now()}`, name: String.fromCharCode(65 + idx), color, deckIds: [] }]);
+    setTiers([...tiers, { id: `t${Date.now()}`, name: String.fromCharCode(65 + idx), deckIds: [] }]);
   };
 
   const renameTier = (id: string, name: string) =>
     setTiers((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
 
-  const colorTier = (id: string, color: string) =>
-    setTiers((prev) => prev.map((t) => t.id === id ? { ...t, color } : t));
-
-  const removeTier = (id: string) =>
+  const removeTier = (id: string) => {
+    if (tiers.length <= 1) return;
     setTiers((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const moveTier = (id: string, dir: -1 | 1) => {
     setTiers((prev) => {
@@ -291,7 +326,7 @@ export default function TierListMaker() {
   const applyPreset = (key: string) => {
     const preset = PRESETS[key];
     if (!preset) return;
-    setTiers(preset.map((t, i) => ({ id: `t${i}-${Date.now()}`, name: t.name, color: t.color, deckIds: [] })));
+    setTiers(preset.map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] })));
   };
 
   const exportImage = async () => {
@@ -318,31 +353,35 @@ export default function TierListMaker() {
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
       <div className="min-h-screen px-3 py-4 md:py-6 max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-center mb-4">서열표 만들기</h1>
+        <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
-        <div className="flex flex-wrap gap-2 mb-3 items-center">
-          <span className="text-sm font-semibold">프리셋:</span>
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <span className="text-base font-semibold w-full md:w-auto">프리셋</span>
           {Object.keys(PRESETS).map((k) => (
             <button
               key={k}
               onClick={() => applyPreset(k)}
-              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
             >
               {k}
             </button>
           ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={addTier}
-            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 ml-auto"
+            disabled={tiers.length >= MAX_TIERS}
+            className="flex-1 px-4 py-3 text-base bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50"
           >
-            + 티어 추가
+            + 티어 추가 ({tiers.length}/{MAX_TIERS})
           </button>
           <button
             onClick={exportImage}
             disabled={exporting}
-            className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+            className="flex-1 px-4 py-3 text-base bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold disabled:opacity-50"
           >
-            {exporting ? "저장 중..." : "이미지 저장"}
+            {exporting ? "저장 중..." : "💾 이미지 저장"}
           </button>
         </div>
 
@@ -350,7 +389,7 @@ export default function TierListMaker() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-center text-lg font-bold p-2 border-b border-gray-200 dark:border-gray-700 bg-transparent"
+            className="w-full text-center text-xl font-bold p-3 border-b-2 border-gray-200 dark:border-gray-700 bg-transparent"
             placeholder="서열표 제목"
           />
           <div>
@@ -358,39 +397,48 @@ export default function TierListMaker() {
               <TierRow
                 key={tier.id}
                 tier={tier}
+                color={getTierColor(i, tiers.length)}
                 decks={tier.deckIds.map((id) => deckById.get(id)).filter(Boolean) as Deck[]}
-                onDrop={(deckId) => onTierDrop(tier.id, deckId)}
+                onDropToEnd={onTierEndDrop(tier.id)}
+                onDropOnDeck={onDeckDrop}
                 onRename={(name) => renameTier(tier.id, name)}
-                onColorChange={(color) => colorTier(tier.id, color)}
                 onRemove={() => removeTier(tier.id)}
                 onMoveUp={() => moveTier(tier.id, -1)}
                 onMoveDown={() => moveTier(tier.id, 1)}
                 canMoveUp={i > 0}
                 canMoveDown={i < tiers.length - 1}
+                canRemove={tiers.length > 1}
               />
             ))}
           </div>
         </div>
 
-        <div className="mb-2">
+        <div className="mb-3">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="덱 검색..."
-            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+            placeholder="🔍 덱 검색..."
+            className="w-full px-4 py-3 text-base border-2 rounded-lg bg-white dark:bg-gray-800"
           />
         </div>
 
         <DropZone
           onDrop={onPoolDrop}
-          className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[120px]"
+          className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[160px]"
         >
-          <div className="text-xs text-gray-500 mb-2">
-            {filteredPool.length}개의 덱 (드래그해서 티어로 이동)
+          <div className="text-sm text-gray-500 mb-3 font-medium">
+            {filteredPool.length}개의 덱 · 드래그해서 티어로 이동
           </div>
-          <div className="flex flex-wrap gap-2">
-            {filteredPool.map((d) => <DeckCard key={d.id} deck={d} />)}
+          <div className="flex flex-wrap gap-3">
+            {filteredPool.map((d, idx) => (
+              <DeckCard
+                key={d.id}
+                deck={d}
+                fromTierId={null}
+                fromIndex={idx}
+              />
+            ))}
           </div>
         </DropZone>
       </div>
