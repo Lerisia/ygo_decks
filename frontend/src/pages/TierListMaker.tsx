@@ -151,24 +151,25 @@ function DeckCard({
   return (
     <div
       ref={(node) => { drag(drop(node)); }}
-        onClick={() => onTap?.(deck.id)}
-        className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
-        style={{ width: cardWidth }}
-        title={deck.name}
-      >
-        <img
-          src={img}
-          alt={deck.name}
-          draggable={false}
-          className={`${imgSize} box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
-        />
-        {showLabel && (
-          <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
-            {deck.name}
-          </div>
-        )}
-      </div>
-    );
+      onClick={() => onTap?.(deck.id)}
+      className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+      style={{ width: cardWidth, height: showLabel ? undefined : 112 }}
+      title={deck.name}
+    >
+      <img
+        src={img}
+        alt={deck.name}
+        draggable={false}
+        style={{ display: "block" }}
+        className={`${imgSize} box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
+      />
+      {showLabel && (
+        <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
+          {deck.name}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // === Drop zone (container — appends to end) ===
