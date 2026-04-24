@@ -604,16 +604,22 @@ export default function TierListMaker() {
           <div className="text-sm text-gray-500 mb-3 font-medium">
             {filteredPool.length}개의 덱 · 탭하거나 드래그해서 티어로 이동
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-items-center">
-            {filteredPool.map((d, idx) => (
-              <DeckCard
-                key={d.id}
-                deck={d}
-                fromTierId={null}
-                fromIndex={idx}
-                onTap={(deckId) => setTapMenuDeckId(deckId)}
-              />
-            ))}
+          <div className="w-full grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-items-center">
+            {filteredPool.length === 0 ? (
+              <div className="col-span-full text-center text-gray-400 py-6 text-sm">
+                {search ? "검색 결과가 없습니다" : "모든 덱이 배치되었습니다"}
+              </div>
+            ) : (
+              filteredPool.map((d, idx) => (
+                <DeckCard
+                  key={d.id}
+                  deck={d}
+                  fromTierId={null}
+                  fromIndex={idx}
+                  onTap={(deckId) => setTapMenuDeckId(deckId)}
+                />
+              ))
+            )}
           </div>
         </DropZone>
       </div>
