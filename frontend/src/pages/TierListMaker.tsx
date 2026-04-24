@@ -459,7 +459,7 @@ export default function TierListMaker() {
   const [tiers, setTiers] = useState<Tier[]>(
     PRESETS[DEFAULT_PRESET].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
   );
-  const [title, setTitle] = useState("내 서열표");
+  const [title, setTitle] = useState("내 티어표");
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
@@ -595,7 +595,7 @@ export default function TierListMaker() {
     <DndProvider backend={MultiBackend} options={DnDBackends}>
       <AutoScroller />
       <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
+        <h1 className="text-3xl font-bold text-center mb-4">티어표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">
           <span className="text-base font-semibold w-full md:w-auto">프리셋</span>
@@ -642,7 +642,7 @@ export default function TierListMaker() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full text-center text-xl font-bold p-3 border-b-2 border-gray-200 dark:border-gray-700 bg-transparent"
-            placeholder="서열표 제목"
+            placeholder="티어표 제목"
           />
           <div>
             {tiers.map((tier, i) => (
