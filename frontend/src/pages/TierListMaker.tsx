@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { DndProvider, useDrag, useDrop, useDragLayer } from "react-dnd";
 import { MultiBackend, TouchTransition, MouseTransition } from "react-dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
@@ -238,7 +238,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[108px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[100px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
@@ -264,7 +264,7 @@ function TierRow({
 
       <DropZone
         onDrop={onDropToEnd}
-        className="flex-1 min-w-0 flex flex-wrap gap-1 px-2 py-0.5 bg-gray-50 dark:bg-gray-800 items-center content-center"
+        className="flex-1 min-w-0 flex flex-wrap gap-1 px-2 py-0 bg-gray-50 dark:bg-gray-800 items-center content-center"
       >
         {decks.length === 0 && (
           <span className="text-sm text-gray-400">덱을 탭하거나 여기로 끌어다 놓으세요</span>
@@ -303,6 +303,49 @@ function TierRow({
       </div>
     </div>
   );
+}
+
+// === Auto-scroll window when dragging near edges ===
+function AutoScroller() {
+  const isDragging = useDragLayer((m) => m.isDragging());
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    let currentY = 0;
+    let animId = 0;
+    const SCROLL_ZONE = 120;
+    const SCROLL_SPEED = 18;
+
+    const onMove = (e: any) => {
+      if (e.touches && e.touches[0]) currentY = e.touches[0].clientY;
+      else if (typeof e.clientY === "number") currentY = e.clientY;
+    };
+
+    const loop = () => {
+      const vh = window.innerHeight;
+      if (currentY > 0) {
+        if (currentY < SCROLL_ZONE) {
+          window.scrollBy(0, -SCROLL_SPEED);
+        } else if (currentY > vh - SCROLL_ZONE) {
+          window.scrollBy(0, SCROLL_SPEED);
+        }
+      }
+      animId = requestAnimationFrame(loop);
+    };
+
+    window.addEventListener("dragover", onMove);
+    window.addEventListener("touchmove", onMove, { passive: true });
+    animId = requestAnimationFrame(loop);
+
+    return () => {
+      window.removeEventListener("dragover", onMove);
+      window.removeEventListener("touchmove", onMove);
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [isDragging]);
+
+  return null;
 }
 
 // === Fixed-size export layout (landscape, for image save) ===
@@ -517,6 +560,7 @@ export default function TierListMaker() {
 
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
+      <AutoScroller />
       <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
