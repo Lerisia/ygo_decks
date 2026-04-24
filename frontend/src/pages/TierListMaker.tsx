@@ -74,7 +74,7 @@ function DeckCard({
   onDropOn?: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
   onDropOutside?: (deckId: number) => void;
   onTap?: (deckId: number) => void;
-  size?: "normal" | "export";
+  size?: "normal" | "export" | "pool";
   showLabel?: boolean;
 }) {
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -101,6 +101,28 @@ function DeckCard({
   }), [deck.id, fromTierId, fromIndex, onDropOn]);
 
   const img = deck.cover_image_small || deck.cover_image || "/default_cover.png";
+
+  if (size === "pool") {
+    return (
+      <div
+        ref={(node) => { drag(drop(node)); }}
+        onClick={() => onTap?.(deck.id)}
+        className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col items-center ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+        style={{ width: 100 }}
+        title={deck.name}
+      >
+        <img
+          src={img}
+          alt={deck.name}
+          draggable={false}
+          className="w-24 h-24 box-border object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600 shadow shrink-0"
+        />
+        <div className="w-24 text-[13px] text-center truncate text-gray-700 dark:text-gray-200 font-medium leading-tight mt-1">
+          {deck.name}
+        </div>
+      </div>
+    );
+  }
 
   if (size === "export") {
     const exportWidth = showLabel ? 96 : 120;
@@ -650,7 +672,7 @@ export default function TierListMaker() {
           <div className="text-sm text-gray-500 mb-3 font-medium">
             {filteredPool.length}개의 덱 · 탭하거나 드래그해서 티어로 이동
           </div>
-          <div className="w-full grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-items-center">
+          <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 justify-items-center">
             {filteredPool.length === 0 ? (
               <div className="col-span-full text-center text-gray-400 py-6 text-sm">
                 {search ? "검색 결과가 없습니다" : "모든 덱이 배치되었습니다"}
@@ -663,6 +685,7 @@ export default function TierListMaker() {
                   fromTierId={null}
                   fromIndex={idx}
                   onTap={(deckId) => setTapMenuDeckId(deckId)}
+                  size="pool"
                 />
               ))
             )}
