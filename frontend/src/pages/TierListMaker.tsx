@@ -291,7 +291,7 @@ function ExportView({
   showLabel: boolean;
 }) {
   return (
-    <div style={{ width: 1280, background: "#ffffff", color: "#111827" }}>
+    <div style={{ width: 768, background: "#ffffff", color: "#111827" }}>
       <div style={{
         textAlign: "center",
         fontSize: 32,
@@ -473,7 +473,7 @@ export default function TierListMaker() {
       const dataUrl = await toPng(hiddenExportRef.current, {
         backgroundColor: "#ffffff",
         pixelRatio: 2,
-        width: 1280,
+        width: 768,
         skipFonts: true,
       });
       const link = document.createElement("a");
@@ -490,7 +490,7 @@ export default function TierListMaker() {
 
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
-      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-lg mx-auto">
+      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">
