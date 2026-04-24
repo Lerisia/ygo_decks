@@ -66,6 +66,7 @@ function DeckCard({
   onDropOutside,
   onTap,
   size = "normal",
+  showLabel = true,
 }: {
   deck: Deck;
   fromTierId: string | null; // null = pool
@@ -74,6 +75,7 @@ function DeckCard({
   onDropOutside?: (deckId: number) => void;
   onTap?: (deckId: number) => void;
   size?: "normal" | "export";
+  showLabel?: boolean;
 }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
@@ -110,9 +112,11 @@ function DeckCard({
           crossOrigin="anonymous"
           className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300 shadow"
         />
-        <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
-          {deck.name}
-        </div>
+        {showLabel && (
+          <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
+            {deck.name}
+          </div>
+        )}
       </div>
     );
   }
@@ -131,9 +135,11 @@ function DeckCard({
         draggable={false}
         className={`w-20 h-20 box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
       />
-      <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
-        {deck.name}
-      </div>
+      {showLabel && (
+        <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
+          {deck.name}
+        </div>
+      )}
     </div>
   );
 }
@@ -173,6 +179,7 @@ function TierRow({
   tier,
   color,
   decks,
+  showLabel,
   onDropToEnd,
   onDropOnDeck,
   onDropOutside,
@@ -188,6 +195,7 @@ function TierRow({
   tier: Tier;
   color: string;
   decks: Deck[];
+  showLabel: boolean;
   onDropToEnd: (item: DragItem) => void;
   onDropOnDeck: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
   onDropOutside: (deckId: number) => void;
@@ -243,6 +251,7 @@ function TierRow({
             onDropOn={onDropOnDeck}
             onDropOutside={onDropOutside}
             onTap={onTapDeck}
+            showLabel={showLabel}
           />
         ))}
       </DropZone>
@@ -274,10 +283,12 @@ function ExportView({
   title,
   tiers,
   deckById,
+  showLabel,
 }: {
   title: string;
   tiers: Tier[];
   deckById: Map<number, Deck>;
+  showLabel: boolean;
 }) {
   return (
     <div style={{ width: 1280, background: "#ffffff", color: "#111827" }}>
@@ -328,7 +339,7 @@ function ExportView({
               {tier.deckIds.map((id) => {
                 const d = deckById.get(id);
                 if (!d) return null;
-                return <DeckCard key={d.id} deck={d} fromTierId={tier.id} fromIndex={0} size="export" />;
+                return <DeckCard key={d.id} deck={d} fromTierId={tier.id} fromIndex={0} size="export" showLabel={showLabel} />;
               })}
             </div>
           </div>
@@ -349,6 +360,7 @@ export default function TierListMaker() {
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
+  const [showLabels, setShowLabels] = useState(true);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
@@ -478,7 +490,7 @@ export default function TierListMaker() {
 
   return (
     <DndProvider backend={MultiBackend} options={DnDBackends}>
-      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-3xl mx-auto">
+      <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-lg mx-auto">
         <h1 className="text-3xl font-bold text-center mb-4">서열표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">
@@ -494,7 +506,7 @@ export default function TierListMaker() {
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-2">
           <button
             onClick={addTier}
             disabled={tiers.length >= MAX_TIERS}
@@ -511,6 +523,16 @@ export default function TierListMaker() {
           </button>
         </div>
 
+        <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showLabels}
+            onChange={(e) => setShowLabels(e.target.checked)}
+            className="w-5 h-5"
+          />
+          <span className="text-sm font-medium">덱 이름 표시</span>
+        </label>
+
         <div className="w-full bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow mb-4">
           <input
             value={title}
@@ -525,6 +547,7 @@ export default function TierListMaker() {
                 tier={tier}
                 color={getTierColor(i, tiers.length)}
                 decks={tier.deckIds.map((id) => deckById.get(id)).filter(Boolean) as Deck[]}
+                showLabel={showLabels}
                 onDropToEnd={onTierEndDrop(tier.id)}
                 onDropOnDeck={onDeckDrop}
                 onDropOutside={(deckId) => moveDeck(deckId, null, -1)}
@@ -554,7 +577,7 @@ export default function TierListMaker() {
         {/* Hidden fixed-size export view */}
         <div style={{ position: "absolute", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
           <div ref={hiddenExportRef}>
-            <ExportView title={title} tiers={tiers} deckById={deckById} />
+            <ExportView title={title} tiers={tiers} deckById={deckById} showLabel={showLabels} />
           </div>
         </div>
 
