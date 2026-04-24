@@ -145,8 +145,8 @@ function DeckCard({
     );
   }
 
-  const cardWidth = showLabel ? 80 : 96;
-  const imgSize = showLabel ? "w-20 h-20" : "w-24 h-24";
+  const cardWidth = showLabel ? 80 : 112;
+  const imgSize = showLabel ? "w-20 h-20" : "w-[112px] h-[112px]";
 
   return (
     <div
@@ -238,7 +238,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[100px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[112px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
