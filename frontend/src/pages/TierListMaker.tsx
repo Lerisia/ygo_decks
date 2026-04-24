@@ -130,7 +130,7 @@ function DeckCard({
         draggable={false}
         className={`w-20 h-20 box-border object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
       />
-      <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-tight mt-0.5">
+      <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-none mt-1 mb-0 pb-0">
         {deck.name}
       </div>
     </div>
