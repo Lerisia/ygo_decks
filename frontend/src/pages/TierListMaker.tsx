@@ -48,7 +48,17 @@ const DEFAULT_PRESET = "S-D";
 const DnDBackends = {
   backends: [
     { id: "html5", backend: HTML5Backend, transition: MouseTransition },
-    { id: "touch", backend: TouchBackend, options: { enableMouseEvents: false }, preview: true, transition: TouchTransition },
+    {
+      id: "touch",
+      backend: TouchBackend,
+      options: {
+        enableMouseEvents: false,
+        delayTouchStart: 250,  // press-and-hold 250ms to start drag
+        touchSlop: 8,          // 8px tolerance before drag activates
+      },
+      preview: true,
+      transition: TouchTransition,
+    },
   ],
 };
 
