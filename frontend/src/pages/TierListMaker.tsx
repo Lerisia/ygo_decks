@@ -272,7 +272,7 @@ function TierRow({
   return (
     <div className="flex border-b-2 border-gray-200 dark:border-gray-700" style={{ minHeight: 114 }}>
       <div
-        className="flex items-center justify-center shrink-0 w-20 md:w-24"
+        className="flex items-center justify-center shrink-0 w-12 md:w-24"
         style={{ backgroundColor: color }}
       >
         {editing ? (
@@ -282,12 +282,12 @@ function TierRow({
             onChange={(e) => onRename(e.target.value)}
             onBlur={() => setEditing(false)}
             onKeyDown={(e) => { if (e.key === "Enter") setEditing(false); }}
-            className="w-16 text-center bg-white/20 text-white font-bold text-2xl md:text-3xl rounded px-1"
+            className="w-10 md:w-16 text-center bg-white/20 text-white font-bold text-xl md:text-3xl rounded px-1"
           />
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="text-white font-bold text-2xl md:text-3xl tracking-wide w-full h-full"
+            className="text-white font-bold text-xl md:text-3xl tracking-wide w-full h-full"
           >
             {tier.name || "?"}
           </button>
@@ -315,7 +315,7 @@ function TierRow({
         ))}
       </DropZone>
 
-      <div className="flex flex-col justify-center gap-1 px-2 bg-gray-100 dark:bg-gray-900 shrink-0 w-10 md:w-12">
+      <div className="flex flex-col justify-center gap-1 px-1 md:px-2 bg-gray-100 dark:bg-gray-900 shrink-0 w-8 md:w-12">
         <button
           onClick={onMoveUp}
           disabled={!canMoveUp}
