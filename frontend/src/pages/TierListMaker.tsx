@@ -201,7 +201,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[110px] md:min-h-[126px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
@@ -295,6 +295,7 @@ function ExportView({
             style={{
               display: "flex",
               borderBottom: "2px solid #e5e7eb",
+              minHeight: 128,
             }}
           >
             <div
