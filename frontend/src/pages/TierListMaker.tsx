@@ -121,7 +121,7 @@ function DeckCard({
       ref={(node) => { drag(drop(node)); }}
       onClick={() => onTap?.(deck.id)}
       className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
-      style={{ width: 80, height: 104 }}
+      style={{ width: 80 }}
       title={deck.name}
     >
       <img
