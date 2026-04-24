@@ -257,7 +257,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700" style={{ minHeight: 112 }}>
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700" style={{ minHeight: 114 }}>
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
