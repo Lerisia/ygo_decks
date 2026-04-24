@@ -39,7 +39,6 @@ const getTierColor = (index: number, total: number): string => {
 
 const PRESETS: Record<string, string[]> = {
   "S-D": ["S", "A", "B", "C", "D"],
-  "S-F": ["S", "A", "B", "C", "D", "F"],
   "1-5": ["1", "2", "3", "4", "5"],
   "상/중/하": ["상", "중", "하"],
 };
