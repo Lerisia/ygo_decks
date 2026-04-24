@@ -449,7 +449,7 @@ export default function TierListMaker() {
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
