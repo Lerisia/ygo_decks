@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 const games = [
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞추기" },
+  { to: "/tier-list-maker", icon: "📊", title: "자작 서열표", desc: "덱 티어리스트 만들고 이미지로 저장" },
 ];
 
 function Playground() {

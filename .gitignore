@@ -55,3 +55,7 @@ media/
 *.pt
 *.pth
 *.csv
+
+# Signing keys & certificates
+*.jks
+*.pem

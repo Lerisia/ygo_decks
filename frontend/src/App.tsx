@@ -27,6 +27,7 @@ import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import DeckScanner from "./pages/DeckScanner";
 import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
+import TierListMaker from "./pages/TierListMaker";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
@@ -62,6 +63,7 @@ function App() {
           <Route path="/card-detector" element={<DeckScanner />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/card-quiz" element={<CardQuiz />} />
+          <Route path="/tier-list-maker" element={<TierListMaker />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
