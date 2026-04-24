@@ -38,10 +38,13 @@ const getTierColor = (index: number, total: number): string => {
 };
 
 const PRESETS: Record<string, string[]> = {
+  "S-D": ["S", "A", "B", "C", "D"],
   "S-F": ["S", "A", "B", "C", "D", "F"],
   "1-5": ["1", "2", "3", "4", "5"],
   "상/중/하": ["상", "중", "하"],
 };
+
+const DEFAULT_PRESET = "S-D";
 
 const DnDBackends = {
   backends: [
@@ -62,6 +65,7 @@ function DeckCard({
   fromIndex,
   onDropOn,
   onDropOutside,
+  onTap,
   size = "normal",
 }: {
   deck: Deck;
@@ -69,6 +73,7 @@ function DeckCard({
   fromIndex: number;
   onDropOn?: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
   onDropOutside?: (deckId: number) => void;
+  onTap?: (deckId: number) => void;
   size?: "normal" | "export";
 }) {
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -115,7 +120,8 @@ function DeckCard({
   return (
     <div
       ref={(node) => { drag(drop(node)); }}
-      className={`shrink-0 cursor-grab active:cursor-grabbing touch-none select-none ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+      onClick={() => onTap?.(deck.id)}
+      className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
       title={deck.name}
     >
       <img
@@ -169,6 +175,7 @@ function TierRow({
   onDropToEnd,
   onDropOnDeck,
   onDropOutside,
+  onTapDeck,
   onRename,
   onRemove,
   onMoveUp,
@@ -183,6 +190,7 @@ function TierRow({
   onDropToEnd: (item: DragItem) => void;
   onDropOnDeck: (item: DragItem, targetTierId: string | null, targetIndex: number) => void;
   onDropOutside: (deckId: number) => void;
+  onTapDeck: (deckId: number) => void;
   onRename: (name: string) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -233,6 +241,7 @@ function TierRow({
             fromIndex={idx}
             onDropOn={onDropOnDeck}
             onDropOutside={onDropOutside}
+            onTap={onTapDeck}
           />
         ))}
       </DropZone>
@@ -333,11 +342,12 @@ export default function TierListMaker() {
   const [allDecks, setAllDecks] = useState<Deck[]>([]);
   const [search, setSearch] = useState("");
   const [tiers, setTiers] = useState<Tier[]>(
-    PRESETS["S-F"].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
+    PRESETS[DEFAULT_PRESET].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
   );
   const [title, setTitle] = useState("내 서열표");
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
@@ -501,6 +511,7 @@ export default function TierListMaker() {
                 onDropToEnd={onTierEndDrop(tier.id)}
                 onDropOnDeck={onDeckDrop}
                 onDropOutside={(deckId) => moveDeck(deckId, null, -1)}
+                onTapDeck={(deckId) => setTapMenuDeckId(deckId)}
                 onRename={(name) => renameTier(tier.id, name)}
                 onRemove={() => removeTier(tier.id)}
                 onMoveUp={() => moveTier(tier.id, -1)}
@@ -530,6 +541,63 @@ export default function TierListMaker() {
           </div>
         </div>
 
+        {/* Tap-to-place menu */}
+        {tapMenuDeckId !== null && (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setTapMenuDeckId(null)}
+          >
+            <div
+              className="bg-white dark:bg-gray-800 rounded-xl p-5 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <img
+                  src={deckById.get(tapMenuDeckId)?.cover_image_small || deckById.get(tapMenuDeckId)?.cover_image || "/default_cover.png"}
+                  alt=""
+                  className="w-16 h-16 rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                />
+                <div className="font-semibold text-lg truncate">
+                  {deckById.get(tapMenuDeckId)?.name}
+                </div>
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">티어 선택</div>
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {tiers.map((tier, i) => (
+                  <button
+                    key={tier.id}
+                    onClick={() => {
+                      moveDeck(tapMenuDeckId, tier.id, -1);
+                      setTapMenuDeckId(null);
+                    }}
+                    className="py-3 rounded-lg text-white font-bold text-lg"
+                    style={{ backgroundColor: getTierColor(i, tiers.length) }}
+                  >
+                    {tier.name || "?"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    moveDeck(tapMenuDeckId, null, -1);
+                    setTapMenuDeckId(null);
+                  }}
+                  className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg font-semibold"
+                >
+                  풀로 되돌리기
+                </button>
+                <button
+                  onClick={() => setTapMenuDeckId(null)}
+                  className="flex-1 py-2 bg-gray-300 dark:bg-gray-600 rounded-lg font-semibold"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <DropZone
           onDrop={onPoolDrop}
           className="w-full p-3 bg-gray-100 dark:bg-gray-800 rounded-lg min-h-[160px]"
@@ -544,6 +612,7 @@ export default function TierListMaker() {
                 deck={d}
                 fromTierId={null}
                 fromIndex={idx}
+                onTap={(deckId) => setTapMenuDeckId(deckId)}
               />
             ))}
           </div>
