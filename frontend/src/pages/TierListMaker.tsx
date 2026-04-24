@@ -120,16 +120,17 @@ function DeckCard({
     <div
       ref={(node) => { drag(drop(node)); }}
       onClick={() => onTap?.(deck.id)}
-      className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+      className={`shrink-0 cursor-pointer active:cursor-grabbing touch-none select-none flex flex-col ${isDragging ? "opacity-30" : ""} ${isOver ? "scale-110 transition-transform" : ""}`}
+      style={{ width: 80, height: 104 }}
       title={deck.name}
     >
       <img
         src={img}
         alt={deck.name}
         draggable={false}
-        className={`w-20 md:w-24 h-20 md:h-24 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow`}
+        className={`w-20 h-20 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow shrink-0`}
       />
-      <div className="w-20 md:w-24 text-xs md:text-sm text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-tight mt-0.5">
+      <div className="w-20 text-[11px] text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-tight mt-0.5">
         {deck.name}
       </div>
     </div>
@@ -201,7 +202,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[110px] md:min-h-[126px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[112px]">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
