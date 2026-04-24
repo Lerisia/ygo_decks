@@ -432,8 +432,9 @@ function ExportView({
                 flex: 1,
                 display: "flex",
                 flexWrap: "wrap",
-                gap: 0,
-                padding: 0,
+                gap: 4,
+                paddingLeft: 8,
+                paddingRight: 8,
                 backgroundColor: "#f9fafb",
                 alignItems: "center",
               }}
