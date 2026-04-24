@@ -109,7 +109,7 @@ function DeckCard({
           draggable={false}
           className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300 shadow"
         />
-        <div className="w-24 text-sm text-center truncate mt-1 text-gray-700 font-semibold">
+        <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
           {deck.name}
         </div>
       </div>
@@ -129,7 +129,7 @@ function DeckCard({
         draggable={false}
         className={`w-20 md:w-24 h-20 md:h-24 object-cover rounded-lg border-2 ${isOver ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} shadow`}
       />
-      <div className="w-20 md:w-24 text-xs md:text-sm text-center truncate mt-1 text-gray-700 dark:text-gray-300 font-medium">
+      <div className="w-20 md:w-24 text-xs md:text-sm text-center truncate text-gray-700 dark:text-gray-300 font-medium leading-tight mt-0.5">
         {deck.name}
       </div>
     </div>
@@ -201,7 +201,7 @@ function TierRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="flex border-b-2 border-gray-200 dark:border-gray-700 min-h-[100px] md:min-h-[120px]">
+    <div className="flex border-b-2 border-gray-200 dark:border-gray-700">
       <div
         className="flex items-center justify-center shrink-0 w-20 md:w-24"
         style={{ backgroundColor: color }}
@@ -227,7 +227,7 @@ function TierRow({
 
       <DropZone
         onDrop={onDropToEnd}
-        className="flex-1 flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 items-center"
+        className="flex-1 flex flex-wrap gap-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 items-center"
       >
         {decks.length === 0 && (
           <span className="text-sm text-gray-400">덱을 탭하거나 여기로 끌어다 놓으세요</span>
@@ -295,7 +295,6 @@ function ExportView({
             style={{
               display: "flex",
               borderBottom: "2px solid #e5e7eb",
-              minHeight: 140,
             }}
           >
             <div
@@ -317,8 +316,8 @@ function ExportView({
                 flex: 1,
                 display: "flex",
                 flexWrap: "wrap",
-                gap: 10,
-                padding: 12,
+                gap: 6,
+                padding: 6,
                 backgroundColor: "#f9fafb",
                 alignItems: "center",
               }}
