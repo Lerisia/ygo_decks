@@ -125,19 +125,32 @@ function DeckCard({
   }
 
   if (size === "export") {
-    const exportWidth = showLabel ? 96 : 120;
-    const exportImgSize = showLabel ? "w-24 h-24" : "w-[120px] h-[120px]";
+    const cardW = showLabel ? 110 : 132;
+    const imgW = showLabel ? 110 : 132;
+    const imgH = showLabel ? 110 : 132;
     return (
-      <div className="shrink-0" style={{ width: exportWidth }}>
+      <div style={{ width: cardW, height: 132, display: "flex", flexDirection: "column" }}>
         <img
           src={img}
           alt={deck.name}
           draggable={false}
           crossOrigin="anonymous"
-          className={`${exportImgSize} object-cover rounded-lg border-2 border-gray-300 shadow`}
+          style={{ width: imgW, height: imgH, display: "block", objectFit: "cover", borderRadius: 8, border: "2px solid #d1d5db", boxSizing: "border-box" }}
         />
         {showLabel && (
-          <div className="w-24 text-xs text-center truncate text-gray-700 font-semibold leading-tight">
+          <div
+            style={{
+              height: 22,
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#374151",
+              textAlign: "center",
+              lineHeight: "22px",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+            }}
+          >
             {deck.name}
           </div>
         )}
@@ -397,7 +410,7 @@ function ExportView({
             style={{
               display: "flex",
               borderBottom: "2px solid #e5e7eb",
-              minHeight: 128,
+              minHeight: 134,
             }}
           >
             <div
@@ -419,8 +432,8 @@ function ExportView({
                 flex: 1,
                 display: "flex",
                 flexWrap: "wrap",
-                gap: 6,
-                padding: 6,
+                gap: 0,
+                padding: 0,
                 backgroundColor: "#f9fafb",
                 alignItems: "center",
               }}
