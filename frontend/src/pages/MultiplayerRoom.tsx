@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { getRoom, leaveRoom, kickPlayer, type RoomDetail } from "@/api/multiplayerApi";
+import { getGameInfo } from "@/lib/multiplayerGames";
 
 const STATUS_LABEL: Record<string, string> = {
   waiting: "대기 중",
@@ -91,6 +92,7 @@ export default function MultiplayerRoom() {
   }
 
   const isHost = myUserId !== undefined && room.host === myUserId;
+  const game = getGameInfo(room.current_game);
 
   return (
     <div className="min-h-screen px-4 py-6 max-w-2xl mx-auto">
@@ -98,6 +100,12 @@ export default function MultiplayerRoom() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <h1 className="text-xl font-bold truncate">{room.name}</h1>
+            {game && (
+              <div className="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                <span>{game.icon}</span>
+                <span>{game.label}</span>
+              </div>
+            )}
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               방장: {room.host_name}
             </p>

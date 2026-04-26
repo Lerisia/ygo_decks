@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listRooms, createRoom, joinRoom, type RoomListItem } from "@/api/multiplayerApi";
 import { isAuthenticated } from "@/api/accountApi";
+import { AVAILABLE_GAMES, getGameInfo, type GameId } from "@/lib/multiplayerGames";
 
 const STATUS_LABEL: Record<string, string> = {
   waiting: "대기 중",
@@ -28,6 +29,7 @@ export default function Multiplayer() {
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newMaxPlayers, setNewMaxPlayers] = useState(4);
+  const [newGame, setNewGame] = useState<GameId>(AVAILABLE_GAMES[0].id);
   const [creating, setCreating] = useState(false);
 
   // join modal state
@@ -64,6 +66,7 @@ export default function Multiplayer() {
         name: newName.trim(),
         password: newPassword || undefined,
         max_players: newMaxPlayers,
+        current_game: newGame,
       });
       navigate(`/multiplayer/rooms/${room.id}`);
     } catch (e: any) {
@@ -131,6 +134,31 @@ export default function Multiplayer() {
               className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
             />
           </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">게임</label>
+            <div className="grid grid-cols-2 gap-2">
+              {AVAILABLE_GAMES.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  disabled={!g.available}
+                  onClick={() => setNewGame(g.id)}
+                  className={`p-3 rounded-lg border text-left transition ${
+                    newGame === g.id
+                      ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                  } ${!g.available ? "opacity-50 cursor-not-allowed" : "hover:border-blue-400"}`}
+                >
+                  <div className="flex items-center gap-1 mb-1">
+                    <span>{g.icon}</span>
+                    <span className="font-semibold text-sm">{g.label}</span>
+                    {!g.available && <span className="ml-auto text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">준비중</span>}
+                  </div>
+                  <div className="text-xs text-gray-500">{g.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">비밀번호 (선택)</label>
@@ -177,7 +205,9 @@ export default function Multiplayer() {
         <p className="text-center text-gray-500 py-8">현재 열린 방이 없습니다. 첫 번째 방을 만들어보세요!</p>
       ) : (
         <div className="space-y-2">
-          {rooms.map((r) => (
+          {rooms.map((r) => {
+            const game = getGameInfo(r.current_game);
+            return (
             <button
               key={r.id}
               onClick={() => handleJoinClick(r)}
@@ -189,8 +219,13 @@ export default function Multiplayer() {
                   <span className="font-bold truncate">{r.name}</span>
                   {r.has_password && <span title="비밀번호 있음">🔒</span>}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  방장: {r.host_name} · 코드: {r.code}
+                <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                  {game && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                    <span>{game.icon}</span>
+                    <span>{game.label}</span>
+                  </span>}
+                  <span>방장: {r.host_name}</span>
+                  <span>· {r.code}</span>
                 </div>
               </div>
               <div className="text-right shrink-0 ml-3">
@@ -202,7 +237,8 @@ export default function Multiplayer() {
                 </span>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
