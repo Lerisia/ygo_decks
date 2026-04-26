@@ -232,7 +232,6 @@ export default function Multiplayer() {
                     <span>{game.label}</span>
                   </span>}
                   <span>방장: {r.host_name}</span>
-                  <span>· {r.code}</span>
                 </div>
               </div>
               <div className="text-right shrink-0 ml-3">

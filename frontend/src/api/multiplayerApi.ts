@@ -27,7 +27,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type RoomListItem = {
   id: number;
-  code: string;
   name: string;
   host_name: string;
   has_password: boolean;

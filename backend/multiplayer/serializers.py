@@ -21,7 +21,7 @@ class RoomListItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = [
-            "id", "code", "name", "host_name",
+            "id", "name", "host_name",
             "has_password", "max_players", "player_count",
             "allow_guests", "status", "current_game",
             "created_at",
