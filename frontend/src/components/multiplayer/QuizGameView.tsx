@@ -108,7 +108,7 @@ export default function QuizGameView({ question, myResult, reveal, finalResult, 
           </div>
         ) : (
           <div className="inline-block px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-full text-sm mb-3">
-            아무도 못 맞췄어요
+            정답자 없음
           </div>
         )}
         <p className="text-xs text-gray-400">다음 문제로 곧 넘어갑니다...</p>
