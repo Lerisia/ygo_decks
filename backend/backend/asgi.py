@@ -14,13 +14,13 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
-from channels.auth import AuthMiddlewareStack  # noqa: E402
+from multiplayer.auth import JWTAuthMiddlewareStack  # noqa: E402
 from multiplayer.routing import websocket_urlpatterns  # noqa: E402
 
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
-    'websocket': AuthMiddlewareStack(
+    'websocket': JWTAuthMiddlewareStack(
         URLRouter(websocket_urlpatterns)
     ),
 })

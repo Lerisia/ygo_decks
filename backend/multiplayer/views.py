@@ -13,6 +13,7 @@ from .serializers import (
     RoomCreateSerializer,
     RoomPlayerSerializer,
 )
+from . import events
 
 
 def _add_self_as_host(room, user):
@@ -76,10 +77,11 @@ def join_room(request, room_id):
 
     try:
         with transaction.atomic():
-            RoomPlayer.objects.create(room=room, user=user)
+            player = RoomPlayer.objects.create(room=room, user=user)
     except Exception as e:
         return Response({"error": f"입장 실패: {e}"}, status=400)
 
+    events.player_joined(room.id, RoomPlayerSerializer(player).data)
     return Response(RoomDetailSerializer(room).data)
 
 
@@ -88,13 +90,17 @@ def join_room(request, room_id):
 def leave_room(request, room_id):
     room = get_object_or_404(Room, id=room_id)
     user = request.user
-    deleted, _ = RoomPlayer.objects.filter(room=room, user=user).delete()
-    if deleted == 0:
+    player = RoomPlayer.objects.filter(room=room, user=user).first()
+    if player is None:
         return Response({"error": "방에 참가하지 않았습니다."}, status=400)
+    player_id = player.id
+    player.delete()
+    events.player_left(room.id, player_id)
 
     if room.host_id == user.id:
         room.status = "closed"
         room.save(update_fields=["status"])
+        events.room_updated(room.id, RoomDetailSerializer(room).data)
 
     return Response({"ok": True})
 
@@ -111,6 +117,7 @@ def kick_player(request, room_id, player_id):
     if target.user_id and target.user_id == request.user.id:
         return Response({"error": "자기 자신은 강퇴할 수 없습니다."}, status=400)
 
+    target_id = target.id
     with transaction.atomic():
         if target.user_id:
             ids = list(room.kicked_user_ids or [])
@@ -125,4 +132,5 @@ def kick_player(request, room_id, player_id):
         room.save(update_fields=["kicked_user_ids", "kicked_guest_nicknames"])
         target.delete()
 
+    events.player_kicked(room.id, target_id)
     return Response({"ok": True})
