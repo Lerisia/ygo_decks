@@ -181,14 +181,15 @@ export default function QuizGameView({ question, myResult, reveal, finalResult, 
       </div>
 
       {lockedFromCorrect && (
-        <p className="mt-3 text-center text-green-600 dark:text-green-400 font-semibold">
+        <div className="mt-3 p-3 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-center font-bold">
           ✓ 정답! +{myResult?.delta}점 (총 {myResult?.total_score}점)
-        </p>
+        </div>
       )}
-      {onCooldown && !lockedFromCorrect && (
-        <p className="mt-3 text-center text-red-600 dark:text-red-400 font-semibold">
-          ✗ 오답 ({myResult?.delta}점) · 다시 답하려면 {cooldownLeft.toFixed(1)}초 대기
-        </p>
+      {onCooldown && !lockedFromCorrect && typeof myResult?.delta === "number" && myResult.delta < 0 && (
+        <div className="mt-3 p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-center font-bold">
+          ✗ 오답! {myResult.delta}점 (총 {myResult.total_score}점)<br />
+          <span className="text-sm font-normal">{cooldownLeft.toFixed(1)}초 후 다시 시도 가능</span>
+        </div>
       )}
     </div>
   );
