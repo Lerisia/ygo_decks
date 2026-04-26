@@ -240,7 +240,7 @@ export default function MultiplayerRoom() {
         onClick={handleLeave}
         className="w-full py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600"
       >
-        {isHost ? "방 닫고 나가기" : "방 나가기"}
+        방 나가기
       </button>
     </div>
   );
