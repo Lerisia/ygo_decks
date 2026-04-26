@@ -11,6 +11,7 @@ from .serializers import (
     RoomListItemSerializer,
     RoomDetailSerializer,
     RoomCreateSerializer,
+    RoomUpdateSerializer,
     RoomPlayerSerializer,
 )
 from . import events
@@ -103,6 +104,35 @@ def leave_room(request, room_id):
         events.room_updated(room.id, RoomDetailSerializer(room).data)
 
     return Response({"ok": True})
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_room(request, room_id):
+    room = get_object_or_404(Room, id=room_id)
+    if room.host_id != request.user.id:
+        return Response({"error": "방장만 설정을 변경할 수 있습니다."}, status=403)
+    if room.status != "waiting":
+        return Response({"error": "게임 중에는 설정을 변경할 수 없습니다."}, status=400)
+
+    serializer = RoomUpdateSerializer(data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    # max_players cannot drop below current player count
+    if "max_players" in data and data["max_players"] < room.player_count():
+        return Response({"error": "현재 인원 수보다 적게 설정할 수 없습니다."}, status=400)
+
+    if "password" in data:
+        raw = data.pop("password")
+        room.password = make_password(raw) if raw else ""
+
+    for field, value in data.items():
+        setattr(room, field, value)
+
+    room.save()
+    events.room_updated(room.id, RoomDetailSerializer(room).data)
+    return Response(RoomDetailSerializer(room).data)
 
 
 @api_view(["POST"])

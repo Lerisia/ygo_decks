@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
-import { getRoom, leaveRoom, kickPlayer, type RoomDetail } from "@/api/multiplayerApi";
-import { getGameInfo } from "@/lib/multiplayerGames";
+import { getRoom, leaveRoom, kickPlayer, updateRoom, type RoomDetail } from "@/api/multiplayerApi";
+import { getGameInfo, AVAILABLE_GAMES, type GameId } from "@/lib/multiplayerGames";
 
 const STATUS_LABEL: Record<string, string> = {
   waiting: "대기 중",
@@ -18,6 +18,8 @@ export default function MultiplayerRoom() {
   const [initialRoom, setInitialRoom] = useState<RoomDetail | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const { status, room: liveRoom } = useRoomSocket({ roomId: id });
   const room = liveRoom || initialRoom;
@@ -58,6 +60,36 @@ export default function MultiplayerRoom() {
     if (!id) return;
     if (!confirm("이 플레이어를 강퇴하시겠습니까?")) return;
     try { await kickPlayer(id, playerId); } catch (e: any) { setError(e.message); }
+  };
+
+  const handleSaveSettings = async (
+    formName: string,
+    formGame: GameId,
+    formMaxPlayers: number,
+    formIsPublic: boolean,
+    pwAction: "keep" | "clear" | "set",
+    pwValue: string,
+  ) => {
+    if (!id) return;
+    setSavingSettings(true);
+    setError("");
+    try {
+      const data: any = {
+        name: formName.trim(),
+        current_game: formGame,
+        max_players: formMaxPlayers,
+        is_listed: formIsPublic,
+      };
+      if (pwAction === "clear") data.password = "";
+      else if (pwAction === "set") data.password = pwValue;
+      // "keep" → omit
+      await updateRoom(id, data);
+      setShowSettings(false);
+    } catch (e: any) {
+      setError(e.message || "설정 변경 실패");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const handleCopyCode = () => {
@@ -135,6 +167,26 @@ export default function MultiplayerRoom() {
         </div>
       </div>
 
+      {isHost && room.status === "waiting" && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full px-4 py-2 bg-white dark:bg-gray-800 rounded-xl shadow text-sm font-semibold flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <span>⚙ 방 설정</span>
+            <span className="text-gray-400">{showSettings ? "▲" : "▼"}</span>
+          </button>
+          {showSettings && (
+            <RoomSettingsForm
+              room={room}
+              saving={savingSettings}
+              onSave={handleSaveSettings}
+              onCancel={() => setShowSettings(false)}
+            />
+          )}
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-bold">플레이어 ({room.players.length}/{room.max_players})</h2>
@@ -184,6 +236,144 @@ export default function MultiplayerRoom() {
       >
         {isHost ? "방 닫고 나가기" : "방 나가기"}
       </button>
+    </div>
+  );
+}
+
+function RoomSettingsForm({
+  room,
+  saving,
+  onSave,
+  onCancel,
+}: {
+  room: RoomDetail;
+  saving: boolean;
+  onSave: (
+    name: string,
+    game: GameId,
+    maxPlayers: number,
+    isPublic: boolean,
+    pwAction: "keep" | "clear" | "set",
+    pwValue: string,
+  ) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(room.name);
+  const [game, setGame] = useState<GameId>((room.current_game as GameId) || AVAILABLE_GAMES[0].id);
+  const [maxPlayers, setMaxPlayers] = useState(room.max_players);
+  const [isPublic, setIsPublic] = useState(room.is_listed);
+  const [pwMode, setPwMode] = useState<"keep" | "clear" | "set">("keep");
+  const [pwValue, setPwValue] = useState("");
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mt-2 space-y-3">
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">방 이름</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={50}
+          className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">게임</label>
+        <div className="grid grid-cols-2 gap-2">
+          {AVAILABLE_GAMES.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              disabled={!g.available}
+              onClick={() => setGame(g.id)}
+              className={`p-2 rounded-lg border text-left text-sm ${
+                game === g.id
+                  ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                  : "border-gray-300 dark:border-gray-600"
+              } ${!g.available ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <span>{g.icon} {g.label}</span>
+              {!g.available && <span className="ml-1 text-[10px] text-gray-500">(준비중)</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">
+          최대 인원 ({room.players.length}명 이상)
+        </label>
+        <select
+          value={maxPlayers}
+          onChange={(e) => setMaxPlayers(Number(e.target.value))}
+          className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+        >
+          {[2, 3, 4].map((n) => (
+            <option key={n} value={n} disabled={n < room.players.length}>{n}명</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">공개 설정</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPublic(true)}
+            className={`flex-1 py-2 rounded-lg border text-sm ${
+              isPublic ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20" : "border-gray-300 dark:border-gray-600"
+            }`}
+          >공개</button>
+          <button
+            type="button"
+            onClick={() => setIsPublic(false)}
+            className={`flex-1 py-2 rounded-lg border text-sm ${
+              !isPublic ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20" : "border-gray-300 dark:border-gray-600"
+            }`}
+          >비공개</button>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">
+          비밀번호 ({room.has_password ? "현재 설정됨" : "현재 없음"})
+        </label>
+        <select
+          value={pwMode}
+          onChange={(e) => setPwMode(e.target.value as any)}
+          className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-2"
+        >
+          <option value="keep">변경 안 함</option>
+          <option value="set">새 비밀번호 설정</option>
+          {room.has_password && <option value="clear">비밀번호 제거</option>}
+        </select>
+        {pwMode === "set" && (
+          <input
+            type="text"
+            value={pwValue}
+            onChange={(e) => setPwValue(e.target.value)}
+            placeholder="새 비밀번호"
+            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+          />
+        )}
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg font-semibold text-sm"
+        >
+          취소
+        </button>
+        <button
+          onClick={() => onSave(name, game, maxPlayers, isPublic, pwMode, pwValue)}
+          disabled={saving}
+          className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50"
+        >
+          {saving ? "저장 중..." : "저장"}
+        </button>
+      </div>
     </div>
   );
 }

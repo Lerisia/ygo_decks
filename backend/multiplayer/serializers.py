@@ -69,3 +69,31 @@ class RoomCreateSerializer(serializers.ModelSerializer):
         if not v:
             raise serializers.ValidationError("방 이름을 입력하세요.")
         return v
+
+
+class RoomUpdateSerializer(serializers.ModelSerializer):
+    """Patch room settings while in lobby. All fields optional.
+    `password`: omit to keep, "" to clear, non-empty to set.
+    """
+    password = serializers.CharField(required=False, allow_blank=True, max_length=128)
+
+    class Meta:
+        model = Room
+        fields = ["name", "password", "max_players", "is_listed", "current_game"]
+        extra_kwargs = {
+            "name": {"required": False},
+            "max_players": {"required": False},
+            "is_listed": {"required": False},
+            "current_game": {"required": False},
+        }
+
+    def validate_max_players(self, value):
+        if not (2 <= value <= 4):
+            raise serializers.ValidationError("플레이어 수는 2~4명 사이여야 합니다.")
+        return value
+
+    def validate_name(self, value):
+        v = value.strip()
+        if not v:
+            raise serializers.ValidationError("방 이름을 입력하세요.")
+        return v

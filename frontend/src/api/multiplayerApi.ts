@@ -86,6 +86,20 @@ export const createRoom = (data: CreateRoomData) =>
 export const getRoom = (roomId: number) =>
   request<RoomDetail>(`/rooms/${roomId}/`);
 
+export type UpdateRoomData = {
+  name?: string;
+  password?: string;  // omit to keep, "" to clear, non-empty to set
+  max_players?: number;
+  is_listed?: boolean;
+  current_game?: string;
+};
+
+export const updateRoom = (roomId: number, data: UpdateRoomData) =>
+  request<RoomDetail>(`/rooms/${roomId}/update/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
 export const joinRoom = (roomId: number, password?: string) =>
   request<RoomDetail>(`/rooms/${roomId}/join/`, {
     method: "POST",
