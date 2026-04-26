@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 const games = [
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞추기" },
   { to: "/tier-list-maker", icon: "📊", title: "티어표 만들기", desc: "덱 티어리스트 만들고 이미지로 저장" },
+  { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "여러 명이 함께 즐기는 게임" },
 ];
 
 function Playground() {
