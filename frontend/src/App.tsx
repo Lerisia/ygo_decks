@@ -29,6 +29,7 @@ import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
 import TierListMaker from "./pages/TierListMaker";
 import Multiplayer from "./pages/Multiplayer";
+import MultiplayerRoom from "./pages/MultiplayerRoom";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
@@ -66,6 +67,7 @@ function App() {
           <Route path="/card-quiz" element={<CardQuiz />} />
           <Route path="/tier-list-maker" element={<TierListMaker />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
+          <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
