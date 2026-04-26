@@ -261,9 +261,12 @@ function RoomSettingsForm({
   const [name, setName] = useState(room.name);
   const [game, setGame] = useState<GameId>((room.current_game as GameId) || AVAILABLE_GAMES[0].id);
   const [maxPlayers, setMaxPlayers] = useState(room.max_players);
-  const [isPublic, setIsPublic] = useState(room.is_listed);
   const [pwMode, setPwMode] = useState<"keep" | "clear" | "set">("keep");
   const [pwValue, setPwValue] = useState("");
+
+  const handleSubmit = () => {
+    onSave(name, game, maxPlayers, true, pwMode, pwValue);
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mt-2 space-y-3">
@@ -316,26 +319,6 @@ function RoomSettingsForm({
       </div>
 
       <div>
-        <label className="block text-xs text-gray-500 mb-1">공개 설정</label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPublic(true)}
-            className={`flex-1 py-2 rounded-lg border text-sm ${
-              isPublic ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20" : "border-gray-300 dark:border-gray-600"
-            }`}
-          >공개</button>
-          <button
-            type="button"
-            onClick={() => setIsPublic(false)}
-            className={`flex-1 py-2 rounded-lg border text-sm ${
-              !isPublic ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20" : "border-gray-300 dark:border-gray-600"
-            }`}
-          >비공개</button>
-        </div>
-      </div>
-
-      <div>
         <label className="block text-xs text-gray-500 mb-1">
           비밀번호 ({room.has_password ? "현재 설정됨" : "현재 없음"})
         </label>
@@ -367,7 +350,7 @@ function RoomSettingsForm({
           취소
         </button>
         <button
-          onClick={() => onSave(name, game, maxPlayers, isPublic, pwMode, pwValue)}
+          onClick={handleSubmit}
           disabled={saving}
           className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50"
         >
