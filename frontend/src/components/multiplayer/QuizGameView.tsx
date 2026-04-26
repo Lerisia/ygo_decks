@@ -30,6 +30,9 @@ export type QuizRoundReveal = {
   correct_answer: string;
   scores: Record<string, number>; // player_id -> total
   round: number;
+  winner_player_id?: string | null;
+  winner_name?: string | null;
+  winner_score?: number;
 };
 
 export type QuizGameEnd = {
@@ -98,7 +101,16 @@ export default function QuizGameView({ question, myResult, reveal, finalResult, 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 text-center">
         <p className="text-sm text-gray-500 mb-2">정답</p>
-        <p className="text-2xl font-bold mb-4">{reveal.correct_answer}</p>
+        <p className="text-2xl font-bold mb-3">{reveal.correct_answer}</p>
+        {reveal.winner_name ? (
+          <div className="inline-block px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-semibold mb-3">
+            🎉 {reveal.winner_name} +{reveal.winner_score}점
+          </div>
+        ) : (
+          <div className="inline-block px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-full text-sm mb-3">
+            아무도 못 맞췄어요
+          </div>
+        )}
         <p className="text-xs text-gray-400">다음 문제로 곧 넘어갑니다...</p>
       </div>
     );

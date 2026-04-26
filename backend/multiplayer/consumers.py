@@ -236,13 +236,19 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _db_end_round(self):
-        from .models import Room
+        from .models import Room, RoomPlayer
         from .games import quiz
         room = Room.objects.get(id=self.room_id)
         state = room.game_state or {}
         reveal = quiz.end_round(state)
         room.game_state = state
         room.save(update_fields=["game_state"])
+        if reveal and reveal.get("winner_player_id"):
+            try:
+                p = RoomPlayer.objects.get(id=int(reveal["winner_player_id"]))
+                reveal["winner_name"] = p.display_name
+            except (RoomPlayer.DoesNotExist, ValueError):
+                reveal["winner_name"] = None
         return reveal
 
     @database_sync_to_async

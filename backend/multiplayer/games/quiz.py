@@ -184,10 +184,19 @@ def end_round(state):
     state["phase"] = "reveal"
     if not rd:
         return None
+    winner_player_id = None
+    winner_stage_score = 0
+    for pid, pr in rd.get("player_round", {}).items():
+        if pr.get("answered_correctly"):
+            winner_player_id = pid
+            winner_stage_score = pr.get("round_score", 0)
+            break  # round ends on first correct
     return {
         "correct_answer": rd["correct_answer"],
         "scores": dict(state["scores"]),
         "round": state["round"],
+        "winner_player_id": winner_player_id,
+        "winner_score": winner_stage_score,
     }
 
 
