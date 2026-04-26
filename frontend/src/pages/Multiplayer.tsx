@@ -177,7 +177,7 @@ export default function Multiplayer() {
                 onChange={(e) => setNewMaxPlayers(Number(e.target.value))}
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
               >
-                {[2, 3, 4, 5, 6, 8, 10, 12, 16].map((n) => (
+                {[2, 3, 4].map((n) => (
                   <option key={n} value={n}>{n}명</option>
                 ))}
               </select>

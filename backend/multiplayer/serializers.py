@@ -60,8 +60,8 @@ class RoomCreateSerializer(serializers.ModelSerializer):
         fields = ["name", "password", "max_players", "is_listed", "current_game"]
 
     def validate_max_players(self, value):
-        if not (2 <= value <= 16):
-            raise serializers.ValidationError("플레이어 수는 2~16명 사이여야 합니다.")
+        if not (2 <= value <= 4):
+            raise serializers.ValidationError("플레이어 수는 2~4명 사이여야 합니다.")
         return value
 
     def validate_name(self, value):
