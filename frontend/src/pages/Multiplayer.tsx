@@ -76,12 +76,19 @@ export default function Multiplayer() {
     }
   };
 
-  const handleJoinClick = (room: RoomListItem) => {
-    if (room.has_password) {
-      setPwRoom(room);
-      setPwInput("");
-    } else {
-      doJoin(room, "");
+  const handleJoinClick = async (room: RoomListItem) => {
+    // Try without password first — backend allows existing members in regardless.
+    try {
+      await joinRoom(room.id, "");
+      navigate(`/multiplayer/rooms/${room.id}`);
+    } catch (e: any) {
+      const msg = e.message || "";
+      if (room.has_password && msg.includes("비밀번호")) {
+        setPwRoom(room);
+        setPwInput("");
+      } else {
+        setError(msg || "입장 실패");
+      }
     }
   };
 
