@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listRooms, createRoom, joinRoom, type RoomListItem } from "@/api/multiplayerApi";
+import { listRooms, createRoom, joinRoom, myRoom, type RoomListItem, type RoomDetail } from "@/api/multiplayerApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { AVAILABLE_GAMES, getGameInfo, type GameId } from "@/lib/multiplayerGames";
 
@@ -24,6 +24,7 @@ export default function Multiplayer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [currentRoom, setCurrentRoom] = useState<RoomDetail | null>(null);
 
   // create form state
   const [newName, setNewName] = useState("");
@@ -51,9 +52,12 @@ export default function Multiplayer() {
 
   useEffect(() => {
     loadRooms();
+    if (loggedIn) {
+      myRoom().then((d) => setCurrentRoom(d.room)).catch(() => {});
+    }
     const interval = setInterval(loadRooms, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loggedIn]);
 
   const handleCreate = async () => {
     if (!newName.trim()) {
@@ -198,6 +202,15 @@ export default function Multiplayer() {
             {creating ? "생성 중..." : "방 만들기"}
           </button>
         </div>
+      )}
+
+      {currentRoom && (
+        <button
+          onClick={() => navigate(`/multiplayer/rooms/${currentRoom.id}`)}
+          className="w-full mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300 text-left hover:bg-blue-100 dark:hover:bg-blue-900/30 transition"
+        >
+          현재 입장한 방: <span className="font-semibold">{currentRoom.name}</span> · 돌아가기 →
+        </button>
       )}
 
       {error && (

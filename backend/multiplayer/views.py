@@ -22,6 +22,21 @@ def _add_self_as_host(room, user):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_room(request):
+    """Return the active room the user is in, or null."""
+    membership = (
+        RoomPlayer.objects.filter(user=request.user)
+        .exclude(room__status="closed")
+        .select_related("room")
+        .first()
+    )
+    if not membership:
+        return Response({"room": None})
+    return Response({"room": RoomDetailSerializer(membership.room).data})
+
+
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def list_rooms(request):
     """List public, non-closed rooms."""

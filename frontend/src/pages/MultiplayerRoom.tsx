@@ -128,6 +128,12 @@ export default function MultiplayerRoom() {
 
   return (
     <div className="min-h-screen px-4 py-6 max-w-2xl mx-auto">
+      <button
+        onClick={() => navigate("/multiplayer")}
+        className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+      >
+        ← 방 목록
+      </button>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">

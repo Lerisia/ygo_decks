@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path("rooms/", views.list_rooms, name="multiplayer-list-rooms"),
+    path("rooms/my/", views.my_room, name="multiplayer-my-room"),
     path("rooms/create/", views.create_room, name="multiplayer-create-room"),
     path("rooms/<int:room_id>/", views.get_room, name="multiplayer-get-room"),
     path("rooms/<int:room_id>/update/", views.update_room, name="multiplayer-update-room"),

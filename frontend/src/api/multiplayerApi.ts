@@ -76,6 +76,9 @@ export type CreateRoomData = {
 export const listRooms = () =>
   request<{ rooms: RoomListItem[] }>("/rooms/");
 
+export const myRoom = () =>
+  request<{ room: RoomDetail | null }>("/rooms/my/");
+
 export const createRoom = (data: CreateRoomData) =>
   request<RoomDetail>("/rooms/create/", {
     method: "POST",
