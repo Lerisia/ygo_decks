@@ -20,7 +20,7 @@ from django.conf import settings
 
 SIZES = [8, 10, 12, 16]
 UPSCALE_MAP = {8: 160, 10: 160, 12: 168, 16: 160}
-SCORE_MAP = {0: 4, 1: 3, 2: 2, 3: 1}  # stage_index -> score
+SCORE_MAP = {"0": 4, "1": 3, "2": 2, "3": 1}  # stage_index -> score (string keys for msgpack)
 SECONDS_PER_STAGE = 3
 GRACE_SECONDS = 4
 COOLDOWN_SECONDS = 3
@@ -151,7 +151,7 @@ def submit_answer(state, player_id, choice):
         return {"error": "round_over"}
 
     stage = current_stage(state)
-    score_delta = SCORE_MAP[stage]
+    score_delta = SCORE_MAP[str(stage)]
     correct = (choice == rd["correct_answer"])
     if correct:
         pr["answered_correctly"] = True
