@@ -40,6 +40,7 @@ ALLOWED_HOSTS = ['ygodecks.com', 'www.ygodecks.com', 'localhost', '127.0.0.1']
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -55,12 +56,14 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'corsheaders',
+    'channels',
     'deck',
     'card',
     'question',
     'userstatistics',
     'user',
     'tool',
+    'multiplayer',
 ]
 
 MIDDLEWARE = [
@@ -139,6 +142,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = 'backend.asgi.application'
+
+# Channels
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 
 # Database
