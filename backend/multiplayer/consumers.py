@@ -25,6 +25,8 @@ class PingConsumer(AsyncJsonWebsocketConsumer):
 # Map from room_id -> running game-runner task. Lives in-process; one runner
 # per host's consumer process is sufficient since only the host runs it.
 _GAME_RUNNERS = {}
+# Per-round early-end events so submit_answer (correct) can wake the runner.
+_ROUND_END_EVENTS = {}
 
 
 class RoomConsumer(AsyncJsonWebsocketConsumer):
@@ -75,10 +77,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, content, **kwargs):
         msg_type = content.get("type")
+        print(f"[RoomConsumer room={self.room_id} user={self.user.id}] receive: {content}")
         if msg_type == "submit_answer":
             await self._handle_submit_answer(content.get("choice"))
         elif msg_type == "start_game_runner" and self.is_host:
-            # Host explicitly requests timer to start (after REST start endpoint)
             await self._maybe_start_game_runner()
         else:
             await self.send_json({"type": "ack", "received": content})
@@ -104,6 +106,11 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         if result is None:
             return
         await self.send_json({"type": "quiz_my_result", **result})
+        # First correct answer ends the round immediately.
+        if result.get("correct") is True:
+            ev = _ROUND_END_EVENTS.get(self.room_id)
+            if ev is not None:
+                ev.set()
 
         # Check if all players answered → end round early via runner
         if result.get("all_answered"):
@@ -159,10 +166,20 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 payload = await self._db_start_round()
                 if payload is None:
                     break  # no questions or finished
+
+                # Set up early-end event for this round
+                ev = asyncio.Event()
+                _ROUND_END_EVENTS[self.room_id] = ev
+
                 await self._broadcast_event("quiz_question", payload)
 
-                # Wait for round duration
-                await asyncio.sleep(quiz.ROUND_DURATION)
+                # Wait for either round timer OR a correct answer (early end)
+                try:
+                    await asyncio.wait_for(ev.wait(), timeout=quiz.ROUND_DURATION)
+                except asyncio.TimeoutError:
+                    pass
+                finally:
+                    _ROUND_END_EVENTS.pop(self.room_id, None)
 
                 # End round, broadcast reveal
                 reveal = await self._db_end_round()
