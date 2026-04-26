@@ -9,5 +9,7 @@ urlpatterns = [
     path("rooms/<int:room_id>/update/", views.update_room, name="multiplayer-update-room"),
     path("rooms/<int:room_id>/join/", views.join_room, name="multiplayer-join-room"),
     path("rooms/<int:room_id>/leave/", views.leave_room, name="multiplayer-leave-room"),
+    path("rooms/<int:room_id>/start/", views.start_game, name="multiplayer-start-game"),
+    path("rooms/<int:room_id>/end/", views.end_game, name="multiplayer-end-game"),
     path("rooms/<int:room_id>/kick/<int:player_id>/", views.kick_player, name="multiplayer-kick-player"),
 ]

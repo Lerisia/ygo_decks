@@ -208,6 +208,51 @@ def update_room(request, room_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def start_game(request, room_id):
+    room = get_object_or_404(Room, id=room_id)
+    if room.host_id != request.user.id:
+        return Response({"error": "방장만 게임을 시작할 수 있습니다."}, status=403)
+    if room.status != "waiting":
+        return Response({"error": "게임 시작 가능한 상태가 아닙니다."}, status=400)
+    if room.player_count() < 2:
+        return Response({"error": "최소 2명이 필요합니다."}, status=400)
+    if not room.current_game:
+        return Response({"error": "게임이 선택되지 않았습니다."}, status=400)
+
+    with transaction.atomic():
+        room.status = "in_game"
+        room.game_state = {}
+        # Reset scores at game start
+        room.players.update(score=0)
+        room.save(update_fields=["status", "game_state"])
+
+    events.room_updated(room.id, RoomDetailSerializer(room).data)
+    events.broadcast(room.id, "game_started", {"game": room.current_game})
+    return Response(RoomDetailSerializer(room).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def end_game(request, room_id):
+    room = get_object_or_404(Room, id=room_id)
+    if room.host_id != request.user.id:
+        return Response({"error": "방장만 게임을 종료할 수 있습니다."}, status=403)
+    if room.status != "in_game":
+        return Response({"error": "진행 중인 게임이 없습니다."}, status=400)
+
+    final_scores = list(room.players.values("id", "score").order_by("-score"))
+    with transaction.atomic():
+        room.status = "waiting"
+        room.game_state = {}
+        room.save(update_fields=["status", "game_state"])
+
+    events.room_updated(room.id, RoomDetailSerializer(room).data)
+    events.broadcast(room.id, "game_ended", {"final_scores": final_scores})
+    return Response(RoomDetailSerializer(room).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def kick_player(request, room_id, player_id):
     room = get_object_or_404(Room, id=room_id)
     if room.host_id != request.user.id:

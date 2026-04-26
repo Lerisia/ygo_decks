@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
-import { getRoom, leaveRoom, kickPlayer, updateRoom, type RoomDetail } from "@/api/multiplayerApi";
+import { getRoom, leaveRoom, kickPlayer, updateRoom, startGame, endGame, type RoomDetail } from "@/api/multiplayerApi";
 import { getGameInfo, AVAILABLE_GAMES, type GameId } from "@/lib/multiplayerGames";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -90,6 +90,17 @@ export default function MultiplayerRoom() {
     } finally {
       setSavingSettings(false);
     }
+  };
+
+  const handleStartGame = async () => {
+    if (!id) return;
+    try { await startGame(id); } catch (e: any) { setError(e.message); }
+  };
+
+  const handleEndGame = async () => {
+    if (!id) return;
+    if (!confirm("게임을 종료하시겠습니까?")) return;
+    try { await endGame(id); } catch (e: any) { setError(e.message); }
   };
 
   const handleCopyCode = () => {
@@ -232,9 +243,37 @@ export default function MultiplayerRoom() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 text-center text-sm text-gray-500">
-        게임 시작 기능은 곧 추가됩니다.
-      </div>
+      {room.status === "waiting" && isHost && (
+        <button
+          onClick={handleStartGame}
+          disabled={room.players.length < 2 || !room.current_game}
+          className="w-full py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+        >
+          게임 시작 {room.players.length < 2 ? "(최소 2명 필요)" : ""}
+        </button>
+      )}
+
+      {room.status === "waiting" && !isHost && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 text-center text-sm text-gray-500">
+          방장이 게임을 시작하기를 기다리는 중...
+        </div>
+      )}
+
+      {room.status === "in_game" && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
+          <p className="text-center text-sm text-gray-500 mb-3">
+            🎮 게임이 진행 중입니다 — {game?.label || room.current_game}
+          </p>
+          {isHost && (
+            <button
+              onClick={handleEndGame}
+              className="w-full py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"
+            >
+              게임 종료
+            </button>
+          )}
+        </div>
+      )}
 
       <button
         onClick={handleLeave}

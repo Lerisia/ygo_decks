@@ -111,6 +111,12 @@ export const joinRoom = (roomId: number, password?: string) =>
 export const leaveRoom = (roomId: number) =>
   request<{ ok: boolean }>(`/rooms/${roomId}/leave/`, { method: "POST" });
 
+export const startGame = (roomId: number) =>
+  request<RoomDetail>(`/rooms/${roomId}/start/`, { method: "POST" });
+
+export const endGame = (roomId: number) =>
+  request<RoomDetail>(`/rooms/${roomId}/end/`, { method: "POST" });
+
 export const kickPlayer = (roomId: number, playerId: number) =>
   request<{ ok: boolean }>(`/rooms/${roomId}/kick/${playerId}/`, {
     method: "POST",
