@@ -77,7 +77,6 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, content, **kwargs):
         msg_type = content.get("type")
-        print(f"[RoomConsumer room={self.room_id} user={self.user.id}] receive: {content}")
         if msg_type == "submit_answer":
             await self._handle_submit_answer(content.get("choice"))
         elif msg_type == "start_game_runner" and self.is_host:
