@@ -1,8 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { getRoom, leaveRoom, kickPlayer, updateRoom, startGame, endGame, type RoomDetail } from "@/api/multiplayerApi";
 import { getGameInfo, AVAILABLE_GAMES, type GameId } from "@/lib/multiplayerGames";
+import QuizGameView, {
+  type QuizQuestionEvent,
+  type QuizMyResult,
+  type QuizRoundReveal,
+  type QuizGameEnd,
+} from "@/components/multiplayer/QuizGameView";
 
 const STATUS_LABEL: Record<string, string> = {
   waiting: "대기 중",
@@ -21,7 +27,38 @@ export default function MultiplayerRoom() {
   const [showSettings, setShowSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  const { status, room: liveRoom } = useRoomSocket({ roomId: id });
+  // Quiz game state
+  const [quizQuestion, setQuizQuestion] = useState<QuizQuestionEvent | null>(null);
+  const [quizMyResult, setQuizMyResult] = useState<QuizMyResult | null>(null);
+  const [quizReveal, setQuizReveal] = useState<QuizRoundReveal | null>(null);
+  const [quizFinal, setQuizFinal] = useState<QuizGameEnd | null>(null);
+  const sendRef = useRef<((data: unknown) => void) | null>(null);
+
+  const { status, room: liveRoom, send } = useRoomSocket({
+    roomId: id,
+    onMessage: (msg) => {
+      if (msg.type === "quiz_question") {
+        setQuizQuestion(msg as unknown as QuizQuestionEvent);
+        setQuizMyResult(null);
+        setQuizReveal(null);
+        setQuizFinal(null);
+      } else if (msg.type === "quiz_my_result") {
+        setQuizMyResult(msg as unknown as QuizMyResult);
+      } else if (msg.type === "quiz_round_reveal") {
+        setQuizReveal(msg as unknown as QuizRoundReveal);
+      } else if (msg.type === "quiz_game_end") {
+        setQuizFinal(msg as unknown as QuizGameEnd);
+        setQuizQuestion(null);
+        setQuizReveal(null);
+      } else if (msg.type === "game_started") {
+        setQuizQuestion(null);
+        setQuizMyResult(null);
+        setQuizReveal(null);
+        setQuizFinal(null);
+      }
+    },
+  });
+  sendRef.current = send;
   const room = liveRoom || initialRoom;
 
   // Initial REST fetch (so we have something even before WS connects)
@@ -260,14 +297,24 @@ export default function MultiplayerRoom() {
       )}
 
       {room.status === "in_game" && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
-          <p className="text-center text-sm text-gray-500 mb-3">
-            🎮 게임이 진행 중입니다 — {game?.label || room.current_game}
-          </p>
+        <div className="mb-4">
+          {room.current_game === "quiz" ? (
+            <QuizGameView
+              question={quizQuestion}
+              myResult={quizMyResult}
+              reveal={quizReveal}
+              finalResult={quizFinal}
+              onAnswer={(choice) => sendRef.current?.({ type: "submit_answer", choice })}
+            />
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center text-sm text-gray-500">
+              🎮 게임이 진행 중입니다 — {game?.label || room.current_game}
+            </div>
+          )}
           {isHost && (
             <button
               onClick={handleEndGame}
-              className="w-full py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"
+              className="mt-3 w-full py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"
             >
               게임 종료
             </button>

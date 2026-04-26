@@ -19,7 +19,7 @@ export const AVAILABLE_GAMES: GameInfo[] = [
     label: "화질구지 퀴즈",
     icon: "🐤",
     description: "저화질 일러스트 맞추기",
-    available: false,  // toggle to true when game logic ships
+    available: true,
   },
 ];
 
