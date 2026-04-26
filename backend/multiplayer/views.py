@@ -36,13 +36,31 @@ def create_room(request):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     raw_password = data.pop("password", "") or ""
+
+    # Leave any rooms the user is already in (one-room-at-a-time rule)
+    user = request.user
+    other_memberships = RoomPlayer.objects.filter(user=user).select_related("room")
+    rooms_to_close = []
+    for m in list(other_memberships):
+        old_room = m.room
+        old_player_id = m.id
+        was_host = old_room.host_id == user.id
+        m.delete()
+        events.player_left(old_room.id, old_player_id)
+        if was_host and old_room.status != "closed":
+            rooms_to_close.append(old_room)
+    for old_room in rooms_to_close:
+        old_room.status = "closed"
+        old_room.save(update_fields=["status"])
+        events.room_updated(old_room.id, RoomDetailSerializer(old_room).data)
+
     with transaction.atomic():
         room = Room.objects.create(
-            host=request.user,
+            host=user,
             password=make_password(raw_password) if raw_password else "",
             **data,
         )
-        _add_self_as_host(room, request.user)
+        _add_self_as_host(room, user)
     return Response(RoomDetailSerializer(room).data, status=status.HTTP_201_CREATED)
 
 
@@ -76,6 +94,22 @@ def join_room(request, room_id):
     raw_password = request.data.get("password", "") or ""
     if room.has_password and not check_password(raw_password, room.password):
         return Response({"error": "비밀번호가 틀렸습니다."}, status=403)
+
+    # User can only be in one room at a time → auto-leave any others.
+    other_memberships = RoomPlayer.objects.filter(user=user).exclude(room=room).select_related("room")
+    rooms_to_close = []
+    for m in list(other_memberships):
+        old_room = m.room
+        old_player_id = m.id
+        was_host = old_room.host_id == user.id
+        m.delete()
+        events.player_left(old_room.id, old_player_id)
+        if was_host and old_room.status != "closed":
+            rooms_to_close.append(old_room)
+    for old_room in rooms_to_close:
+        old_room.status = "closed"
+        old_room.save(update_fields=["status"])
+        events.room_updated(old_room.id, RoomDetailSerializer(old_room).data)
 
     try:
         with transaction.atomic():
