@@ -29,31 +29,33 @@ def list_rooms(request):
     return Response({"rooms": RoomListItemSerializer(rooms, many=True).data})
 
 
+def _user_blocked_by_existing_room(user):
+    """Return the active (non-closed) room the user is in, or None."""
+    return (
+        RoomPlayer.objects.filter(user=user)
+        .exclude(room__status="closed")
+        .select_related("room")
+        .first()
+    )
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_room(request):
+    user = request.user
+
+    blocked = _user_blocked_by_existing_room(user)
+    if blocked:
+        return Response(
+            {"error": "이미 다른 방에 참가 중입니다. 먼저 그 방에서 나가세요.",
+             "current_room_id": blocked.room_id},
+            status=400,
+        )
+
     serializer = RoomCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     raw_password = data.pop("password", "") or ""
-
-    # Leave any rooms the user is already in (one-room-at-a-time rule)
-    user = request.user
-    other_memberships = RoomPlayer.objects.filter(user=user).select_related("room")
-    rooms_to_close = []
-    for m in list(other_memberships):
-        old_room = m.room
-        old_player_id = m.id
-        was_host = old_room.host_id == user.id
-        m.delete()
-        events.player_left(old_room.id, old_player_id)
-        if was_host and old_room.status != "closed":
-            rooms_to_close.append(old_room)
-    for old_room in rooms_to_close:
-        old_room.status = "closed"
-        old_room.save(update_fields=["status"])
-        events.room_updated(old_room.id, RoomDetailSerializer(old_room).data)
-
     with transaction.atomic():
         room = Room.objects.create(
             host=user,
@@ -95,21 +97,20 @@ def join_room(request, room_id):
     if room.has_password and not check_password(raw_password, room.password):
         return Response({"error": "비밀번호가 틀렸습니다."}, status=403)
 
-    # User can only be in one room at a time → auto-leave any others.
-    other_memberships = RoomPlayer.objects.filter(user=user).exclude(room=room).select_related("room")
-    rooms_to_close = []
-    for m in list(other_memberships):
-        old_room = m.room
-        old_player_id = m.id
-        was_host = old_room.host_id == user.id
-        m.delete()
-        events.player_left(old_room.id, old_player_id)
-        if was_host and old_room.status != "closed":
-            rooms_to_close.append(old_room)
-    for old_room in rooms_to_close:
-        old_room.status = "closed"
-        old_room.save(update_fields=["status"])
-        events.room_updated(old_room.id, RoomDetailSerializer(old_room).data)
+    # Block if user is already in another active room
+    blocked = (
+        RoomPlayer.objects.filter(user=user)
+        .exclude(room=room)
+        .exclude(room__status="closed")
+        .select_related("room")
+        .first()
+    )
+    if blocked:
+        return Response(
+            {"error": "이미 다른 방에 참가 중입니다. 먼저 그 방에서 나가세요.",
+             "current_room_id": blocked.room_id},
+            status=400,
+        )
 
     try:
         with transaction.atomic():
@@ -134,8 +135,12 @@ def leave_room(request, room_id):
     events.player_left(room.id, player_id)
 
     if room.host_id == user.id:
-        room.status = "closed"
-        room.save(update_fields=["status"])
+        # Host leaving closes the room and removes all remaining players,
+        # so they can freely join another room.
+        with transaction.atomic():
+            room.status = "closed"
+            room.save(update_fields=["status"])
+            RoomPlayer.objects.filter(room=room).delete()
         events.room_updated(room.id, RoomDetailSerializer(room).data)
 
     return Response({"ok": True})
