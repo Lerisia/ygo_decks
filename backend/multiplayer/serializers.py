@@ -57,7 +57,7 @@ class RoomCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ["name", "password", "max_players", "allow_guests", "is_listed", "current_game"]
+        fields = ["name", "password", "max_players", "is_listed", "current_game"]
 
     def validate_max_players(self, value):
         if not (2 <= value <= 16):

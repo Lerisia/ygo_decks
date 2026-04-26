@@ -52,11 +52,10 @@ def get_room(request, room_id):
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def join_room(request, room_id):
     room = get_object_or_404(Room, id=room_id)
     raw_password = request.data.get("password", "") or ""
-    guest_nickname = (request.data.get("guest_nickname") or "").strip()
 
     if room.status == "closed":
         return Response({"error": "종료된 방입니다."}, status=400)
@@ -67,36 +66,17 @@ def join_room(request, room_id):
     if room.has_password and not check_password(raw_password, room.password):
         return Response({"error": "비밀번호가 틀렸습니다."}, status=403)
 
-    user = request.user if request.user.is_authenticated else None
+    user = request.user
+    if user.id in (room.kicked_user_ids or []):
+        return Response({"error": "강퇴된 유저입니다."}, status=403)
 
-    if user is None:
-        if not room.allow_guests:
-            return Response({"error": "이 방은 로그인 유저만 입장할 수 있습니다."}, status=403)
-        if not guest_nickname or len(guest_nickname) > 20:
-            return Response({"error": "유효한 닉네임을 입력하세요 (1~20자)."}, status=400)
-        if guest_nickname in (room.kicked_guest_nicknames or []):
-            return Response({"error": "강퇴된 닉네임입니다."}, status=403)
-    else:
-        if user.id in (room.kicked_user_ids or []):
-            return Response({"error": "강퇴된 유저입니다."}, status=403)
-
-    # Already in room?
-    existing = None
-    if user is not None:
-        existing = RoomPlayer.objects.filter(room=room, user=user).first()
-    elif guest_nickname:
-        existing = RoomPlayer.objects.filter(room=room, user__isnull=True, guest_nickname=guest_nickname).first()
-
+    existing = RoomPlayer.objects.filter(room=room, user=user).first()
     if existing:
         return Response(RoomDetailSerializer(room).data)
 
     try:
         with transaction.atomic():
-            RoomPlayer.objects.create(
-                room=room,
-                user=user,
-                guest_nickname=guest_nickname if user is None else "",
-            )
+            RoomPlayer.objects.create(room=room, user=user)
     except Exception as e:
         return Response({"error": f"입장 실패: {e}"}, status=400)
 
@@ -104,24 +84,15 @@ def join_room(request, room_id):
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def leave_room(request, room_id):
     room = get_object_or_404(Room, id=room_id)
-    user = request.user if request.user.is_authenticated else None
-    guest_nickname = (request.data.get("guest_nickname") or "").strip()
-
-    qs = RoomPlayer.objects.filter(room=room)
-    if user:
-        qs = qs.filter(user=user)
-    else:
-        qs = qs.filter(user__isnull=True, guest_nickname=guest_nickname)
-
-    deleted, _ = qs.delete()
+    user = request.user
+    deleted, _ = RoomPlayer.objects.filter(room=room, user=user).delete()
     if deleted == 0:
         return Response({"error": "방에 참가하지 않았습니다."}, status=400)
 
-    # Host left → close room (transfer-of-host can come later)
-    if user and room.host_id == user.id:
+    if room.host_id == user.id:
         room.status = "closed"
         room.save(update_fields=["status"])
 
