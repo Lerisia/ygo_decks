@@ -130,17 +130,33 @@ def leave_room(request, room_id):
     player = RoomPlayer.objects.filter(room=room, user=user).first()
     if player is None:
         return Response({"error": "방에 참가하지 않았습니다."}, status=400)
-    player_id = player.id
-    player.delete()
-    events.player_left(room.id, player_id)
 
-    if room.host_id == user.id:
-        # Host leaving closes the room and removes all remaining players,
-        # so they can freely join another room.
-        with transaction.atomic():
-            room.status = "closed"
-            room.save(update_fields=["status"])
-            RoomPlayer.objects.filter(room=room).delete()
+    was_host = (room.host_id == user.id)
+    player_id = player.id
+
+    with transaction.atomic():
+        player.delete()
+
+        if was_host:
+            # Transfer host to the next remaining player (oldest joined).
+            next_host = (
+                RoomPlayer.objects.filter(room=room)
+                .exclude(user__isnull=True)
+                .order_by("joined_at")
+                .first()
+            )
+            if next_host:
+                room.host = next_host.user
+                room.save(update_fields=["host"])
+                next_host.is_host = True
+                next_host.save(update_fields=["is_host"])
+            else:
+                # No remaining players — close the room.
+                room.status = "closed"
+                room.save(update_fields=["status"])
+
+    events.player_left(room.id, player_id)
+    if was_host:
         events.room_updated(room.id, RoomDetailSerializer(room).data)
 
     return Response({"ok": True})
