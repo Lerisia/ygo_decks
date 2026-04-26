@@ -57,24 +57,25 @@ def get_room(request, room_id):
 @permission_classes([IsAuthenticated])
 def join_room(request, room_id):
     room = get_object_or_404(Room, id=room_id)
-    raw_password = request.data.get("password", "") or ""
+    user = request.user
 
     if room.status == "closed":
         return Response({"error": "종료된 방입니다."}, status=400)
 
-    if room.is_full():
-        return Response({"error": "방이 가득 찼습니다."}, status=400)
-
-    if room.has_password and not check_password(raw_password, room.password):
-        return Response({"error": "비밀번호가 틀렸습니다."}, status=403)
-
-    user = request.user
-    if user.id in (room.kicked_user_ids or []):
-        return Response({"error": "강퇴된 유저입니다."}, status=403)
-
+    # Already a member? Skip password / kick / full checks (re-entering own session).
     existing = RoomPlayer.objects.filter(room=room, user=user).first()
     if existing:
         return Response(RoomDetailSerializer(room).data)
+
+    if user.id in (room.kicked_user_ids or []):
+        return Response({"error": "강퇴된 유저입니다."}, status=403)
+
+    if room.is_full():
+        return Response({"error": "방이 가득 찼습니다."}, status=400)
+
+    raw_password = request.data.get("password", "") or ""
+    if room.has_password and not check_password(raw_password, room.password):
+        return Response({"error": "비밀번호가 틀렸습니다."}, status=403)
 
     try:
         with transaction.atomic():
