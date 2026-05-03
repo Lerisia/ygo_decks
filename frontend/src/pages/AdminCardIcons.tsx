@@ -189,8 +189,8 @@ export default function AdminCardIcons() {
             <div>
               <div
                 ref={containerRef}
-                className="relative bg-gray-200 dark:bg-gray-900 rounded-lg overflow-hidden touch-none select-none"
-                style={{ width: editorSize, height: editorSize, maxWidth: "100%" }}
+                className="relative bg-gray-200 dark:bg-gray-900 rounded-lg overflow-hidden touch-none select-none aspect-square w-full"
+                style={{ maxWidth: editorSize }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
