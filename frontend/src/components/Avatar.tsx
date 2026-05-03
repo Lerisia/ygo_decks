@@ -67,7 +67,7 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
             height: innerSize,
             backgroundImage: `url(${icon.card_image_url})`,
             backgroundSize: `${bgWidth}px ${bgHeight}px`,
-            backgroundPosition: `${bgX}px ${bgY}px`,
+            backgroundPosition: `${bgX + 2}px ${bgY}px`,
             backgroundRepeat: "no-repeat",
           }}
         />
