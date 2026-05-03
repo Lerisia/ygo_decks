@@ -21,6 +21,7 @@ export default function AdminCardIcons() {
 
   const [icons, setIcons] = useState<CardIcon[]>([]);
   const [error, setError] = useState("");
+  const [showCrosshair, setShowCrosshair] = useState(false);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -241,13 +242,14 @@ export default function AdminCardIcons() {
             {/* Preview + save */}
             <div>
               <h3 className="font-semibold mb-2 text-sm">미리보기</h3>
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-4 mb-2">
                 <CircularPreview
                   imageUrl={selectedCard.image_url || ""}
                   centerX={centerX}
                   centerY={centerY}
                   radius={radius}
                   size={PREVIEW_SIZE}
+                  crosshair={showCrosshair}
                 />
                 <CircularPreview
                   imageUrl={selectedCard.image_url || ""}
@@ -255,6 +257,7 @@ export default function AdminCardIcons() {
                   centerY={centerY}
                   radius={radius}
                   size={48}
+                  crosshair={showCrosshair}
                 />
                 <CircularPreview
                   imageUrl={selectedCard.image_url || ""}
@@ -262,8 +265,18 @@ export default function AdminCardIcons() {
                   centerY={centerY}
                   radius={radius}
                   size={32}
+                  crosshair={showCrosshair}
                 />
               </div>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showCrosshair}
+                  onChange={(e) => setShowCrosshair(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">중앙 십자선 표시</span>
+              </label>
 
               <label className="block text-xs text-gray-500 mb-1">제목 (선택)</label>
               <input
@@ -324,21 +337,15 @@ export default function AdminCardIcons() {
 }
 
 function CircularPreview({
-  imageUrl, centerX, centerY, radius, size,
+  imageUrl, centerX, centerY, radius, size, crosshair = false,
 }: {
   imageUrl: string;
   centerX: number;
   centerY: number;
   radius: number;
   size: number;
+  crosshair?: boolean;
 }) {
-  // We want to show a circular crop where the circle of radius (in image-relative)
-  // becomes the full preview. Background-size scales image so that the cropped
-  // diameter (2*radius * imageDim) maps to `size`.
-  // scale = size / (2*radius*imageDim). Since we're using percentage-based positioning
-  // on a square container that displays the image with object-cover, we can use
-  // a ratio approach: the image is shown at scale = 1 / (2*radius), centered on
-  // (centerX, centerY).
   const scale = 1 / (2 * radius);
   const bgSize = size * scale;
   const bgX = -(centerX * bgSize - size / 2);
@@ -346,6 +353,7 @@ function CircularPreview({
   return (
     <div
       style={{
+        position: "relative",
         width: size,
         height: size,
         borderRadius: "50%",
@@ -354,8 +362,22 @@ function CircularPreview({
         backgroundPosition: `${bgX}px ${bgY}px`,
         backgroundRepeat: "no-repeat",
         border: "2px solid #d1d5db",
+        overflow: "hidden",
       }}
       aria-hidden
-    />
+    >
+      {crosshair && (
+        <>
+          <div style={{
+            position: "absolute", left: "50%", top: 0, bottom: 0, width: 1,
+            background: "rgba(239, 68, 68, 0.85)", transform: "translateX(-50%)", pointerEvents: "none",
+          }} />
+          <div style={{
+            position: "absolute", top: "50%", left: 0, right: 0, height: 1,
+            background: "rgba(239, 68, 68, 0.85)", transform: "translateY(-50%)", pointerEvents: "none",
+          }} />
+        </>
+      )}
+    </div>
   );
 }
