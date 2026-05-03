@@ -1,0 +1,361 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  searchCards, listIcons, createIcon, deleteIcon,
+  type CardSearchResult, type CardIcon,
+} from "@/api/cardIconApi";
+
+const PREVIEW_SIZE = 96;
+
+export default function AdminCardIcons() {
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CardSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const [selectedCard, setSelectedCard] = useState<CardSearchResult | null>(null);
+  // Crop state — center + radius in 0~1 ratio of image min dimension
+  const [centerX, setCenterX] = useState(0.5);
+  const [centerY, setCenterY] = useState(0.5);
+  const [radius, setRadius] = useState(0.25);
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [icons, setIcons] = useState<CardIcon[]>([]);
+  const [error, setError] = useState("");
+
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [imgDims, setImgDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // Load saved icons on mount
+  useEffect(() => {
+    refreshIcons();
+  }, []);
+
+  const refreshIcons = async () => {
+    try {
+      const data = await listIcons();
+      setIcons(data.icons);
+    } catch (e: any) {
+      setError(e.message || "아이콘 목록 로드 실패");
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    if (!query.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    const id = setTimeout(async () => {
+      try {
+        const data = await searchCards(query);
+        setSearchResults(data.results);
+      } catch (e: any) {
+        setError(e.message || "검색 실패");
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  const handleSelectCard = (c: CardSearchResult) => {
+    setSelectedCard(c);
+    setCenterX(0.5);
+    setCenterY(0.5);
+    setRadius(0.25);
+    setTitle(c.name);
+    setSearchResults([]);
+    setQuery("");
+  };
+
+  const onImageLoad = () => {
+    if (imgRef.current) {
+      setImgDims({ w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight });
+    }
+  };
+
+  // Drag to move circle center
+  const dragRef = useRef<{ active: boolean; offsetX: number; offsetY: number } | null>(null);
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!containerRef.current) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { active: true, offsetX: 0, offsetY: 0 };
+    handlePointerMove(e);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current?.active || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setCenterX(Math.max(0, Math.min(1, x)));
+    setCenterY(Math.max(0, Math.min(1, y)));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (dragRef.current) dragRef.current.active = false;
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  const handleSave = async () => {
+    if (!selectedCard) return;
+    setSaving(true);
+    setError("");
+    try {
+      await createIcon({
+        card: selectedCard.id,
+        title: title.trim(),
+        center_x: centerX,
+        center_y: centerY,
+        radius: radius,
+      });
+      await refreshIcons();
+      setSelectedCard(null);
+    } catch (e: any) {
+      setError(e.message || "저장 실패");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("이 아이콘을 삭제하시겠습니까?")) return;
+    try {
+      await deleteIcon(id);
+      await refreshIcons();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const editorSize = 480;
+
+  return (
+    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-2">카드 아이콘 관리</h1>
+      <p className="text-sm text-gray-500 mb-6">관리자 전용 — 카드 일러스트를 원형으로 잘라 아이콘으로 등록합니다.</p>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Card search */}
+      {!selectedCard && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-6">
+          <h2 className="font-semibold mb-2">카드 검색</h2>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="카드 이름으로 검색"
+            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-3"
+          />
+          {searching && <p className="text-sm text-gray-500">검색 중...</p>}
+          {searchResults.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {searchResults.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => handleSelectCard(c)}
+                  className="flex flex-col items-center p-2 border rounded-lg bg-gray-50 dark:bg-gray-900 hover:border-blue-500"
+                >
+                  {c.image_url && (
+                    <img src={c.image_url} alt="" className="w-20 h-20 object-cover rounded mb-1" />
+                  )}
+                  <span className="text-xs text-center truncate w-full">{c.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Crop editor */}
+      {selectedCard && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">크롭: {selectedCard.name}</h2>
+            <button
+              onClick={() => setSelectedCard(null)}
+              className="text-sm text-gray-500 hover:underline"
+            >
+              ← 카드 다시 선택
+            </button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Editor */}
+            <div>
+              <div
+                ref={containerRef}
+                className="relative bg-gray-200 dark:bg-gray-900 rounded-lg overflow-hidden touch-none select-none"
+                style={{ width: editorSize, height: editorSize, maxWidth: "100%" }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+              >
+                {selectedCard.image_url && (
+                  <img
+                    ref={imgRef}
+                    src={selectedCard.image_url}
+                    onLoad={onImageLoad}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    draggable={false}
+                  />
+                )}
+                {/* Dimming overlay outside circle (ring trick) */}
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${(centerX - radius) * 100}%`,
+                    top: `${(centerY - radius) * 100}%`,
+                    width: `${radius * 200}%`,
+                    height: `${radius * 200}%`,
+                    borderRadius: "50%",
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
+                    border: "2px solid #3b82f6",
+                  }}
+                />
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs text-gray-500">
+                  크기: {(radius * 200).toFixed(1)}%
+                </label>
+                <input
+                  type="range"
+                  min={0.05}
+                  max={0.5}
+                  step={0.005}
+                  value={radius}
+                  onChange={(e) => setRadius(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-2">이미지 위에서 드래그하여 원형 위치 조정</p>
+            </div>
+
+            {/* Preview + save */}
+            <div>
+              <h3 className="font-semibold mb-2 text-sm">미리보기</h3>
+              <div className="flex items-center gap-4 mb-4">
+                <CircularPreview
+                  imageUrl={selectedCard.image_url || ""}
+                  centerX={centerX}
+                  centerY={centerY}
+                  radius={radius}
+                  size={PREVIEW_SIZE}
+                />
+                <CircularPreview
+                  imageUrl={selectedCard.image_url || ""}
+                  centerX={centerX}
+                  centerY={centerY}
+                  radius={radius}
+                  size={48}
+                />
+                <CircularPreview
+                  imageUrl={selectedCard.image_url || ""}
+                  centerX={centerX}
+                  centerY={centerY}
+                  radius={radius}
+                  size={32}
+                />
+              </div>
+
+              <label className="block text-xs text-gray-500 mb-1">제목 (선택)</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="이 아이콘의 표시명"
+                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-3"
+              />
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "저장 중..." : "아이콘 저장"}
+              </button>
+              {imgDims.w > 0 && (
+                <p className="text-[10px] text-gray-400 mt-2">
+                  원본: {imgDims.w}×{imgDims.h} · 좌표 ({(centerX * 100).toFixed(1)}%, {(centerY * 100).toFixed(1)}%) · 반지름 {(radius * 100).toFixed(1)}%
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved icons */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+        <h2 className="font-semibold mb-3">저장된 아이콘 ({icons.length})</h2>
+        {icons.length === 0 ? (
+          <p className="text-sm text-gray-500">아직 등록된 아이콘이 없습니다.</p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {icons.map((icon) => (
+              <div key={icon.id} className="flex flex-col items-center text-center">
+                <CircularPreview
+                  imageUrl={icon.card_image_url || ""}
+                  centerX={icon.center_x}
+                  centerY={icon.center_y}
+                  radius={icon.radius}
+                  size={64}
+                />
+                <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
+                <button
+                  onClick={() => handleDelete(icon.id)}
+                  className="text-[10px] text-red-500 mt-1 hover:underline"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CircularPreview({
+  imageUrl, centerX, centerY, radius, size,
+}: {
+  imageUrl: string;
+  centerX: number;
+  centerY: number;
+  radius: number;
+  size: number;
+}) {
+  // We want to show a circular crop where the circle of radius (in image-relative)
+  // becomes the full preview. Background-size scales image so that the cropped
+  // diameter (2*radius * imageDim) maps to `size`.
+  // scale = size / (2*radius*imageDim). Since we're using percentage-based positioning
+  // on a square container that displays the image with object-cover, we can use
+  // a ratio approach: the image is shown at scale = 1 / (2*radius), centered on
+  // (centerX, centerY).
+  const scale = 1 / (2 * radius);
+  const bgSize = size * scale;
+  const bgX = -(centerX * bgSize - size / 2);
+  const bgY = -(centerY * bgSize - size / 2);
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
+        backgroundSize: `${bgSize}px ${bgSize}px`,
+        backgroundPosition: `${bgX}px ${bgY}px`,
+        backgroundRepeat: "no-repeat",
+        border: "2px solid #d1d5db",
+      }}
+      aria-hidden
+    />
+  );
+}

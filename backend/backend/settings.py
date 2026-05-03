@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'user',
     'tool',
     'multiplayer',
+    'avatar',
 ]
 
 MIDDLEWARE = [

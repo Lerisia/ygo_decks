@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/', include('user.urls')),
     path('api/', include('tool.urls')),
     path('api/multiplayer/', include('multiplayer.urls')),
+    path('api/avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
