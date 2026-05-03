@@ -429,7 +429,7 @@ function CircularPreview({
         borderRadius: "50%",
         backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
         backgroundSize: `${bgWidth}px ${bgHeight}px`,
-        backgroundPosition: `${bgX + 1}px ${bgY}px`,
+        backgroundPosition: `${bgX + 2}px ${bgY}px`,
         backgroundOrigin: "border-box",
         backgroundRepeat: "no-repeat",
         border: "2px solid #d1d5db",
