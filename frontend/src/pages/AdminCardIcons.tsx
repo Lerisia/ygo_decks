@@ -190,8 +190,11 @@ export default function AdminCardIcons() {
             <div>
               <div
                 ref={containerRef}
-                className="relative bg-gray-200 dark:bg-gray-900 rounded-lg overflow-hidden touch-none select-none aspect-square w-full"
-                style={{ maxWidth: editorSize }}
+                className="relative bg-gray-200 dark:bg-gray-900 rounded-lg overflow-hidden touch-none select-none w-full"
+                style={{
+                  maxWidth: editorSize,
+                  aspectRatio: imgDims.w && imgDims.h ? `${imgDims.w} / ${imgDims.h}` : "1 / 1",
+                }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -203,23 +206,31 @@ export default function AdminCardIcons() {
                     src={selectedCard.image_url}
                     onLoad={onImageLoad}
                     alt=""
-                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    className="absolute inset-0 w-full h-full pointer-events-none"
                     draggable={false}
                   />
                 )}
-                {/* Dimming overlay outside circle (ring trick) */}
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${(centerX - radius) * 100}%`,
-                    top: `${(centerY - radius) * 100}%`,
-                    width: `${radius * 200}%`,
-                    height: `${radius * 200}%`,
-                    borderRadius: "50%",
-                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
-                    border: "2px solid #3b82f6",
-                  }}
-                />
+                {/* Crop circle: center (centerX,centerY) fractional of image, radius fraction of image min(W,H) */}
+                {imgDims.w > 0 && imgDims.h > 0 && (() => {
+                  const minDim = Math.min(imgDims.w, imgDims.h);
+                  // Convert to container percentage, where radius is in image-min-dim units
+                  const rPercentX = (radius * minDim) / imgDims.w * 100;
+                  const rPercentY = (radius * minDim) / imgDims.h * 100;
+                  return (
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${centerX * 100 - rPercentX}%`,
+                        top: `${centerY * 100 - rPercentY}%`,
+                        width: `${rPercentX * 2}%`,
+                        height: `${rPercentY * 2}%`,
+                        borderRadius: "50%",
+                        boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
+                        border: "2px solid #3b82f6",
+                      }}
+                    />
+                  );
+                })()}
               </div>
 
               <div className="mt-3 space-y-2">
@@ -346,10 +357,30 @@ function CircularPreview({
   size: number;
   crosshair?: boolean;
 }) {
-  const scale = 1 / (2 * radius);
-  const bgSize = size * scale;
-  const bgX = -(centerX * bgSize - size / 2);
-  const bgY = -(centerY * bgSize - size / 2);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    if (!imageUrl) { setDims(null); return; }
+    const img = new Image();
+    img.onload = () => setDims({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = imageUrl;
+  }, [imageUrl]);
+
+  // For non-square images, radius is relative to min(imgW, imgH).
+  // Crop center (centerX, centerY) is image-relative (0..1).
+  let bgWidth = size, bgHeight = size, bgX = 0, bgY = 0;
+  if (dims) {
+    const minDim = Math.min(dims.w, dims.h);
+    const cropDiameterImg = 2 * radius * minDim; // pixels in image space
+    const scale = size / cropDiameterImg;
+    bgWidth = dims.w * scale;
+    bgHeight = dims.h * scale;
+    const cxImg = centerX * dims.w;
+    const cyImg = centerY * dims.h;
+    bgX = -(cxImg * scale - size / 2);
+    bgY = -(cyImg * scale - size / 2);
+  }
+
   return (
     <div
       style={{
@@ -358,7 +389,7 @@ function CircularPreview({
         height: size,
         borderRadius: "50%",
         backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
-        backgroundSize: `${bgSize}px ${bgSize}px`,
+        backgroundSize: `${bgWidth}px ${bgHeight}px`,
         backgroundPosition: `${bgX}px ${bgY}px`,
         backgroundRepeat: "no-repeat",
         border: "2px solid #d1d5db",
