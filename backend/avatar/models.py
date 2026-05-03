@@ -37,6 +37,23 @@ class UserBorderUnlock(models.Model):
         return f"{self.user_id} unlocked {self.border.key}"
 
 
+class UserIconUnlock(models.Model):
+    """Tracks which CardIcons a user has unlocked / can equip."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="icon_unlocks")
+    icon = models.ForeignKey("avatar.CardIcon", on_delete=models.CASCADE, related_name="user_unlocks")
+    granted_at = models.DateTimeField(auto_now_add=True)
+    note = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "icon"], name="unique_user_icon_unlock"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} unlocked icon {self.icon_id}"
+
+
 class CardIcon(models.Model):
     """A circular crop of a card illustration, usable as a user avatar.
 

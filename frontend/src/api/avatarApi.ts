@@ -49,6 +49,14 @@ export type Border = {
 export const listPublicIcons = (q?: string) =>
   request<{ icons: PublicCardIcon[] }>(`/card-icons/public/${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 
+export const listMyIcons = (q?: string) =>
+  request<{ icons: PublicCardIcon[] }>(`/card-icons/my/${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+
+export type ShopCardIcon = PublicCardIcon & { owned: boolean };
+
+export const listShopIcons = (q?: string) =>
+  request<{ icons: ShopCardIcon[] }>(`/card-icons/shop/${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+
 export const getMyAvatar = () =>
   request<{
     icon: PublicCardIcon | null;

@@ -3,7 +3,9 @@ from . import views
 
 urlpatterns = [
     path("card-icons/", views.list_icons, name="avatar-list-icons"),
-    path("card-icons/public/", views.public_list_icons, name="avatar-public-list"),
+    path("card-icons/my/", views.my_icons, name="avatar-my-icons"),
+    path("card-icons/shop/", views.shop_list_icons, name="avatar-shop-list"),
+    path("card-icons/grant/", views.grant_icon, name="avatar-grant-icon"),
     path("card-icons/create/", views.create_icon, name="avatar-create-icon"),
     path("card-icons/<int:icon_id>/", views.update_icon, name="avatar-update-icon"),
     path("card-icons/<int:icon_id>/delete/", views.delete_icon, name="avatar-delete-icon"),

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import {
-  listPublicIcons, getMyAvatar, setMyAvatar,
+  listMyIcons, getMyAvatar, setMyAvatar,
   getMyBorders, setMyBorder,
   type PublicCardIcon, type Border,
 } from "@/api/avatarApi";
@@ -26,7 +26,7 @@ export default function MyAvatar() {
       navigate("/unauthorized");
       return;
     }
-    Promise.all([listPublicIcons(), getMyAvatar(), getMyBorders()])
+    Promise.all([listMyIcons(), getMyAvatar(), getMyBorders()])
       .then(([listData, meData, bordersData]) => {
         setIcons(listData.icons);
         setCurrent(meData.icon);
@@ -166,9 +166,19 @@ export default function MyAvatar() {
       {loading ? (
         <p className="text-center text-gray-500">로딩 중...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">
-          {query ? "검색 결과가 없습니다." : "등록된 아이콘이 없습니다."}
-        </p>
+        <div className="text-center py-8">
+          <p className="text-gray-500 mb-3">
+            {query ? "검색 결과가 없습니다." : "보유한 아이콘이 없습니다."}
+          </p>
+          {!query && (
+            <button
+              onClick={() => navigate("/playground/icon-shop")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold"
+            >
+              아이콘 샵 둘러보기 →
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
           {filtered.map((icon) => {

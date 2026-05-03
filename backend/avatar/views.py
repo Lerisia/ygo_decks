@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from card.models import Card
-from .models import CardIcon, Border, UserBorderUnlock
+from .models import CardIcon, Border, UserBorderUnlock, UserIconUnlock
 from .serializers import CardIconSerializer, BorderSerializer
 
 
@@ -85,15 +85,56 @@ def delete_icon(request, icon_id):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_icons(request):
+    """Icons unlocked by the current user, sorted by Korean card name. Optional ?q= search."""
+    user = request.user
+    q = (request.GET.get("q") or "").strip()
+    qs = CardIcon.objects.select_related("card").filter(user_unlocks__user=user)
+    if q:
+        qs = qs.filter(card__korean_name__icontains=q) | qs.filter(title__icontains=q)
+    qs = qs.distinct().order_by("card__korean_name", "id")
+    return Response({"icons": CardIconSerializer(qs, many=True).data})
+
+
+@api_view(["GET"])
 @permission_classes([AllowAny])
-def public_list_icons(request):
-    """User-facing icon list: sorted by Korean card name, optional ?q= search."""
+def shop_list_icons(request):
+    """All icons with ownership flag for the current user (if authenticated)."""
     q = (request.GET.get("q") or "").strip()
     qs = CardIcon.objects.select_related("card").all()
     if q:
         qs = qs.filter(card__korean_name__icontains=q) | qs.filter(title__icontains=q)
     qs = qs.distinct().order_by("card__korean_name", "id")
-    return Response({"icons": CardIconSerializer(qs, many=True).data})
+
+    user = request.user if request.user.is_authenticated else None
+    owned_ids = set()
+    if user:
+        owned_ids = set(
+            UserIconUnlock.objects.filter(user=user).values_list("icon_id", flat=True)
+        )
+    data = CardIconSerializer(qs, many=True).data
+    for d in data:
+        d["owned"] = d["id"] in owned_ids
+    return Response({"icons": data})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def grant_icon(request):
+    """Admin: grant an icon to a user."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    user_id = request.data.get("user_id")
+    icon_id = request.data.get("icon_id")
+    note = request.data.get("note", "")
+    try:
+        target = User.objects.get(id=int(user_id))
+        icon = CardIcon.objects.get(id=int(icon_id))
+    except (User.DoesNotExist, CardIcon.DoesNotExist, ValueError, TypeError):
+        return Response({"error": "유저나 아이콘을 찾을 수 없습니다."}, status=404)
+    UserIconUnlock.objects.get_or_create(user=target, icon=icon, defaults={"note": note})
+    return Response({"ok": True})
 
 
 def _resolve_default_border():
@@ -180,7 +221,7 @@ def grant_border(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def set_my_avatar(request):
-    """Set the current user's avatar to a CardIcon (or null to reset to default)."""
+    """Set the current user's avatar to a CardIcon they own (or null to reset)."""
     icon_id = request.data.get("icon_id")
     user = request.user
     if icon_id is None:
@@ -191,6 +232,8 @@ def set_my_avatar(request):
         icon = CardIcon.objects.get(id=int(icon_id))
     except (CardIcon.DoesNotExist, ValueError, TypeError):
         return Response({"error": "아이콘을 찾을 수 없습니다."}, status=404)
+    if not UserIconUnlock.objects.filter(user=user, icon=icon).exists():
+        return Response({"error": "보유하지 않은 아이콘입니다."}, status=403)
     user.avatar_icon = icon
     user.save(update_fields=["avatar_icon"])
     return Response({"ok": True, "icon": CardIconSerializer(icon).data})
