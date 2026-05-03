@@ -438,7 +438,7 @@ export default function AdminCardIcons() {
             return <p className="text-sm text-gray-500">검색 결과가 없습니다.</p>;
           }
           return (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-5 gap-3">
             {filteredSaved.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
@@ -456,7 +456,7 @@ export default function AdminCardIcons() {
                       radius: icon.radius,
                     }}
                     border={previewBorder}
-                    size={64}
+                    size={96}
                   />
                   <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
                   <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${CATEGORY_BADGE[icon.category]}`}>
