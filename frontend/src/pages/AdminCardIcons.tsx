@@ -42,6 +42,7 @@ export default function AdminCardIcons() {
   const [availableBorders, setAvailableBorders] = useState<Border[]>([]);
   const [previewBorderId, setPreviewBorderId] = useState<number | null>(null);
   const [savedQuery, setSavedQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<IconCategory | "all">("all");
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -423,23 +424,67 @@ export default function AdminCardIcons() {
           placeholder="저장된 아이콘 검색 (이름)"
           className="w-full px-3 py-2 mb-3 border rounded-lg bg-white dark:bg-gray-800 text-sm"
         />
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(["all", "default", "shop", "exclusive"] as const).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-1 text-xs rounded-full border ${
+                categoryFilter === cat
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              }`}
+            >
+              {cat === "all" ? "전체" : CATEGORY_LABEL[cat as IconCategory]}
+            </button>
+          ))}
+        </div>
         {(() => {
           const q = savedQuery.trim().toLowerCase();
-          const filteredSaved = q
+          let filteredSaved = q
             ? icons.filter((i) =>
                 (i.card_name || "").toLowerCase().includes(q) ||
                 (i.title || "").toLowerCase().includes(q)
               )
             : icons;
+          if (categoryFilter !== "all") {
+            filteredSaved = filteredSaved.filter((i) => i.category === categoryFilter);
+          }
+          // Sort: category order, then price asc (for shop), then name
+          const catOrder: Record<IconCategory, number> = { default: 0, shop: 1, exclusive: 2 };
+          filteredSaved = [...filteredSaved].sort((a, b) => {
+            const ca = catOrder[a.category] - catOrder[b.category];
+            if (ca !== 0) return ca;
+            if (a.category === "shop" && b.category === "shop") {
+              const pa = (a.price || 0) - (b.price || 0);
+              if (pa !== 0) return pa;
+            }
+            return (a.card_name || "").localeCompare(b.card_name || "");
+          });
+
           if (icons.length === 0) {
             return <p className="text-sm text-gray-500">아직 등록된 아이콘이 없습니다.</p>;
           }
           if (filteredSaved.length === 0) {
             return <p className="text-sm text-gray-500">검색 결과가 없습니다.</p>;
           }
+
+          // Group by category for display
+          const groups: { cat: IconCategory; items: typeof filteredSaved }[] = [];
+          for (const cat of ["default", "shop", "exclusive"] as IconCategory[]) {
+            const items = filteredSaved.filter((i) => i.category === cat);
+            if (items.length > 0) groups.push({ cat, items });
+          }
+
           return (
-            <div className="grid grid-cols-5 gap-3">
-            {filteredSaved.map((icon) => {
+          <div className="space-y-5">
+          {groups.map(({ cat, items }) => (
+            <div key={cat}>
+              <h3 className={`text-xs font-semibold mb-2 inline-block px-2 py-0.5 rounded ${CATEGORY_BADGE[cat]}`}>
+                {CATEGORY_LABEL[cat]} · {items.length}
+              </h3>
+              <div className="grid grid-cols-5 gap-3">
+              {items.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
                 <div key={icon.id} className="flex flex-col items-center text-center">
@@ -479,6 +524,9 @@ export default function AdminCardIcons() {
                 </div>
               );
             })}
+              </div>
+            </div>
+          ))}
           </div>
           );
         })()}
