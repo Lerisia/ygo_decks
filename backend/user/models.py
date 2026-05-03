@@ -17,6 +17,12 @@ class User(AbstractUser):
     use_custom_lookup = models.BooleanField(default=False)
     pending_deletion = models.BooleanField(default=False)
     deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    avatar_icon = models.ForeignKey(
+        "avatar.CardIcon",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="users",
+    )
 
     def __str__(self):
         return self.username

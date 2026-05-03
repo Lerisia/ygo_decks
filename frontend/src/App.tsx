@@ -31,6 +31,7 @@ import TierListMaker from "./pages/TierListMaker";
 import Multiplayer from "./pages/Multiplayer";
 import MultiplayerRoom from "./pages/MultiplayerRoom";
 import AdminCardIcons from "./pages/AdminCardIcons";
+import MyAvatar from "./pages/MyAvatar";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
@@ -70,6 +71,7 @@ function App() {
           <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />
           <Route path="/manage/card-icons" element={<AdminCardIcons />} />
+          <Route path="/mypage/avatar" element={<MyAvatar />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />

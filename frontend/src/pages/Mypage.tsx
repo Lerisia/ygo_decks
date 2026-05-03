@@ -118,6 +118,13 @@ const Mypage = () => {
           보유 덱 관리 →
         </button>
 
+        <button
+          onClick={() => navigate("/mypage/avatar")}
+          className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+        >
+          아이콘 설정 →
+        </button>
+
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
           <button
             onClick={() => toggle("username")}
