@@ -1,8 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import {
   searchCards, listIcons, createIcon, updateIcon, deleteIcon,
-  type CardSearchResult, type CardIcon,
+  type CardSearchResult, type CardIcon, type IconCategory,
 } from "@/api/cardIconApi";
+import { getMyBorders, type Border } from "@/api/avatarApi";
+import Avatar from "@/components/Avatar";
+
+const CATEGORY_LABEL: Record<IconCategory, string> = {
+  default: "기본 지급",
+  shop: "상점 판매",
+  exclusive: "비매품",
+};
+
+const CATEGORY_BADGE: Record<IconCategory, string> = {
+  default: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+  shop: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+  exclusive: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+};
 
 const PREVIEW_SIZE = 96;
 
@@ -23,14 +37,26 @@ export default function AdminCardIcons() {
   const [error, setError] = useState("");
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [editingIconId, setEditingIconId] = useState<number | null>(null);
+  const [category, setCategory] = useState<IconCategory>("exclusive");
+  const [price, setPrice] = useState<number>(0);
+  const [availableBorders, setAvailableBorders] = useState<Border[]>([]);
+  const [previewBorderId, setPreviewBorderId] = useState<number | null>(null);
+  const [savedQuery, setSavedQuery] = useState("");
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [imgDims, setImgDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
-  // Load saved icons on mount
+  // Load saved icons + borders on mount
   useEffect(() => {
     refreshIcons();
+    getMyBorders()
+      .then((d) => {
+        setAvailableBorders(d.borders);
+        const def = d.borders.find((b) => b.is_default) || d.borders[0];
+        if (def) setPreviewBorderId(def.id);
+      })
+      .catch(() => {});
   }, []);
 
   const refreshIcons = async () => {
@@ -65,6 +91,8 @@ export default function AdminCardIcons() {
     setCenterY(0.5);
     setRadius(0.25);
     setTitle(c.name);
+    setCategory("exclusive");
+    setPrice(0);
     setSearchResults([]);
     setQuery("");
     setEditingIconId(null);
@@ -81,6 +109,8 @@ export default function AdminCardIcons() {
     setCenterY(icon.center_y);
     setRadius(icon.radius);
     setTitle(icon.title || icon.card_name);
+    setCategory(icon.category);
+    setPrice(icon.price);
     setEditingIconId(icon.id);
     setSearchResults([]);
     setQuery("");
@@ -121,21 +151,18 @@ export default function AdminCardIcons() {
     setSaving(true);
     setError("");
     try {
+      const payload = {
+        title: title.trim(),
+        center_x: centerX,
+        center_y: centerY,
+        radius: radius,
+        category,
+        price: category === "shop" ? price : 0,
+      };
       if (editingIconId) {
-        await updateIcon(editingIconId, {
-          title: title.trim(),
-          center_x: centerX,
-          center_y: centerY,
-          radius: radius,
-        });
+        await updateIcon(editingIconId, payload);
       } else {
-        await createIcon({
-          card: selectedCard.id,
-          title: title.trim(),
-          center_x: centerX,
-          center_y: centerY,
-          radius: radius,
-        });
+        await createIcon({ card: selectedCard.id, ...payload });
       }
       await refreshIcons();
       setSelectedCard(null);
@@ -329,6 +356,29 @@ export default function AdminCardIcons() {
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-3"
               />
 
+              <label className="block text-xs text-gray-500 mb-1">분류</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as IconCategory)}
+                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-2"
+              >
+                <option value="default">기본 지급 (모든 유저에게 표시)</option>
+                <option value="shop">상점 판매</option>
+                <option value="exclusive">비매품 (어드민 부여)</option>
+              </select>
+              {category === "shop" && (
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-500 mb-1">가격 (포인트)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={price}
+                    onChange={(e) => setPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+                  />
+                </div>
+              )}
+
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -348,39 +398,90 @@ export default function AdminCardIcons() {
 
       {/* Saved icons */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-        <h2 className="font-semibold mb-3">저장된 아이콘 ({icons.length})</h2>
-        {icons.length === 0 ? (
-          <p className="text-sm text-gray-500">아직 등록된 아이콘이 없습니다.</p>
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-            {icons.map((icon) => (
-              <div key={icon.id} className="flex flex-col items-center text-center">
-                <CircularPreview
-                  imageUrl={icon.card_image_url || ""}
-                  centerX={icon.center_x}
-                  centerY={icon.center_y}
-                  radius={icon.radius}
-                  size={64}
-                />
-                <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
-                <div className="flex gap-2 mt-1">
-                  <button
-                    onClick={() => handleEditIcon(icon)}
-                    className="text-[10px] text-blue-500 hover:underline"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => handleDelete(icon.id)}
-                    className="text-[10px] text-red-500 hover:underline"
-                  >
-                    삭제
-                  </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h2 className="font-semibold">저장된 아이콘 ({icons.length})</h2>
+          {availableBorders.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500">미리보기 테두리</label>
+              <select
+                value={previewBorderId ?? ""}
+                onChange={(e) => setPreviewBorderId(e.target.value ? Number(e.target.value) : null)}
+                className="px-2 py-1 border rounded-lg bg-white dark:bg-gray-800 text-xs"
+              >
+                <option value="">없음</option>
+                {availableBorders.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <input
+          type="text"
+          value={savedQuery}
+          onChange={(e) => setSavedQuery(e.target.value)}
+          placeholder="저장된 아이콘 검색 (이름)"
+          className="w-full px-3 py-2 mb-3 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+        />
+        {(() => {
+          const q = savedQuery.trim().toLowerCase();
+          const filteredSaved = q
+            ? icons.filter((i) =>
+                (i.card_name || "").toLowerCase().includes(q) ||
+                (i.title || "").toLowerCase().includes(q)
+              )
+            : icons;
+          if (icons.length === 0) {
+            return <p className="text-sm text-gray-500">아직 등록된 아이콘이 없습니다.</p>;
+          }
+          if (filteredSaved.length === 0) {
+            return <p className="text-sm text-gray-500">검색 결과가 없습니다.</p>;
+          }
+          return (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {filteredSaved.map((icon) => {
+              const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
+              return (
+                <div key={icon.id} className="flex flex-col items-center text-center">
+                  <Avatar
+                    icon={{
+                      id: icon.id,
+                      title: icon.title,
+                      card: icon.card,
+                      card_id: icon.card_id,
+                      card_name: icon.card_name,
+                      card_image_url: icon.card_image_url,
+                      center_x: icon.center_x,
+                      center_y: icon.center_y,
+                      radius: icon.radius,
+                    }}
+                    border={previewBorder}
+                    size={64}
+                  />
+                  <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
+                  <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${CATEGORY_BADGE[icon.category]}`}>
+                    {CATEGORY_LABEL[icon.category]}{icon.category === "shop" ? ` ${icon.price}P` : ""}
+                  </span>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => handleEditIcon(icon)}
+                      className="text-[10px] text-blue-500 hover:underline"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => handleDelete(icon.id)}
+                      className="text-[10px] text-red-500 hover:underline"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

@@ -27,6 +27,7 @@ class CardIconSerializer(serializers.ModelSerializer):
             "id", "title",
             "card", "card_id", "card_name", "card_image_url",
             "center_x", "center_y", "radius",
+            "category", "price",
             "created_at", "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]

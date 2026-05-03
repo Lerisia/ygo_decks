@@ -32,6 +32,8 @@ export type CardSearchResult = {
   image_url: string | null;
 };
 
+export type IconCategory = "default" | "shop" | "exclusive";
+
 export type CardIcon = {
   id: number;
   title: string;
@@ -42,6 +44,8 @@ export type CardIcon = {
   center_x: number;
   center_y: number;
   radius: number;
+  category: IconCategory;
+  price: number;
   created_at: string;
 };
 
@@ -57,13 +61,22 @@ export const createIcon = (data: {
   center_x: number;
   center_y: number;
   radius: number;
+  category?: IconCategory;
+  price?: number;
 }) =>
   request<CardIcon>("/card-icons/create/", {
     method: "POST",
     body: JSON.stringify(data),
   });
 
-export const updateIcon = (id: number, data: Partial<{ title: string; center_x: number; center_y: number; radius: number }>) =>
+export const updateIcon = (id: number, data: Partial<{
+  title: string;
+  center_x: number;
+  center_y: number;
+  radius: number;
+  category: IconCategory;
+  price: number;
+}>) =>
   request<CardIcon>(`/card-icons/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(data),

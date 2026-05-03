@@ -28,6 +28,22 @@ def list_icons(request):
     return Response({"icons": CardIconSerializer(icons, many=True).data})
 
 
+VALID_CATEGORIES = {"default", "shop", "exclusive"}
+
+
+def _resolve_category_price(data):
+    cat = (data.get("category") or "exclusive").strip()
+    if cat not in VALID_CATEGORIES:
+        cat = "exclusive"
+    try:
+        price = int(data.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    if cat != "shop":
+        price = 0
+    return cat, max(0, price)
+
+
 @api_view(["POST"])
 @permission_classes([IsAdminUser])
 def create_icon(request):
@@ -54,12 +70,15 @@ def create_icon(request):
     if not (0 <= cx <= 1 and 0 <= cy <= 1 and 0 < r <= 1):
         return Response({"error": "좌표 범위가 유효하지 않습니다."}, status=400)
 
+    cat, price = _resolve_category_price(request.data)
     icon = CardIcon.objects.create(
         card=card,
         title=(request.data.get("title") or "")[:80],
         center_x=cx,
         center_y=cy,
         radius=r,
+        category=cat,
+        price=price,
         created_by=request.user,
     )
     return Response(CardIconSerializer(icon).data, status=201)
@@ -72,6 +91,13 @@ def update_icon(request, icon_id):
     for field in ("title", "center_x", "center_y", "radius"):
         if field in request.data:
             setattr(icon, field, request.data[field])
+    if "category" in request.data or "price" in request.data:
+        new_cat, new_price = _resolve_category_price({
+            "category": request.data.get("category", icon.category),
+            "price": request.data.get("price", icon.price),
+        })
+        icon.category = new_cat
+        icon.price = new_price
     icon.save()
     return Response(CardIconSerializer(icon).data)
 
@@ -87,12 +113,17 @@ def delete_icon(request, icon_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_icons(request):
-    """Icons unlocked by the current user, sorted by Korean card name. Optional ?q= search."""
+    """Icons available to the current user: default category + their unlocked icons.
+    Sorted by Korean card name. Optional ?q= search.
+    """
+    from django.db.models import Q
     user = request.user
     q = (request.GET.get("q") or "").strip()
-    qs = CardIcon.objects.select_related("card").filter(user_unlocks__user=user)
+    qs = CardIcon.objects.select_related("card").filter(
+        Q(category="default") | Q(user_unlocks__user=user)
+    )
     if q:
-        qs = qs.filter(card__korean_name__icontains=q) | qs.filter(title__icontains=q)
+        qs = qs.filter(Q(card__korean_name__icontains=q) | Q(title__icontains=q))
     qs = qs.distinct().order_by("card__korean_name", "id")
     return Response({"icons": CardIconSerializer(qs, many=True).data})
 
@@ -115,7 +146,8 @@ def shop_list_icons(request):
         )
     data = CardIconSerializer(qs, many=True).data
     for d in data:
-        d["owned"] = d["id"] in owned_ids
+        # default-category icons are effectively owned by everyone
+        d["owned"] = (d["category"] == "default") or (d["id"] in owned_ids)
     return Response({"icons": data})
 
 
@@ -232,7 +264,9 @@ def set_my_avatar(request):
         icon = CardIcon.objects.get(id=int(icon_id))
     except (CardIcon.DoesNotExist, ValueError, TypeError):
         return Response({"error": "아이콘을 찾을 수 없습니다."}, status=404)
-    if not UserIconUnlock.objects.filter(user=user, icon=icon).exists():
+    is_default = icon.category == "default"
+    is_unlocked = UserIconUnlock.objects.filter(user=user, icon=icon).exists()
+    if not (is_default or is_unlocked):
         return Response({"error": "보유하지 않은 아이콘입니다."}, status=403)
     user.avatar_icon = icon
     user.save(update_fields=["avatar_icon"])

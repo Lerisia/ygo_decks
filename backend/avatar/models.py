@@ -61,6 +61,12 @@ class CardIcon(models.Model):
     `card_illust` image, so it's resolution-independent and easy to re-edit.
     """
 
+    CATEGORY_CHOICES = [
+        ("default", "기본 지급"),
+        ("shop", "상점 판매"),
+        ("exclusive", "비매품"),
+    ]
+
     card = models.ForeignKey(
         "card.Card",
         on_delete=models.CASCADE,
@@ -70,6 +76,8 @@ class CardIcon(models.Model):
     center_x = models.FloatField(help_text="Crop center X (0~1)")
     center_y = models.FloatField(help_text="Crop center Y (0~1)")
     radius = models.FloatField(help_text="Crop radius (0~1, of image min(w,h))")
+    category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default="exclusive")
+    price = models.PositiveIntegerField(default=0, help_text="Shop price (only used when category=shop)")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
