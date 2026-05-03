@@ -69,7 +69,7 @@ function App() {
           <Route path="/tier-list-maker" element={<TierListMaker />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />
-          <Route path="/admin/card-icons" element={<AdminCardIcons />} />
+          <Route path="/manage/card-icons" element={<AdminCardIcons />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
