@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserInfo, changeUsername, changePassword, logout, checkUsernameExists } from "../api/accountApi";
+import { getMyAvatar, type PublicCardIcon } from "@/api/avatarApi";
+import Avatar from "@/components/Avatar";
 
 const Mypage = () => {
   const [email, setEmail] = useState("");
@@ -14,6 +16,7 @@ const Mypage = () => {
   const [passwordError, setPasswordError] = useState("");
   const [message, setMessage] = useState("");
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [avatarIcon, setAvatarIcon] = useState<PublicCardIcon | null>(null);
 
   const navigate = useNavigate();
 
@@ -33,6 +36,7 @@ const Mypage = () => {
       }
     };
     fetchUserInfo();
+    getMyAvatar().then((d) => setAvatarIcon(d.icon)).catch(() => {});
   }, [navigate]);
 
   const handleChangeUsername = async () => {
@@ -94,11 +98,20 @@ const Mypage = () => {
   return (
     <div className="h-auto min-h-screen px-4 py-6">
       <div className="w-full max-w-md mx-auto space-y-3">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">이메일</p>
-          <p className="font-medium">{email}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">닉네임</p>
-          <p className="font-medium">{originalUsername}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 flex items-center gap-4">
+          <button
+            onClick={() => navigate("/mypage/avatar")}
+            className="shrink-0 transition hover:opacity-80"
+            title="아이콘 변경"
+          >
+            <Avatar icon={avatarIcon} size={64} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400">이메일</p>
+            <p className="font-medium truncate">{email}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">닉네임</p>
+            <p className="font-medium truncate">{originalUsername}</p>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
