@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  searchCards, listIcons, createIcon, deleteIcon,
+  searchCards, listIcons, createIcon, updateIcon, deleteIcon,
   type CardSearchResult, type CardIcon,
 } from "@/api/cardIconApi";
 
@@ -22,6 +22,7 @@ export default function AdminCardIcons() {
   const [icons, setIcons] = useState<CardIcon[]>([]);
   const [error, setError] = useState("");
   const [showCrosshair, setShowCrosshair] = useState(false);
+  const [editingIconId, setEditingIconId] = useState<number | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,24 @@ export default function AdminCardIcons() {
     setTitle(c.name);
     setSearchResults([]);
     setQuery("");
+    setEditingIconId(null);
+  };
+
+  const handleEditIcon = (icon: CardIcon) => {
+    setSelectedCard({
+      id: icon.card,
+      card_id: icon.card_id,
+      name: icon.card_name,
+      image_url: icon.card_image_url,
+    });
+    setCenterX(icon.center_x);
+    setCenterY(icon.center_y);
+    setRadius(icon.radius);
+    setTitle(icon.title || icon.card_name);
+    setEditingIconId(icon.id);
+    setSearchResults([]);
+    setQuery("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const onImageLoad = () => {
@@ -102,15 +121,25 @@ export default function AdminCardIcons() {
     setSaving(true);
     setError("");
     try {
-      await createIcon({
-        card: selectedCard.id,
-        title: title.trim(),
-        center_x: centerX,
-        center_y: centerY,
-        radius: radius,
-      });
+      if (editingIconId) {
+        await updateIcon(editingIconId, {
+          title: title.trim(),
+          center_x: centerX,
+          center_y: centerY,
+          radius: radius,
+        });
+      } else {
+        await createIcon({
+          card: selectedCard.id,
+          title: title.trim(),
+          center_x: centerX,
+          center_y: centerY,
+          radius: radius,
+        });
+      }
       await refreshIcons();
       setSelectedCard(null);
+      setEditingIconId(null);
     } catch (e: any) {
       setError(e.message || "저장 실패");
     } finally {
@@ -176,12 +205,14 @@ export default function AdminCardIcons() {
       {selectedCard && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">크롭: {selectedCard.name}</h2>
+            <h2 className="font-semibold">
+              {editingIconId ? "수정" : "크롭"}: {selectedCard.name}
+            </h2>
             <button
-              onClick={() => setSelectedCard(null)}
+              onClick={() => { setSelectedCard(null); setEditingIconId(null); }}
               className="text-sm text-gray-500 hover:underline"
             >
-              ← 카드 다시 선택
+              ← {editingIconId ? "취소" : "카드 다시 선택"}
             </button>
           </div>
 
@@ -303,7 +334,7 @@ export default function AdminCardIcons() {
                 disabled={saving}
                 className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? "저장 중..." : "아이콘 저장"}
+                {saving ? "저장 중..." : editingIconId ? "수정 저장" : "아이콘 저장"}
               </button>
               {imgDims.w > 0 && (
                 <p className="text-[10px] text-gray-400 mt-2">
@@ -332,12 +363,20 @@ export default function AdminCardIcons() {
                   size={64}
                 />
                 <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
-                <button
-                  onClick={() => handleDelete(icon.id)}
-                  className="text-[10px] text-red-500 mt-1 hover:underline"
-                >
-                  삭제
-                </button>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    onClick={() => handleEditIcon(icon)}
+                    className="text-[10px] text-blue-500 hover:underline"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => handleDelete(icon.id)}
+                    className="text-[10px] text-red-500 hover:underline"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
             ))}
           </div>
