@@ -483,7 +483,7 @@ export default function AdminCardIcons() {
               <h3 className={`text-xs font-semibold mb-2 inline-block px-2 py-0.5 rounded ${CATEGORY_BADGE[cat]}`}>
                 {CATEGORY_LABEL[cat]} · {items.length}
               </h3>
-              <div className="grid grid-cols-5 gap-3">
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(5, 120px)" }}>
               {items.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
