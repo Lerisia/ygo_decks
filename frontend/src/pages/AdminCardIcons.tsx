@@ -501,7 +501,7 @@ export default function AdminCardIcons() {
               <h3 className={`text-xs font-semibold mb-2 inline-block px-2 py-0.5 rounded ${CATEGORY_BADGE[cat]}`}>
                 {CATEGORY_LABEL[cat]} · {items.length}
               </h3>
-              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${colsPerRow}, ${colsPerRow === 6 ? 104 : 120}px)` }}>
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${colsPerRow}, ${colsPerRow === 6 ? 80 : 120}px)` }}>
               {items.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
@@ -519,7 +519,7 @@ export default function AdminCardIcons() {
                       radius: icon.radius,
                     }}
                     border={previewBorder}
-                    size={96}
+                    size={colsPerRow === 6 ? 64 : 96}
                   />
                   <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
                   <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${CATEGORY_BADGE[icon.category]}`}>
