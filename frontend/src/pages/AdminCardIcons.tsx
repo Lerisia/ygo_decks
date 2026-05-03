@@ -43,7 +43,7 @@ export default function AdminCardIcons() {
   const [previewBorderId, setPreviewBorderId] = useState<number | null>(null);
   const [savedQuery, setSavedQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<IconCategory | "all">("all");
-  const [colsPerRow, setColsPerRow] = useState<5 | 6>(5);
+  const [colsPerRow, setColsPerRow] = useState<5 | 8>(5);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -404,10 +404,10 @@ export default function AdminCardIcons() {
           <h2 className="font-semibold">저장된 아이콘 ({icons.length})</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              {[5, 6].map((n) => (
+              {[5, 8].map((n) => (
                 <button
                   key={n}
-                  onClick={() => setColsPerRow(n as 5 | 6)}
+                  onClick={() => setColsPerRow(n as 5 | 8)}
                   className={`px-2 py-1 text-xs rounded border ${
                     colsPerRow === n
                       ? "bg-blue-600 text-white border-blue-600"
@@ -501,7 +501,7 @@ export default function AdminCardIcons() {
               <h3 className={`text-xs font-semibold mb-2 inline-block px-2 py-0.5 rounded ${CATEGORY_BADGE[cat]}`}>
                 {CATEGORY_LABEL[cat]} · {items.length}
               </h3>
-              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${colsPerRow}, ${colsPerRow === 6 ? 80 : 120}px)` }}>
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${colsPerRow}, ${colsPerRow === 8 ? 80 : 120}px)` }}>
               {items.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
@@ -519,7 +519,7 @@ export default function AdminCardIcons() {
                       radius: icon.radius,
                     }}
                     border={previewBorder}
-                    size={colsPerRow === 6 ? 64 : 96}
+                    size={colsPerRow === 8 ? 64 : 96}
                   />
                   <span className="text-xs mt-1 truncate w-full">{icon.title || icon.card_name}</span>
                   <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${CATEGORY_BADGE[icon.category]}`}>
