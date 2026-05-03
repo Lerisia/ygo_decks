@@ -429,10 +429,8 @@ function CircularPreview({
         borderRadius: "50%",
         backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
         backgroundSize: `${bgWidth}px ${bgHeight}px`,
-        backgroundPosition: `${bgX + 2}px ${bgY}px`,
+        backgroundPosition: `${bgX}px ${bgY}px`,
         backgroundRepeat: "no-repeat",
-        outline: "2px solid #d1d5db",
-        outlineOffset: "-2px",
         overflow: "hidden",
       }}
       aria-hidden

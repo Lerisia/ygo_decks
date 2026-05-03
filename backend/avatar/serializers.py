@@ -1,5 +1,19 @@
 from rest_framework import serializers
-from .models import CardIcon
+from .models import CardIcon, Border
+
+
+class BorderSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Border
+        fields = ["id", "key", "name", "color", "image_url", "is_default"]
+
+    def get_image_url(self, obj):
+        try:
+            return obj.image.url if obj.image else None
+        except Exception:
+            return None
 
 
 class CardIconSerializer(serializers.ModelSerializer):

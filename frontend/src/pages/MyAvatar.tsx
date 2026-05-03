@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import {
   listPublicIcons, getMyAvatar, setMyAvatar,
-  type PublicCardIcon,
+  getMyBorders, setMyBorder,
+  type PublicCardIcon, type Border,
 } from "@/api/avatarApi";
 
 export default function MyAvatar() {
@@ -16,20 +17,39 @@ export default function MyAvatar() {
   const [saving, setSaving] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  const [borders, setBorders] = useState<Border[]>([]);
+  const [currentBorder, setCurrentBorder] = useState<Border | null>(null);
+  const [savingBorder, setSavingBorder] = useState<number | null>(null);
+
   useEffect(() => {
     if (!localStorage.getItem("access_token")) {
       navigate("/unauthorized");
       return;
     }
-    Promise.all([listPublicIcons(), getMyAvatar()])
-      .then(([listData, meData]) => {
+    Promise.all([listPublicIcons(), getMyAvatar(), getMyBorders()])
+      .then(([listData, meData, bordersData]) => {
         setIcons(listData.icons);
         setCurrent(meData.icon);
-        setIsDefault(meData.is_default);
+        setIsDefault(meData.is_default_icon);
+        setCurrentBorder(meData.border);
+        setBorders(bordersData.borders);
       })
       .catch((e: any) => setError(e.message || "로드 실패"))
       .finally(() => setLoading(false));
   }, [navigate]);
+
+  const handlePickBorder = async (b: Border) => {
+    setSavingBorder(b.id);
+    setError("");
+    try {
+      const r = await setMyBorder(b.id);
+      setCurrentBorder(r.border);
+    } catch (e: any) {
+      setError(e.message || "테두리 변경 실패");
+    } finally {
+      setSavingBorder(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,7 +81,7 @@ export default function MyAvatar() {
       // Re-fetch to get the default
       const me = await getMyAvatar();
       setCurrent(me.icon);
-      setIsDefault(me.is_default);
+      setIsDefault(me.is_default_icon);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -81,12 +101,15 @@ export default function MyAvatar() {
       <p className="text-sm text-gray-500 mb-5">멀티플레이 등에서 표시되는 아이콘을 선택하세요.</p>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 flex items-center gap-4">
-        <Avatar icon={current} size={80} />
+        <Avatar icon={current} border={currentBorder} size={80} />
         <div className="flex-1">
           <p className="font-semibold">현재 아이콘</p>
           <p className="text-sm text-gray-500">
             {current ? (current.title || current.card_name) : "(없음)"}
             {isDefault && " · 기본"}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            테두리: {currentBorder?.name || "없음"}
           </p>
         </div>
         {!isDefault && current && (
@@ -99,6 +122,32 @@ export default function MyAvatar() {
           </button>
         )}
       </div>
+
+      {borders.length > 1 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
+          <h2 className="font-semibold mb-3 text-sm">테두리</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            {borders.map((b) => {
+              const isSelected = currentBorder?.id === b.id;
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => handlePickBorder(b)}
+                  disabled={savingBorder !== null}
+                  className={`flex flex-col items-center p-2 rounded-lg border-2 transition ${
+                    isSelected
+                      ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
+                  }`}
+                >
+                  <Avatar icon={current} border={b} size={56} />
+                  <span className="text-xs mt-1 truncate w-full text-center">{b.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <input
         type="text"
@@ -135,7 +184,7 @@ export default function MyAvatar() {
                     : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
-                <Avatar icon={icon} size={64} />
+                <Avatar icon={icon} border={currentBorder} size={64} />
                 <span className="text-xs mt-1 truncate w-full text-center">
                   {icon.title || icon.card_name}
                 </span>

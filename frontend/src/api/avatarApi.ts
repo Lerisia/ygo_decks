@@ -37,14 +37,37 @@ export type PublicCardIcon = {
   radius: number;
 };
 
+export type Border = {
+  id: number;
+  key: string;
+  name: string;
+  color: string;
+  image_url: string | null;
+  is_default: boolean;
+};
+
 export const listPublicIcons = (q?: string) =>
   request<{ icons: PublicCardIcon[] }>(`/card-icons/public/${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 
 export const getMyAvatar = () =>
-  request<{ icon: PublicCardIcon | null; is_default: boolean }>("/me/");
+  request<{
+    icon: PublicCardIcon | null;
+    is_default_icon: boolean;
+    border: Border | null;
+    is_default_border: boolean;
+  }>("/me/");
 
 export const setMyAvatar = (iconId: number | null) =>
   request<{ ok: boolean; icon: PublicCardIcon | null }>("/me/set/", {
     method: "POST",
     body: JSON.stringify({ icon_id: iconId }),
+  });
+
+export const getMyBorders = () =>
+  request<{ borders: Border[] }>("/borders/me/");
+
+export const setMyBorder = (borderId: number | null) =>
+  request<{ ok: boolean; border: Border | null }>("/borders/me/set/", {
+    method: "POST",
+    body: JSON.stringify({ border_id: borderId }),
   });

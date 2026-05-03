@@ -10,4 +10,7 @@ urlpatterns = [
     path("card-icons/search-cards/", views.search_cards, name="avatar-search-cards"),
     path("me/", views.my_avatar, name="avatar-me"),
     path("me/set/", views.set_my_avatar, name="avatar-set-me"),
+    path("borders/me/", views.my_borders, name="avatar-my-borders"),
+    path("borders/me/set/", views.set_my_border, name="avatar-set-my-border"),
+    path("borders/grant/", views.grant_border, name="avatar-grant-border"),
 ]

@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from card.models import Card
-from .models import CardIcon
-from .serializers import CardIconSerializer
+from .models import CardIcon, Border, UserBorderUnlock
+from .serializers import CardIconSerializer, BorderSerializer
 
 
 def _resolve_default_icon():
@@ -96,20 +96,85 @@ def public_list_icons(request):
     return Response({"icons": CardIconSerializer(qs, many=True).data})
 
 
+def _resolve_default_border():
+    return Border.objects.filter(is_default=True).first() or Border.objects.first()
+
+
+def _ensure_default_unlock(user):
+    """Make sure the user has the default border in their unlocks."""
+    default_border = Border.objects.filter(is_default=True).first()
+    if default_border:
+        UserBorderUnlock.objects.get_or_create(user=user, border=default_border)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_avatar(request):
-    """Get current user's avatar (or fallback to default Kuriboh)."""
+    """Get current user's avatar + border (with defaults)."""
     user = request.user
     icon = user.avatar_icon
     if icon is None:
         icon = _resolve_default_icon()
-    if icon is None:
-        return Response({"icon": None, "is_default": True})
+
+    border = user.equipped_border
+    if border is None:
+        border = _resolve_default_border()
+
     return Response({
-        "icon": CardIconSerializer(icon).data,
-        "is_default": user.avatar_icon is None,
+        "icon": CardIconSerializer(icon).data if icon else None,
+        "is_default_icon": user.avatar_icon is None,
+        "border": BorderSerializer(border).data if border else None,
+        "is_default_border": user.equipped_border is None,
     })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_borders(request):
+    """List borders the user has unlocked."""
+    user = request.user
+    _ensure_default_unlock(user)
+    qs = Border.objects.filter(user_unlocks__user=user).distinct().order_by("sort_order", "id")
+    return Response({"borders": BorderSerializer(qs, many=True).data})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def set_my_border(request):
+    """Equip a border the user has unlocked. Pass null to reset to default."""
+    user = request.user
+    border_id = request.data.get("border_id")
+    if border_id is None:
+        user.equipped_border = None
+        user.save(update_fields=["equipped_border"])
+        return Response({"ok": True, "border": None})
+    try:
+        border = Border.objects.get(id=int(border_id))
+    except (Border.DoesNotExist, ValueError, TypeError):
+        return Response({"error": "테두리를 찾을 수 없습니다."}, status=404)
+    if not UserBorderUnlock.objects.filter(user=user, border=border).exists():
+        return Response({"error": "잠금 해제되지 않은 테두리입니다."}, status=403)
+    user.equipped_border = border
+    user.save(update_fields=["equipped_border"])
+    return Response({"ok": True, "border": BorderSerializer(border).data})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def grant_border(request):
+    """Admin: grant a border to a user."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    user_id = request.data.get("user_id")
+    border_id = request.data.get("border_id")
+    note = request.data.get("note", "")
+    try:
+        target = User.objects.get(id=int(user_id))
+        border = Border.objects.get(id=int(border_id))
+    except (User.DoesNotExist, Border.DoesNotExist, ValueError, TypeError):
+        return Response({"error": "유저나 테두리를 찾을 수 없습니다."}, status=404)
+    UserBorderUnlock.objects.get_or_create(user=target, border=border, defaults={"note": note})
+    return Response({"ok": True})
 
 
 @api_view(["POST"])

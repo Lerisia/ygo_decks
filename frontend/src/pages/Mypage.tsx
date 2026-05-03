@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserInfo, changeUsername, changePassword, logout, checkUsernameExists } from "../api/accountApi";
-import { getMyAvatar, type PublicCardIcon } from "@/api/avatarApi";
+import { getMyAvatar, type PublicCardIcon, type Border } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 
 const Mypage = () => {
@@ -17,6 +17,7 @@ const Mypage = () => {
   const [message, setMessage] = useState("");
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [avatarIcon, setAvatarIcon] = useState<PublicCardIcon | null>(null);
+  const [avatarBorder, setAvatarBorder] = useState<Border | null>(null);
 
   const navigate = useNavigate();
 
@@ -36,7 +37,7 @@ const Mypage = () => {
       }
     };
     fetchUserInfo();
-    getMyAvatar().then((d) => setAvatarIcon(d.icon)).catch(() => {});
+    getMyAvatar().then((d) => { setAvatarIcon(d.icon); setAvatarBorder(d.border); }).catch(() => {});
   }, [navigate]);
 
   const handleChangeUsername = async () => {
@@ -104,7 +105,7 @@ const Mypage = () => {
             className="shrink-0 transition hover:opacity-80"
             title="아이콘 변경"
           >
-            <Avatar icon={avatarIcon} size={64} />
+            <Avatar icon={avatarIcon} border={avatarBorder} size={64} />
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-gray-500 dark:text-gray-400">이메일</p>
