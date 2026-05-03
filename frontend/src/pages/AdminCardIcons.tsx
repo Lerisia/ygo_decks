@@ -43,6 +43,7 @@ export default function AdminCardIcons() {
   const [previewBorderId, setPreviewBorderId] = useState<number | null>(null);
   const [savedQuery, setSavedQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<IconCategory | "all">("all");
+  const [colsPerRow, setColsPerRow] = useState<5 | 6>(5);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -401,21 +402,38 @@ export default function AdminCardIcons() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h2 className="font-semibold">저장된 아이콘 ({icons.length})</h2>
-          {availableBorders.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">미리보기 테두리</label>
-              <select
-                value={previewBorderId ?? ""}
-                onChange={(e) => setPreviewBorderId(e.target.value ? Number(e.target.value) : null)}
-                className="px-2 py-1 border rounded-lg bg-white dark:bg-gray-800 text-xs"
-              >
-                <option value="">없음</option>
-                {availableBorders.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              {[5, 6].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setColsPerRow(n as 5 | 6)}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    colsPerRow === n
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  {n}열
+                </button>
+              ))}
             </div>
-          )}
+            {availableBorders.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500">테두리</label>
+                <select
+                  value={previewBorderId ?? ""}
+                  onChange={(e) => setPreviewBorderId(e.target.value ? Number(e.target.value) : null)}
+                  className="px-2 py-1 border rounded-lg bg-white dark:bg-gray-800 text-xs"
+                >
+                  <option value="">없음</option>
+                  {availableBorders.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
         <input
           type="text"
@@ -483,7 +501,7 @@ export default function AdminCardIcons() {
               <h3 className={`text-xs font-semibold mb-2 inline-block px-2 py-0.5 rounded ${CATEGORY_BADGE[cat]}`}>
                 {CATEGORY_LABEL[cat]} · {items.length}
               </h3>
-              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(5, 120px)" }}>
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${colsPerRow}, ${colsPerRow === 6 ? 104 : 120}px)` }}>
               {items.map((icon) => {
               const previewBorder = availableBorders.find((b) => b.id === previewBorderId) || null;
               return (
