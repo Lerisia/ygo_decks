@@ -50,7 +50,7 @@ export default function Avatar({ icon, size = 48, className = "" }: Props) {
         height: size,
         backgroundImage: `url(${icon.card_image_url})`,
         backgroundSize: `${bgWidth}px ${bgHeight}px`,
-        backgroundPosition: `${bgX}px ${bgY}px`,
+        backgroundPosition: `${bgX + 1}px ${bgY}px`,
         backgroundRepeat: "no-repeat",
       }}
       aria-label={icon.title || icon.card_name}
