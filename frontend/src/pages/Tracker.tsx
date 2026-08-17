@@ -69,7 +69,7 @@ export default function Tracker() {
   const winOptions = getValidWinOptions(t.currentRank);
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-lg mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-bold text-center mb-2">듀얼 트래커</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 text-sm">
         마스터 듀얼을 플레이하면 자동으로 전적이 기록됩니다.
@@ -89,7 +89,7 @@ export default function Tracker() {
 
       {isLoggedIn && (
         <>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-3 space-y-3">
+          <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-3 space-y-3">
             <div>
               <label className="block text-sm font-semibold mb-1">기록할 시트</label>
               <select value={t.selectedGroup || ""} onChange={(e) => handleGroupChange(Number(e.target.value) || null)} disabled={t.isTracking}
@@ -144,7 +144,7 @@ export default function Tracker() {
             )}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-3">
+          <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold">내 덱</p>

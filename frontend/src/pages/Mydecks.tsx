@@ -90,7 +90,7 @@ const Mydecks = () => {
     .filter(deck => !searchQuery || deck.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="min-h-screen px-4 pt-4 pb-24">
+    <div className="min-h-screen px-0 sm:px-4 pt-4 pb-24">
       <h2 className="text-2xl font-semibold text-center mb-4">보유 덱 관리</h2>
 
       <input

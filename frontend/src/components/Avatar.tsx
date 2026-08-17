@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Border } from "@/api/avatarApi";
 import AnimatedBorder from "./AnimatedBorder";
 
-const ANIMATED_BORDER_KEYS = ["fire", "water", "wind", "earth", "light", "dark", "labrynth", "melodious", "skystriker"] as const;
+const ANIMATED_BORDER_KEYS = ["fire", "water", "wind", "earth", "light", "dark", "labrynth", "melodious", "skystriker", "spring"] as const;
 type AnimatedKey = (typeof ANIMATED_BORDER_KEYS)[number];
 const isAnimatedKey = (k: string | undefined): k is AnimatedKey =>
   !!k && (ANIMATED_BORDER_KEYS as readonly string[]).includes(k);
@@ -64,34 +64,25 @@ function loadDims(url: string): Promise<{ w: number; h: number }> {
 /** Renders a circular crop of a card illustration as the user avatar.
  *  Falls back to a generic gray placeholder when icon is null.
  */
-// All cropped card illustrations are stored at 624×624. Skipping the natural-
-// dimension fetch saves ~1 image decode per Avatar instance — meaningful on
-// pages like the icon shop with 500+ tiles rendering at once.
-const STANDARD_ILLUST_RE = /\/card_illusts\/[^/]+\.(jpg|jpeg|png)$/i;
-
 export default function Avatar({ icon, border, size = 48, className = "" }: Props) {
   const url = icon?.card_image_url || null;
-  const isStandard = !!url && STANDARD_ILLUST_RE.test(url);
+  // Always probe natural dimensions (cached per URL across instances).
+  // Previously we assumed /card_illusts/* were 624×624, but pendulum
+  // cards ship with non-square artwork — that assumption squished them
+  // on the icon admin grid.
   const [dims, setDims] = useState<{ w: number; h: number } | null>(() => {
     if (!url) return null;
-    if (dimsCache.get(url)) return dimsCache.get(url) || null;
-    if (isStandard) return { w: 624, h: 624 };
-    return null;
+    return dimsCache.get(url) || null;
   });
 
   useEffect(() => {
     if (!url) { setDims(null); return; }
     const cached = dimsCache.get(url);
     if (cached) { setDims(cached); return; }
-    if (isStandard) {
-      // Trust the standard 624x624 layout — no extra fetch needed.
-      setDims({ w: 624, h: 624 });
-      return;
-    }
     let cancelled = false;
     loadDims(url).then((d) => { if (!cancelled) setDims(d); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [url, isStandard]);
+  }, [url]);
 
   // Border ring takes thickness from total size; inner icon shrinks accordingly.
   // Overlay borders shrink the icon like other borders, but draw decorations on top.
@@ -113,10 +104,12 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
     bgHeight = dims.h * scale;
     bgX = -(icon.center_x * dims.w * scale - innerSize / 2);
     bgY = -(icon.center_y * dims.h * scale - innerSize / 2);
-    // Optical right-nudge, scaled with size so it's proportional (not a fixed 2px on tiny avatars).
+    // Optical right-nudge to match admin crop preview exactly.
     const target = Math.max(0, Math.floor(innerSize / 48));
     nudgeX = Math.min(target, Math.max(0, -bgX));
   }
+  // Cropped path also gets the same nudge so it visually matches the admin preview.
+  const croppedNudgeX = Math.max(0, Math.floor(innerSize / 48));
 
   // Wrapper handles the ring; inner div renders the icon
   const ringStyle: React.CSSProperties = animated
@@ -152,15 +145,16 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
           <span className="text-gray-500" style={{ fontSize: innerSize / 2 }}>?</span>
         </div>
       ) : icon.cropped_image_url ? (
-        // Pre-cropped path: server already produced a 256x256 square, so we
-        // can just stretch it. No positioning math, no second image fetch.
+        // Pre-cropped path: server produced a 256x256 square. We slightly
+        // overscale + shift right to match the admin crop preview's nudgeX.
         <div
-          className="rounded-full bg-gray-200 dark:bg-gray-700"
+          className="rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"
           style={{
             width: innerSize,
             height: innerSize,
             backgroundImage: `url(${icon.cropped_image_url})`,
-            backgroundSize: "100% 100%",
+            backgroundSize: `${innerSize + croppedNudgeX * 2}px ${innerSize}px`,
+            backgroundPosition: `${croppedNudgeX}px 0px`,
             backgroundRepeat: "no-repeat",
             position: "relative",
             zIndex: 1,

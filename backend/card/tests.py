@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 from PIL import Image as PILImage
 from io import BytesIO
 from django.core.files.base import ContentFile
-from .models import Card, UploadRecord, QuizHighScore
+from .models import Card, UploadRecord, QuizHighScore, QuizAllTimeBest, QuizMonthlyAward, QuizWeeklyAward
 from user.models import User
 
 
@@ -147,13 +147,13 @@ class QuizScoreAndLeaderboardTest(TestCase):
         resp = self.client.get("/api/quiz/leaderboard/")
         self.assertIn("period", resp.json())
 
-    @patch("card.quiz_views.timezone")
-    def test_leaderboard_excludes_old_month_scores_after_may(self, mock_tz):
-        from django.utils import timezone as real_tz
+    @patch("card.quiz_views._kst_now")
+    def test_leaderboard_excludes_old_month_scores_in_may(self, mock_kst_now):
         from datetime import datetime
+        from django.utils import timezone as real_tz
 
-        fake_now = real_tz.make_aware(datetime(2026, 5, 15, 12, 0, 0))
-        mock_tz.now.return_value = fake_now
+        # Pre-cutover: May 2026 → monthly window. April scores excluded.
+        mock_kst_now.return_value = datetime(2026, 5, 15, 12, 0, 0)
 
         old = QuizHighScore.objects.create(user=self.user, score=99, streak=10)
         old.created_at = real_tz.make_aware(datetime(2026, 4, 20, 12, 0, 0))
@@ -164,6 +164,179 @@ class QuizScoreAndLeaderboardTest(TestCase):
         new.save(update_fields=["created_at"])
 
         resp = self.client.get("/api/quiz/leaderboard/")
-        data = resp.json()["leaderboard"]
+        body = resp.json()
+        self.assertEqual(body["cadence"], "monthly")
+        data = body["leaderboard"]
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["username"], "player2")
+
+    @patch("card.quiz_views._kst_now")
+    def test_leaderboard_uses_weekly_window_from_june_1(self, mock_kst_now):
+        from datetime import datetime
+        from django.utils import timezone as real_tz
+
+        # 2026-06-03 is Wed; current week is Mon 2026-06-01 ~ Sun 2026-06-07.
+        mock_kst_now.return_value = datetime(2026, 6, 3, 12, 0, 0)
+
+        in_week = QuizHighScore.objects.create(user=self.user, score=42, streak=3)
+        in_week.created_at = real_tz.make_aware(datetime(2026, 6, 2, 9, 0, 0))
+        in_week.save(update_fields=["created_at"])
+
+        # Score from Sunday 2026-05-31 (prior week) must NOT appear.
+        last_week = QuizHighScore.objects.create(user=self.user2, score=200, streak=20)
+        last_week.created_at = real_tz.make_aware(datetime(2026, 5, 31, 23, 0, 0))
+        last_week.save(update_fields=["created_at"])
+
+        resp = self.client.get("/api/quiz/leaderboard/")
+        body = resp.json()
+        self.assertEqual(body["cadence"], "weekly")
+        self.assertEqual(len(body["leaderboard"]), 1)
+        self.assertEqual(body["leaderboard"][0]["username"], "player1")
+
+    def test_submit_creates_and_updates_all_time_best(self):
+        self.client.force_authenticate(user=self.user)
+        self.client.post("/api/quiz/submit-score/", {"score": 10, "streak": 2}, format="json")
+        atb = QuizAllTimeBest.objects.get(user=self.user)
+        self.assertEqual(atb.score, 10)
+
+        # Improve → updated.
+        self.client.post("/api/quiz/submit-score/", {"score": 25, "streak": 5}, format="json")
+        atb.refresh_from_db()
+        self.assertEqual(atb.score, 25)
+
+        # Lower → unchanged.
+        self.client.post("/api/quiz/submit-score/", {"score": 5, "streak": 1}, format="json")
+        atb.refresh_from_db()
+        self.assertEqual(atb.score, 25)
+
+    @patch("card.quiz_views._kst_now")
+    def test_submit_resets_weekly_after_cutover(self, mock_kst_now):
+        from datetime import datetime
+        from django.utils import timezone as real_tz
+
+        self.client.force_authenticate(user=self.user)
+
+        # First play: Wednesday 2026-06-03 in the 06-01 week. Score=30.
+        mock_kst_now.return_value = datetime(2026, 6, 3, 10, 0, 0)
+        self.client.post("/api/quiz/submit-score/", {"score": 30, "streak": 5}, format="json")
+        best = QuizHighScore.objects.get(user=self.user)
+        self.assertEqual(best.score, 30)
+        # Backdate created_at so subsequent same-period checks work.
+        best.created_at = real_tz.make_aware(datetime(2026, 6, 3, 10, 0, 0))
+        best.save(update_fields=["created_at"])
+
+        # Next Monday (2026-06-08, new week). A score LOWER than the prior
+        # week's must still reset (this is the whole point of weekly reset).
+        mock_kst_now.return_value = datetime(2026, 6, 8, 9, 0, 0)
+        resp = self.client.post("/api/quiz/submit-score/", {"score": 10, "streak": 2}, format="json")
+        self.assertTrue(resp.json()["is_new_record"])
+        best.refresh_from_db()
+        self.assertEqual(best.score, 10)
+
+    @patch("card.quiz_views._kst_now")
+    def test_submit_keeps_monthly_semantics_before_cutover(self, mock_kst_now):
+        from datetime import datetime
+        from django.utils import timezone as real_tz
+
+        self.client.force_authenticate(user=self.user)
+
+        # May 5 (week of 05-04 Mon).
+        mock_kst_now.return_value = datetime(2026, 5, 5, 10, 0, 0)
+        self.client.post("/api/quiz/submit-score/", {"score": 50, "streak": 8}, format="json")
+        best = QuizHighScore.objects.get(user=self.user)
+        best.created_at = real_tz.make_aware(datetime(2026, 5, 5, 10, 0, 0))
+        best.save(update_fields=["created_at"])
+
+        # May 25 (different week, same month). Lower score must NOT overwrite.
+        mock_kst_now.return_value = datetime(2026, 5, 25, 10, 0, 0)
+        resp = self.client.post("/api/quiz/submit-score/", {"score": 30, "streak": 4}, format="json")
+        self.assertFalse(resp.json()["is_new_record"])
+        best.refresh_from_db()
+        self.assertEqual(best.score, 50)
+
+
+class QuizMonthlyAwardCommandTest(TestCase):
+    def setUp(self):
+        self.u1 = User.objects.create_user(email="m1@t.com", username="m1", password="x")
+        self.u2 = User.objects.create_user(email="m2@t.com", username="m2", password="x")
+        self.u3 = User.objects.create_user(email="m3@t.com", username="m3", password="x")
+
+    def _make_score(self, user, score, when):
+        s = QuizHighScore.objects.create(user=user, score=score, streak=1)
+        s.created_at = when
+        s.save(update_fields=["created_at"])
+
+    def test_may_2026_uses_special_prizes(self):
+        from datetime import datetime
+        may_dt = timezone.make_aware(datetime(2026, 5, 15, 12, 0, 0))
+        self._make_score(self.u1, 100, may_dt)
+        self._make_score(self.u2, 80, may_dt)
+        self._make_score(self.u3, 60, may_dt)
+
+        call_command("award_quiz_monthly_top3", "--year=2026", "--month=5")
+        awards = list(QuizMonthlyAward.objects.filter(year=2026, month=5).order_by("rank"))
+        self.assertEqual([a.points_awarded for a in awards], [1000, 500, 300])
+
+    def test_post_may_2026_refuses(self):
+        from datetime import datetime
+        jun_dt = timezone.make_aware(datetime(2026, 6, 15, 12, 0, 0))
+        self._make_score(self.u1, 100, jun_dt)
+        call_command("award_quiz_monthly_top3", "--year=2026", "--month=6")
+        self.assertEqual(QuizMonthlyAward.objects.filter(year=2026, month=6).count(), 0)
+
+
+class QuizWeeklyAwardCommandTest(TestCase):
+    def setUp(self):
+        self.u1 = User.objects.create_user(email="w1@t.com", username="w1", password="x")
+        self.u2 = User.objects.create_user(email="w2@t.com", username="w2", password="x")
+        self.u3 = User.objects.create_user(email="w3@t.com", username="w3", password="x")
+        self.u4 = User.objects.create_user(email="w4@t.com", username="w4", password="x")
+
+    def _make_score(self, user, score, when):
+        s = QuizHighScore.objects.create(user=user, score=score, streak=1)
+        s.created_at = when
+        s.save(update_fields=["created_at"])
+
+    def test_weekly_top3_prizes_500_300_200(self):
+        from datetime import datetime
+        # Week of 2026-06-01 Mon ~ 2026-06-07 Sun.
+        in_week = timezone.make_aware(datetime(2026, 6, 3, 10, 0, 0))
+        out_of_week = timezone.make_aware(datetime(2026, 5, 31, 23, 0, 0))
+        self._make_score(self.u1, 100, in_week)
+        self._make_score(self.u2, 80, in_week)
+        self._make_score(self.u3, 60, in_week)
+        # Excluded by date — bigger score but outside the target week.
+        self._make_score(self.u4, 999, out_of_week)
+
+        call_command("award_quiz_weekly_top3", "--week-start=2026-06-01")
+        rows = list(QuizWeeklyAward.objects.filter(week_start_date="2026-06-01").order_by("rank"))
+        self.assertEqual([r.user_id for r in rows], [self.u1.id, self.u2.id, self.u3.id])
+        self.assertEqual([r.points_awarded for r in rows], [500, 300, 200])
+
+    def test_weekly_idempotent(self):
+        from datetime import datetime
+        in_week = timezone.make_aware(datetime(2026, 6, 3, 10, 0, 0))
+        self._make_score(self.u1, 100, in_week)
+        call_command("award_quiz_weekly_top3", "--week-start=2026-06-01")
+        call_command("award_quiz_weekly_top3", "--week-start=2026-06-01")
+        # Re-run should NOT duplicate.
+        self.assertEqual(QuizWeeklyAward.objects.filter(week_start_date="2026-06-01").count(), 1)
+
+    def test_week_start_must_be_monday(self):
+        # Tuesday → command refuses (no rows created).
+        call_command("award_quiz_weekly_top3", "--week-start=2026-06-02")
+        self.assertEqual(QuizWeeklyAward.objects.count(), 0)
+
+
+class QuizAllTimeBestBackfillTest(TestCase):
+    """The data migration that seeds QuizAllTimeBest from QuizHighScore at
+    cutover ran before this test method via Django's normal migration
+    plumbing — but for explicit coverage, simulate the same behavior on the
+    real models so refactors of either model stay safe."""
+    def test_backfill_idempotent_one_per_user(self):
+        u = User.objects.create_user(email="b1@t.com", username="b1", password="x")
+        QuizHighScore.objects.create(user=u, score=77, streak=9)
+        QuizAllTimeBest.objects.create(user=u, score=77, streak=9, achieved_at=timezone.now())
+        # OneToOne — second insert must fail.
+        with self.assertRaises(Exception):
+            QuizAllTimeBest.objects.create(user=u, score=10, streak=1, achieved_at=timezone.now())

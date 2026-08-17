@@ -21,6 +21,16 @@ export default function MyAvatar() {
   const [currentBorder, setCurrentBorder] = useState<Border | null>(null);
   const [savingBorder, setSavingBorder] = useState<number | null>(null);
 
+  // Persisted across sessions — toggling once was getting repetitive.
+  const [excludeDefault, setExcludeDefault] = useState<boolean>(() => {
+    try { return localStorage.getItem("avatar_exclude_default") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("avatar_exclude_default", excludeDefault ? "1" : "0"); } catch {}
+  }, [excludeDefault]);
+  // "" = show all themes. "__none__" = icons with no theme set.
+  const [selectedTheme, setSelectedTheme] = useState<string>("");
+
   useEffect(() => {
     if (!localStorage.getItem("access_token")) {
       navigate("/unauthorized");
@@ -51,14 +61,43 @@ export default function MyAvatar() {
     }
   };
 
+  // Theme list (filtered to whatever icons the user actually owns) — sorted
+  // alphabetically, with the "no theme" bucket pinned to the end.
+  const allThemes = useMemo(() => {
+    const set = new Set<string>();
+    let hasNoTheme = false;
+    for (const i of icons) {
+      if (i.theme) set.add(i.theme);
+      else hasNoTheme = true;
+    }
+    const arr = [...set].sort((a, b) => a.localeCompare(b));
+    if (hasNoTheme) arr.push("__none__");
+    return arr;
+  }, [icons]);
+
+  // Debounce the query that drives filtering — typing fast on phones
+  // was triggering a re-filter + 100+ Avatar re-renders per keystroke
+  // and stalling the input. Input stays instant, list catches up after.
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 200);
+    return () => clearTimeout(t);
+  }, [query]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return icons;
-    return icons.filter((i) =>
-      (i.card_name || "").toLowerCase().includes(q) ||
-      (i.title || "").toLowerCase().includes(q)
-    );
-  }, [icons, query]);
+    const q = debouncedQuery.trim().toLowerCase();
+    let list = icons;
+    if (excludeDefault) list = list.filter((i) => i.category !== "default");
+    if (selectedTheme) list = list.filter((i) => (i.theme || "__none__") === selectedTheme);
+    if (q) {
+      list = list.filter((i) =>
+        (i.card_name || "").toLowerCase().includes(q) ||
+        (i.title || "").toLowerCase().includes(q) ||
+        (i.theme || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [icons, debouncedQuery, excludeDefault, selectedTheme]);
 
   const handlePick = async (icon: PublicCardIcon) => {
     setSaving(icon.id);
@@ -90,7 +129,7 @@ export default function MyAvatar() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-3xl mx-auto">
       <button
         onClick={() => navigate("/mypage")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -100,7 +139,7 @@ export default function MyAvatar() {
       <h1 className="text-2xl font-bold mb-1">아이콘 설정</h1>
       <p className="text-sm text-gray-500 mb-5">멀티플레이 등에서 표시되는 아이콘을 선택하세요.</p>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 flex items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-4 flex items-center gap-4">
         <Avatar icon={current} border={currentBorder} size={80} />
         <div className="flex-1">
           <p className="font-semibold">현재 아이콘</p>
@@ -124,23 +163,37 @@ export default function MyAvatar() {
       </div>
 
       {borders.length > 1 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
+        <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-4">
           <h2 className="font-semibold mb-3 text-sm">테두리</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {borders.map((b) => {
               const isSelected = currentBorder?.id === b.id;
+              const isLocked = b.unlocked === false;
               return (
                 <button
                   key={b.id}
-                  onClick={() => handlePickBorder(b)}
-                  disabled={savingBorder !== null}
-                  className={`flex flex-col items-center p-2 rounded-lg border-2 transition ${
-                    isSelected
-                      ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                      : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
+                  onClick={() => !isLocked && handlePickBorder(b)}
+                  disabled={savingBorder !== null || isLocked}
+                  title={isLocked ? `🔒 ${b.unlock_condition || "잠김"}` : b.name}
+                  className={`relative flex flex-col items-center p-2 rounded-lg border-2 transition ${
+                    isLocked
+                      ? "border-transparent cursor-not-allowed"
+                      : isSelected
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                   }`}
                 >
-                  <Avatar icon={current} border={b} size={56} />
+                  <div className="relative">
+                    <Avatar icon={current} border={b} size={72} />
+                    {isLocked && (
+                      <span
+                        className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 text-white text-lg"
+                        aria-hidden
+                      >
+                        🔒
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs mt-1 truncate w-full text-center">{b.name}</span>
                 </button>
               );
@@ -148,6 +201,32 @@ export default function MyAvatar() {
           </div>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <label className="inline-flex items-center gap-2 text-sm select-none cursor-pointer">
+          <input
+            type="checkbox"
+            checked={excludeDefault}
+            onChange={(e) => setExcludeDefault(e.target.checked)}
+            className="rounded"
+          />
+          기본 아이콘 제외
+        </label>
+        {allThemes.length > 0 && (
+          <select
+            value={selectedTheme}
+            onChange={(e) => setSelectedTheme(e.target.value)}
+            className="ml-auto px-3 py-1.5 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+          >
+            <option value="">테마: 전체</option>
+            {allThemes.map((t) => (
+              <option key={t} value={t}>
+                {t === "__none__" ? "(테마 없음)" : t}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <input
         type="text"
@@ -172,7 +251,7 @@ export default function MyAvatar() {
           </p>
           {!query && (
             <button
-              onClick={() => navigate("/playground/icon-shop")}
+              onClick={() => navigate("/icon-shop")}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold"
             >
               아이콘 샵 둘러보기 →
@@ -180,7 +259,7 @@ export default function MyAvatar() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
           {filtered.map((icon) => {
             const isSelected = current?.id === icon.id;
             return (
@@ -194,7 +273,7 @@ export default function MyAvatar() {
                     : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
-                <Avatar icon={icon} border={currentBorder} size={64} />
+                <Avatar icon={icon} border={currentBorder} size={72} />
                 <span className="text-xs mt-1 truncate w-full text-center">
                   {icon.title || icon.card_name}
                 </span>

@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/', include('tool.urls')),
     path('api/multiplayer/', include('multiplayer.urls')),
     path('api/avatar/', include('avatar.urls')),
+    path('api/solo/', include('solo.urls')),
+    path('api/', include('changelog.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

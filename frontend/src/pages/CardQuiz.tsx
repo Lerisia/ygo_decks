@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import Avatar from "@/components/Avatar";
 
 const RESOLUTION_STEPS = ["8x8", "10x10", "12x12", "16x16"];
 const SCORE_MAP: Record<string, number> = { "8x8": 4, "10x10": 3, "12x12": 2, "16x16": 1 };
@@ -15,7 +16,30 @@ type LeaderboardEntry = {
   username: string;
   score: number;
   streak: number;
+  avatar_icon: import("@/api/avatarApi").PublicCardIcon | null;
+  border: import("@/api/avatarApi").Border | null;
 };
+
+type ViewerAllTimeBest = { score: number; streak: number } | null;
+
+// Header copy + payout table for the leaderboard. Until the cutover we show
+// both the (one-time) May monthly bonus and the upcoming weekly schedule so
+// players see why this month is hot. After cutover, only weekly applies.
+function RewardInfo({ cadence }: { cadence: "monthly" | "weekly" | "" }) {
+  if (cadence === "weekly") {
+    return (
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        매주 월요일 정산 — 1등 500P · 2등 300P · 3등 200P 지급
+      </p>
+    );
+  }
+  return (
+    <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+      <p>이번 달(5월) 한정 — 1등 <span className="font-bold text-amber-600 dark:text-amber-400">1000P</span> · 2등 500P · 3등 300P 지급</p>
+      <p>6월 1일부터 → 매주 월요일 정산 1등 500P · 2등 300P · 3등 200P</p>
+    </div>
+  );
+}
 
 function CardQuiz() {
   const [card, setCard] = useState<QuizCard | null>(null);
@@ -28,6 +52,8 @@ function CardQuiz() {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [period, setPeriod] = useState("");
+  const [cadence, setCadence] = useState<"monthly" | "weekly" | "">("");
+  const [allTimeBest, setAllTimeBest] = useState<ViewerAllTimeBest>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,10 +85,15 @@ function CardQuiz() {
   }, [stopTimer]);
 
   const fetchLeaderboard = useCallback(async () => {
-    const res = await fetch("/api/quiz/leaderboard/");
+    const token = localStorage.getItem("access_token");
+    const res = await fetch("/api/quiz/leaderboard/", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     const data = await res.json();
     setLeaderboard(data.leaderboard || []);
     setPeriod(data.period || "");
+    setCadence(data.cadence || "");
+    setAllTimeBest(data.viewer_all_time_best || null);
   }, []);
 
   const fetchNextCard = useCallback(async () => {
@@ -170,7 +201,7 @@ function CardQuiz() {
   const timerColor = timeLeft <= 5 ? "bg-red-500" : timeLeft <= 10 ? "bg-yellow-500" : "bg-green-500";
 
   return (
-    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/playground")}
         className="text-lg font-semibold hover:text-blue-600 mb-4"
@@ -182,9 +213,9 @@ function CardQuiz() {
       {!card && !gameOver && (
         <div className="text-center space-y-6">
           <p className="text-gray-600 dark:text-gray-400 md:text-lg">
-            저화질 카드 일러스트를 보고 이름을 맞춰보세요!
+            저화질 카드 일러스트를 보고 이름을 맞혀보세요!
           </p>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 md:p-6 text-base md:text-base text-left space-y-1.5 md:space-y-2">
+          <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 md:p-6 text-base md:text-base text-left space-y-1.5 md:space-y-2">
             <p>• 4개의 선택지 중 정답을 고르세요</p>
             <p>• 제한시간 {INITIAL_TIME}초</p>
             <p>• 해상도를 올릴수록 획득 점수가 줄어듭니다</p>
@@ -207,20 +238,27 @@ function CardQuiz() {
 
           {leaderboard.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold mb-3">리더보드 ({period})</h2>
+              <h2 className="text-lg font-semibold mb-1">리더보드 ({period})</h2>
+              <RewardInfo cadence={cadence} />
+              {allTimeBest && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  내 역대 최고: <span className="font-semibold">{allTimeBest.score}점</span> <span className="text-gray-400">({allTimeBest.streak}연승)</span>
+                </p>
+              )}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
                 {leaderboard.map((entry, i) => (
                   <div
                     key={i}
-                    className={`flex justify-between px-4 py-2.5 text-base ${
+                    className={`flex items-center justify-between px-4 py-2 text-base gap-3 ${
                       i === 0 ? "bg-yellow-50 dark:bg-yellow-900/20 font-bold" : ""
                     } ${i > 0 ? "border-t border-gray-100 dark:border-gray-700" : ""}`}
                   >
-                    <span>
-                      {i === 0 ? "👑 " : `${i + 1}. `}
-                      {entry.username}
-                    </span>
-                    <span className="font-semibold">{entry.score}점 <span className="text-gray-400 font-normal">{entry.streak}연승</span></span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-6 text-center shrink-0">{i === 0 ? "👑" : `${i + 1}.`}</span>
+                      <Avatar icon={entry.avatar_icon} border={entry.border} size={32} />
+                      <span className="truncate">{entry.username}</span>
+                    </div>
+                    <span className="font-semibold shrink-0">{entry.score}점 <span className="text-gray-400 font-normal">{entry.streak}연승</span></span>
                   </div>
                 ))}
               </div>
@@ -330,7 +368,7 @@ function CardQuiz() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+          <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4">
             <p className="text-lg">
               최종 점수: <span className="font-bold text-2xl text-blue-500">{score}</span>점
             </p>
@@ -364,20 +402,27 @@ function CardQuiz() {
 
           {leaderboard.length > 0 && (
             <div className="mt-4">
-              <h2 className="text-lg font-semibold mb-3">리더보드 ({period})</h2>
+              <h2 className="text-lg font-semibold mb-1">리더보드 ({period})</h2>
+              <RewardInfo cadence={cadence} />
+              {allTimeBest && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  내 역대 최고: <span className="font-semibold">{allTimeBest.score}점</span> <span className="text-gray-400">({allTimeBest.streak}연승)</span>
+                </p>
+              )}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
                 {leaderboard.map((entry, i) => (
                   <div
                     key={i}
-                    className={`flex justify-between px-4 py-2.5 text-base ${
+                    className={`flex items-center justify-between px-4 py-2 text-base gap-3 ${
                       i === 0 ? "bg-yellow-50 dark:bg-yellow-900/20 font-bold" : ""
                     } ${i > 0 ? "border-t border-gray-100 dark:border-gray-700" : ""}`}
                   >
-                    <span>
-                      {i === 0 ? "👑 " : `${i + 1}. `}
-                      {entry.username}
-                    </span>
-                    <span className="font-semibold">{entry.score}점 <span className="text-gray-400 font-normal">{entry.streak}연승</span></span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-6 text-center shrink-0">{i === 0 ? "👑" : `${i + 1}.`}</span>
+                      <Avatar icon={entry.avatar_icon} border={entry.border} size={32} />
+                      <span className="truncate">{entry.username}</span>
+                    </div>
+                    <span className="font-semibold shrink-0">{entry.score}점 <span className="text-gray-400 font-normal">{entry.streak}연승</span></span>
                   </div>
                 ))}
               </div>

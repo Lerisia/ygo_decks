@@ -1,0 +1,9 @@
+# Sudoers rule for the co-op bot's deploy path.
+# Install: sudo cp coop-bot-sudoers /etc/sudoers.d/coop-bot-deploy
+#          sudo chmod 440 /etc/sudoers.d/coop-bot-deploy
+#          sudo visudo -c    # validate before it takes effect
+#
+# Allow user `elyss` to run ONLY the deploy_root script as root without a
+# password. Anything else still requires the password. The script itself must
+# be owned by root and non-writable by elyss (see install instructions).
+elyss ALL=(root) NOPASSWD: /usr/local/sbin/ygo-deploy-root

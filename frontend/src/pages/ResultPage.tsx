@@ -93,7 +93,7 @@ function ResultPage() {
   ].filter(tag => tag !== "해당 없음");
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-lg mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-lg mx-auto">
       <p className="text-center text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">당신에게 어울리는 덱은</p>
       <h1 className="text-3xl font-extrabold text-center">{result?.name}</h1>
 
@@ -146,7 +146,7 @@ function ResultPage() {
         )}
       </div>
 
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow p-4 space-y-2 text-sm">
+      <div className="mt-6 bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500 dark:text-gray-400">덱 파워</span>
           <span className="font-semibold">{result?.strength}</span>

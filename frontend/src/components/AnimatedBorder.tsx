@@ -2,7 +2,8 @@ type AnimatedBorderType =
   | "fire" | "water" | "wind" | "earth" | "light" | "dark"
   | "labrynth"
   | "melodious"
-  | "skystriker";
+  | "skystriker"
+  | "spring";
 
 interface Props {
   type: AnimatedBorderType;
@@ -17,10 +18,12 @@ const THEMES: Record<string, string[]> = {
   light:    ["#b8860b", "#fde047", "#fffbe6", "#fde047", "#b8860b"],
   dark:     ["#1e1b4b", "#6d28d9", "#c084fc", "#6d28d9", "#1e1b4b"],
   labrynth: ["#b8b4c4", "#d4d0dc", "#ebe8f0", "#d4d0dc", "#b8b4c4"],
+  // 봄 — 분홍 단색
+  spring: ["#f9a8c8", "#fbc3d6", "#fde0e9", "#fbc3d6", "#f9a8c8"],
 };
 
 const ROTATING: Set<string> = new Set(["fire", "water", "wind", "earth", "light", "dark"]);
-const SPARKLE: Set<string> = new Set(["labrynth"]);
+const SPARKLE: Set<string> = new Set(["labrynth", "spring"]);
 
 const RING_OUTER = 50;
 const RING_INNER = 45;
@@ -200,3 +203,4 @@ function SkyStrikerOverlay({ size }: { size: number }) {
     </svg>
   );
 }
+

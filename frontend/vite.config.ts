@@ -30,19 +30,33 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,woff2}"],
+        // Precache hashed assets only. The HTML shell is excluded so the
+        // browser always fetches the latest index (which references the new
+        // hashed bundles) on every navigation — game pages get the latest
+        // build without users needing to manually refresh.
+        globPatterns: ["**/*.{js,css,svg,woff2}"],
+        // Take over open tabs immediately when a new SW is installed and
+        // drop stale caches. Critical for fast iteration: a deploy reaches
+        // every connected client within seconds.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/admin/, /^\/api/],
+        navigateFallbackDenylist: [/^\/admin/, /^\/api/, /^\/ws/],
+        // Always go to the network for API + WebSocket — never cache
+        // gameplay-critical responses.
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/ygodecks\.com\/api\//,
-            handler: "NetworkFirst",
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws/"),
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/media/"),
+            handler: "StaleWhileRevalidate",
             options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60,
-              },
+              cacheName: "media-cache",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
             },
           },
         ],
@@ -62,8 +76,27 @@ export default defineConfig({
       usePolling: true,
     },
     proxy: {
-      "/api": "http://localhost:8000",
-      "/media": "http://localhost:8000",
+      // Point at the live nginx so the dev frontend talks to the
+      // production daphne. nginx 80→443 redirects, so we hit https
+      // directly. `secure: false` skips cert validation (live cert is
+      // for the real domain, not localhost). Revert to localhost:8000
+      // if running a local backend.
+      "/api": {
+        target: "https://localhost",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/media": {
+        target: "https://localhost",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/ws": {
+        target: "wss://localhost",
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {

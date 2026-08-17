@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
     darkMode: ["class"],
+    // hover: variant only fires on devices that actually support hover
+    // (mouse/trackpad). Without this, tap-to-press on mobile leaves the
+    // button stuck in its hover style until the user taps elsewhere.
+    future: {
+        hoverOnlyWhenSupported: true,
+    },
     content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}"
@@ -56,6 +62,6 @@ export default {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 };
 

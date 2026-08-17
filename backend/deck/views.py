@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from .models import Deck, AestheticTag, PerformanceTag, DeckAlias
+from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -52,7 +52,10 @@ def get_deck_result(request):
     if search_params.get("difficulty") is not None:
         query &= Q(difficulty=search_params["difficulty"])
     if search_params.get("strength") is not None:
-        query &= Q(strength=search_params["strength"])
+        # Survey sends a band index (0-4). Each band covers 1-2 adjacent tiers.
+        # Unknown band → empty tuple → __in matches nothing → 404 (backward compat).
+        tiers = STRENGTH_BAND_TO_TIERS.get(search_params["strength"], ())
+        query &= Q(strength__in=tiers)
 
     # ManyToManyField filtering (Summoning Methods & Tags)
     summoning_method_ids = search_params.get("summoning_methods", [])

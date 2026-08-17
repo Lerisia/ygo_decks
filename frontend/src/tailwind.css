@@ -52,3 +52,62 @@
   }
 
 }
+
+@keyframes admin-border-shine {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.admin-border-anim {
+  background-size: 200% 200%;
+  animation: admin-border-shine 3s linear infinite;
+}
+
+@keyframes metal-shine-sweep {
+  0%, 57%   { background-position: -150% 0; }
+  100%      { background-position: 250% 0; }
+}
+
+.metal-border-anim {
+  position: relative;
+}
+
+/* 입체감을 위한 정적 음영 — 위쪽이 밝고 아래쪽이 어두운 스페큘러 효과 */
+.metal-border-anim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.05) 35%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.15) 70%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 주기적으로 슥 지나가는 광택 */
+.metal-border-anim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: metal-shine-sweep 7s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}

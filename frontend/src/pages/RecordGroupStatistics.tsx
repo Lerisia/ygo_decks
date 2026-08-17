@@ -220,7 +220,7 @@ const StatisticsPage = () => {
     `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-4xl mx-auto">
       <button
         onClick={() => navigate(`/record-groups/${recordGroupId}`)}
         className="text-lg font-semibold hover:text-blue-600 mb-4"
@@ -429,7 +429,7 @@ const StatisticsPage = () => {
                 <tr className="border-b dark:border-gray-700">
                   <th className="text-left px-2 pb-2 w-[20%] sm:w-[15%]">덱</th>
                   <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">등장</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">등장률</th>
+                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">사용률</th>
                   <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">승률</th>
                   <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">선공률</th>
                   <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">선공 승</th>

@@ -77,6 +77,18 @@ class GetDeckResultTest(TestCase):
         resp = self.client.get("/api/deck/result", {"key": "strength=9"})
         self.assertEqual(resp.status_code, 404)
 
+    def test_strength_band_covers_two_tiers(self):
+        # band 1 = {tier 0, tier 1} — both deck1(tier 0) and deck2(tier 1) should
+        # be candidates. Result is randomly one of them, so run multiple times
+        # and confirm both names can appear.
+        names_seen = set()
+        for _ in range(40):
+            resp = self.client.get("/api/deck/result", {"key": "strength=1"})
+            self.assertEqual(resp.status_code, 200)
+            names_seen.add(resp.json()["name"])
+            self.client.cookies.clear()  # fresh session each request
+        self.assertEqual(names_seen, {"융합덱", "싱크로덱"})
+
     def test_response_increments_num_views(self):
         self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
         self.deck1.refresh_from_db()

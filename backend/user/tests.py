@@ -203,3 +203,187 @@ class CleanupUnverifiedUsersTest(TestCase):
 
         call_command("cleanup_unverified_users")
         self.assertTrue(User.objects.filter(id=staff.id).exists())
+
+
+class PointTransactionModelTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="pt@test.com", username="pt", password="pass1234")
+
+    def test_award_points_creates_transaction(self):
+        from user.points import award_points
+        from user.models import PointTransaction
+        award_points(self.user, 50, kind="daily_bonus", note="첫 보너스")
+        tx = PointTransaction.objects.filter(user=self.user).get()
+        self.assertEqual(tx.amount, 50)
+        self.assertEqual(tx.kind, "daily_bonus")
+        self.assertEqual(tx.note, "첫 보너스")
+        self.assertEqual(tx.balance_after, 50)
+
+    def test_award_points_balance_after_compounds(self):
+        from user.points import award_points
+        from user.models import PointTransaction
+        award_points(self.user, 30, kind="daily_bonus")
+        award_points(self.user, 70, kind="game_dm")
+        txs = list(PointTransaction.objects.filter(user=self.user).order_by("created_at"))
+        self.assertEqual([t.balance_after for t in txs], [30, 100])
+
+    def test_award_points_zero_or_negative_no_transaction(self):
+        from user.points import award_points
+        from user.models import PointTransaction
+        award_points(self.user, 0, kind="daily_bonus")
+        award_points(self.user, -5, kind="daily_bonus")
+        self.assertEqual(PointTransaction.objects.filter(user=self.user).count(), 0)
+
+    def test_default_kind_is_other(self):
+        from user.points import award_points
+        from user.models import PointTransaction
+        award_points(self.user, 10)
+        tx = PointTransaction.objects.filter(user=self.user).get()
+        self.assertEqual(tx.kind, "other")
+
+
+class IconPurchaseTransactionTest(TestCase):
+    def setUp(self):
+        from avatar.models import CardIcon
+        self.user = User.objects.create_user(email="buyer@test.com", username="buyer", password="pass1234")
+        self.user.points = 500
+        self.user.save(update_fields=["points"])
+        self.icon = CardIcon.objects.create(title="레드드래곤", price=100, category="shop", center_x=0.5, center_y=0.5, radius=0.5)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_purchase_creates_spend_transaction(self):
+        from user.models import PointTransaction
+        resp = self.client.post(f"/api/avatar/card-icons/{self.icon.id}/purchase/")
+        self.assertEqual(resp.status_code, 200)
+        tx = PointTransaction.objects.filter(user=self.user).get()
+        self.assertEqual(tx.amount, -100)
+        self.assertEqual(tx.kind, "icon_purchase")
+        self.assertEqual(tx.balance_after, 400)
+
+
+class PointHistoryAPITest(TestCase):
+    def setUp(self):
+        from user.points import award_points
+        self.user = User.objects.create_user(email="h@test.com", username="hist", password="pass1234")
+        self.other = User.objects.create_user(email="o@test.com", username="other", password="pass1234")
+        award_points(self.user, 10, kind="daily_bonus", note="day 1")
+        award_points(self.user, 30, kind="game_dm", note="round 1")
+        award_points(self.other, 100, kind="daily_bonus", note="other's points")
+        self.client = APIClient()
+
+    def test_unauth_returns_401(self):
+        resp = self.client.get("/api/user/points/history/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_returns_only_own_transactions_newest_first(self):
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get("/api/user/points/history/")
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json().get("results", [])
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]["kind"], "game_dm")
+        self.assertEqual(results[0]["amount"], 30)
+        self.assertEqual(results[1]["kind"], "daily_bonus")
+        self.assertEqual(results[1]["amount"], 10)
+
+    def test_pagination_metadata_present(self):
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get("/api/user/points/history/")
+        body = resp.json()
+        self.assertIn("results", body)
+        self.assertIn("count", body)
+
+
+class AdminPointsGrantAPITest(TestCase):
+    def setUp(self):
+        from user.models import User as U
+        self.admin = U.objects.create_user(email="admin@test.com", username="admin", password="x", is_staff=True)
+        self.user = U.objects.create_user(email="u@test.com", username="testuser", password="x")
+        self.user.points = 100
+        self.user.lifetime_points_earned = 100
+        self.user.save()
+        self.client = APIClient()
+
+    def test_unauth_denied(self):
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": 50, "note": "이벤트 보상"},
+            format="json",
+        )
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_non_admin_denied(self):
+        regular = User.objects.create_user(email="r@test.com", username="reg", password="x")
+        self.client.force_authenticate(user=regular)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": 50, "note": "이벤트"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_grant_positive_creates_transaction_and_unlocks_borders(self):
+        from user.models import PointTransaction
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": 50, "note": "이벤트 보상"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.points, 150)
+        self.assertEqual(self.user.lifetime_points_earned, 150)
+        tx = PointTransaction.objects.filter(user=self.user).get()
+        self.assertEqual(tx.amount, 50)
+        self.assertEqual(tx.kind, "admin_grant")
+        self.assertEqual(tx.note, "이벤트 보상")
+        self.assertEqual(tx.balance_after, 150)
+
+    def test_deduct_negative_does_not_lower_lifetime(self):
+        from user.models import PointTransaction
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": -30, "note": "환불 회수"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.points, 70)
+        # Lifetime stays at 100 — deducts don't lower the cumulative tally.
+        self.assertEqual(self.user.lifetime_points_earned, 100)
+        tx = PointTransaction.objects.filter(user=self.user).get()
+        self.assertEqual(tx.amount, -30)
+        self.assertEqual(tx.kind, "admin_grant")
+
+    def test_zero_amount_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": 0, "note": "x"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unknown_user_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "nonexistent", "amount": 50, "note": "x"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_deduct_below_zero_clamps_to_zero(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/manage/points/grant/",
+            {"username": "testuser", "amount": -500, "note": "전부 회수"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.user.refresh_from_db()
+        # Clamp to 0 so user.points stays a PositiveIntegerField.
+        self.assertEqual(self.user.points, 0)

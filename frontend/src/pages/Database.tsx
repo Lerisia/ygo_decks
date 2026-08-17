@@ -184,7 +184,7 @@ export default function DatabasePage() {
   };
 
   return (
-    <div className="h-auto min-h-screen px-4 text-center p-4">
+    <div className="h-auto min-h-screen px-0 sm:px-4 text-center p-4">
       {/* Search decks */}
       <Input
         placeholder="덱 이름 검색..."
@@ -210,7 +210,7 @@ export default function DatabasePage() {
                 className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
               >
                 <option value="">전체</option>
-                {["티어권", "준티어권", "비티어권", "하위권"].map((o) => (
+                {["최상위권", "중상위권", "중위권", "중하위권", "최하위권"].map((o) => (
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>

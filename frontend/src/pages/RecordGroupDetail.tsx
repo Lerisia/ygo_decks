@@ -313,6 +313,7 @@ const RecordGroupDetailPage = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
+  const [showRegisterForm, setShowRegisterForm] = useState(true);
 
   // RANK_OPTIONS imported from utils/rankUtils
 
@@ -641,7 +642,7 @@ const RecordGroupDetailPage = () => {
   }));
 
   return (
-    <div className="px-2 py-4 min-h-screen max-w-screen-sm mx-auto p-4">
+    <div className="px-0 sm:px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-2xl font-bold flex items-center gap-1 min-w-0">
           <span className="truncate">{recordGroupName}</span>
@@ -686,9 +687,17 @@ const RecordGroupDetailPage = () => {
           )}
         </div>
       )}
-      {isOwner && <div className="p-4 border rounded-lg shadow bg-white dark:bg-gray-800 mb-6 max-w-2xl w-full mx-auto">
+      {isOwner && <div className="mb-6 max-w-2xl w-full mx-auto">
+        <button
+          type="button"
+          onClick={() => setShowRegisterForm((v) => !v)}
+          className="w-full flex items-center justify-between py-2 text-left font-semibold text-lg"
+        >
+          <span>기록 등록</span>
+          <span className="text-gray-400 text-sm">{showRegisterForm ? "접기 ▲" : "펼치기 ▼"}</span>
+        </button>
+        {showRegisterForm && <div>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">기록 등록</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             <a href="/mypage/mydecks" className="underline">보유 덱 관리</a>에서 등록한 덱만 선택 가능
           </p>
@@ -930,6 +939,7 @@ const RecordGroupDetailPage = () => {
             기록 추가
           </button>
         </div>
+        </div>}
       </div>}
 
       <div className="flex justify-end gap-4 mb-4">

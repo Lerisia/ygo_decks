@@ -1,6 +1,6 @@
 const Terms = () => {
   return (
-    <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto text-gray-800 dark:text-gray-200 leading-relaxed">
+    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-3xl mx-auto text-gray-800 dark:text-gray-200 leading-relaxed">
       <h2 className="text-2xl font-bold text-center mb-6">Terms of Use & Privacy Policy</h2>
 
       <p>This website and app ("YGODecks") provides deck recommendations, match record tracking, and analysis for Yu-Gi-Oh! Master Duel.</p>

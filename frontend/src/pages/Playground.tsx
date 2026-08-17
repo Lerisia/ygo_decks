@@ -1,17 +1,19 @@
 import { useNavigate } from "react-router-dom";
+import PLogo from "@/components/PLogo";
 
-const games = [
-  { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞추기" },
+type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean };
+const games: Game[] = [
+  { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "여러 명이 함께 즐기는 게임", rewardBadge: true },
+  { to: "/solo", icon: "🐤", title: "솔로 플레이", desc: "혼자 즐기는 미니 게임", rewardBadge: true },
   { to: "/tier-list-maker", icon: "📊", title: "티어표 만들기", desc: "덱 티어리스트 만들고 이미지로 저장" },
-  { to: "/playground/icon-shop", icon: "🛍️", title: "아이콘 샵", desc: "프로필 아이콘 모으기" },
-  // { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "여러 명이 함께 즐기는 게임" },
+  { to: "/icon-shop", icon: "🛍️", title: "아이콘 샵", desc: "포인트로 아이콘 구매" },
 ];
 
 function Playground() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
+    <div className="min-h-screen px-0 sm:px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
       <h1 className="text-2xl md:text-4xl font-bold text-center mb-2">놀이터</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">다양한 미니게임을 즐겨보세요!</p>
 
@@ -20,8 +22,13 @@ function Playground() {
           <button
             key={g.to}
             onClick={() => navigate(g.to)}
-            className="flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
+            className="relative flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
           >
+            {g.rewardBadge && (
+              <span className="absolute top-1.5 left-1.5">
+                <PLogo size={20} />
+              </span>
+            )}
             <span className="text-3xl md:text-5xl mb-2">{g.icon}</span>
             <span className="font-semibold md:text-lg">{g.title}</span>
             <span className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">{g.desc}</span>

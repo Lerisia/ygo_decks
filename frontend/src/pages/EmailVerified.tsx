@@ -11,7 +11,7 @@ export default function EmailVerified() {
       </p>
 
       <img
-        src="/media/card_illusts/538097900_fxoXy5g.jpg"
+        src="/media/card_illusts/538097900_illust.jpg"
         alt="웰컴 라뷰린스"
         className="mt-6 mx-auto w-48 sm:w-56 md:w-64 lg:w-72 max-w-full rounded-lg shadow-lg"
       />

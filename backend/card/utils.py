@@ -126,24 +126,38 @@ def fetch_korean_name(konami_id):
     print(f"⚠️ Korean name not found for Konami ID {konami_id}")
     return None
 
-def update_korean_names():
+def update_korean_names(revalidate=False):
+    """Fetch official Korean names from Konami DB.
+
+    By default, only fetches cards that don't have a korean_name yet.
+    With revalidate=True, queries every card and overwrites if Konami's
+    official name differs from what we have stored — useful for catching
+    placeholder/manual entries that have since received an official name.
+    """
     cards = Card.objects.exclude(konami_id=0).exclude(konami_id=None)
 
     updated_cards = []
+    overwritten_count = 0
     updated_count = 0
 
     for card in cards:
-        if card.korean_name:
+        if card.korean_name and not revalidate:
             continue
 
         korean_name = fetch_korean_name(card.konami_id)
-
-        if korean_name:
-            card.korean_name = korean_name
-            updated_cards.append(card)
-            updated_count += 1
+        if not korean_name:
+            continue
+        if korean_name == card.korean_name:
+            continue
+        was_set = bool(card.korean_name)
+        card.korean_name = korean_name
+        updated_cards.append(card)
+        updated_count += 1
+        if was_set:
+            overwritten_count += 1
+            print(f"  🔁 overwrote: konami {card.konami_id} → {korean_name}")
 
     if updated_cards:
         Card.objects.bulk_update(updated_cards, ["korean_name"])
 
-    print(f"✅ {updated_count} cards updated with Korean names.")
+    print(f"✅ {updated_count} cards updated ({overwritten_count} overwritten).")

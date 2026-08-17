@@ -89,6 +89,86 @@ export const changePassword = async (currentPassword: string, newPassword: strin
     return response.json();
 };
 
+// Daily login bonus — call once on app load when authenticated.
+export interface PointTransaction {
+  id: number;
+  amount: number;
+  kind: string;
+  kind_label: string;
+  display_label: string;
+  note: string;
+  balance_after: number;
+  created_at: string;
+}
+
+export interface PointHistoryPage {
+  results: PointTransaction[];
+  count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+}
+
+export interface AdminUserHit {
+  id: number;
+  username: string;
+  points: number;
+}
+
+export const adminSearchUsers = async (q: string): Promise<AdminUserHit[]> => {
+  const token = localStorage.getItem("access_token") || "";
+  const res = await fetch(`/api/manage/users/search/?q=${encodeURIComponent(q)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return body.results || [];
+};
+
+export const adminGrantPoints = async (
+  username: string,
+  amount: number,
+  note: string,
+): Promise<{ ok: boolean; user: { id: number; username: string; points: number }; amount: number; note: string }> => {
+  const token = localStorage.getItem("access_token") || "";
+  const res = await fetch("/api/manage/points/grant/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username, amount, note }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body && (body.error || body.detail)) || "지급 실패");
+  return body;
+};
+
+export const getPointsHistory = async (page = 1, pageSize = 50): Promise<PointHistoryPage | null> => {
+  const token = localStorage.getItem("access_token");
+  if (!token) return null;
+  const res = await fetch(`/api/user/points/history/?page=${page}&page_size=${pageSize}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return res.json();
+};
+
+export const claimDailyBonus = async (): Promise<{
+  claimed: boolean;
+  points_added: number;
+  points: number;
+} | null> => {
+  const token = localStorage.getItem("access_token");
+  if (!token) return null;
+  const response = await fetch("/api/daily-bonus/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) return null;
+  return response.json();
+};
+
 // Get user info
 export const getUserInfo = async () => {
     const token = localStorage.getItem("access_token");

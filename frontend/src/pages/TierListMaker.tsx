@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { DndProvider, useDrag, useDrop, useDragLayer } from "react-dnd";
 import { MultiBackend, TouchTransition, MouseTransition } from "react-dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -464,6 +465,7 @@ function ExportView({
 
 // === Main page ===
 export default function TierListMaker() {
+  const navigate = useNavigate();
   const [allDecks, setAllDecks] = useState<Deck[]>([]);
   const [search, setSearch] = useState("");
   const [tiers, setTiers] = useState<Tier[]>(
@@ -605,6 +607,12 @@ export default function TierListMaker() {
     <DndProvider backend={MultiBackend} options={DnDBackends}>
       <AutoScroller />
       <div className="min-h-screen w-full px-3 py-4 md:py-6 max-w-5xl mx-auto">
+        <button
+          onClick={() => navigate("/playground")}
+          className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+        >
+          ← 놀이터
+        </button>
         <h1 className="text-3xl font-bold text-center mb-4">티어표 만들기</h1>
 
         <div className="flex flex-wrap gap-2 mb-4 items-center">

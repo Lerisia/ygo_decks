@@ -59,3 +59,13 @@ media/
 # Signing keys & certificates
 *.jks
 *.pem
+
+# Bot: secrets and local venv
+bot/.env
+bot/venv/
+bot/__pycache__/
+
+# Local logs & scratch files
+logs/
+temp/
+backend/logs/

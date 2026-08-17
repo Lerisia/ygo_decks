@@ -38,12 +38,29 @@ class AestheticTag(models.Model):
     def __str__(self):
         return self.name
 
+# Strength survey "band" — each survey option maps to 1-2 tiers with intentional
+# overlap between neighbours. Deck.strength itself stays a single tier (0-4).
+STRENGTH_BAND_TO_TIERS = {
+    0: (0,),         # 최상위
+    1: (0, 1),       # 최상위 + 중상위
+    2: (1, 2),       # 중상위 + 중위
+    3: (2, 3),       # 중위 + 중하위
+    4: (3, 4),       # 중하위 + 최하위
+}
+# Reverse map: given a deck's tier, which bands include it (for lookup gen).
+STRENGTH_TIER_TO_BANDS = {
+    tier: tuple(b for b, tiers in STRENGTH_BAND_TO_TIERS.items() if tier in tiers)
+    for tier in range(5)
+}
+
+
 class Deck(models.Model):
     class _Strength(models.IntegerChoices):
-        SUBPAR = 0, '티어권'
-        NONMETA = 1, '준티어권'
-        NEARMETA = 2, '비티어권'
-        META = 3, '하위권'
+        TOP = 0, '최상위권'
+        UPPER = 1, '중상위권'
+        MIDDLE = 2, '중위권'
+        LOWER = 3, '중하위권'
+        BOTTOM = 4, '최하위권'
 
     class _Difficulty(models.IntegerChoices):
         EASY = 0, '쉬움'

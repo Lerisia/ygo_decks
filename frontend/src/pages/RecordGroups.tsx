@@ -53,7 +53,7 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
 
   return (
     <div className="hidden md:block w-full max-w-md">
-      <h3 className="text-lg font-semibold mb-2">등장률 차트</h3>
+      <h3 className="text-lg font-semibold mb-2">사용률 차트</h3>
       <ResponsiveContainer width="100%" height={350}>
         <PieChart style={{ overflow: 'visible' }}>
           <Pie
@@ -205,7 +205,7 @@ const RecordGroups = () => {
   const isLoggedIn = localStorage.getItem("access_token");
 
   return (
-    <div className="p-6 min-h-screen">
+    <div className="px-0 sm:px-6 py-6 min-h-screen">
       <h1 className="text-2xl md:text-3xl font-bold mb-4">시트 관리</h1>
 
       {Capacitor.isNativePlatform() && isLoggedIn && (
@@ -238,7 +238,7 @@ const RecordGroups = () => {
             {showMetaStats ? "숨기기 ▲" : "더 보기 ▼"}
           </button>
           {showMetaStats && (
-            <div className="mt-2 p-4 bg-white dark:bg-gray-800 shadow rounded">
+            <div className="mt-2 px-2 py-3 sm:p-4 bg-white dark:bg-gray-800 shadow rounded">
               <p className="text-xs text-gray-700 dark:text-gray-300">
                 ※ 최근 1주일 · 다이아 이상 / 레이팅 / 듀컵 기반
               </p>
@@ -325,22 +325,32 @@ const RecordGroups = () => {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">{group.name}</h2>
                 <button
-                  className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="삭제"
+                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow"
+                  aria-label="이 시트 삭제"
+                  title="이 시트 삭제"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm("이 시트를 삭제할까요?")) {
-                      deleteRecordGroup(group.id)
-                        .then(() => {
-                          alert("삭제 완료");
-                          window.location.reload();
-                        })
-                        .catch((err) => alert("삭제 실패: " + err.message));
+                    // Two-step confirm — the first tap is easy to trigger by
+                    // accident on mobile, so demand the group name typed
+                    // before the destructive network call.
+                    const typed = prompt(
+                      `이 시트를 삭제하려면 시트 이름을 정확히 입력하세요:\n\n"${group.name}"`
+                    );
+                    if (typed == null) return;
+                    if (typed.trim() !== group.name) {
+                      alert("시트 이름이 일치하지 않아 삭제하지 않았습니다.");
+                      return;
                     }
+                    deleteRecordGroup(group.id)
+                      .then(() => {
+                        alert("삭제 완료");
+                        window.location.reload();
+                      })
+                      .catch((err) => alert("삭제 실패: " + err.message));
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </button>
               </div>

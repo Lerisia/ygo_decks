@@ -542,7 +542,6 @@ def recent_meta_deck_stats(request):
 
     total_matches = qs.count()
 
-    # 상대 덱 집계
     opp_stats = qs.values(
         "opponent_deck_id", "opponent_deck__name",
     ).annotate(
@@ -550,40 +549,20 @@ def recent_meta_deck_stats(request):
         wins=Count("id", filter=Q(result="lose")),
     )
 
-    # 내 덱 집계
-    player_stats = qs.values(
-        "deck_id", "deck__name",
-    ).annotate(
-        count=Count("id"),
-        wins=Count("id", filter=Q(result="win")),
-    )
-
-    # 합산
-    combined = {}
-    for stat in opp_stats:
-        did = stat["opponent_deck_id"]
-        combined[did] = {"deck_id": did, "deck_name": stat["opponent_deck__name"], "count": stat["count"], "wins": stat["wins"]}
-    for stat in player_stats:
-        did = stat["deck_id"]
-        if did in combined:
-            combined[did]["count"] += stat["count"]
-            combined[did]["wins"] += stat["wins"]
-        else:
-            combined[did] = {"deck_id": did, "deck_name": stat["deck__name"], "count": stat["count"], "wins": stat["wins"]}
-
-    total_appearances = total_matches * 2
     results = []
-    for stat in combined.values():
-        percent = stat["count"] / total_appearances * 100 if total_appearances > 0 else 0
-        win_rate = stat["wins"] / stat["count"] * 100 if stat["count"] > 0 else 0
+    for stat in opp_stats:
+        count = stat["count"]
+        wins = stat["wins"]
+        percent = count / total_matches * 100 if total_matches > 0 else 0
+        win_rate = wins / count * 100 if count > 0 else 0
         results.append({
-            "meta_deck_id": stat["deck_id"],
-            "meta_deck_name": stat["deck_name"],
+            "meta_deck_id": stat["opponent_deck_id"],
+            "meta_deck_name": stat["opponent_deck__name"],
             "appearance_percent": round(percent, 1),
             "win_rate": round(win_rate, 1),
         })
 
-    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
+    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:20]
 
     return Response({
         "total_matches": total_matches,

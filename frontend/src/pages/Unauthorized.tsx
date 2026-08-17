@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const Unauthorized: React.FC = () => {
   return (
-    <div className="min-h-screen px-4 py-6 text-center">
+    <div className="min-h-screen px-0 sm:px-4 py-6 text-center">
       <h1 className="text-5xl font-extrabold text-gray-800 dark:text-gray-200 md:text-7xl">403 Forbidden</h1>
       <p className="mt-2 text-lg text-gray-600 dark:text-gray-400 md:text-xl">
         You do not have permission to access this page.

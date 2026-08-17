@@ -11,6 +11,11 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Kill the gray/translucent box that mobile WebKit (iOS Safari, Android
+     Chrome) flashes on every tap. Users were reading the box as
+     "something is selected" while just trying to scroll. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -24,10 +29,117 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* iOS Safari auto-zooms when an input/textarea has font-size < 16px,
+   yanking the layout sideways and leaving the page scrolled-out. Force
+   a 16px floor on phone-sized viewports so the zoom never triggers;
+   sm+ keeps whatever the component declared. */
+@media (max-width: 639px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Multiplayer canvas-game immersion mode. MultiplayerRoom toggles this
+   class on body during DM/TW in-game so the wrapper can claim the full
+   viewport without any global chrome (navbar shell, footer, banners)
+   contributing layout — that was sneaking in 1-2px and triggering a
+   page scroll on tall windows. */
+/* Descendant selector — header lives 3+ levels deep (body > #root > AppDiv
+   > header), so the `>` chain wasn't matching and the bar kept rendering
+   for non-logged-in guests. */
+body.mp-in-game header,
+body.mp-in-game footer {
+  display: none !important;
+}
+
+/* Drawer-mode canvas drag protection. iPadOS and most touch browsers will
+   happily drag-select emoji glyphs, avatar background-divs, and chat
+   text if the drawer's stroke leaves the canvas. Lock down selection +
+   native drag on EVERY descendant so nothing is grabbable while a game
+   is active — text copy in chat is sacrificed; users can re-read but
+   not select. (`*` selector keeps Avatar bg-image divs included even
+   though they're not <img>.) */
+body.mp-in-game,
+body.mp-in-game * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+body.mp-in-game img {
+  pointer-events: none;
+}
+/* Keep inputs/textareas usable for typing — `user-select: none` on them
+   blocks the iOS caret-positioning gesture, making chat input awkward. */
+body.mp-in-game input,
+body.mp-in-game textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 👍/👎 reaction float — drifts upward + fades over ~1.5s, then the
+   element is removed upstream. */
+@keyframes dm-react-float {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.6); }
+  15%  { opacity: 1; transform: translateY(0)   scale(1.15); }
+  30%  { transform: translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateY(-48px) scale(0.9); }
+}
+.dm-react-float {
+  animation: dm-react-float 1.5s ease-out forwards;
+}
+
+/* Lock body to viewport on lg+ (PC / iPad landscape) so it can't scroll
+   past the wrapper. svh — not dvh — because dvh recomputes whenever iOS
+   chrome auto-hides on scroll, which made the canvas resize wobble. The
+   one exception is "user is typing" (input focus), where we briefly
+   switch to dvh so the on-screen keyboard doesn't trap the chat input.
+   `(orientation: landscape)` keeps iPad-portrait — including Pro 12.9 at
+   1024px wide and Air-class iPads in Safari's "request desktop site"
+   mode (which reports innerWidth ≥ 1024 even in portrait) — out of this
+   block, so portrait pages stay naturally scrollable and the canvas
+   isn't height-clamped to fit `max-h-[1080px]`. */
+@media (min-width: 1024px) and (orientation: landscape) {
+  /* position: fixed + inset: 0 takes the body out of normal flow so
+     iOS Safari can't rubber-band-pan it. overscroll-behavior alone
+     wasn't enough on iPadOS — finger drags still shifted the layout
+     by a few pixels. */
+  html:has(body.mp-in-game) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body.mp-in-game {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    /* svh while idle; dvh while typing so the keyboard doesn't trap
+       the chat input. Both height + min/max so the base body
+       { min-height: 100vh } can't override us. */
+    height: 100svh;
+    min-height: 100svh;
+    max-height: 100svh;
+    /* Center the in-game wrapper when its max-w/max-h leaves letterbox
+       bands on bigger monitors (e.g. 2560×1440 displaying at 1920×1080). */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* JS toggles .mp-kbd-up on focusin / visualViewport shrink — more
+     reliable than :has() which iPadOS Safari occasionally drops during
+     game-phase transitions, leaving the input under the keyboard. */
+  body.mp-in-game.mp-kbd-up {
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+  }
+  body.mp-in-game.mp-kbd-up [data-wide-game="true"] {
+    height: 100dvh;
+  }
 }
 
 h1 {
@@ -48,10 +160,17 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
-button:hover {
-  border-color: #646cff;
+/* Mouse-only hover so mobile taps don't leave a sticky border on the
+   button (e.g. quiz answers showing the previous selection on the next
+   question). */
+@media (hover: hover) {
+  button:hover {
+    border-color: #646cff;
+  }
 }
-button:focus,
+/* Outline only for keyboard focus, not for click. Without this, mobile
+   clicks left a 4px ring on the last-pressed button — looked like the
+   user had "selected" something they only tapped through. */
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }

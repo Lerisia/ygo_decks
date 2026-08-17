@@ -1,0 +1,35 @@
+[Unit]
+Description=YGO Decks Discord Co-op Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=elyss
+Group=elyss
+WorkingDirectory=/home/elyss/ygo_decks/bot
+EnvironmentFile=/home/elyss/ygo_decks/bot/.env
+# Ensure `claude` (installed via nvm) is on PATH; HOME so claude finds its
+# stored login (~/.claude/) rather than defaulting to /root or an empty HOME.
+Environment=PATH=/home/elyss/.nvm/versions/node/v22.14.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/home/elyss
+ExecStart=/home/elyss/ygo_decks/bot/venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+
+# Hardening — bot needs sudo for the deploy script (whitelisted in
+# /etc/sudoers.d/coop-bot-deploy) so we can't set NoNewPrivileges=true.
+# We DO limit filesystem writes to project + user config dirs. Deploy script
+# runs as root so /var/www writes happen through the sudo boundary, not
+# through the bot's own capabilities.
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/elyss/ygo_decks /home/elyss/.cache /home/elyss/.config /home/elyss/.claude /home/elyss/.local /var/www/frontend
+PrivateTmp=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=coop-bot
+
+[Install]
+WantedBy=multi-user.target

@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from django.utils import timezone
 from .serializers import CustomTokenObtainPairSerializer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from deck.models import Deck
@@ -89,6 +89,153 @@ def get_user_info(request):
     return Response({
         "email": user.email,
         "username": user.username,
+        "points": user.points,
+        "lifetime_points_earned": user.lifetime_points_earned,
+        "is_staff": bool(user.is_staff),
+    })
+
+
+DAILY_BONUS_AMOUNT = 10
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def claim_daily_bonus(request):
+    user = request.user
+    today = timezone.localdate()
+    if user.last_daily_bonus_at == today:
+        return Response({
+            "claimed": False,
+            "points_added": 0,
+            "points": user.points,
+        })
+    from .points import award_points
+    result = award_points(user, DAILY_BONUS_AMOUNT, kind="daily_bonus", note="데일리 보너스")
+    user.last_daily_bonus_at = today
+    user.save(update_fields=["last_daily_bonus_at"])
+    return Response({
+        "claimed": True,
+        "points_added": DAILY_BONUS_AMOUNT,
+        "points": user.points,
+        "newly_unlocked_borders": result.get("newly_unlocked", []),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def admin_user_search(request):
+    """Partial-match user lookup for admin tools (points grant, etc).
+    Returns up to 20 matches by username (icontains)."""
+    from .models import User as UserM
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return Response({"results": []})
+    qs = (UserM.objects
+          .filter(username__icontains=q)
+          .order_by("username")[:20])
+    return Response({
+        "results": [
+            {"id": u.id, "username": u.username, "points": u.points or 0}
+            for u in qs
+        ]
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def admin_grant_points(request):
+    """Admin grants/deducts points for a user with a free-text reason.
+    Body: { username, amount (int, !=0), note }.
+    - amount > 0: regular award_points path (lifetime +=, may unlock borders)
+    - amount < 0: deduct from points, clamp at 0, lifetime untouched.
+    Both paths write a PointTransaction(kind=admin_grant) for the audit log.
+    """
+    from .models import User as UserM, PointTransaction
+    from django.db import transaction as dbtx
+    username = (request.data.get("username") or "").strip()
+    note = (request.data.get("note") or "").strip()
+    try:
+        amount = int(request.data.get("amount"))
+    except (TypeError, ValueError):
+        return Response({"error": "amount는 정수여야 합니다."}, status=400)
+    if amount == 0:
+        return Response({"error": "amount는 0일 수 없습니다."}, status=400)
+    if not username:
+        return Response({"error": "username이 필요합니다."}, status=400)
+    try:
+        target = UserM.objects.get(username=username)
+    except UserM.DoesNotExist:
+        return Response({"error": f"사용자 '{username}'을 찾을 수 없습니다."}, status=404)
+
+    if amount > 0:
+        from .points import award_points
+        award_points(target, amount, kind="admin_grant", note=note)
+    else:
+        with dbtx.atomic():
+            u = UserM.objects.select_for_update().get(pk=target.pk)
+            new_points = max(0, (u.points or 0) + amount)  # amount is negative
+            u.points = new_points
+            u.save(update_fields=["points"])
+            target.points = u.points
+            PointTransaction.objects.create(
+                user=u, amount=amount, kind="admin_grant", note=note[:200],
+                balance_after=u.points,
+            )
+    return Response({
+        "ok": True,
+        "user": {"id": target.id, "username": target.username, "points": target.points},
+        "amount": amount,
+        "note": note,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def points_history(request):
+    """Paginated transaction log for the authenticated user.
+    Query params: page (1-indexed), page_size (default 50, max 200)."""
+    from .models import PointTransaction
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = max(1, min(200, int(request.GET.get("page_size", 50))))
+    except (TypeError, ValueError):
+        page_size = 50
+    qs = PointTransaction.objects.filter(user=request.user).order_by("-created_at", "-id")
+    total = qs.count()
+    start = (page - 1) * page_size
+    rows = qs[start:start + page_size]
+    kind_label_map = dict(PointTransaction.KIND_CHOICES)
+
+    def _display(tx):
+        label = kind_label_map.get(tx.kind, tx.kind)
+        # Icon purchases want the icon's name baked into the label so the
+        # row reads "아이콘 구매 (드래곤)" — note is then redundant.
+        if tx.kind == "icon_purchase" and tx.note:
+            return f"{label} ({tx.note})", ""
+        return label, tx.note
+
+    results = []
+    for tx in rows:
+        display_label, display_note = _display(tx)
+        results.append({
+            "id": tx.id,
+            "amount": tx.amount,
+            "kind": tx.kind,
+            "kind_label": kind_label_map.get(tx.kind, tx.kind),
+            "display_label": display_label,
+            "note": display_note,
+            "balance_after": tx.balance_after,
+            "created_at": tx.created_at.isoformat(),
+        })
+    return Response({
+        "results": results,
+        "count": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": start + page_size < total,
     })
 
 class CustomRegisterView(RegisterView):

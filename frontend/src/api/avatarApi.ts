@@ -25,6 +25,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export type IconCategory = "default" | "shop" | "exclusive";
+export type IconRarity = "" | "common" | "rare" | "epic" | "legendary";
+
 export type PublicCardIcon = {
   id: number;
   title: string;
@@ -32,9 +35,16 @@ export type PublicCardIcon = {
   card_id: string;
   card_name: string;
   card_image_url: string | null;
+  cropped_image_url?: string | null;
   center_x: number;
   center_y: number;
   radius: number;
+  category: IconCategory;
+  rarity: IconRarity;
+  price: number;
+  theme: string;
+  shop_listed_at?: string | null;
+  is_new?: boolean;
 };
 
 export type Border = {
@@ -44,6 +54,11 @@ export type Border = {
   color: string;
   image_url: string | null;
   is_default: boolean;
+  category?: IconCategory;
+  rarity?: IconRarity;
+  price?: number;
+  unlocked?: boolean;
+  unlock_condition?: string;
 };
 
 export const listPublicIcons = (q?: string) =>
@@ -56,6 +71,11 @@ export type ShopCardIcon = PublicCardIcon & { owned: boolean };
 
 export const listShopIcons = (q?: string) =>
   request<{ icons: ShopCardIcon[] }>(`/card-icons/shop/${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+
+export const purchaseIcon = (iconId: number) =>
+  request<{ ok: true; points: number; icon_id: number }>(`/card-icons/${iconId}/purchase/`, {
+    method: "POST",
+  });
 
 export const getMyAvatar = () =>
   request<{
@@ -78,4 +98,24 @@ export const setMyBorder = (borderId: number | null) =>
   request<{ ok: boolean; border: Border | null }>("/borders/me/set/", {
     method: "POST",
     body: JSON.stringify({ border_id: borderId }),
+  });
+
+export type ShopBorder = Border & { owned: boolean };
+
+export const listShopBorders = () =>
+  request<{ borders: ShopBorder[] }>("/borders/shop/");
+
+export const purchaseBorder = (borderId: number) =>
+  request<{ ok: true; points: number; border_id: number }>(`/borders/${borderId}/purchase/`, {
+    method: "POST",
+  });
+
+// Admin
+export const listAdminBorders = () =>
+  request<{ borders: Border[] }>("/borders/admin/");
+
+export const updateBorder = (borderId: number, data: { category?: IconCategory; rarity?: IconRarity }) =>
+  request<Border>(`/borders/${borderId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
   });

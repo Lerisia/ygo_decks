@@ -1,31 +1,41 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { isAuthenticated } from "../api/accountApi";
+import { isAuthenticated, isAdmin } from "../api/accountApi";
 
 const mainTabs = [
   { to: "/recommend", icon: "🔍", label: "테스트" },
   { to: "/database", icon: "📚", label: "도감" },
   { to: "/records", icon: "📝", label: "전적" },
-  { to: "/deck-scanner", icon: "🪄", label: "AI스캔" },
+  { to: "/playground", icon: "🎮", label: "놀이터" },
 ];
 
 const moreTabs = [
   { to: "/", icon: "🏠", label: "홈" },
-  { to: "/playground", icon: "🎮", label: "놀이터" },
+  { to: "/deck-scanner", icon: "🪄", label: "AI스캔" },
+  { to: "/icon-shop", icon: "🛍️", label: "아이콘 샵" },
   { to: "/mypage/mydecks", icon: "🃏", label: "보유 덱", auth: true },
   { to: "/terms", icon: "📄", label: "이용약관" },
 ];
+
 
 function BottomTabBar() {
   const location = useLocation();
   const isLoggedIn = isAuthenticated();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setMoreOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isLoggedIn) { setIsAdminUser(false); return; }
+    let cancelled = false;
+    isAdmin().then((flag) => { if (!cancelled) setIsAdminUser(!!flag); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isLoggedIn]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -45,6 +55,9 @@ function BottomTabBar() {
   const isActive = (path: string) => location.pathname === path;
   const morePaths = moreTabs.map((t) => t.to);
   const isMoreActive = moreOpen || morePaths.includes(location.pathname);
+
+  // Hide entirely while inside a multiplayer room (games need full screen).
+  if (location.pathname.startsWith("/multiplayer/rooms/")) return null;
 
   return (
     <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50">
@@ -75,6 +88,15 @@ function BottomTabBar() {
             <span className="text-lg">{isLoggedIn ? "👤" : "🔑"}</span>
             <span className="mt-1">{isLoggedIn ? "마이페이지" : "로그인"}</span>
           </Link>
+          {isAdminUser && (
+            <Link
+              to="/manage"
+              className="flex flex-col items-center text-xs py-2 rounded-lg border border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-900/10"
+            >
+              <span className="text-lg">🛠️</span>
+              <span className="mt-1">관리</span>
+            </Link>
+          )}
         </div>
       )}
 

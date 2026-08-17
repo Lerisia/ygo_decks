@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view, parser_classes, permission_class
 from rest_framework.response import Response
 from .models import UploadRecord, CardDetection, Card
 from rest_framework.parsers import MultiPartParser
+from rest_framework import permissions
 from .classify import predict_card_from_bytes
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -217,3 +218,83 @@ def classify_deck_image(request):
         'result': results
     })
 
+
+_CARD_SEARCH_INDEX = None  # list of (id, name, name_normalized, image_url)
+_CARD_SEARCH_INDEX_AT = 0
+_CARD_SEARCH_TTL = 300  # 5 minutes
+
+
+def _normalize_for_search(s: str) -> str:
+    """Strip whitespace and lowercase for forgiving substring matching.
+    Lets '라뷰 린스' match '라뷰린스' and vice versa."""
+    if not s:
+        return ""
+    return "".join(s.split()).lower()
+
+
+def _get_card_search_index():
+    """Return a cached in-memory index of all cards with illustrations.
+    Refreshed every 5 minutes — substring search against this is much
+    faster than repeated SQL LIKE scans, and lets us normalize whitespace
+    on both sides without DB-side support."""
+    import time as _t
+    global _CARD_SEARCH_INDEX, _CARD_SEARCH_INDEX_AT
+    if _CARD_SEARCH_INDEX is not None and _t.time() - _CARD_SEARCH_INDEX_AT < _CARD_SEARCH_TTL:
+        return _CARD_SEARCH_INDEX
+    qs = (
+        Card.objects.filter(card_illust__isnull=False)
+        .exclude(card_illust="")
+        .only("id", "korean_name", "name", "card_illust")
+    )
+    index = []
+    for c in qs:
+        name = c.korean_name or c.name or ""
+        try:
+            url = c.card_illust.url if c.card_illust else None
+        except Exception:
+            url = None
+        index.append((c.id, name, _normalize_for_search(name), url))
+    _CARD_SEARCH_INDEX = index
+    _CARD_SEARCH_INDEX_AT = _t.time()
+    return _CARD_SEARCH_INDEX
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def search_cards_by_name(request):
+    """Substring search by Korean name with whitespace ignored. In-memory
+    cache so it's instant even at ~14k cards. Returns up to 300 relevance-
+    ranked matches (exact → prefix → substring); the client renders them
+    incrementally. Public — guests in multiplayer rooms (DuchMind guesser
+    lookup, TW guess) need this to function without auth."""
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return Response({"results": []})
+    q_norm = _normalize_for_search(q)
+    if not q_norm:
+        return Response({"results": []})
+    index = _get_card_search_index()
+    # Relevance ranking: exact name → prefix match → substring match.
+    # Within prefix/substring buckets, shorter names come first — the
+    # canonical card tends to have the shortest name containing the
+    # query (e.g. "드래곤" itself before "...드래곤..." archetype cards).
+    exact, prefix, substr = [], [], []
+    for cid, name, name_norm, url in index:
+        if q_norm not in name_norm:
+            continue
+        item = {"id": cid, "name": name, "image_url": url}
+        if name_norm == q_norm:
+            exact.append(item)
+        elif name_norm.startswith(q_norm):
+            prefix.append(item)
+        else:
+            substr.append(item)
+    prefix.sort(key=lambda r: len(r["name"]))
+    substr.sort(key=lambda r: len(r["name"]))
+    # Cap at 300 — comfortably covers even the largest archetypes (HERO,
+    # etc.) so they're fully browsable by archetype name. The client
+    # renders these incrementally (60 at a time, +60 on scroll), so a big
+    # result set doesn't cost a heavy initial render. 300 also bounds the
+    # payload for very generic queries (e.g. a single common syllable).
+    results = (exact + prefix + substr)[:300]
+    return Response({"results": results})

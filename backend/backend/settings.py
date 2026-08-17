@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     'tool',
     'multiplayer',
     'avatar',
+    'solo',
+    'changelog',
 ]
 
 MIDDLEWARE = [

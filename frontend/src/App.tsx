@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import './App.css'
 import Navbar from "./components/Navbar";
 import BottomTabBar from "./components/BottomTabBar";
+import { useDrawingMode } from "./lib/drawingMode";
 import TrackerBanner from "./components/TrackerBanner";
 import TrackerConfirmModal from "./components/TrackerConfirmModal";
 import Recommend from './pages/Recommend'
@@ -17,6 +18,9 @@ import DeckStatistics from "./pages/Statistics";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Mypage from "./pages/Mypage";
+import PointsHistory from "./pages/PointsHistory";
+import AdminPointsGrant from "./pages/AdminPointsGrant";
+import AdminIndex from "./pages/AdminIndex";
 import Mydecks from "./pages/Mydecks";
 import Noresults from "./pages/Noresults";
 import DatabasePage from "./pages/Database";
@@ -27,12 +31,22 @@ import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import DeckScanner from "./pages/DeckScanner";
 import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
+import Solo from "./pages/Solo";
+import SoloDuchmind from "./pages/SoloDuchmind";
+import SoloDraw from "./pages/SoloDraw";
+import SoloDrawingDetail from "./pages/SoloDrawingDetail";
+import SoloTwenty from "./pages/SoloTwenty";
 import TierListMaker from "./pages/TierListMaker";
 import Multiplayer from "./pages/Multiplayer";
 import MultiplayerRoom from "./pages/MultiplayerRoom";
 import AdminCardIcons from "./pages/AdminCardIcons";
+import AdminEffectTags from "./pages/AdminEffectTags";
+import AdminDuchMindWords from "./pages/AdminDuchMindWords";
+import DuchMindWordPacks from "./pages/DuchMindWordPacks";
+import DuchMindWordPackDetail from "./pages/DuchMindWordPackDetail";
 import MyAvatar from "./pages/MyAvatar";
 import IconShop from "./pages/IconShop";
+import Changelog from "./pages/Changelog";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
@@ -41,11 +55,15 @@ import Tracker from "./pages/Tracker";
 function App() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
+  // While a player is actively drawing (DuchMind turn / Solo draw page),
+  // all site chrome is hidden so nothing overlaps the canvas.
+  const drawingMode = useDrawingMode();
 
   return (
     <div>
-      <TrackerBanner />
-      <Navbar />
+      {!drawingMode && <TrackerBanner />}
+      {!drawingMode && <Navbar />}
       <Routes>
           <Route path="/" element={<Info />} />
           <Route path="/recommend" element ={<Recommend />} />
@@ -57,6 +75,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/mypage" element={<Mypage />} />
+          <Route path="/mypage/points" element={<PointsHistory />} />
           <Route path="/mypage/mydecks" element={<Mydecks />} />
           <Route path="/no-results" element={<Noresults />} />
           <Route path="/database" element={<DatabasePage />} />
@@ -67,23 +86,35 @@ function App() {
           <Route path="/deck-scanner" element={<DeckScanner />} />
           <Route path="/card-detector" element={<DeckScanner />} />
           <Route path="/playground" element={<Playground />} />
+          <Route path="/solo" element={<Solo />} />
+          <Route path="/solo-duchmind" element={<SoloDuchmind />} />
+          <Route path="/solo-duchmind/draw" element={<SoloDraw />} />
+          <Route path="/solo-duchmind/:id" element={<SoloDrawingDetail />} />
+          <Route path="/solo-twenty" element={<SoloTwenty />} />
           <Route path="/card-quiz" element={<CardQuiz />} />
           <Route path="/tier-list-maker" element={<TierListMaker />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />
+          <Route path="/manage" element={<AdminIndex />} />
           <Route path="/manage/card-icons" element={<AdminCardIcons />} />
+          <Route path="/manage/effect-tags" element={<AdminEffectTags />} />
+          <Route path="/manage/duchmind-words" element={<AdminDuchMindWords />} />
+          <Route path="/manage/points-grant" element={<AdminPointsGrant />} />
+          <Route path="/duchmind-wordpacks" element={<DuchMindWordPacks />} />
+          <Route path="/duchmind-wordpacks/:packId" element={<DuchMindWordPackDetail />} />
           <Route path="/mypage/avatar" element={<MyAvatar />} />
-          <Route path="/playground/icon-shop" element={<IconShop />} />
+          <Route path="/icon-shop" element={<IconShop />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
           <Route path="/tracker" element={<Tracker />} />
+          <Route path="/changelog" element={<Changelog />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
-      <Footer />
-      <BottomTabBar />
+      {!inMultiplayerRoom && !drawingMode && <Footer />}
+      {!drawingMode && <BottomTabBar />}
       <TrackerConfirmModal />
-      <div className="sm:hidden h-16" />
+      {!inMultiplayerRoom && !drawingMode && <div className="sm:hidden h-16" />}
     </div>
   );
 }

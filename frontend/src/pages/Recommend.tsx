@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 function Recommend() {
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-4">
+    <div className="min-h-screen flex flex-col items-center px-2 sm:px-4 pt-4">
       <div className="relative mb-6 w-full max-w-2xl">
         <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto rounded-lg" />
         <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 mx-auto object-cover rounded-lg" />

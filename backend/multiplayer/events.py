@@ -46,6 +46,11 @@ def player_kicked(room_id, player_id):
     broadcast(room_id, "player_kicked", {"player_id": player_id})
 
 
+def player_updated(room_id, player_data):
+    """Send a single updated player record (for icon swap, etc.)."""
+    broadcast(room_id, "player_updated", {"player": player_data})
+
+
 def room_updated(room_id, room_data):
     """Send full room state. Useful for status changes / game start / etc."""
     broadcast(room_id, "room_updated", {"room": room_data})

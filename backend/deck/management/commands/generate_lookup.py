@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 import json
 import os
 from itertools import combinations
-from deck.models import Deck
+from deck.models import Deck, STRENGTH_TIER_TO_BANDS
 from user.models import User  # 모든 유저를 조회하기 위해 추가
 
 STATUS_MAPPING = {"unique": 1, "multiple": 0}
@@ -33,36 +33,39 @@ def generate_lookup_table(excluded_decks=None):
     deck_keys = []
 
     for deck in decks:
-        base_items = [
-            f"s={deck.strength}",
-            f"d={deck.difficulty}",
-            f"t={deck.deck_type}",
-            f"a={deck.art_style}"
-        ]
-
         summoning_methods = [f"sm={method}" for method in sorted(deck.summoning_methods.values_list("method", flat=True))]
         aesthetic_tags = [f"atag={tag}" for tag in sorted(deck.aesthetic_tags.values_list("id", flat=True))]
         performance_tags = [f"ptag={tag}" for tag in sorted(deck.performance_tags.values_list("id", flat=True))]
-        
-        all_items = base_items + summoning_methods + aesthetic_tags + performance_tags
-        base_key = sorted_key(all_items)
-        deck_keys.append(base_key)
 
-        if base_key not in lookup_table:
-            lookup_table[base_key] = STATUS_MAPPING["unique"]
-        else:
-            lookup_table[base_key] = STATUS_MAPPING["multiple"]
+        # Each deck contributes to every band that covers its tier (bands overlap
+        # neighbours by design, so a deck typically appears in 2 bands).
+        for band in STRENGTH_TIER_TO_BANDS.get(deck.strength, ()):
+            base_items = [
+                f"s={band}",
+                f"d={deck.difficulty}",
+                f"t={deck.deck_type}",
+                f"a={deck.art_style}"
+            ]
 
-        num_parts = len(all_items)
-        for r in range(1, num_parts):
-            for subset in combinations(all_items, r):
-                sub_key = sorted_key(subset)
-                if sub_key in lookup_table:
-                    if lookup_table[sub_key] == STATUS_MAPPING["unique"]:
-                        lookup_table[sub_key] = STATUS_MAPPING["multiple"]
-                        mark_subsets_multiple(lookup_table, sub_key.split("|"))
-                else:
-                    lookup_table[sub_key] = STATUS_MAPPING["unique"]
+            all_items = base_items + summoning_methods + aesthetic_tags + performance_tags
+            base_key = sorted_key(all_items)
+            deck_keys.append(base_key)
+
+            if base_key not in lookup_table:
+                lookup_table[base_key] = STATUS_MAPPING["unique"]
+            else:
+                lookup_table[base_key] = STATUS_MAPPING["multiple"]
+
+            num_parts = len(all_items)
+            for r in range(1, num_parts):
+                for subset in combinations(all_items, r):
+                    sub_key = sorted_key(subset)
+                    if sub_key in lookup_table:
+                        if lookup_table[sub_key] == STATUS_MAPPING["unique"]:
+                            lookup_table[sub_key] = STATUS_MAPPING["multiple"]
+                            mark_subsets_multiple(lookup_table, sub_key.split("|"))
+                    else:
+                        lookup_table[sub_key] = STATUS_MAPPING["unique"]
 
     for base_key in deck_keys:
         final_key = sorted_key([base_key, "end"])

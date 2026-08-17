@@ -8,6 +8,8 @@ const Mypage = () => {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [originalUsername, setOriginalUsername] = useState("");
+  const [points, setPoints] = useState<number | null>(null);
+  const [lifetimePoints, setLifetimePoints] = useState<number | null>(null);
   const [isUsernameValid, setIsUsernameValid] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -34,6 +36,8 @@ const Mypage = () => {
         setEmail(userInfo.email);
         setUsername(userInfo.username);
         setOriginalUsername(userInfo.username);
+        if (typeof userInfo.points === "number") setPoints(userInfo.points);
+        if (typeof userInfo.lifetime_points_earned === "number") setLifetimePoints(userInfo.lifetime_points_earned);
       }
     };
     fetchUserInfo();
@@ -97,9 +101,9 @@ const Mypage = () => {
   const inputClass = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
-    <div className="h-auto min-h-screen px-4 py-6">
+    <div className="h-auto min-h-screen px-0 sm:px-4 py-6">
       <div className="w-full max-w-md mx-auto space-y-3">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 flex items-center gap-4">
           <button
             onClick={() => navigate("/mypage/avatar")}
             className="shrink-0 transition hover:opacity-80"
@@ -114,6 +118,30 @@ const Mypage = () => {
             <p className="font-medium truncate">{originalUsername}</p>
           </div>
         </div>
+
+        {(points !== null || lifetimePoints !== null) && (
+          <button
+            onClick={() => navigate("/mypage/points")}
+            className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 grid grid-cols-2 gap-3 w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition relative"
+            title="포인트 내역 보기"
+          >
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">보유 포인트</p>
+              <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                {points !== null ? points.toLocaleString() : "—"}
+                <span className="text-sm font-semibold ml-0.5">P</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">누적 포인트</p>
+              <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                {lifetimePoints !== null ? lifetimePoints.toLocaleString() : "—"}
+                <span className="text-sm font-semibold ml-0.5">P</span>
+              </p>
+            </div>
+            <span className="absolute top-2 right-3 text-xs text-gray-400">내역 →</span>
+          </button>
+        )}
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
           <span className="font-semibold">다크 모드</span>
@@ -137,6 +165,13 @@ const Mypage = () => {
           className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
         >
           아이콘 설정 →
+        </button>
+
+        <button
+          onClick={() => navigate("/duchmind-wordpacks")}
+          className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+        >
+          🎨 듀치마인드 단어장 →
         </button>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
