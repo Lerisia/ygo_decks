@@ -68,6 +68,7 @@ export const updateMatchRecord = async (
     rank?: string | null;
     wins?: number | null;
     score?: number | null;
+    score_type?: string | null;
     notes?: string;
   }
 ) => {

@@ -106,6 +106,7 @@ export const EditMatchModal = ({
     rank: match.rank || "",
     wins: match.wins || null,
     score: match.score?.toString() || "",
+    score_type: match.score_type || "",
     notes: match.notes || "",
   });
 
@@ -113,7 +114,7 @@ export const EditMatchModal = ({
 
   useEffect(() => {
     if (match.rank) setUseRankOrScore("rank");
-    else if (match.score) setUseRankOrScore("score");
+    else if (match.score) setUseRankOrScore(match.score_type || "rating");
   }, [match]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -127,6 +128,7 @@ export const EditMatchModal = ({
         opponent_deck: form.opponent_deck || null,
         opponent_deck_name: form.opponent_deck ? null : (form.opponent_deck_name || null),
         score: form.score ? Number(form.score) : null,
+        score_type: form.score ? (form.score_type || null) : null,
         rank: form.rank || null,
       });
       alert("수정 완료!");
@@ -199,14 +201,23 @@ export const EditMatchModal = ({
             <select
               value={useRankOrScore}
               onChange={(e) => {
-                setUseRankOrScore(e.target.value);
-                setForm((prev) => ({ ...prev, rank: "", score: "" }));
+                const value = e.target.value;
+                setUseRankOrScore(value);
+                setForm((prev) => ({
+                  ...prev,
+                  rank: "",
+                  score: "",
+                  wins: null,
+                  score_type: ["rating", "duelist_cup", "other"].includes(value) ? value : "",
+                }));
               }}
               className={selectClass}
             >
               <option value="none">입력 안 함</option>
               <option value="rank">랭크</option>
-              <option value="score">점수</option>
+              <option value="rating">레이팅</option>
+              <option value="duelist_cup">듀얼리스트 컵</option>
+              <option value="other">기타</option>
             </select>
           </div>
 
