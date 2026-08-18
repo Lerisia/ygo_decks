@@ -12,6 +12,7 @@ type Deck = {
   name: string;
   cover_image_small?: string | null;
   cover_image?: string | null;
+  aesthetic_tags?: string[];
 };
 
 type Tier = {
@@ -476,10 +477,22 @@ export default function TierListMaker() {
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
   const [showLabels, setShowLabels] = useState(true);
+  const [aestheticTags, setAestheticTags] = useState<string[]>([]);
+  const [selectedAestheticTags, setSelectedAestheticTags] = useState<string[]>([]);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
+    fetch("/api/tags/")
+      .then((res) => res.json())
+      .then((data) => setAestheticTags(data.aesthetic_tags || []))
+      .catch(() => {});
   }, []);
+
+  const toggleAestheticTag = (tag: string) => {
+    setSelectedAestheticTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   const placedIds = useMemo(() => new Set(tiers.flatMap((t) => t.deckIds)), [tiers]);
 
@@ -487,8 +500,13 @@ export default function TierListMaker() {
     const q = search.toLowerCase().trim();
     return allDecks
       .filter((d) => !placedIds.has(d.id))
-      .filter((d) => !q || d.name.toLowerCase().includes(q));
-  }, [allDecks, placedIds, search]);
+      .filter((d) => !q || d.name.toLowerCase().includes(q))
+      .filter(
+        (d) =>
+          selectedAestheticTags.length === 0 ||
+          selectedAestheticTags.every((tag) => d.aesthetic_tags?.includes(tag))
+      );
+  }, [allDecks, placedIds, search, selectedAestheticTags]);
 
   const deckById = useMemo(() => {
     const m = new Map<number, Deck>();
@@ -696,6 +714,27 @@ export default function TierListMaker() {
           />
         </div>
 
+        {aestheticTags.length > 0 && (
+          <div className="mb-3">
+            <p className="text-left text-sm font-semibold mb-2">태그 (비성능적)</p>
+            <div className="flex flex-wrap gap-2">
+              {aestheticTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => toggleAestheticTag(tag)}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    selectedAestheticTags.includes(tag)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Hidden fixed-size export view */}
         <div style={{ position: "absolute", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
           <div ref={hiddenExportRef}>
@@ -770,7 +809,9 @@ export default function TierListMaker() {
           <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 justify-items-center">
             {filteredPool.length === 0 ? (
               <div className="col-span-full text-center text-gray-400 py-6 text-sm">
-                {search ? "검색 결과가 없습니다" : "모든 덱이 배치되었습니다"}
+                {search || selectedAestheticTags.length > 0
+                  ? "검색 결과가 없습니다"
+                  : "모든 덱이 배치되었습니다"}
               </div>
             ) : (
               filteredPool.map((d, idx) => (
