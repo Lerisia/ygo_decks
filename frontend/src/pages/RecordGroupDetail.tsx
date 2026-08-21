@@ -440,8 +440,11 @@ const RecordGroupDetailPage = () => {
 
   const recentOptions = getRecentOpponentDeckOptions();
   const recentIds = new Set(recentOptions.map((o) => o.value));
-  const otherOptions = allOptions.filter((opt) => !recentIds.has(opt.value));
-  const prioritizedOptions = [...recentOptions, ...otherOptions];
+  const unknownOption = allOptions.find((opt) => opt.value === "null")!;
+  const otherOptions = allOptions.filter(
+    (opt) => !recentIds.has(opt.value) && opt.value !== "null"
+  );
+  const prioritizedOptions = [unknownOption, ...recentOptions, ...otherOptions];
 
   const handleDelete = async (matchId: number) => {
     try {
