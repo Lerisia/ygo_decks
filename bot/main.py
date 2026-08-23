@@ -14,7 +14,7 @@ import logging
 import os
 import shutil
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,24 @@ DISCORD_MSG_LIMIT = 2000
 EDIT_MIN_INTERVAL_SEC = 1.5
 MAX_STEPS_SHOWN = 12  # tail of the tool-call timeline to display
 
+# Per-channel session persistence: reuse the same Claude session_id if the
+# channel has been active within this window, so the bot remembers previous
+# turns. Claude auto-compacts long sessions, so a long window is safe.
+# 0 = never expire.
+SESSION_TIMEOUT_SEC = int(os.environ.get("SESSION_TIMEOUT_SEC", str(7 * 24 * 3600)))
+SESSIONS_FILE = BASE_DIR / "sessions.json"
+_sessions_lock = asyncio.Lock()
+
+# Fallback memory: a rolling log of recent turns per channel. When a Claude
+# session can't be resumed (expired, deleted, or `-r` fails), the tail of
+# this log is prepended to the first message of the new session so context
+# survives anyway.
+HISTORY_FILE = BASE_DIR / "history.json"
+HISTORY_MAX_TURNS = int(os.environ.get("HISTORY_MAX_TURNS", "12"))
+HISTORY_TURN_CHARS = 1500  # per side (user / bot) cap when injecting
+
+RESET_COMMANDS = ("!reset", "!새세션", "!리셋")
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     level=logging.INFO,
@@ -45,20 +63,18 @@ logging.basicConfig(
 log = logging.getLogger("coop-bot")
 
 
-SYSTEM_PROMPT_TEMPLATE = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, 팀원의 요청을 받아 코드 편집·테스트·commit·배포까지 자율 수행합니다.
+BOT_SYSTEM_PROMPT = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, 팀원의 요청을 받아 코드 편집·테스트·commit·배포까지 자율 수행합니다.
 
 프로젝트: YGO Decks (한국 유희왕 마스터 듀얼 덱 추천/전적 사이트)
-작업 디렉토리: {project_dir}
+작업 디렉토리: /home/elyss/ygo_decks
 
 ## 팀 구성
 - **오너 (사장님)**: Discord 유저 `rb_elyss` — 한국어 이름 **엘리스**. 이 사람이 이 프로젝트의 주인.
 - **부운영자**: 그 외 화이트리스트된 유저들. 신뢰받은 협업자이지만 오너는 아님.
 
-## 이번 요청
-- 요청자: **{sender_name}** (Discord ID {sender_id}) — {sender_role}
-- 원문 메시지는 맨 아래에 있음.
+각 유저 메시지의 맨 앞에 `[요청자: 이름 (역할, Discord ID N)]` 라인이 붙어옵니다. 요청자가 오너이면 "엘리스님"으로, 부운영자이면 상대에 맞는 호칭으로 자연스럽게.
 
-요청자가 오너이면 "엘리스님"으로, 부운영자이면 "OO님"으로 자연스럽게 호칭해도 됨.
+여러 요청이 한 세션 안에서 이어질 수 있음. 이전 대화 맥락 참고 가능.
 
 ## 표준 절차 (반드시 이 순서로)
 1. 요청 이해. 애매하면 바로 실행하지 말고 Discord에서 되묻기.
@@ -108,13 +124,113 @@ SYSTEM_PROMPT_TEMPLATE = """당신은 YGO Decks 사이트 팀의 Discord 봇으�
 - 그 외 sudo는 여전히 비번 물어서 실패 (systemd sandbox로도 못 벗어남)
 
 ## 답변 규칙
-- Discord 답변은 **한국어**, 2000자 이내.
-- 완료 시: 무엇을 했는지 1~3줄 + commit hash + 배포 결과.
+- Discord 답변은 **한국어**로.
+- 길어도 됨 (봇이 자동으로 여러 메시지로 분할해서 보냄).
+- 완료 시: 무엇을 했는지 요약 + commit hash + 배포 결과.
 - 실패 시: 어느 단계에서 실패했는지 명확히.
-
-## 부운영자 요청
-{message}
 """
+
+
+def build_user_message(sender_name: str, sender_id: int, sender_role: str, raw_msg: str) -> str:
+    return (
+        f"[요청자: {sender_name} ({sender_role}, Discord ID {sender_id}) · "
+        f"{date.today().isoformat()}]\n\n{raw_msg}"
+    )
+
+
+# --- Session persistence -------------------------------------------------
+
+async def _load_sessions() -> dict:
+    if not SESSIONS_FILE.exists():
+        return {}
+    try:
+        return json.loads(SESSIONS_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_sessions_sync(data: dict):
+    tmp = SESSIONS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    tmp.replace(SESSIONS_FILE)
+
+
+async def get_resume_id(session_key: str) -> str | None:
+    async with _sessions_lock:
+        data = await _load_sessions()
+        entry = data.get(session_key)
+        if not entry:
+            return None
+        try:
+            last = datetime.fromisoformat(entry["last_activity"])
+        except (KeyError, ValueError):
+            return None
+        age = (datetime.now(timezone.utc) - last).total_seconds()
+        if SESSION_TIMEOUT_SEC and age > SESSION_TIMEOUT_SEC:
+            return None
+        return entry.get("session_id")
+
+
+async def save_session(session_key: str, session_id: str):
+    async with _sessions_lock:
+        data = await _load_sessions()
+        data[session_key] = {
+            "session_id": session_id,
+            "last_activity": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_sessions_sync(data)
+
+
+async def clear_session(session_key: str):
+    async with _sessions_lock:
+        data = await _load_sessions()
+        if data.pop(session_key, None) is not None:
+            _save_sessions_sync(data)
+
+
+# --- Fallback conversation history ---------------------------------------
+
+def _load_history() -> dict:
+    if not HISTORY_FILE.exists():
+        return {}
+    try:
+        return json.loads(HISTORY_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+async def append_history(session_key: str, user_msg: str, bot_reply: str):
+    async with _sessions_lock:
+        data = _load_history()
+        turns = data.setdefault(session_key, [])
+        turns.append({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "user": user_msg[:HISTORY_TURN_CHARS],
+            "bot": bot_reply[:HISTORY_TURN_CHARS],
+        })
+        data[session_key] = turns[-HISTORY_MAX_TURNS:]
+        tmp = HISTORY_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        tmp.replace(HISTORY_FILE)
+
+
+async def build_history_preamble(session_key: str) -> str:
+    """Context block injected into the first message of a fresh session."""
+    async with _sessions_lock:
+        turns = _load_history().get(session_key) or []
+    if not turns:
+        return ""
+    lines = [
+        "[이전 대화 기록 — 새 세션이라 원래 맥락이 없어서 봇이 자동 첨부함. "
+        "아래를 참고해 대화를 자연스럽게 이어갈 것.]",
+    ]
+    for t in turns:
+        when = t.get("at", "")[:16].replace("T", " ")
+        lines.append(f"--- {when} UTC ---")
+        lines.append(f"유저: {t.get('user', '')}")
+        lines.append(f"봇: {t.get('bot', '')}")
+    lines.append("[이전 대화 기록 끝]\n")
+    return "\n".join(lines) + "\n"
 
 
 TOOL_ICONS = {
@@ -166,6 +282,7 @@ class ProgressTracker:
         self.latest_text: str = ""          # last assistant text block
         self.final_text: str = ""           # result event
         self.done: bool = False
+        self.session_id: str | None = None  # captured from stream for resume
 
     def add_tool_use(self, name: str, input_: dict):
         self.steps.append(_summarise_tool(name, input_))
@@ -198,30 +315,37 @@ class ProgressTracker:
         return text
 
 
-async def run_claude_streaming(user_message: str, on_update) -> tuple[int, ProgressTracker]:
+async def run_claude_streaming(
+    user_message: str, on_update, resume_id: str | None = None,
+) -> tuple[int, ProgressTracker]:
     """Spawn `claude -p --output-format stream-json` and stream events.
 
-    `on_update(tracker)` is called after each event; the callback is expected
-    to throttle Discord edits itself.
-    """
-    prompt = SYSTEM_PROMPT_TEMPLATE.format(
-        project_dir=PROJECT_DIR,
-        message=user_message,
-        today=date.today().isoformat(),
-    )
+    Passes the bot rules via `--append-system-prompt`. If `resume_id` is
+    provided, continues that Claude session with `-r`; otherwise a fresh
+    session is created and its id is captured on `tracker.session_id`.
 
+    `on_update(tracker)` is called after each event; the callback throttles
+    Discord edits itself.
+    """
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
     for k in ("SUDO_ASKPASS", "SUDO_PROMPT"):
         env.pop(k, None)
 
-    log.info("Spawning claude subprocess (cwd=%s)", PROJECT_DIR)
-    proc = await asyncio.create_subprocess_exec(
+    args = [
         CLAUDE_BIN,
-        "-p", prompt,
+        "-p", user_message,
+        "--append-system-prompt", BOT_SYSTEM_PROMPT,
         "--output-format", "stream-json",
         "--verbose",
         "--permission-mode", "bypassPermissions",
+    ]
+    if resume_id:
+        args.extend(["-r", resume_id])
+
+    log.info("Spawning claude subprocess (cwd=%s, resume=%s)", PROJECT_DIR, resume_id or "no")
+    proc = await asyncio.create_subprocess_exec(
+        *args,
         cwd=str(PROJECT_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -258,11 +382,22 @@ async def run_claude_streaming(user_message: str, on_update) -> tuple[int, Progr
         return (-1, tracker)
 
     rc = await proc.wait()
+    if rc != 0 and proc.stderr is not None:
+        try:
+            err = (await proc.stderr.read()).decode(errors="replace").strip()
+        except Exception:
+            err = ""
+        if err:
+            log.warning("claude exited rc=%s: %s", rc, err[:500])
     return (rc, tracker)
 
 
 def _handle_event(event: dict[str, Any], tracker: ProgressTracker):
     et = event.get("type")
+    # Capture session id from the init event (or any event that has one).
+    sid = event.get("session_id")
+    if sid and not tracker.session_id:
+        tracker.session_id = sid
     if et == "assistant":
         content = (event.get("message") or {}).get("content") or []
         for block in content:
@@ -353,7 +488,35 @@ async def on_message(message: discord.Message):
         return
 
     log.info("Request from %s: %s", message.author.name, message.content[:200])
-    status_msg = await message.reply(f"🤔 작업 시작... (최대 {CLAUDE_TIMEOUT_SEC // 60}분)")
+
+    # Role & channel key for session lookup. DMs get a per-user session key,
+    # guild channels get a per-channel key.
+    is_dm = isinstance(message.channel, discord.DMChannel)
+    session_key = f"dm-{message.author.id}" if is_dm else str(message.channel.id)
+
+    if message.content.strip().lower() in RESET_COMMANDS:
+        await clear_session(session_key)
+        await message.reply("🧹 세션을 초기화했습니다. 다음 요청부터 새 대화로 시작합니다.")
+        return
+
+    sender_role = "오너" if message.author.name == "rb_elyss" else "부운영자"
+    raw_msg = message.content
+    user_msg = build_user_message(
+        sender_name=message.author.display_name or message.author.name,
+        sender_id=message.author.id,
+        sender_role=sender_role,
+        raw_msg=raw_msg,
+    )
+    resume_id = await get_resume_id(session_key)
+    if not resume_id:
+        # Fresh session — inject the rolling history log so context survives
+        # even when the underlying Claude session is gone.
+        preamble = await build_history_preamble(session_key)
+        if preamble:
+            user_msg = preamble + user_msg
+
+    prefix = "🔄 이어가는 중" if resume_id else "🆕 새 세션"
+    status_msg = await message.reply(f"🤔 작업 시작... ({prefix}, 최대 {CLAUDE_TIMEOUT_SEC // 60}분)")
 
     # Debounce edits so we don't hit Discord's rate limit even if events arrive
     # rapidly (a batch of tool calls can fire back-to-back).
@@ -378,7 +541,20 @@ async def on_message(message: discord.Message):
                 log.warning("Discord edit failed: %s", e)
 
     try:
-        rc, tracker = await run_claude_streaming(message.content, on_update)
+        rc, tracker = await run_claude_streaming(user_msg, on_update, resume_id=resume_id)
+        if resume_id and rc != 0 and not tracker.steps and not tracker.final_text:
+            # `-r` with a stale/deleted session id fails before doing any
+            # work. Fall back to a fresh session with the history log.
+            log.warning("Resume of %s failed; retrying with a fresh session", resume_id)
+            await clear_session(session_key)
+            preamble = await build_history_preamble(session_key)
+            user_msg = preamble + build_user_message(
+                sender_name=message.author.display_name or message.author.name,
+                sender_id=message.author.id,
+                sender_role=sender_role,
+                raw_msg=raw_msg,
+            )
+            rc, tracker = await run_claude_streaming(user_msg, on_update, resume_id=None)
     except Exception as e:
         log.exception("Bot error")
         try:
@@ -407,9 +583,20 @@ async def on_message(message: discord.Message):
         except discord.HTTPException as e:
             log.warning("Follow-up send failed: %s", e)
             break
+    # Persist session + rolling history for next turn in this channel/DM.
+    if tracker.session_id:
+        try:
+            await save_session(session_key, tracker.session_id)
+        except Exception:
+            log.exception("Failed to persist session")
+    try:
+        await append_history(session_key, raw_msg, tracker.final_text or tracker.latest_text)
+    except Exception:
+        log.exception("Failed to append history")
     log.info(
-        "Completed request from %s (rc=%s, %d chunk%s)",
+        "Completed request from %s (rc=%s, %d chunk%s, session=%s)",
         message.author.name, rc, len(chunks), "s" if len(chunks) > 1 else "",
+        tracker.session_id[:8] if tracker.session_id else "?",
     )
 
 

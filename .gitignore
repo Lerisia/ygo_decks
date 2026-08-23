@@ -64,6 +64,9 @@ media/
 bot/.env
 bot/venv/
 bot/__pycache__/
+bot/sessions.json
+bot/history.json
+bot/*.tmp
 
 # Local logs & scratch files
 logs/
