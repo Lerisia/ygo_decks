@@ -562,7 +562,7 @@ def recent_meta_deck_stats(request):
             "win_rate": round(win_rate, 1),
         })
 
-    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:20]
+    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
 
     return Response({
         "total_matches": total_matches,
