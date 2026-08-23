@@ -296,7 +296,9 @@ class ProgressTracker:
         self.final_text = text.strip()
         self.done = True
 
-    def render(self) -> str:
+    def render(self, clamp: bool = True) -> str:
+        """`clamp` keeps in-flight progress edits to one message; the final
+        render passes clamp=False and is split across messages instead."""
         header = "✅ 완료" if self.done else "🤔 작업 중"
         lines = [f"**{header}**"]
         if self.steps:
@@ -309,7 +311,7 @@ class ProgressTracker:
             lines.append("")
             lines.append(body)
         text = "\n".join(lines)
-        if len(text) > DISCORD_MSG_LIMIT:
+        if clamp and len(text) > DISCORD_MSG_LIMIT:
             keep = DISCORD_MSG_LIMIT - 40
             text = text[:keep] + "\n\n…(잘림)"
         return text
@@ -415,14 +417,6 @@ def _handle_event(event: dict[str, Any], tracker: ProgressTracker):
             tracker.set_final(result)
         else:
             tracker.done = True
-
-
-def _truncate(text: str, limit: int = DISCORD_MSG_LIMIT) -> str:
-    """Used for in-flight progress edits where extending across messages
-    would spam. Final output uses `_split_for_discord` instead."""
-    if len(text) <= limit:
-        return text
-    return text[: limit - 40] + "\n\n…(잘림)"
 
 
 def _split_for_discord(text: str, limit: int = DISCORD_MSG_LIMIT) -> list[str]:
@@ -565,7 +559,7 @@ async def on_message(message: discord.Message):
 
     # Force final render (bypasses throttle so completion always shows).
     tracker.done = True
-    final = tracker.render()
+    final = tracker.render(clamp=False)
     if rc != 0 and "실패" not in final and "❌" not in final:
         final = f"❌ 실패 (exit {rc})\n\n{final}"
 
