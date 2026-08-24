@@ -711,16 +711,16 @@ const RecordGroupDetailPage = () => {
           )}
         </div>
       )}
-      {isOwner && <div className="mb-6 max-w-2xl w-full mx-auto">
+      {isOwner && <div className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
         <button
           type="button"
           onClick={() => setShowRegisterForm((v) => !v)}
-          className="w-full flex items-center justify-between py-2 text-left font-semibold text-lg"
+          className="w-full flex items-center justify-between py-1 text-left font-semibold text-lg"
         >
           <span>기록 등록</span>
           <span className="text-gray-400 text-sm">{showRegisterForm ? "접기 ▲" : "펼치기 ▼"}</span>
         </button>
-        {showRegisterForm && <div>
+        {showRegisterForm && <div className="mt-2 pb-1">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             <a href="/mypage/mydecks" className="underline">보유 덱 관리</a>에서 등록한 덱만 선택 가능
