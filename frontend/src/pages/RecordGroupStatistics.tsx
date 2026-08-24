@@ -129,6 +129,7 @@ const StatisticsPage = () => {
   const [activeTab, setActiveTab] = useState<"basic" | "deck" | "rankChange">("basic");
   const [rankSubTab, setRankSubTab] = useState<"rank" | "score">("rank");
   const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
+  const [showWinLoss, setShowWinLoss] = useState(false);
   const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
 
   useEffect(() => {
@@ -168,7 +169,10 @@ const StatisticsPage = () => {
       return b.count - a.count;
     });
 
-  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 10);
+  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 10).map((e) => {
+    const winRatio = e.count > 0 ? (e.ratio * e.total_wins) / e.count : 0;
+    return { ...e, winRatio, loseRatio: e.ratio - winRatio, loseCount: e.count - e.total_wins };
+  });
 
   const rankData = rankHistory
     .filter((m) => m.rank)
@@ -343,7 +347,24 @@ const StatisticsPage = () => {
 
           {/* 상대 덱 비율 */}
           <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱 비율</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">상대 덱 비율</h2>
+              <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showWinLoss}
+                  onChange={(e) => setShowWinLoss(e.target.checked)}
+                  className="accent-blue-600"
+                />
+                승패 비율 표시
+                {showWinLoss && (
+                  <span className="flex items-center gap-1 ml-1 text-xs">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-[#2563eb]" />승
+                    <span className="inline-block w-3 h-3 rounded-sm bg-[#dc2626]" />패
+                  </span>
+                )}
+              </label>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={420}>
                 <BarChart data={oppTopDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
@@ -357,21 +378,38 @@ const StatisticsPage = () => {
                     tick={<OppDeckTick entries={oppTopDecks} />}
                   />
                   <Tooltip
-                    formatter={(value: number, _name, item) => {
-                      const count = (item as { payload?: { count?: number } })?.payload?.count ?? 0;
-                      return [`${value.toFixed(1)}% (${count}게임)`, "비율"];
+                    formatter={(value: number, name, item) => {
+                      const payload = (item as { payload?: { count?: number; total_wins?: number; loseCount?: number } })?.payload;
+                      if (name === "승리") return [`${value.toFixed(1)}% (${payload?.total_wins ?? 0}승)`, name];
+                      if (name === "패배") return [`${value.toFixed(1)}% (${payload?.loseCount ?? 0}패)`, name];
+                      return [`${value.toFixed(1)}% (${payload?.count ?? 0}게임)`, "비율"];
                     }}
                     contentStyle={{ fontSize: '0.875rem' }}
                   />
-                  <Bar dataKey="ratio" fill="#2563eb" radius={[0, 4, 4, 0]} barSize={20}>
-                    <LabelList
-                      dataKey="ratio"
-                      position="right"
-                      formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
-                      className="fill-gray-600 dark:fill-gray-300"
-                      style={{ fontSize: 12 }}
-                    />
-                  </Bar>
+                  {showWinLoss ? (
+                    <>
+                      <Bar dataKey="winRatio" name="승리" stackId="wl" fill="#2563eb" barSize={20} />
+                      <Bar dataKey="loseRatio" name="패배" stackId="wl" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20}>
+                        <LabelList
+                          dataKey="ratio"
+                          position="right"
+                          formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
+                          className="fill-gray-600 dark:fill-gray-300"
+                          style={{ fontSize: 12 }}
+                        />
+                      </Bar>
+                    </>
+                  ) : (
+                    <Bar dataKey="ratio" fill="#2563eb" radius={[0, 4, 4, 0]} barSize={20}>
+                      <LabelList
+                        dataKey="ratio"
+                        position="right"
+                        formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
+                        className="fill-gray-600 dark:fill-gray-300"
+                        style={{ fontSize: 12 }}
+                      />
+                    </Bar>
+                  )}
                 </BarChart>
               </ResponsiveContainer>
               <table className="w-full table-fixed text-sm">
