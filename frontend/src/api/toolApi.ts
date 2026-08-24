@@ -260,6 +260,22 @@ export const getMetaDeckStats = async () => {
   return await response.json();
 };
 
+export const getUserStatisticsFull = async (deckId?: number) => {
+  const params = deckId ? `?deck_id=${deckId}` : "";
+  const token = localStorage.getItem("access_token");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const response = await fetch(`${API_BASE_URL}/record-groups/statistics/full/${params}`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API 요청 실패: ${response.status}`);
+  }
+  return response.json();
+};
+
 export const getRecordGroupRankHistory = async (recordGroupId: number) => {
   const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/`, {
     headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },

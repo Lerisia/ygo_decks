@@ -81,6 +81,7 @@ function App() {
           <Route path="/database" element={<DatabasePage />} />
           <Route path="/database/:deckId" element={<DeckDetail />} />
           <Route path="/records" element={<RecordGroups />} />
+          <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />
           <Route path="/record-groups/:recordGroupId/statistics" element={<RecordGroupStatistics />} />
           <Route path="/deck-scanner" element={<DeckScanner />} />

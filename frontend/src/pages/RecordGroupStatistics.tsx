@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList } from "recharts";
-import { getRecordGroupStatisticsFull, getRecordGroupRankHistory } from "@/api/toolApi";
+import { getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups } from "@/api/toolApi";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
 interface DeckInfo {
@@ -26,7 +26,9 @@ interface DeckWinRateStatsItem {
 }
 
 interface StatisticsData {
-  record_group_name: string;
+  record_group_name?: string;
+  record_groups?: { id: number; name: string }[];
+  group_count?: number;
   basic: {
     total_games: number;
     total_wins: number;
@@ -131,10 +133,36 @@ const StatisticsPage = () => {
   const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
   const [showWinLoss, setShowWinLoss] = useState(false);
   const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
+  const [mySheets, setMySheets] = useState<{ id: number; name: string }[]>([]);
+  const isAggregate = !recordGroupId;
+
+  useEffect(() => {
+    if (!localStorage.getItem("access_token")) return;
+    getUserRecordGroups()
+      .then((groups: { id: number; name: string }[]) => setMySheets(groups))
+      .catch(() => {});
+  }, []);
+
+  // Switching sheets (or to 전체) resets per-sheet state.
+  useEffect(() => {
+    setStats(null);
+    setSelectedDeckId(undefined);
+    setDeckFilterOptions([]);
+    setActiveTab((t) => (t === "rankChange" && !recordGroupId ? "basic" : t));
+  }, [recordGroupId]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (!recordGroupId) {
+          const statsRes = await getUserStatisticsFull(selectedDeckId);
+          setStats(statsRes);
+          setRankHistory([]);
+          if (deckFilterOptions.length === 0 && statsRes.my_deck_stats) {
+            setDeckFilterOptions(statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean));
+          }
+          return;
+        }
         const [statsRes, rankRes] = await Promise.all([
           getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId),
           getRecordGroupRankHistory(Number(recordGroupId)),
@@ -146,10 +174,11 @@ const StatisticsPage = () => {
         }
       } catch (err) {
         console.error("통계 데이터를 불러오지 못했습니다", err);
+        if (!recordGroupId) navigate("/unauthorized");
       }
     };
     fetchData();
-  }, [recordGroupId, selectedDeckId]);
+  }, [recordGroupId, selectedDeckId, navigate]);
 
   if (!stats) return <div className="p-6">로딩 중...</div>;
 
@@ -245,17 +274,35 @@ const StatisticsPage = () => {
 
   return (
     <div className="min-h-screen px-0 sm:px-4 py-6 max-w-4xl mx-auto">
-      <button
-        onClick={() => navigate(`/record-groups/${recordGroupId}`)}
-        className="text-lg font-semibold hover:text-blue-600 mb-4"
-      >
-        ← {stats.record_group_name}
-      </button>
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <button
+          onClick={() => navigate(isAggregate ? "/records" : `/record-groups/${recordGroupId}`)}
+          className="text-lg font-semibold hover:text-blue-600 truncate"
+        >
+          ← {isAggregate ? "전체 통계" : stats.record_group_name}
+        </button>
+        {mySheets.length > 0 && (isAggregate || mySheets.some((g) => g.id === Number(recordGroupId))) && (
+          <select
+            value={isAggregate ? "all" : recordGroupId}
+            onChange={(e) =>
+              navigate(e.target.value === "all" ? "/record-groups/statistics" : `/record-groups/${e.target.value}/statistics`)
+            }
+            className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100 max-w-[45%]"
+          >
+            <option value="all">전체 (모든 시트)</option>
+            {mySheets.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="flex justify-center gap-4 mb-4 border-b dark:border-gray-700 pb-2">
         <button onClick={() => setActiveTab("basic")} className={tabClass("basic")}>요약</button>
         <button onClick={() => setActiveTab("deck")} className={tabClass("deck")}>상대별 통계</button>
-        <button onClick={() => setActiveTab("rankChange")} className={tabClass("rankChange")}>랭크 변화</button>
+        {!isAggregate && (
+          <button onClick={() => setActiveTab("rankChange")} className={tabClass("rankChange")}>랭크 변화</button>
+        )}
       </div>
 
       {deckFilterOptions.length > 1 && (
