@@ -7,6 +7,7 @@ import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
 import { getNextRankState, RANK_OPTIONS, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
+import { isInitialsOnly, matchesInitials } from "@/utils/hangul";
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
@@ -456,22 +457,6 @@ const RecordGroupDetailPage = () => {
     }
   };
 
-  const getInitials = (text: string): string => {
-    const initials = [
-      'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ',
-      'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ',
-      'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
-    ];
-    return Array.from(text).map(char => {
-      const code = char.charCodeAt(0) - 44032;
-      if (code >= 0 && code <= 11171) {
-        return initials[Math.floor(code / 588)];
-      }
-      if (initials.includes(char)) return char;
-      return '';
-    }).join('');
-  };
-
   const getValidWinOptions = (rank: string): { value: number; label: string }[] => {
     return getValidWinOpts(rank).map((w) => ({ value: w, label: `${w}승` }));
   };
@@ -744,27 +729,13 @@ const RecordGroupDetailPage = () => {
             filterOption={(option, input) => {
               const lowered = input.toLowerCase();
               const label = option.label.toLowerCase();
-              const isAllInitials = /^[ㄱ-ㅎ]+$/.test(lowered);
-              const labelInitials = getInitials(label);
+              const aliases = Array.isArray(option.data.aliases) ? option.data.aliases : [];
 
-              const labelMatch = label.includes(lowered);
-              const aliasMatch = Array.isArray(option.data.aliases)
-                ? option.data.aliases.some((alias) =>
-                    alias.toLowerCase().includes(lowered)
-                  )
-                : false;
-
-              if (isAllInitials) {
-                const initialsMatch =
-                  labelInitials.startsWith(lowered) ||
-                  (Array.isArray(option.data.aliases) &&
-                    option.data.aliases.some((alias) =>
-                      getInitials(alias.toLowerCase()).startsWith(lowered)
-                    ));
-                return initialsMatch;
+              if (isInitialsOnly(lowered)) {
+                return matchesInitials(lowered, label, aliases.map((a) => a.toLowerCase()));
               }
 
-              return labelMatch || aliasMatch;
+              return label.includes(lowered) || aliases.some((alias) => alias.toLowerCase().includes(lowered));
             }}
           />
           {newMatch.opponent_deck === "null" && (
