@@ -206,7 +206,17 @@ const RecordGroups = () => {
 
   return (
     <div className="px-0 sm:px-6 py-6 min-h-screen">
-      <h1 className="text-2xl md:text-3xl font-bold mb-4">시트 관리</h1>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h1 className="text-2xl md:text-3xl font-bold">시트 관리</h1>
+        {isLoggedIn && (
+          <button
+            onClick={() => navigate("/record-groups/statistics")}
+            className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            내 통계
+          </button>
+        )}
+      </div>
 
       {Capacitor.isNativePlatform() && isLoggedIn && (
         <button
