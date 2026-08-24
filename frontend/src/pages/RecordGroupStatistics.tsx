@@ -131,7 +131,7 @@ const StatisticsPage = () => {
   const [activeTab, setActiveTab] = useState<"basic" | "deck" | "rankChange">("basic");
   const [rankSubTab, setRankSubTab] = useState<"rank" | "score">("rank");
   const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
-  const [showWinLoss, setShowWinLoss] = useState(false);
+  const [showWinLoss, setShowWinLoss] = useState(true);
   const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
   const [mySheets, setMySheets] = useState<{ id: number; name: string }[]>([]);
   const isAggregate = !recordGroupId;
