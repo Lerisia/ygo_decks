@@ -277,8 +277,10 @@ export const getUserStatisticsFull = async (deckId?: number) => {
 };
 
 export const getRecordGroupRankHistory = async (recordGroupId: number) => {
+  const token = localStorage.getItem("access_token");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+    headers,
   });
 
   if (!response.ok) {

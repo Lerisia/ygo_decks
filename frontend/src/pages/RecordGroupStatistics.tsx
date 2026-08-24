@@ -165,7 +165,7 @@ const StatisticsPage = () => {
         }
         const [statsRes, rankRes] = await Promise.all([
           getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId),
-          getRecordGroupRankHistory(Number(recordGroupId)),
+          getRecordGroupRankHistory(Number(recordGroupId)).catch(() => ({ matches: [] })),
         ]);
         setStats(statsRes);
         setRankHistory(rankRes.matches || []);
