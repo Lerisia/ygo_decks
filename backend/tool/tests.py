@@ -246,6 +246,15 @@ class FullStatisticsTest(TestCase):
         self.assertEqual(len(data["my_deck_stats"]), 2)
         self.assertEqual(len(data["opponent_deck_stats"]), 1)
 
+    def test_unknown_opponent_has_null_deck_in_personal_stats(self):
+        _create_match(self.group, self.deck1, result="win")
+
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/")
+        opp_stats = resp.json()["opponent_deck_stats"]
+        unknown = [s for s in opp_stats if s["deck"] is None and not s.get("custom_name")]
+        self.assertEqual(len(unknown), 1)
+        self.assertEqual(unknown[0]["total_games"], 1)
+
     def test_custom_opponent_grouped_in_personal_stats(self):
         _create_match(self.group, self.deck1, opponent_deck_name="커스텀A", result="win")
         _create_match(self.group, self.deck1, opponent_deck_name="커스텀A", result="lose")

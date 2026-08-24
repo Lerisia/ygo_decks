@@ -350,7 +350,7 @@ def get_record_group_statistics_full(request, record_group_id):
         )
 
         opponent_deck_stats.append({
-            "deck": DeckShortSerializer(opp_deck).data,
+            "deck": DeckShortSerializer(opp_deck).data if opp_deck else None,
             "custom_name": None,
             "count": opp_count,
             "ratio": opp_ratio,
