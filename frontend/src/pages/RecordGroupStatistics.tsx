@@ -367,7 +367,7 @@ const StatisticsPage = () => {
                     <LabelList
                       dataKey="ratio"
                       position="right"
-                      formatter={(v) => `${Number(v).toFixed(1)}%`}
+                      formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
                       className="fill-gray-600 dark:fill-gray-300"
                       style={{ fontSize: 12 }}
                     />
