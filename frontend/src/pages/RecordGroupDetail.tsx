@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
          updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility } from "@/api/toolApi";
 import { getAllDecks } from "@/api/deckApi";
@@ -286,6 +286,7 @@ export const EditMatchModal = ({
 const RecordGroupDetailPage = () => {
   const [recordGroupName, setRecordGroupName] = useState("");
   const { recordGroupId } = useParams();
+  const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -658,6 +659,14 @@ const RecordGroupDetailPage = () => {
 
   return (
     <div className="px-0 sm:px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
+      {isOwner && (
+        <button
+          onClick={() => navigate("/records")}
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2"
+        >
+          ← 시트 목록
+        </button>
+      )}
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-2xl font-bold flex items-center gap-1 min-w-0">
           <span className="truncate">{recordGroupName}</span>
