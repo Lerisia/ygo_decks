@@ -100,8 +100,8 @@ const OppDeckTick = ({ x, y, payload, entries }: {
   const shown = name.length > 7 ? `${name.slice(0, 7)}…` : name;
   return (
     <g transform={`translate(${x ?? 0},${y ?? 0})`}>
-      <image href={img} x={-118} y={-10} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
-      <text x={-92} y={0} dy={4} fontSize={12} textAnchor="start" className="fill-gray-700 dark:fill-gray-200">
+      <image href={img} x={-106} y={-10} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
+      <text x={-80} y={0} dy={4} fontSize={12} textAnchor="start" className="fill-gray-700 dark:fill-gray-200">
         <title>{name}</title>
         {shown}
       </text>
