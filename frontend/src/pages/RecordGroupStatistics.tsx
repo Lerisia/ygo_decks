@@ -329,11 +329,14 @@ const StatisticsPage = () => {
                     {oppDecks.map((entry, i) =>
                       entry.deck
                         ? <Cell key={entry.deck.id} fill={`url(#image-oppo-${entry.deck.id})`} />
-                        : <Cell key={`other-${i}`} fill={entry.custom_name ? "#6b7280" : "#000"} />
+                        : <Cell key={`other-${i}`} fill="url(#image-oppo-unknown)" />
                     )}
                   </Pie>
                   <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} contentStyle={{ fontSize: '0.875rem' }} />
                   <defs>
+                    <pattern id="image-oppo-unknown" patternUnits="objectBoundingBox" width={1} height={1}>
+                      <image href={UNKNOWN_DECK_IMAGE} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
+                    </pattern>
                     {oppDecks.map((entry) => {
                       if (!entry.deck) return null;
                       return (
