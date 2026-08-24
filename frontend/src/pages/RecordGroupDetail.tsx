@@ -6,6 +6,7 @@ import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
 import { getNextRankState, RANK_OPTIONS, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
+import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
@@ -1021,11 +1022,11 @@ const RecordGroupDetailPage = () => {
                 </div>
 
                 <div className="w-16 sm:w-32 flex flex-col items-center flex-shrink-0">
-                  {match.opponent_deck?.cover_image_small ? (
-                    <img src={match.opponent_deck.cover_image_small} alt={match.opponent_deck.name} className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 sm:w-16 sm:h-16 rounded bg-gray-200 dark:bg-gray-700" />
-                  )}
+                  <img
+                    src={match.opponent_deck?.cover_image_small || UNKNOWN_DECK_IMAGE}
+                    alt={match.opponent_deck?.name ?? match.opponent_deck_name ?? "모름/기타"}
+                    className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover"
+                  />
                   <p className="text-xs sm:text-sm mt-1 text-center break-keep">
                     {match.opponent_deck?.name ?? match.opponent_deck_name ?? "모름/기타"}
                   </p>

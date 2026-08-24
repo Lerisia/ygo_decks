@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { getRecordGroupStatisticsFull, getRecordGroupRankHistory } from "@/api/toolApi";
+import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
 interface DeckInfo {
   id: number;
@@ -92,11 +93,7 @@ const DeckRow = ({ image, name, children }: { image: string | null; name: string
   <tr>
     <td className="px-2 py-1.5">
       <div className="flex items-center gap-2">
-        {image ? (
-          <img src={image} alt={name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-        ) : (
-          <div className="w-6 h-6 rounded bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
-        )}
+        <img src={image || UNKNOWN_DECK_IMAGE} alt={name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
         <span className="truncate">{name}</span>
       </div>
     </td>
@@ -441,11 +438,11 @@ const StatisticsPage = () => {
                   <tr key={entry.deck?.id ?? `unknown-${i}`}>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1.5">
-                        {entry.deck?.cover_image_small && !isUnknownDeck(entry) ? (
-                          <img src={entry.deck.cover_image_small} alt={entry.deck.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-5 h-5 rounded bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
-                        )}
+                        <img
+                          src={(!isUnknownDeck(entry) && entry.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE}
+                          alt={getOppDeckName(entry)}
+                          className="w-5 h-5 rounded object-cover flex-shrink-0"
+                        />
                         <span className="hidden sm:inline truncate">{getOppDeckName(entry)}</span>
                       </div>
                     </td>
