@@ -537,10 +537,25 @@ const RecordGroupDetailPage = () => {
     }
   };
 
-  const deckOptions = owned_decks.map((deck) => ({
+  const deckOptions: OptionType[] = owned_decks.map((deck) => ({
     value: String(deck.id),
     label: deck.name,
+    aliases: decks.find((d) => d.id === deck.id)?.aliases || [],
   }));
+
+  // Shared search for both deck selects: name/alias substring, or initials
+  // (with compound jamo expanded) when the query is all consonants.
+  const deckFilterOption = (option: { label: string; data: OptionType }, input: string) => {
+    const lowered = input.toLowerCase();
+    const label = option.label.toLowerCase();
+    const aliases = Array.isArray(option.data.aliases) ? option.data.aliases.map((a) => a.toLowerCase()) : [];
+
+    if (isInitialsOnly(lowered)) {
+      return matchesInitials(lowered, label, aliases);
+    }
+
+    return label.includes(lowered) || aliases.some((alias) => alias.includes(lowered));
+  };
 
   const handleOpponentDeckChange = (selectedOption: OptionType | null) => {
     setNewMatch((prev) => ({
@@ -703,7 +718,7 @@ const RecordGroupDetailPage = () => {
           </p>
         </div>
         <div className="flex flex-col gap-2">
-          <Select
+          <Select<OptionType>
             options={deckOptions}
             value={deckOptions.find((d) => d.value === newMatch.deck) || null}
             onChange={(selected) =>
@@ -713,9 +728,10 @@ const RecordGroupDetailPage = () => {
               }))
             }
             isDisabled={isLoading}
-            placeholder="내 덱 선택"
+            placeholder="내 덱 선택 (초성·별칭 검색 가능)"
             isClearable
             styles={customSelectStyles}
+            filterOption={deckFilterOption}
             menuPortalTarget={typeof window !== "undefined" ? document.body : null}
           />
           <Select<OptionType>
@@ -726,17 +742,7 @@ const RecordGroupDetailPage = () => {
             placeholder="상대 덱 선택 (초성 검색 가능)"
             isClearable
             styles={customSelectStyles}
-            filterOption={(option, input) => {
-              const lowered = input.toLowerCase();
-              const label = option.label.toLowerCase();
-              const aliases = Array.isArray(option.data.aliases) ? option.data.aliases : [];
-
-              if (isInitialsOnly(lowered)) {
-                return matchesInitials(lowered, label, aliases.map((a) => a.toLowerCase()));
-              }
-
-              return label.includes(lowered) || aliases.some((alias) => alias.toLowerCase().includes(lowered));
-            }}
+            filterOption={deckFilterOption}
           />
           {newMatch.opponent_deck === "null" && (
             <input
