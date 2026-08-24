@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList } from "recharts";
 import { getRecordGroupStatisticsFull, getRecordGroupRankHistory } from "@/api/toolApi";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
@@ -89,6 +89,26 @@ const StatCard = ({ label, value }: { label: string; value: string | number }) =
   </div>
 );
 
+
+const OppDeckTick = ({ x, y, payload, entries }: {
+  x?: number; y?: number; payload?: { value?: string };
+  entries: { deck: DeckInfo | null; isUnknown: boolean; displayName: string }[];
+}) => {
+  const name = payload?.value ?? "";
+  const entry = entries.find((e) => e.displayName === name);
+  const img = (entry && !entry.isUnknown && entry.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE;
+  const shown = name.length > 7 ? `${name.slice(0, 7)}…` : name;
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <image href={img} x={-118} y={-10} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
+      <text x={-92} y={0} dy={4} fontSize={12} textAnchor="start" className="fill-gray-700 dark:fill-gray-200">
+        <title>{name}</title>
+        {shown}
+      </text>
+    </g>
+  );
+};
+
 const DeckRow = ({ image, name, children }: { image: string | null; name: string; children: React.ReactNode }) => (
   <tr>
     <td className="px-2 py-1.5">
@@ -147,6 +167,8 @@ const StatisticsPage = () => {
       if (!a.isUnknown && b.isUnknown) return -1;
       return b.count - a.count;
     });
+
+  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 7);
 
   const rankData = rankHistory
     .filter((m) => m.rank)
@@ -324,29 +346,33 @@ const StatisticsPage = () => {
             <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱 비율</h2>
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart style={{ overflow: 'visible' }}>
-                  <Pie data={oppDecks} dataKey="ratio" nameKey="displayName" cx="50%" cy="50%" outerRadius={110} label={false}>
-                    {oppDecks.map((entry, i) =>
-                      entry.deck
-                        ? <Cell key={entry.deck.id} fill={`url(#image-oppo-${entry.deck.id})`} />
-                        : <Cell key={`other-${i}`} fill="url(#image-oppo-unknown)" />
-                    )}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} contentStyle={{ fontSize: '0.875rem' }} />
-                  <defs>
-                    <pattern id="image-oppo-unknown" patternUnits="objectBoundingBox" width={1} height={1}>
-                      <image href={UNKNOWN_DECK_IMAGE} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
-                    </pattern>
-                    {oppDecks.map((entry) => {
-                      if (!entry.deck) return null;
-                      return (
-                        <pattern id={`image-oppo-${entry.deck.id}`} key={entry.deck.id} patternUnits="objectBoundingBox" width={1} height={1}>
-                          <image href={entry.deck.cover_image_small || ""} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
-                        </pattern>
-                      );
-                    })}
-                  </defs>
-                </PieChart>
+                <BarChart data={oppTopDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="displayName"
+                    width={124}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={<OppDeckTick entries={oppTopDecks} />}
+                  />
+                  <Tooltip
+                    formatter={(value: number, _name, item) => {
+                      const count = (item as { payload?: { count?: number } })?.payload?.count ?? 0;
+                      return [`${value.toFixed(1)}% (${count}게임)`, "비율"];
+                    }}
+                    contentStyle={{ fontSize: '0.875rem' }}
+                  />
+                  <Bar dataKey="ratio" fill="#2563eb" radius={[0, 4, 4, 0]} barSize={20}>
+                    <LabelList
+                      dataKey="ratio"
+                      position="right"
+                      formatter={(v) => `${Number(v).toFixed(1)}%`}
+                      className="fill-gray-600 dark:fill-gray-300"
+                      style={{ fontSize: 12 }}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
               <table className="w-full table-fixed text-sm">
                 <thead>
