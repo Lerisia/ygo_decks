@@ -216,6 +216,7 @@ def get_record_group_statistics(request, record_group_id):
     })
 
 from .serializers import DeckShortSerializer
+from .statistics import compute_full_statistics
 
 @api_view(['GET'])
 def get_record_group_statistics_full(request, record_group_id):
@@ -229,226 +230,38 @@ def get_record_group_statistics_full(request, record_group_id):
     if deck_id:
         matches = matches.filter(deck_id=deck_id)
 
-    # ----------------------
-    # 1) Basic statistics
-    # ----------------------
-    total_games = matches.count()
-    total_wins = matches.filter(result="win").count()
-    overall_win_rate = (total_wins / total_games * 100) if total_games > 0 else 0
-
-    first_games = matches.filter(first_or_second="first")
-    second_games = matches.filter(first_or_second="second")
-
-    first_win_count = first_games.filter(result="win").count()
-    first_win_rate = (first_win_count / first_games.count() * 100) if first_games.count() > 0 else 0
-
-    second_win_count = second_games.filter(result="win").count()
-    second_win_rate = (second_win_count / second_games.count() * 100) if second_games.count() > 0 else 0
-
-    first_ratio = (first_games.count() / total_games * 100) if total_games > 0 else 0
-
-    coin_toss_win_matches = matches.filter(coin_toss_result="win")
-    coin_toss_lose_matches = matches.filter(coin_toss_result="lose")
-
-    coin_toss_win_count = coin_toss_win_matches.count()
-    coin_toss_lose_count = coin_toss_lose_matches.count()
-    coin_toss_win_rate = (coin_toss_win_count / total_games * 100) if total_games > 0 else 0
-
-    coin_toss_win_and_match_win = coin_toss_win_matches.filter(result="win").count()
-    coin_toss_win_win_rate = (coin_toss_win_and_match_win / coin_toss_win_count * 100) if coin_toss_win_count > 0 else 0
-
-    coin_toss_lose_and_match_win = coin_toss_lose_matches.filter(result="win").count()
-    coin_toss_lose_win_rate = (coin_toss_lose_and_match_win / coin_toss_lose_count * 100) if coin_toss_lose_count > 0 else 0
-
-    # ----------------------
-    # 2) Statistics by my decks
-    # ----------------------
-    my_deck_ids = matches.values_list('deck_id', flat=True).distinct()
-
-    my_deck_stats = []
-    for deck_id in my_deck_ids:
-        deck_count = matches.filter(deck_id=deck_id).count()
-        deck_ratio = deck_count / total_games * 100 if total_games > 0 else 0
-        deck = Deck.objects.get(id=deck_id)
-        deck_matches = matches.filter(deck_id=deck_id)
-        deck_total = deck_matches.count()
-        deck_win_count = deck_matches.filter(result="win").count()
-        deck_win_rate = (deck_win_count / deck_total * 100) if deck_total > 0 else 0
-
-        deck_first = deck_matches.filter(first_or_second="first")
-        deck_second = deck_matches.filter(first_or_second="second")
-        deck_first_win = deck_first.filter(result="win").count()
-        deck_second_win = deck_second.filter(result="win").count()
-        deck_first_win_rate = (deck_first_win / deck_first.count() * 100) if deck_first.count() > 0 else 0
-        deck_second_win_rate = (deck_second_win / deck_second.count() * 100) if deck_second.count() > 0 else 0
-
-        deck_coin_toss_win = deck_matches.filter(coin_toss_result="win")
-        deck_coin_toss_lose = deck_matches.filter(coin_toss_result="lose")
-        deck_coin_toss_win_and_match_win = deck_coin_toss_win.filter(result="win").count()
-        deck_coin_toss_lose_and_match_win = deck_coin_toss_lose.filter(result="win").count()
-        deck_coin_toss_win_rate = (
-            deck_coin_toss_win_and_match_win / deck_coin_toss_win.count() * 100
-            if deck_coin_toss_win.count() > 0 else 0
-        )
-        deck_coin_toss_lose_win_rate = (
-            deck_coin_toss_lose_and_match_win / deck_coin_toss_lose.count() * 100
-            if deck_coin_toss_lose.count() > 0 else 0
-        )
-
-        my_deck_stats.append({
-            "deck": DeckShortSerializer(deck).data,
-            "count": deck_count,
-            "ratio": deck_ratio,
-            "total_games": deck_total,
-            "win_rate": deck_win_rate,
-            "first_win_rate": deck_first_win_rate,
-            "second_win_rate": deck_second_win_rate,
-            "coin_toss_win_win_rate": deck_coin_toss_win_rate,
-            "coin_toss_lose_win_rate": deck_coin_toss_lose_win_rate,
-        })
-
-    # ----------------------
-    # 3) Statistics by opponents' decks
-    # ----------------------
-    # FK가 있는 덱 + 진짜 모름/기타 (opponent_deck=None AND opponent_deck_name 비어있음)
-    fk_matches = matches.exclude(opponent_deck__isnull=True, opponent_deck_name__isnull=False)
-    fk_matches = fk_matches.exclude(opponent_deck__isnull=True, opponent_deck_name__gt="")
-    opponent_deck_ids = fk_matches.values_list('opponent_deck_id', flat=True).distinct()
-
-    opponent_deck_stats = []
-    for opp_deck_id in opponent_deck_ids:
-        try:
-            opp_deck = Deck.objects.get(id=opp_deck_id)
-        except Deck.DoesNotExist:
-            opp_deck = None
-        opp_count = fk_matches.filter(opponent_deck_id=opp_deck_id).count()
-        opp_ratio = opp_count / total_games * 100 if total_games > 0 else 0
-        opp_matches = fk_matches.filter(opponent_deck_id=opp_deck_id)
-        opp_total = opp_matches.count()
-        opp_win_count = opp_matches.filter(result="win").count()
-        opp_win_rate = (opp_win_count / opp_total * 100) if opp_total > 0 else 0
-
-        opp_first = opp_matches.filter(first_or_second="first")
-        opp_second = opp_matches.filter(first_or_second="second")
-        opp_first_win = opp_first.filter(result="win").count()
-        opp_first_ratio = opp_first.count() / opp_total * 100 if opp_total > 0 else 0
-        opp_first_win_rate = (opp_first_win / opp_first.count() * 100) if opp_first.count() > 0 else None
-        opp_second_win = opp_second.filter(result="win").count()
-        opp_second_win_rate = (opp_second_win / opp_second.count() * 100) if opp_second.count() > 0 else None
-
-        opp_coin_toss_win = opp_matches.filter(coin_toss_result="win")
-        opp_coin_toss_lose = opp_matches.filter(coin_toss_result="lose")
-        opp_coin_toss_win_and_match_win = opp_coin_toss_win.filter(result="win").count()
-        opp_coin_toss_lose_and_match_win = opp_coin_toss_lose.filter(result="win").count()
-        opp_coin_toss_win_rate = (
-            opp_coin_toss_win_and_match_win / opp_coin_toss_win.count() * 100
-            if opp_coin_toss_win.count() > 0 else 0
-        )
-        opp_coin_toss_lose_win_rate = (
-            opp_coin_toss_lose_and_match_win / opp_coin_toss_lose.count() * 100
-            if opp_coin_toss_lose.count() > 0 else 0
-        )
-
-        opponent_deck_stats.append({
-            "deck": DeckShortSerializer(opp_deck).data if opp_deck else None,
-            "custom_name": None,
-            "count": opp_count,
-            "ratio": opp_ratio,
-            "total_games": opp_total,
-            "win_rate": opp_win_rate,
-            "first_ratio": opp_first_ratio,
-            "first_win_rate": opp_first_win_rate,
-            "second_win_rate": opp_second_win_rate,
-            "coin_toss_win_win_rate": opp_coin_toss_win_rate,
-            "coin_toss_lose_win_rate": opp_coin_toss_lose_win_rate,
-        })
-
-    custom_names = (
-        matches.filter(opponent_deck__isnull=True)
-        .exclude(opponent_deck_name__isnull=True)
-        .exclude(opponent_deck_name="")
-        .values_list("opponent_deck_name", flat=True)
-        .distinct()
-    )
-    for name in custom_names:
-        c_matches = matches.filter(opponent_deck__isnull=True, opponent_deck_name=name)
-        c_total = c_matches.count()
-        c_win = c_matches.filter(result="win").count()
-        c_first = c_matches.filter(first_or_second="first")
-        c_second = c_matches.filter(first_or_second="second")
-        opponent_deck_stats.append({
-            "deck": None,
-            "custom_name": name,
-            "count": c_total,
-            "ratio": c_total / total_games * 100 if total_games > 0 else 0,
-            "total_games": c_total,
-            "win_rate": (c_win / c_total * 100) if c_total > 0 else 0,
-            "first_ratio": c_first.count() / c_total * 100 if c_total > 0 else 0,
-            "first_win_rate": (c_first.filter(result="win").count() / c_first.count() * 100) if c_first.count() > 0 else None,
-            "second_win_rate": (c_second.filter(result="win").count() / c_second.count() * 100) if c_second.count() > 0 else None,
-            "coin_toss_win_win_rate": 0,
-            "coin_toss_lose_win_rate": 0,
-        })
-
-    # ----------------------
-    # 4) My deck x opponents' deck statistics
-    # ----------------------
-    deck_pairs = matches.values_list('deck_id', 'opponent_deck_id').distinct()
-
-    deck_vs_deck_stats = []
-    for (d_id, o_id) in deck_pairs:
-        pair_matches = matches.filter(deck_id=d_id, opponent_deck_id=o_id)
-        pair_total = pair_matches.count()
-        pair_win_count = pair_matches.filter(result="win").count()
-        pair_win_rate = (pair_win_count / pair_total * 100) if pair_total > 0 else 0
-
-        pair_first = pair_matches.filter(first_or_second="first")
-        pair_second = pair_matches.filter(first_or_second="second")
-        pair_first_win = pair_first.filter(result="win").count()
-        pair_second_win = pair_second.filter(result="win").count()
-        pair_first_win_rate = (pair_first_win / pair_first.count() * 100) if pair_first.count() > 0 else 0
-        pair_second_win_rate = (pair_second_win / pair_second.count() * 100) if pair_second.count() > 0 else 0
-
-        pair_coin_win = pair_matches.filter(coin_toss_result="win")
-        pair_coin_lose = pair_matches.filter(coin_toss_result="lose")
-        pair_coin_win_and_match_win = pair_coin_win.filter(result="win").count()
-        pair_coin_lose_and_match_win = pair_coin_lose.filter(result="win").count()
-        pair_coin_win_win_rate = (pair_coin_win_and_match_win / pair_coin_win.count() * 100) if pair_coin_win.count() else 0
-        pair_coin_lose_win_rate = (pair_coin_lose_and_match_win / pair_coin_lose.count() * 100) if pair_coin_lose.count() else 0
-
-        deck_vs_deck_stats.append({
-            "deck_id": d_id,
-            "opponent_deck_id": o_id,
-            "total_games": pair_total,
-            "win_rate": pair_win_rate,
-            "first_win_rate": pair_first_win_rate,
-            "second_win_rate": pair_second_win_rate,
-            "coin_toss_win_win_rate": pair_coin_win_win_rate,
-            "coin_toss_lose_win_rate": pair_coin_lose_win_rate,
-        })
-
-    # ----------------------
-    # Overall
-    # ----------------------
-    data = {
-        "record_group_name": record_group.name,
-        "basic": {
-            "total_games": total_games,
-            "overall_win_rate": overall_win_rate,
-            "first_win_rate": first_win_rate,
-            "second_win_rate": second_win_rate,
-            "first_ratio": first_ratio,
-            "coin_toss_win_rate": coin_toss_win_rate,
-            "coin_toss_win_win_rate": coin_toss_win_win_rate,
-            "coin_toss_lose_win_rate": coin_toss_lose_win_rate,
-        },
-        "my_deck_stats": my_deck_stats,
-        "opponent_deck_stats": opponent_deck_stats,
-        "deck_vs_deck_stats": deck_vs_deck_stats,
-    }
-
+    data = {"record_group_name": record_group.name}
+    data.update(compute_full_statistics(matches))
     return Response(data, status=status.HTTP_200_OK)
-    
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_user_statistics_full(request):
+    """All of the caller's (non-deleted) sheets merged. Optional `group_ids`
+    (comma-separated) narrows to specific own sheets; `deck_id` as per-sheet."""
+    groups = RecordGroup.objects.filter(user=request.user, is_deleted=False)
+
+    raw_ids = request.GET.get("group_ids")
+    if raw_ids:
+        try:
+            wanted = [int(x) for x in raw_ids.split(",") if x.strip()]
+        except ValueError:
+            return Response({"error": "group_ids must be comma-separated integers"}, status=status.HTTP_400_BAD_REQUEST)
+        groups = groups.filter(id__in=wanted)
+
+    group_list = list(groups.order_by("-created_at").values("id", "name"))
+    group_ids = [g["id"] for g in group_list]
+
+    matches = MatchRecord.objects.filter(record_group_id__in=group_ids, is_deleted=False)
+    deck_id = request.GET.get("deck_id")
+    if deck_id:
+        matches = matches.filter(deck_id=deck_id)
+
+    data = {"record_groups": group_list, "group_count": len(group_list)}
+    data.update(compute_full_statistics(matches))
+    return Response(data, status=status.HTTP_200_OK)
+
 from django.core.paginator import Paginator
 
 @api_view(["GET"])
