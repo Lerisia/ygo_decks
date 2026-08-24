@@ -198,7 +198,7 @@ const StatisticsPage = () => {
       return b.count - a.count;
     });
 
-  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 10).map((e) => {
+  const oppChartDecks = [...oppDecks].sort((a, b) => b.count - a.count).map((e) => {
     const winCount = Math.round((e.count * e.win_rate) / 100);
     const winRatio = (e.ratio * e.win_rate) / 100;
     return { ...e, winCount, loseCount: e.count - winCount, winRatio, loseRatio: e.ratio - winRatio };
@@ -413,9 +413,9 @@ const StatisticsPage = () => {
                 )}
               </label>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
-              <ResponsiveContainer width="100%" height={420}>
-                <BarChart data={oppTopDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
+            <div>
+              <ResponsiveContainer width="100%" height={Math.max(160, oppChartDecks.length * 34 + 16)}>
+                <BarChart data={oppChartDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
                   <XAxis type="number" hide />
                   <YAxis
                     type="category"
@@ -423,7 +423,7 @@ const StatisticsPage = () => {
                     width={124}
                     tickLine={false}
                     axisLine={false}
-                    tick={<OppDeckTick entries={oppTopDecks} />}
+                    tick={<OppDeckTick entries={oppChartDecks} />}
                   />
                   <Tooltip
                     formatter={(value: number, name, item) => {
@@ -460,25 +460,6 @@ const StatisticsPage = () => {
                   )}
                 </BarChart>
               </ResponsiveContainer>
-              <table className="w-full table-fixed text-sm">
-                <thead>
-                  <tr className="border-b dark:border-gray-700">
-                    <th className="text-left px-2 pb-2 w-[70%]">덱</th>
-                    <th className="text-right px-2 pb-2 w-[30%]">비율</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {oppDecks.map((entry, i) => (
-                    <DeckRow
-                      key={entry.deck?.id ?? `unknown-${i}`}
-                      image={isUnknownDeck(entry) ? null : entry.deck?.cover_image_small}
-                      name={getOppDeckName(entry)}
-                    >
-                      <td className="text-right px-2 py-1.5">{entry.ratio.toFixed(1)}%</td>
-                    </DeckRow>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </section>
 
