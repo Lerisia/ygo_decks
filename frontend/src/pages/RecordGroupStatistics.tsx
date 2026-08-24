@@ -168,7 +168,7 @@ const StatisticsPage = () => {
       return b.count - a.count;
     });
 
-  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 7);
+  const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 10);
 
   const rankData = rankHistory
     .filter((m) => m.rank)
@@ -345,7 +345,7 @@ const StatisticsPage = () => {
           <section>
             <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱 비율</h2>
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={420}>
                 <BarChart data={oppTopDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
                   <XAxis type="number" hide />
                   <YAxis
