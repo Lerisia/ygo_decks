@@ -31,6 +31,10 @@ ALLOWED_USER_IDS = {int(x.strip()) for x in os.environ.get("ALLOWED_USER_IDS", "
 PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", "/home/elyss/ygo_decks"))
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or "claude"
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "900"))  # 15 min
+# asyncio's default StreamReader limit is 64KB; a single stream-json event
+# (e.g. a large tool result) easily exceeds that and readline() then raises
+# "ValueError: Separator is not found, and chunk exceed the limit".
+STREAM_LIMIT_BYTES = 32 * 1024 * 1024
 
 DISCORD_MSG_LIMIT = 2000
 # Edit at most this often. Discord rate-limits ~5 edits per 5s per channel;
@@ -352,14 +356,42 @@ async def run_claude_streaming(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
+        limit=STREAM_LIMIT_BYTES,
     )
 
     tracker = ProgressTracker()
 
+    # Drain stderr concurrently: with --verbose claude can write enough to
+    # fill the 64KB pipe buffer, which would block it (and hang proc.wait())
+    # if nobody reads until after stdout closes.
+    stderr_buf = bytearray()
+
+    async def drain_stderr():
+        assert proc.stderr is not None
+        while True:
+            chunk = await proc.stderr.read(65536)
+            if not chunk:
+                return
+            if len(stderr_buf) < 1_000_000:
+                stderr_buf.extend(chunk)
+
+    stderr_task = asyncio.create_task(drain_stderr())
+
     async def read_stream():
         assert proc.stdout is not None
         while True:
-            raw = await proc.stdout.readline()
+            try:
+                raw = await proc.stdout.readline()
+            except ValueError:
+                # One event line overflowed even STREAM_LIMIT_BYTES. The
+                # stream can't be resynced mid-line, so stop reading but
+                # let the run finish instead of crashing the handler.
+                log.exception("stream-json line exceeded %d bytes", STREAM_LIMIT_BYTES)
+                tracker.set_final(
+                    "⚠️ 응답 데이터가 너무 커서 출력 일부가 유실됐습니다. "
+                    "작업 자체는 계속 진행됐을 수 있으니, 결과를 물어보는 메시지를 한 번 더 보내주세요."
+                )
+                return
             if not raw:
                 return
             line = raw.decode(errors="replace").strip()
@@ -380,17 +412,29 @@ async def run_claude_streaming(
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
+        stderr_task.cancel()
         tracker.set_final(f"⏱️ 시간 초과 ({CLAUDE_TIMEOUT_SEC}s)")
         return (-1, tracker)
+    except Exception:
+        # Never leave an orphaned claude process behind on an unexpected error.
+        proc.kill()
+        await proc.wait()
+        stderr_task.cancel()
+        raise
 
     rc = await proc.wait()
-    if rc != 0 and proc.stderr is not None:
-        try:
-            err = (await proc.stderr.read()).decode(errors="replace").strip()
-        except Exception:
-            err = ""
+    try:
+        await asyncio.wait_for(stderr_task, timeout=5)
+    except Exception:
+        stderr_task.cancel()
+    if rc != 0:
+        err = stderr_buf.decode(errors="replace").strip()
         if err:
             log.warning("claude exited rc=%s: %s", rc, err[:500])
+            if not tracker.final_text and not tracker.latest_text:
+                # Without this, a run that died before producing any text
+                # (e.g. API overload) rendered as a bare "작업 중" forever.
+                tracker.set_final(f"오류 출력: `{err[-300:]}`")
     return (rc, tracker)
 
 
