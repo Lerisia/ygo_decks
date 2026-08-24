@@ -170,8 +170,9 @@ const StatisticsPage = () => {
     });
 
   const oppTopDecks = [...oppDecks].sort((a, b) => b.count - a.count).slice(0, 10).map((e) => {
-    const winRatio = e.count > 0 ? (e.ratio * e.total_wins) / e.count : 0;
-    return { ...e, winRatio, loseRatio: e.ratio - winRatio, loseCount: e.count - e.total_wins };
+    const winCount = Math.round((e.count * e.win_rate) / 100);
+    const winRatio = (e.ratio * e.win_rate) / 100;
+    return { ...e, winCount, loseCount: e.count - winCount, winRatio, loseRatio: e.ratio - winRatio };
   });
 
   const rankData = rankHistory
@@ -379,8 +380,8 @@ const StatisticsPage = () => {
                   />
                   <Tooltip
                     formatter={(value: number, name, item) => {
-                      const payload = (item as { payload?: { count?: number; total_wins?: number; loseCount?: number } })?.payload;
-                      if (name === "승리") return [`${value.toFixed(1)}% (${payload?.total_wins ?? 0}승)`, name];
+                      const payload = (item as { payload?: { count?: number; winCount?: number; loseCount?: number } })?.payload;
+                      if (name === "승리") return [`${value.toFixed(1)}% (${payload?.winCount ?? 0}승)`, name];
                       if (name === "패배") return [`${value.toFixed(1)}% (${payload?.loseCount ?? 0}패)`, name];
                       return [`${value.toFixed(1)}% (${payload?.count ?? 0}게임)`, "비율"];
                     }}
