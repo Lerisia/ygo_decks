@@ -216,3 +216,126 @@ class UpdateWikiContentTest(TestCase):
         self.assertEqual(resp.status_code, 403)
 
 
+
+
+# ---------------------------------------------------------------------------
+# Per-question recommendation step (replaces the pre-generated lookup table).
+# ---------------------------------------------------------------------------
+class RecommendStepTest(TestCase):
+    STEP_URL = "/api/deck/recommend/step"
+
+    @classmethod
+    def setUpTestData(cls):
+        for m in (0, 1, 3, 6):
+            SummoningMethod.objects.get_or_create(id=m, defaults={"method": m})
+        cls.p1 = PerformanceTag.objects.create(name="P1", description="기믹1")
+        cls.p2 = PerformanceTag.objects.create(name="P2", description="기믹2")
+        cls.a1 = AestheticTag.objects.create(name="A1", description="조건1")
+        cls.a2 = AestheticTag.objects.create(name="A2", description="조건2")
+
+        def deck(name, strength, difficulty, deck_type, art_style, sms, ptags, atags):
+            d = Deck.objects.create(name=name, strength=strength, difficulty=difficulty,
+                                    deck_type=deck_type, art_style=art_style)
+            d.summoning_methods.set(SummoningMethod.objects.filter(id__in=sms))
+            d.performance_tags.set(ptags)
+            d.aesthetic_tags.set(atags)
+            return d
+
+        cls.d1 = deck("D1", 0, 0, 0, 0, [1], [cls.p1], [cls.a1])
+        cls.d2 = deck("D2", 1, 1, 0, 2, [3, 6], [cls.p1, cls.p2], [cls.a2])
+        cls.d3 = deck("D3", 3, 2, 2, 1, [0], [cls.p2], [])
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def step(self, key=None):
+        params = {"key": key} if key is not None else {}
+        resp = self.client.get(self.STEP_URL, params)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_no_answers_lists_every_viable_option(self):
+        data = self.step()
+        self.assertEqual(data["candidate_count"], 3)
+        self.assertFalse(data["resolved"])
+        av = data["available"]
+        self.assertEqual(av["s"], [0, 1, 2, 3, 4])   # tiers 0,1,3 -> bands (0,1),(1,2),(3,4)
+        self.assertEqual(av["d"], [0, 1, 2])
+        self.assertEqual(av["t"], [0, 2])
+        self.assertEqual(av["a"], [0, 1, 2])
+        self.assertEqual(av["sm"], [0, 1, 3, 6])
+        self.assertEqual(av["ptag"], sorted([self.p1.id, self.p2.id]))
+        self.assertEqual(av["atag"], sorted([self.a1.id, self.a2.id]))
+
+    def test_empty_key_means_no_answers(self):
+        self.assertEqual(self.step("empty")["candidate_count"], 3)
+        self.assertEqual(self.step("")["candidate_count"], 3)
+
+    def test_answers_narrow_candidates_and_options(self):
+        data = self.step("t=0")
+        self.assertEqual(data["candidate_count"], 2)
+        av = data["available"]
+        self.assertEqual(av["d"], [0, 1])
+        self.assertEqual(av["s"], [0, 1, 2])
+        self.assertEqual(av["a"], [0, 2])
+        self.assertEqual(av["sm"], [1, 3, 6])
+        self.assertEqual(av["atag"], sorted([self.a1.id, self.a2.id]))
+        self.assertEqual(av["t"], [0])   # answered key reflects the candidates
+
+    def test_resolves_when_one_candidate_remains(self):
+        data = self.step("d=1|t=0")
+        self.assertEqual(data["candidate_count"], 1)
+        self.assertTrue(data["resolved"])
+
+    def test_strength_band_overlap(self):
+        self.assertEqual(self.step("s=1")["candidate_count"], 2)   # band 1 = tiers 0,1 -> D1, D2
+        self.assertEqual(self.step("s=0")["candidate_count"], 1)   # tier 0 only -> D1
+        data = self.step("s=2")                                     # tiers 1,2 -> D2
+        self.assertTrue(data["resolved"])
+
+    def test_summoning_method_and_tags(self):
+        self.assertTrue(self.step("sm=6")["resolved"])
+        self.assertEqual(self.step(f"ptag={self.p1.id}")["candidate_count"], 2)
+        self.assertTrue(self.step(f"atag={self.a2.id}")["resolved"])
+
+    def test_impossible_combination_yields_zero(self):
+        data = self.step("d=2|t=0")
+        self.assertEqual(data["candidate_count"], 0)
+        self.assertFalse(data["resolved"])
+        self.assertTrue(all(v == [] for v in data["available"].values()))
+
+    def test_key_order_does_not_matter(self):
+        self.assertEqual(self.step("t=0|d=1"), self.step("d=1|t=0"))
+
+    def test_invalid_value_returns_400(self):
+        self.assertEqual(self.client.get(self.STEP_URL, {"key": "s=abc"}).status_code, 400)
+        self.assertEqual(self.client.get(self.STEP_URL, {"key": "zzz=1"}).status_code, 400)
+
+    def test_custom_lookup_excludes_owned_decks(self):
+        user = User.objects.create_user(email="c@test.com", username="custom", password="pass1234")
+        user.use_custom_lookup = True
+        user.save()
+        user.owned_decks.set([self.d1, self.d2])
+        self.client.force_authenticate(user=user)
+        data = self.step()
+        self.assertEqual(data["candidate_count"], 1)
+        self.assertEqual(data["available"]["d"], [2])
+        user.owned_decks.add(self.d3)
+        self.assertEqual(self.step()["candidate_count"], 0)
+
+    def test_logged_in_without_custom_lookup_sees_everything(self):
+        user = User.objects.create_user(email="n@test.com", username="normal", password="pass1234")
+        user.owned_decks.set([self.d1, self.d2, self.d3])
+        self.client.force_authenticate(user=user)
+        self.assertEqual(self.step()["candidate_count"], 3)
+
+    def test_resolved_step_agrees_with_result_endpoint(self):
+        """Whatever the step endpoint calls resolved must be servable by /deck/result."""
+        mapping = {"s": "strength", "d": "difficulty", "t": "deck_type", "a": "art_style",
+                   "sm": "summoning_methods", "ptag": "performance_tags", "atag": "aesthetic_tags"}
+        for key, expected in (("d=1|t=0", "D2"), ("s=0", "D1"), ("sm=6", "D2"), (f"atag={self.a2.id}", "D2")):
+            self.assertTrue(self.step(key)["resolved"], key)
+            long_key = "|".join(f"{mapping[k]}={v}" for k, v in (p.split("=") for p in key.split("|")))
+            resp = self.client.get("/api/deck/result", {"key": long_key})
+            self.assertEqual(resp.status_code, 200, key)
+            self.assertEqual(resp.json()["name"], expected, key)
