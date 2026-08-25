@@ -10,3 +10,17 @@ export const fetchQuestions = async () => {
     return [];
   }
 };
+export type RecommendStep = {
+  candidate_count: number;
+  resolved: boolean;
+  available: Record<string, number[]>;
+};
+
+// Candidate count + viable options for the current answers (replaces the lookup table).
+export const fetchRecommendStep = async (answerKey: string): Promise<RecommendStep> => {
+  const token = localStorage.getItem("access_token");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(`/api/deck/recommend/step?key=${encodeURIComponent(answerKey)}`, { headers });
+  if (!response.ok) throw new Error(`Failed to fetch recommend step: ${response.status}`);
+  return response.json();
+};

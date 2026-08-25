@@ -1,98 +1,65 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import QuestionItem from "../components/QuestionItem";
-import { fetchQuestions } from "../api/questionApi";
-import { fetchLookupTable } from "../api/lookupApi";
+import { fetchQuestions, fetchRecommendStep } from "../api/questionApi";
+import {
+  buildAnswerKey, visibleOptions, hiddenOptionalCount, isFinished,
+  type Question, type Answer, type Available,
+} from "../utils/recommendFlow";
 
-type LookupTable = { [key: string]: number };
-
-type Question = {
-  key: string;
-  question: string;
-  options: { value: number; label: string }[];
-};
+type Step = { key: string; candidateCount: number; available: Available };
 
 function QuestionPage() {
-  const [lookupTable, setLookupTable] = useState<LookupTable | null>(null);
   const [requiredQuestions, setRequiredQuestions] = useState<Question[]>([]);
   const [optionalQuestions, setOptionalQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOptionalQuestions, setSelectedOptionalQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<{ key: string; value: number }[]>([]);
-  
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [step, setStep] = useState<Step | null>(null);
+  const [stepError, setStepError] = useState(false);
+
   const navigate = useNavigate();
+  const answerKey = buildAnswerKey(answers);
+  const stepReady = step !== null && step.key === answerKey;
+  const available = stepReady ? step.available : null;
 
   useEffect(() => {
-    // Get look-up table from backend
-    fetchLookupTable().then(setLookupTable);
-
     fetchQuestions()
       .then((data) => {
-        const required = data.slice(0, 4);
-        const optional = data.slice(4, 7);
-        setRequiredQuestions(required);
-        setOptionalQuestions(optional);
+        setRequiredQuestions(data.slice(0, 4));
+        setOptionalQuestions(data.slice(4, 7));
       })
       .catch((error) => console.error("Error loading questions:", error));
   }, []);
 
+  // Ask the server what is still possible after every answer change.
   useEffect(() => {
-    if (lookupTable && Object.keys(lookupTable).length === 1 && lookupTable["empty"] === 0) {
-      console.log("모든 덱을 보유한 유저입니다. /no-results로 이동합니다.");
-      navigate("/no-results");
-    }
-  }, [lookupTable, navigate]);
+    let cancelled = false;
+    setStepError(false);
+    fetchRecommendStep(answerKey)
+      .then((data) => {
+        if (cancelled) return;
+        setStep({ key: answerKey, candidateCount: data.candidate_count, available: data.available });
+      })
+      .catch((error) => {
+        console.error("추천 단계 조회 실패:", error);
+        if (!cancelled) setStepError(true);
+      });
+    return () => { cancelled = true; };
+  }, [answerKey]);
 
-  const generateAnswerKey = (answers: { key: string; value: number | null }[]) => {
-    const filteredAnswers = answers.filter(({ value }) => value !== null && value !== undefined);
-    if (filteredAnswers.length === 0) return "empty";
-    return filteredAnswers
-      .map(({ key, value }) => `${key}=${value}`)
-      .sort()
-      .join("|");
-  };
+  const getAvailableOptions = (question: Question) => visibleOptions(question, available);
+  const getHiddenQuestionsCount = () => hiddenOptionalCount(optionalQuestions, answers, available);
+
+  const getValidOptionalQuestions = () =>
+    optionalQuestions.filter(
+      (question) => getAvailableOptions(question).length > 1 || answers.some((a) => a.key === question.key)
+    );
 
   const handleSelectOptionalQuestion = (question: Question) => {
     if (!answers.some((a) => a.key === question.key)) {
       setSelectedOptionalQuestions([question]);
     }
-  };
-  
-  // Get # of hidden questions that have only 1 available answer
-  // or 2 available answers including "상관 없음"
-  const getHiddenQuestionsCount = () => {
-    return optionalQuestions.filter((question) => {
-      if (answers.some((a) => a.key === question.key)) return false;
-  
-      const availableOptions = getAvailableOptions(question);
-      return availableOptions.length <= 1;
-    }).length;
-  };
-  
-
-  const getAvailableOptions = (question: Question) => {
-    if (!lookupTable) return [];
-
-    let validOptions = question.options.filter((option) => {
-      const newAnswers = [...answers, { key: question.key, value: option.value }];
-      return generateAnswerKey(newAnswers) in lookupTable;
-    });
-
-    console.log(validOptions);
-  
-    // Remove "상관 없음" if the question has only two answers
-    if (validOptions.length === 2) {
-      validOptions = validOptions.filter(o => o.label !== "상관 없음");
-    }
-  
-    return validOptions;
-  };
-  
-
-  const getValidOptionalQuestions = () => {
-    return optionalQuestions.filter(
-      (question) => getAvailableOptions(question).length > 1 || answers.some((a) => a.key === question.key)
-    );
   };
 
   const handleAnswer = (questionKey: string, value: number) => {
@@ -127,92 +94,96 @@ function QuestionPage() {
         setAnswers((prev) => prev.slice(0, -1));
         setCurrentIndex(answers.length - 1);
     }
-
-    // case 4: Do nothing
-    if (!isRequired && !isOptional) {
-        return;
-    }
   };
-  
+
   useEffect(() => {
-    if (!lookupTable || Object.keys(lookupTable).length === 0) return;
-    
-    const totalQuestions = requiredQuestions.length + optionalQuestions.length;
-    const answeredAndHiddenCount = answers.length + getHiddenQuestionsCount();
-    const answerKey = generateAnswerKey(answers);
-  
-    console.log("응답한 질문 개수:", answers.length);
-    console.log("비활성화된 질문 개수:", getHiddenQuestionsCount());
-    console.log("전체 질문 개수:", totalQuestions);
-    console.log("현재 answerKey:", answerKey);
-    console.log("lookup table에서 찾은 값:", lookupTable[answerKey]);
-  
-    if (answeredAndHiddenCount >= totalQuestions) {
-      console.log("더 이상 답할 수 있는 질문이 없음. 결과 페이지로 이동합니다.");
-      localStorage.setItem("answerKey", answerKey);
-      navigate("/result");
+    if (!stepReady || requiredQuestions.length === 0) return;
+
+    if (step.candidateCount === 0 && answers.length === 0) {
+      navigate("/no-results");
       return;
     }
-  
-    if (lookupTable[answerKey] === 1) { 
-      console.log("answerKey가 유효한 값(1)임. 결과 페이지로 이동합니다.");
+
+    const finished = isFinished({
+      answered: answers.length,
+      hidden: getHiddenQuestionsCount(),
+      total: requiredQuestions.length + optionalQuestions.length,
+      candidateCount: step.candidateCount,
+    });
+    if (finished) {
       localStorage.setItem("answerKey", answerKey);
       navigate("/result");
     }
-  }, [answers, lookupTable, navigate, requiredQuestions, optionalQuestions]);
-  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, stepReady, answers, requiredQuestions, optionalQuestions, navigate]);
+
+  const renderBody = () => {
+    if (stepError) {
+      return <p className="text-red-500">추천 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+    }
+    if (!stepReady || requiredQuestions.length === 0) {
+      return <p className="text-gray-500 dark:text-gray-400">로딩 중...</p>;
+    }
+    if (currentIndex < requiredQuestions.length) {
+      const q = requiredQuestions[currentIndex];
+      return (
+        <QuestionItem
+          key={q.key}
+          question={q.question}
+          options={getAvailableOptions(q)}
+          selectedValue={answers.find((a) => a.key === q.key)?.value ?? undefined}
+          onSelect={(value) => handleAnswer(q.key, value)}
+        />
+      );
+    }
+    if (selectedOptionalQuestions.length > 0) {
+      const q = selectedOptionalQuestions[0];
+      return (
+        <QuestionItem
+          key={q.key}
+          question={q.question}
+          options={getAvailableOptions(q)}
+          selectedValue={answers.find((a) => a.key === q.key)?.value ?? undefined}
+          onSelect={(value) => handleAnswer(q.key, value)}
+        />
+      );
+    }
+    return (
+      <div>
+        <h3 className="mb-4 text-lg font-semibold space-y-4 text-gray-900 dark:text-white">
+          다음 질문을 골라 주세요
+        </h3>
+        <div className="flex flex-col items-center space-y-4 w-full">
+          {getValidOptionalQuestions().length > 0 ? (
+            getValidOptionalQuestions().map((q) => {
+              const isAnswered = answers.some((a) => a.key === q.key);
+              return (
+                <button
+                  key={q.key}
+                  className={`px-4 py-2 rounded-lg transition break-keep w-full max-w-2xl text-center
+                    ${
+                      isAnswered
+                        ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
+                        : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 hover:dark:bg-gray-600 dark:text-gray-100"
+                    }`}
+                  onClick={() => handleSelectOptionalQuestion(q)}
+                  disabled={isAnswered}
+                >
+                  {q.question}
+                </button>
+              );
+            })
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400">선택할 수 있는 추가 질문이 없습니다.</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="mb-4 p-4 text-left h-auto min-h-screen flex flex-col items-center">
-      <div className="mt-6 w-full max-w-lg">
-        {currentIndex < requiredQuestions.length ? (
-          <QuestionItem
-            key={requiredQuestions[currentIndex].key}
-            question={requiredQuestions[currentIndex].question}
-            options={getAvailableOptions(requiredQuestions[currentIndex])}
-            selectedValue={answers.find((a) => a.key === requiredQuestions[currentIndex].key)?.value}
-            onSelect={(value) => handleAnswer(requiredQuestions[currentIndex].key, value)}
-          />
-        ) : selectedOptionalQuestions.length > 0 ? (
-          <QuestionItem
-            key={selectedOptionalQuestions[0].key}
-            question={selectedOptionalQuestions[0].question}
-            options={getAvailableOptions(selectedOptionalQuestions[0])}
-            selectedValue={answers.find((a) => a.key === selectedOptionalQuestions[0].key)?.value}
-            onSelect={(value) => handleAnswer(selectedOptionalQuestions[0].key, value)}
-          />
-        ) : (
-          <div>
-            <h3 className="mb-4 text-lg font-semibold space-y-4 text-gray-900 dark:text-white">
-              다음 질문을 골라 주세요
-            </h3>
-            <div className="flex flex-col items-center space-y-4 w-full">
-              {getValidOptionalQuestions().length > 0 ? (
-                getValidOptionalQuestions().map((q) => {
-                  const isAnswered = answers.some((a) => a.key === q.key);
-
-                  return (
-                    <button
-                      key={q.key}
-                      className={`px-4 py-2 rounded-lg transition break-keep w-full max-w-2xl text-center
-                        ${
-                          isAnswered
-                            ? "bg-gray-300 text-gray-600 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
-                            : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 hover:dark:bg-gray-600 dark:text-gray-100"
-                        }`}
-                      onClick={() => handleSelectOptionalQuestion(q)}
-                      disabled={isAnswered}
-                    >
-                      {q.question}
-                    </button>
-                  );
-                })
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400">선택할 수 있는 추가 질문이 없습니다.</p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="mt-6 w-full max-w-lg">{renderBody()}</div>
       <button
         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
         onClick={handleGoBack}
