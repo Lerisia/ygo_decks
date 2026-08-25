@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS
+from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -28,6 +28,103 @@ def parse_answer_key(answer_key):
     print("Converted answer keys:", criteria)
     return criteria
 
+SHORT_TO_FIELD = {
+    "s": "strength", "d": "difficulty", "t": "deck_type", "a": "art_style",
+    "sm": "summoning_methods", "ptag": "performance_tags", "atag": "aesthetic_tags",
+}
+M2M_FIELDS = ("summoning_methods", "performance_tags", "aesthetic_tags")
+
+
+def parse_short_answer_key(answer_key):
+    """Survey-side key (`s=1|d=0|sm=6`) -> criteria dict. Raises ValueError on junk."""
+    criteria = {}
+    if not answer_key or answer_key == "empty":
+        return criteria
+    for pair in answer_key.split("|"):
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(pair)
+        short, raw = pair.split("=", 1)
+        if short not in SHORT_TO_FIELD:
+            raise ValueError(short)
+        field = SHORT_TO_FIELD[short]
+        value = int(raw)  # ValueError propagates
+        if field in M2M_FIELDS:
+            criteria.setdefault(field, []).append(value)
+        else:
+            criteria[field] = value
+    return criteria
+
+
+def filter_decks(criteria, user=None):
+    """Decks matching the survey criteria; the single source of truth shared by
+    the step endpoint and the result endpoint."""
+    query = Q()
+    if criteria.get("art_style") is not None:
+        query &= Q(art_style=criteria["art_style"])
+    if criteria.get("deck_type") is not None:
+        query &= Q(deck_type=criteria["deck_type"])
+    if criteria.get("difficulty") is not None:
+        query &= Q(difficulty=criteria["difficulty"])
+    if criteria.get("strength") is not None:
+        # Survey sends a band index (0-4). Each band covers 1-2 adjacent tiers.
+        # Unknown band -> empty tuple -> __in matches nothing.
+        tiers = STRENGTH_BAND_TO_TIERS.get(criteria["strength"], ())
+        query &= Q(strength__in=tiers)
+    if criteria.get("summoning_methods"):
+        query &= Q(summoning_methods__id__in=criteria["summoning_methods"])
+    if criteria.get("performance_tags"):
+        query &= Q(performance_tags__id__in=criteria["performance_tags"])
+    if criteria.get("aesthetic_tags"):
+        query &= Q(aesthetic_tags__id__in=criteria["aesthetic_tags"])
+
+    decks = Deck.objects.filter(query).distinct()
+    if user is not None and user.is_authenticated and user.use_custom_lookup:
+        owned = list(user.owned_decks.values_list("id", flat=True))
+        if owned:
+            decks = decks.exclude(id__in=owned)
+    return decks
+
+
+def available_options(decks):
+    """For each survey key, the option values that keep >= 1 of `decks`."""
+    rows = list(decks.values("id", "strength", "difficulty", "deck_type", "art_style"))
+    ids = [r["id"] for r in rows]
+    bands = set()
+    for r in rows:
+        bands.update(STRENGTH_TIER_TO_BANDS.get(r["strength"], ()))
+
+    def m2m(field):
+        return sorted({v for v in Deck.objects.filter(id__in=ids).values_list(f"{field}__id", flat=True) if v is not None})
+
+    return {
+        "s": sorted(bands),
+        "d": sorted({r["difficulty"] for r in rows}),
+        "t": sorted({r["deck_type"] for r in rows}),
+        "a": sorted({r["art_style"] for r in rows}),
+        "sm": m2m("summoning_methods"),
+        "ptag": m2m("performance_tags"),
+        "atag": m2m("aesthetic_tags"),
+    }
+
+
+@api_view(["GET"])
+def recommend_step(request):
+    try:
+        criteria = parse_short_answer_key(request.GET.get("key", ""))
+    except ValueError:
+        return JsonResponse({"error": "invalid key"}, status=400)
+
+    decks = filter_decks(criteria, request.user)
+    count = decks.count()
+    return JsonResponse({
+        "candidate_count": count,
+        "resolved": count == 1,
+        "available": available_options(decks),
+    })
+
+
 @api_view(["GET"])
 def get_deck_result(request):
     answer_key = request.GET.get("key")
@@ -43,47 +140,8 @@ def get_deck_result(request):
     search_params = parse_answer_key(answer_key)
     print("Search params:", search_params)
 
-    # IntegerField filtering
-    query = Q()
-    if search_params.get("art_style") is not None:
-        query &= Q(art_style=search_params["art_style"])
-    if search_params.get("deck_type") is not None:
-        query &= Q(deck_type=search_params["deck_type"])
-    if search_params.get("difficulty") is not None:
-        query &= Q(difficulty=search_params["difficulty"])
-    if search_params.get("strength") is not None:
-        # Survey sends a band index (0-4). Each band covers 1-2 adjacent tiers.
-        # Unknown band → empty tuple → __in matches nothing → 404 (backward compat).
-        tiers = STRENGTH_BAND_TO_TIERS.get(search_params["strength"], ())
-        query &= Q(strength__in=tiers)
-
-    # ManyToManyField filtering (Summoning Methods & Tags)
-    summoning_method_ids = search_params.get("summoning_methods", [])
-    performance_tag_ids = search_params.get("performance_tags", [])
-    aesthetic_tag_ids = search_params.get("aesthetic_tags", [])
-
-    if summoning_method_ids:
-        query &= Q(summoning_methods__id__in=summoning_method_ids)
-
-    if performance_tag_ids:
-        query &= Q(performance_tags__id__in=performance_tag_ids)
-        
-    if aesthetic_tag_ids:
-        query &= Q(aesthetic_tags__id__in=aesthetic_tag_ids)
-
-    # Apply initial query
-    decks = Deck.objects.filter(query).distinct()
+    decks = filter_decks(search_params, request.user)
     print("Filtered QuerySet count:", decks.count())
-    
-    if request.user.is_authenticated and request.user.use_custom_lookup: # if logged in and use custom lookup
-        owned_deck_ids = list(request.user.owned_decks.values_list("id", flat=True))
-        print(f"Owned deck IDs to exclude: {owned_deck_ids}")
-
-        if owned_deck_ids:
-            decks = decks.exclude(id__in=owned_deck_ids)
-            print("Filtered QuerySet after owned deck exclusion:", decks.count())
-        else:
-            print("No owned decks to exclude.")
 
     if answer_key == "empty":
         all_decks = Deck.objects.all()
