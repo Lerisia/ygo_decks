@@ -30,9 +30,9 @@ def get_questions(request):
             "key": "d",
             "question": "원하는 덱 난이도는?",
             "options": [
-                {"value": 0, "label": "비교적 쉽게 익히는 직관적인 덱"},
-                {"value": 1, "label": "약간의 노력이 필요한 덱"},
-                {"value": 2, "label": "높은 게임 이해도가 요구되는 덱"},
+                {"value": 0, "label": "비교적 간단하게 익힐 수 있는 쉬운 난이도의 덱"},
+                {"value": 1, "label": "익히는 데 약간의 노력이 필요한 보통 난이도의 덱"},
+                {"value": 2, "label": "높은 게임 이해도가 요구되는 어려운 덱"},
                 {"value": None, "label": "상관 없음"},
             ]
         },
