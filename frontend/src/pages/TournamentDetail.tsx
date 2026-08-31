@@ -5,7 +5,7 @@ import { getUserInfo } from "@/api/accountApi";
 import {
   checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
   getTournament, kickEntrant, nextRound, overrideMatch, registerTournament,
-  reportMatch, startTournament, withdrawTournament,
+  reportMatch, startTournament, updateCover, withdrawTournament,
   type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
 } from "@/api/tournamentApi";
 
@@ -135,6 +135,29 @@ function TournamentDetailPage() {
   return (
     <div className="px-4 py-6 min-h-screen max-w-3xl mx-auto">
       <button onClick={() => navigate("/tournaments")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회 목록</button>
+
+      {t.cover_image && (
+        <img src={t.cover_image} alt={t.name} className="w-full max-h-64 object-cover rounded-xl mb-3" />
+      )}
+      {isHost && (
+        <div className="flex gap-2 mb-3 text-xs">
+          <label className="cursor-pointer text-blue-600 hover:underline">
+            배너 {t.cover_image ? "변경" : "등록"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) act(() => updateCover(t.id, f));
+              }}
+            />
+          </label>
+          {t.cover_image && (
+            <button className="text-red-500 hover:underline" onClick={() => act(() => updateCover(t.id, null))}>배너 제거</button>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2 mb-1">
         <h1 className="text-2xl font-bold truncate">{t.name}</h1>

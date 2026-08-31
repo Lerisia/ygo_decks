@@ -89,7 +89,26 @@ export const getTournament = (id: number) => req<TournamentDetail>(`/${id}/`);
 export const createTournament = (payload: {
   name: string; description?: string; format: TournamentFormat;
   capacity: number; event_date: string; format_config?: Record<string, unknown>;
-}) => req<TournamentDetail>("/create/", { method: "POST", body: JSON.stringify(payload) });
+}, coverFile?: File | null) => {
+  if (!coverFile) {
+    return req<TournamentDetail>("/create/", { method: "POST", body: JSON.stringify(payload) });
+  }
+  const form = new FormData();
+  form.append("name", payload.name);
+  if (payload.description) form.append("description", payload.description);
+  form.append("format", payload.format);
+  form.append("capacity", String(payload.capacity));
+  form.append("event_date", payload.event_date);
+  if (payload.format_config) form.append("format_config", JSON.stringify(payload.format_config));
+  form.append("cover_image", coverFile);
+  return req<TournamentDetail>("/create/", { method: "POST", body: form });
+};
+
+export const updateCover = (id: number, coverFile: File | null) => {
+  const form = new FormData();
+  if (coverFile) form.append("cover_image", coverFile);
+  return req<TournamentDetail>(`/${id}/cover/`, { method: "POST", body: form });
+};
 
 export const registerTournament = (id: number, mdUid?: string) =>
   req<Entrant>(`/${id}/register/`, { method: "POST", body: JSON.stringify(mdUid ? { md_uid: mdUid } : {}) });

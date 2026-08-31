@@ -89,14 +89,22 @@ def create_tournament(request):
         return _err("capacity가 올바르지 않습니다.")
     if not (2 <= capacity <= 128):
         return _err("정원은 2~128명이어야 합니다.")
+    format_config = data.get("format_config") or {}
+    if isinstance(format_config, str):  # multipart submits JSON as a string
+        import json
+        try:
+            format_config = json.loads(format_config) if format_config else {}
+        except ValueError:
+            return _err("format_config가 올바르지 않습니다.")
     t = Tournament.objects.create(
         name=data["name"],
         description=data.get("description", ""),
         host=request.user,
         format=fmt,
-        format_config=data.get("format_config") or {},
+        format_config=format_config,
         capacity=capacity,
         event_date=data["event_date"],
+        cover_image=request.FILES.get("cover_image"),
     )
     return Response(TournamentDetailSerializer(t).data, status=status.HTTP_201_CREATED)
 
@@ -622,3 +630,20 @@ def deck_card_remove(request, tournament_id, row_id):
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     row.delete()
     return Response({"ok": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def update_cover(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if t.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    image = request.FILES.get("cover_image")
+    if image:
+        t.cover_image = image
+    else:
+        t.cover_image = None
+    t.save(update_fields=["cover_image"])
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)

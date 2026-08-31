@@ -537,3 +537,44 @@ class DeckSubmissionTest(TournamentApiTestBase):
         other_c = self.players[1][1]
         self.assertEqual(other_c.get(f"/api/tournaments/{self.t.id}/deck/", {"entrant_id": entrant_id}).status_code, 403)      # peer
         self.assertEqual(other_c.get(f"/api/tournaments/{self.t.id}/deck/").status_code, 404)          # no own submission yet
+
+
+class CoverImageTest(TournamentApiTestBase):
+    @staticmethod
+    def _png(name="cover.png"):
+        import io
+        from PIL import Image as PILImage
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        buf = io.BytesIO()
+        PILImage.new("RGB", (4, 4), (30, 60, 200)).save(buf, format="PNG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+    def test_create_with_cover_image(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        resp = self.client.post("/api/tournaments/create/", {
+            "name": "커버컵", "format": "swiss", "capacity": 8,
+            "event_date": (timezone.now() + timedelta(days=1)).isoformat(),
+            "cover_image": self._png(),
+        }, format="multipart")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertIn("tournament_covers/", resp.json()["cover_image"] or "")
+
+    def test_host_can_update_and_remove_cover(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        resp = self.client.post(f"/api/tournaments/{t.id}/cover/", {"cover_image": self._png("b.png")}, format="multipart")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertIn("tournament_covers/", resp.json()["cover_image"])
+        resp = self.client.post(f"/api/tournaments/{t.id}/cover/", {}, format="multipart")  # no file = remove
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()["cover_image"])
+
+    def test_cover_update_is_host_only(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        c = _auth(_user("nothost"))
+        self.assertEqual(c.post(f"/api/tournaments/{t.id}/cover/", {"cover_image": self._png()}, format="multipart").status_code, 403)
+
+    def test_capacity_bounds(self):
+        self.assertEqual(self.create(capacity=1).status_code, 400)
+        self.assertEqual(self.create(capacity=129).status_code, 400)
+        self.assertEqual(self.create(name="최대", capacity=128).status_code, 201)

@@ -12,6 +12,7 @@ function CreateTournament() {
   const [capacity, setCapacity] = useState(8);
   const [eventDate, setEventDate] = useState("");
   const [swissRounds, setSwissRounds] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -32,7 +33,7 @@ function CreateTournament() {
         capacity,
         event_date: new Date(eventDate).toISOString(),
         format_config: config,
-      });
+      }, coverFile);
       navigate(`/tournaments/${t.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "생성에 실패했습니다.");
@@ -74,6 +75,18 @@ function CreateTournament() {
             <input type="number" min={1} max={20} className={inputCls} value={swissRounds} onChange={(e) => setSwissRounds(e.target.value)} placeholder="예: 4" />
           </div>
         )}
+        <div>
+          <label className="block text-sm font-semibold mb-1">대회 배너 (선택)</label>
+          <input
+            type="file"
+            accept="image/*"
+            className="block w-full text-sm text-gray-600 dark:text-gray-300"
+            onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+          />
+          {coverFile && (
+            <img src={URL.createObjectURL(coverFile)} alt="배너 미리보기" className="mt-2 w-full h-40 object-cover rounded-lg" />
+          )}
+        </div>
         <div>
           <label className="block text-sm font-semibold mb-1">일시 *</label>
           <input type="datetime-local" className={inputCls} value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
