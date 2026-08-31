@@ -71,4 +71,4 @@ bot/*.tmp
 # Local logs & scratch files
 logs/
 temp/
-backend/logs/
+backend/logs/backend/tournament_legacy_backup_*.sql
