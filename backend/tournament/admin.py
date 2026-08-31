@@ -24,5 +24,5 @@ class RoundAdmin(admin.ModelAdmin):
 
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
-    list_display = ("round", "entrant1", "entrant2", "score1", "score2", "result", "report_status")
+    list_display = ("round", "entrant1", "entrant2", "result", "report_status")
     list_filter = ("report_status", "result")

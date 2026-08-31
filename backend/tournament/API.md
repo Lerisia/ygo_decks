@@ -28,10 +28,10 @@
 
 | 메서드/경로 | 권한 | 설명 |
 |---|---|---|
-| `POST matches/<id>/report/` | 해당 경기 참가자 | 점수 보고. body: `score1`, `score2` → 결과(p1/p2/draw) 자동 판정. 엘림에서 무승부 400. 확정 전 재보고 가능 |
+| `POST matches/<id>/report/` | 해당 경기 참가자 | 결과 보고. body: `result` = `win`/`lose`/`draw` (보고자 관점) → 서버가 p1/p2/draw로 변환. 엘림에서 draw 400. 확정 전 재보고 가능 |
 | `POST matches/<id>/confirm/` | 상대방 | 보고 확인 → 확정. 본인 보고는 본인이 확정 불가 |
 | `POST matches/<id>/dispute/` | 상대방 | 이의 제기 → `disputed` |
-| `POST matches/<id>/override/` | 주최자 | 점수 강제 확정. body: `score1`, `score2` |
+| `POST matches/<id>/override/` | 주최자 | 강제 확정. body: `result` = `p1`/`p2`/`draw` (엘림에서 draw 400) |
 
 부전승(bye) 경기는 생성 시 자동 확정.
 

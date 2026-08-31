@@ -361,14 +361,17 @@ def report_match(request, match_id):
         return _err("이 경기의 참가자가 아닙니다.", status.HTTP_403_FORBIDDEN)
     if match.report_status == "confirmed":
         return _err("이미 확정된 경기입니다.")
-    try:
-        score1, score2 = int(request.data.get("score1")), int(request.data.get("score2"))
-    except (TypeError, ValueError):
-        return _err("점수가 올바르지 않습니다.")
-    if score1 == score2 and match.round.tournament.format == "single_elim":
+    reported = request.data.get("result")
+    if reported not in ("win", "lose", "draw"):
+        return _err("result는 win/lose/draw 중 하나여야 합니다.")
+    if reported == "draw" and match.round.tournament.format == "single_elim":
         return _err("엘리미네이션에서는 무승부가 허용되지 않습니다.")
-    match.score1, match.score2 = score1, score2
-    match.result = "p1" if score1 > score2 else "p2" if score2 > score1 else "draw"
+    role = _match_role(match, request.user)
+    if reported == "draw":
+        match.result = "draw"
+    else:  # reporter-relative -> board-relative
+        won = reported == "win"
+        match.result = "p1" if (role == "p1") == won else "p2"
     match.report_status = "reported"
     match.reported_by = request.user
     match.save()
@@ -412,12 +415,12 @@ def override_match(request, match_id):
         return _err("경기를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     if match.round.tournament.host_id != request.user.id:
         return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
-    try:
-        score1, score2 = int(request.data.get("score1")), int(request.data.get("score2"))
-    except (TypeError, ValueError):
-        return _err("점수가 올바르지 않습니다.")
-    match.score1, match.score2 = score1, score2
-    match.result = "p1" if score1 > score2 else "p2" if score2 > score1 else "draw"
+    result = request.data.get("result")
+    if result not in ("p1", "p2", "draw"):
+        return _err("result는 p1/p2/draw 중 하나여야 합니다.")
+    if result == "draw" and match.round.tournament.format == "single_elim":
+        return _err("엘리미네이션에서는 무승부가 허용되지 않습니다.")
+    match.result = result
     match.report_status = "confirmed"
     match.reported_by = request.user
     match.save()

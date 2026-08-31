@@ -51,12 +51,12 @@ class TournamentApiTestBase(TestCase):
         tournament.refresh_from_db()
         return resp
 
-    def confirm_match(self, match, players, score1=2, score2=1):
-        """Report as entrant1's user, confirm as entrant2's user."""
+    def confirm_match(self, match, players, result="win"):
+        """Report as entrant1's user (win/lose/draw from their view), confirm as entrant2's user."""
         by_user = {u.id: c for u, c in players}
         c1 = by_user[match.entrant1.user_id]
         c2 = by_user[match.entrant2.user_id]
-        r = c1.post(f"/api/tournaments/matches/{match.id}/report/", {"score1": score1, "score2": score2}, format="json")
+        r = c1.post(f"/api/tournaments/matches/{match.id}/report/", {"result": result}, format="json")
         assert r.status_code == 200, r.content
         r = c2.post(f"/api/tournaments/matches/{match.id}/confirm/")
         assert r.status_code == 200, r.content
@@ -179,13 +179,13 @@ class ReportFlowTest(TournamentApiTestBase):
 
     def test_stranger_cannot_report(self):
         c = _auth(_user("stranger"))
-        resp = c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"score1": 2, "score2": 0}, format="json")
+        resp = c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "win"}, format="json")
         self.assertEqual(resp.status_code, 403)
 
     def test_report_then_opponent_confirms(self):
         u1c = dict((u.id, c) for u, c in self.players)[self.match.entrant1.user_id]
         u2c = dict((u.id, c) for u, c in self.players)[self.match.entrant2.user_id]
-        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"score1": 2, "score2": 1}, format="json")
+        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "win"}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.match.refresh_from_db()
         self.assertEqual(self.match.report_status, "reported")
@@ -199,11 +199,11 @@ class ReportFlowTest(TournamentApiTestBase):
     def test_dispute_and_host_override(self):
         u1c = dict((u.id, c) for u, c in self.players)[self.match.entrant1.user_id]
         u2c = dict((u.id, c) for u, c in self.players)[self.match.entrant2.user_id]
-        u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"score1": 2, "score2": 0}, format="json")
+        u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "win"}, format="json")
         self.assertEqual(u2c.post(f"/api/tournaments/matches/{self.match.id}/dispute/").status_code, 200)
         self.match.refresh_from_db()
         self.assertEqual(self.match.report_status, "disputed")
-        resp = self.client.post(f"/api/tournaments/matches/{self.match.id}/override/", {"score1": 0, "score2": 2}, format="json")
+        resp = self.client.post(f"/api/tournaments/matches/{self.match.id}/override/", {"result": "p2"}, format="json")
         self.assertEqual(resp.status_code, 200)
         self.match.refresh_from_db()
         self.assertEqual(self.match.report_status, "confirmed")
@@ -211,8 +211,27 @@ class ReportFlowTest(TournamentApiTestBase):
 
     def test_override_is_host_only(self):
         u1c = dict((u.id, c) for u, c in self.players)[self.match.entrant1.user_id]
-        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/override/", {"score1": 2, "score2": 0}, format="json")
+        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/override/", {"result": "p1"}, format="json")
         self.assertEqual(resp.status_code, 403)
+
+    def test_report_from_entrant2_perspective(self):
+        u2c = dict((u.id, c) for u, c in self.players)[self.match.entrant2.user_id]
+        resp = u2c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "win"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.result, "p2")   # reporter-relative mapping
+
+    def test_swiss_allows_draw(self):
+        u1c = dict((u.id, c) for u, c in self.players)[self.match.entrant1.user_id]
+        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "draw"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.result, "draw")
+
+    def test_invalid_result_value_rejected(self):
+        u1c = dict((u.id, c) for u, c in self.players)[self.match.entrant1.user_id]
+        resp = u1c.post(f"/api/tournaments/matches/{self.match.id}/report/", {"result": "2-1"}, format="json")
+        self.assertEqual(resp.status_code, 400)
 
     def test_single_elim_rejects_draw_report(self):
         t2 = Tournament.objects.get(id=self.create(name="엘림", format="single_elim").json()["id"])
@@ -220,7 +239,7 @@ class ReportFlowTest(TournamentApiTestBase):
         self.start(t2)
         m = Match.objects.get(round__tournament=t2)
         c = dict((u.id, c) for u, c in players)[m.entrant1.user_id]
-        resp = c.post(f"/api/tournaments/matches/{m.id}/report/", {"score1": 1, "score2": 1}, format="json")
+        resp = c.post(f"/api/tournaments/matches/{m.id}/report/", {"result": "draw"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
 
@@ -296,7 +315,7 @@ class StandingsAndCompleteTest(TournamentApiTestBase):
         players = self.make_players(t, 3)
         self.start(t)
         real = Match.objects.get(round__tournament=t, entrant2__isnull=False)
-        self.confirm_match(real, players, score1=2, score2=0)
+        self.confirm_match(real, players)
         standings = APIClient().get(f"/api/tournaments/{t.id}/standings/").json()
         self.assertEqual(len(standings), 3)
         top = standings[0]

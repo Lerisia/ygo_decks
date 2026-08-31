@@ -91,8 +91,6 @@ class Match(models.Model):
     entrant1 = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="matches_as_p1")
     entrant2 = models.ForeignKey(Entrant, null=True, blank=True, on_delete=models.CASCADE, related_name="matches_as_p2")  # None = bye
     bracket_pos = models.PositiveIntegerField(default=0)  # single-elim advancement order
-    score1 = models.PositiveIntegerField(default=0)
-    score2 = models.PositiveIntegerField(default=0)
     result = models.CharField(max_length=6, choices=RESULT_CHOICES, null=True, blank=True)
     report_status = models.CharField(max_length=10, choices=REPORT_STATUS_CHOICES, default="pending")
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
