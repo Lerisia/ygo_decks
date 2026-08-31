@@ -483,3 +483,142 @@ def chat(request, tournament_id):
         return _err("내용은 1~500자여야 합니다.")
     msg = ChatMessage.objects.create(tournament=t, user=request.user, content=content)
     return Response(ChatMessageSerializer(msg).data, status=status.HTTP_201_CREATED)
+
+
+# --- Deck submission ------------------------------------------------------
+
+import os
+import tempfile
+
+from django.conf import settings
+
+from .models import DeckSubmission, DeckSubmissionCard
+from .scanning import scan_deck_image
+from .serializers import DeckSubmissionSerializer
+
+MAX_COPIES = 3
+
+
+def _deck_response(submission):
+    return Response(DeckSubmissionSerializer(submission).data)
+
+
+def _own_active_entrant(t, user):
+    return t.entrants.filter(user=user).exclude(status__in=["withdrawn", "kicked"]).first()
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def deck_submission(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+
+    if request.method == "GET":
+        entrant_id = request.GET.get("entrant_id")
+        if entrant_id:
+            entrant = t.entrants.filter(id=entrant_id).first()
+            if not entrant:
+                return _err("참가자를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+            is_owner = entrant.user_id == request.user.id
+            if not (is_owner or t.host_id == request.user.id):
+                return _err("열람 권한이 없습니다.", status.HTTP_403_FORBIDDEN)
+        else:
+            entrant = _own_active_entrant(t, request.user)
+            if not entrant:
+                return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+        submission = DeckSubmission.objects.filter(entrant=entrant).first()
+        if not submission:
+            return _err("제출된 덱이 없습니다.", status.HTTP_404_NOT_FOUND)
+        return _deck_response(submission)
+
+    # POST: upload screenshot and (re)scan
+    entrant = _own_active_entrant(t, request.user)
+    if not entrant:
+        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if t.status != "recruiting":
+        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    image = request.FILES.get("image")
+    if not image:
+        return _err("image 파일이 필요합니다.")
+
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant)
+    submission.image = image
+    submission.save()
+
+    with tempfile.TemporaryDirectory(prefix="tourdeck_") as work_dir:
+        image_path = os.path.join(work_dir, "input.jpg")
+        with open(image_path, "wb") as f:
+            for chunk in submission.image.chunks():
+                f.write(chunk)
+        detections = scan_deck_image(image_path, work_dir)
+
+    from card.models import Card
+    counts = {}
+    best_conf = {}
+    unmatched = 0
+    cards_by_scanner_id = {c.card_id: c for c in Card.objects.filter(card_id__in=[d[0] for d in detections])}
+    for scanner_id, confidence in detections:
+        card = cards_by_scanner_id.get(scanner_id)
+        if card is None:
+            unmatched += 1
+            continue
+        counts[card.id] = min(counts.get(card.id, 0) + 1, MAX_COPIES)
+        best_conf[card.id] = max(best_conf.get(card.id, 0.0), float(confidence))
+
+    submission.cards.all().delete()
+    DeckSubmissionCard.objects.bulk_create([
+        DeckSubmissionCard(submission=submission, card_id=cid, quantity=qty,
+                           confidence=best_conf[cid], source="auto")
+        for cid, qty in counts.items()
+    ])
+    submission.unmatched_count = unmatched
+    submission.save(update_fields=["unmatched_count"])
+    return _deck_response(submission)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def deck_card_add(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    entrant = _own_active_entrant(t, request.user)
+    if not entrant:
+        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if t.status != "recruiting":
+        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    try:
+        quantity = int(request.data.get("quantity", 1))
+    except (TypeError, ValueError):
+        return _err("quantity가 올바르지 않습니다.")
+    if not (1 <= quantity <= MAX_COPIES):
+        return _err(f"수량은 1~{MAX_COPIES}장이어야 합니다.")
+    from card.models import Card
+    card = Card.objects.filter(id=request.data.get("card_id")).first()
+    if not card:
+        return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant)
+    DeckSubmissionCard.objects.update_or_create(
+        submission=submission, card=card,
+        defaults={"quantity": quantity, "confidence": None, "source": "manual"},
+    )
+    return _deck_response(submission)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def deck_card_remove(request, tournament_id, row_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    entrant = _own_active_entrant(t, request.user)
+    if not entrant:
+        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if t.status != "recruiting":
+        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    row = DeckSubmissionCard.objects.filter(id=row_id, submission__entrant=entrant).first()
+    if not row:
+        return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    row.delete()
+    return Response({"ok": True})

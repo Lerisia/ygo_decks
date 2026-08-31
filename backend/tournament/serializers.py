@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from avatar.serializers import BorderSerializer, CardIconSerializer
 from avatar.views import _resolve_default_border, _resolve_default_icon
-from .models import Announcement, ChatMessage, Entrant, Match, Round, Tournament
+from .models import DeckSubmission, DeckSubmissionCard, Announcement, ChatMessage, Entrant, Match, Round, Tournament
 
 
 def user_avatar(user):
@@ -111,3 +111,36 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     def get_border(self, obj):
         return user_avatar(obj.user)[1]
+
+
+class DeckSubmissionCardSerializer(serializers.ModelSerializer):
+    card = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DeckSubmissionCard
+        fields = ["id", "card", "quantity", "confidence", "source"]
+
+    def get_card(self, obj):
+        illust = getattr(obj.card, "card_illust", None)
+        return {
+            "id": obj.card_id,
+            "name": obj.card.korean_name or obj.card.name,
+            "image_url": illust.url if illust else None,
+        }
+
+
+class DeckSubmissionSerializer(serializers.ModelSerializer):
+    cards = serializers.SerializerMethodField()
+    locked = serializers.SerializerMethodField()
+    entrant_id = serializers.IntegerField(source="entrant.id", read_only=True)
+
+    class Meta:
+        model = DeckSubmission
+        fields = ["id", "entrant_id", "image", "unmatched_count", "cards", "locked", "updated_at"]
+
+    def get_cards(self, obj):
+        qs = obj.cards.select_related("card").order_by("card__korean_name", "card__name")
+        return DeckSubmissionCardSerializer(qs, many=True).data
+
+    def get_locked(self, obj):
+        return obj.entrant.tournament.status != "recruiting"

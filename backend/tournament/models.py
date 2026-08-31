@@ -126,3 +126,30 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"[{self.tournament.name}] {self.user.username}: {self.content[:30]}"
+
+
+class DeckSubmission(models.Model):
+    """One deck per entrant: screenshot in, scanned card list out, manual fixes on top."""
+    entrant = models.OneToOneField(Entrant, on_delete=models.CASCADE, related_name="deck_submission")
+    image = models.ImageField(upload_to="tournament_decks/", null=True, blank=True)
+    unmatched_count = models.PositiveIntegerField(default=0)  # scanner crops with no DB match
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Deck of {self.entrant}"
+
+
+class DeckSubmissionCard(models.Model):
+    SOURCE_CHOICES = [("auto", "스캐너"), ("manual", "수동")]
+
+    submission = models.ForeignKey(DeckSubmission, on_delete=models.CASCADE, related_name="cards")
+    card = models.ForeignKey("card.Card", on_delete=models.CASCADE, related_name="+")
+    quantity = models.PositiveIntegerField(default=1)
+    confidence = models.FloatField(null=True, blank=True)  # null for manual entries
+    source = models.CharField(max_length=8, choices=SOURCE_CHOICES, default="manual")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["submission", "card"], name="unique_submission_card"),
+        ]
