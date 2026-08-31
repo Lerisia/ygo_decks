@@ -574,6 +574,32 @@ class CoverImageTest(TournamentApiTestBase):
         c = _auth(_user("nothost"))
         self.assertEqual(c.post(f"/api/tournaments/{t.id}/cover/", {"cover_image": self._png()}, format="multipart").status_code, 403)
 
+    def test_cover_rejects_oversized_file(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        big = SimpleUploadedFile("big.png", b"x" * (5 * 1024 * 1024 + 1), content_type="image/png")
+        resp = self.client.post(f"/api/tournaments/{t.id}/cover/", {"cover_image": big}, format="multipart")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("5MB", resp.json()["error"])
+
+    def test_cover_rejects_non_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        fake = SimpleUploadedFile("evil.png", b"not an image at all", content_type="image/png")
+        self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/cover/", {"cover_image": fake}, format="multipart").status_code, 400)
+
+    def test_create_rejects_oversized_cover(self):
+        from datetime import timedelta
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.utils import timezone
+        big = SimpleUploadedFile("big.png", b"x" * (5 * 1024 * 1024 + 1), content_type="image/png")
+        resp = self.client.post("/api/tournaments/create/", {
+            "name": "큰커버컵", "format": "swiss", "capacity": 8,
+            "event_date": (timezone.now() + timedelta(days=1)).isoformat(),
+            "cover_image": big,
+        }, format="multipart")
+        self.assertEqual(resp.status_code, 400)
+
     def test_capacity_bounds(self):
         self.assertEqual(self.create(capacity=1).status_code, 400)
         self.assertEqual(self.create(capacity=129).status_code, 400)

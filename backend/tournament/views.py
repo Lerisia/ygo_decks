@@ -74,6 +74,22 @@ def _swiss_round_limit(tournament, entrant_count):
     return max(1, math.ceil(math.log2(max(2, entrant_count))))
 
 
+
+MAX_COVER_BYTES = 5 * 1024 * 1024
+
+
+def _cover_error(image):
+    if image.size > MAX_COVER_BYTES:
+        return "배너 이미지는 5MB 이하여야 합니다."
+    from PIL import Image as PILImage
+    try:
+        PILImage.open(image).verify()
+        image.seek(0)
+    except Exception:
+        return "이미지 파일이 아닙니다."
+    return None
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_tournament(request):
@@ -89,6 +105,11 @@ def create_tournament(request):
         return _err("capacity가 올바르지 않습니다.")
     if not (2 <= capacity <= 128):
         return _err("정원은 2~128명이어야 합니다.")
+    cover = request.FILES.get("cover_image")
+    if cover:
+        cover_err = _cover_error(cover)
+        if cover_err:
+            return _err(cover_err)
     format_config = data.get("format_config") or {}
     if isinstance(format_config, str):  # multipart submits JSON as a string
         import json
@@ -642,6 +663,9 @@ def update_cover(request, tournament_id):
         return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
     image = request.FILES.get("cover_image")
     if image:
+        cover_err = _cover_error(image)
+        if cover_err:
+            return _err(cover_err)
         t.cover_image = image
     else:
         t.cover_image = None

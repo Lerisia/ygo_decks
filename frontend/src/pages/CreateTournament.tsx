@@ -86,7 +86,16 @@ function CreateTournament() {
             type="file"
             accept="image/*"
             className="block w-full text-sm text-gray-600 dark:text-gray-300"
-            onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              if (f && f.size > 5 * 1024 * 1024) {
+                setError("배너 이미지는 5MB 이하여야 합니다.");
+                e.target.value = "";
+                return;
+              }
+              setError("");
+              setCoverFile(f);
+            }}
           />
           {coverFile && (
             <img src={URL.createObjectURL(coverFile)} alt="배너 미리보기" className="mt-2 w-full h-40 object-cover rounded-lg" />

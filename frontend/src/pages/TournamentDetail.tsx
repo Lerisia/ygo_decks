@@ -149,7 +149,13 @@ function TournamentDetailPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) act(() => updateCover(t.id, f));
+                if (!f) return;
+                if (f.size > 5 * 1024 * 1024) {
+                  setError("배너 이미지는 5MB 이하여야 합니다.");
+                  e.target.value = "";
+                  return;
+                }
+                act(() => updateCover(t.id, f));
               }}
             />
           </label>
