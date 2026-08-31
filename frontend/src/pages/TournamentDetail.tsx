@@ -11,7 +11,7 @@ import {
 } from "@/api/tournamentApi";
 
 const FORMAT_LABELS: Record<string, string> = {
-  single_elim: "싱글 엘리미네이션", swiss: "스위스", round_robin: "라운드 로빈",
+  single_elim: "싱글 엘리미네이션", swiss: "스위스", round_robin: "라운드 로빈", swiss_cut: "스위스+결선",
 };
 const STATUS_LABELS: Record<string, string> = {
   recruiting: "모집 중", ongoing: "진행 중", completed: "종료",
