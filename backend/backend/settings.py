@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'deck',
     'card',
     'question',
+    'tournament',
     'userstatistics',
     'user',
     'tool',
