@@ -9,7 +9,7 @@ function CreateTournament() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("swiss");
-  const [capacity, setCapacity] = useState(8);
+  const [capacity, setCapacity] = useState("8");
   const [eventDate, setEventDate] = useState("");
   const [swissRounds, setSwissRounds] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -22,6 +22,11 @@ function CreateTournament() {
       setError("대회 이름과 일시는 필수입니다.");
       return;
     }
+    const cap = Number(capacity);
+    if (!Number.isInteger(cap) || cap < 2 || cap > 128) {
+      setError("정원은 2~128명 사이여야 합니다.");
+      return;
+    }
     setBusy(true);
     try {
       const config: Record<string, unknown> = {};
@@ -30,7 +35,7 @@ function CreateTournament() {
         name: name.trim(),
         description: description.trim(),
         format,
-        capacity,
+        capacity: cap,
         event_date: new Date(eventDate).toISOString(),
         format_config: config,
       }, coverFile);
@@ -66,7 +71,7 @@ function CreateTournament() {
           </div>
           <div>
             <label className="block text-sm font-semibold mb-1">정원 *</label>
-            <input type="number" min={2} max={128} className={inputCls} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
+            <input type="number" min={2} max={128} className={inputCls} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
           </div>
         </div>
         {format === "swiss" && (
