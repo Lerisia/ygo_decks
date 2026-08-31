@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "@/components/Avatar";
+import BracketTree from "@/components/tournament/BracketTree";
 import { getUserInfo } from "@/api/accountApi";
 import {
   checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
@@ -302,6 +303,23 @@ function TournamentDetailPage() {
         <section>
           {t.rounds.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">대회가 시작되면 대진표가 생성됩니다.</p>
+          ) : t.format === "single_elim" ? (
+            <div>
+              <BracketTree rounds={t.rounds} />
+              {(() => {
+                const current = t.rounds.find((r) => r.number === t.current_round);
+                const open = current ? current.matches.filter((m) => m.report_status !== "confirmed") : [];
+                if (open.length === 0) return null;
+                return (
+                  <div className="mt-4">
+                    <h3 className="font-semibold mb-2">진행 중인 경기</h3>
+                    <div className="space-y-2">
+                      {[...open].sort((a, b) => a.bracket_pos - b.bracket_pos).map(renderMatch)}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           ) : (
             <div className="space-y-4">
               {[...t.rounds].sort((a, b) => b.number - a.number).map((r) => (
