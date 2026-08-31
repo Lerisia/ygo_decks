@@ -210,7 +210,7 @@ export default function DatabasePage() {
                 className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
               >
                 <option value="">전체</option>
-                {["최상위권", "중상위권", "중위권", "중하위권", "최하위권"].map((o) => (
+                {["최상위권", "상위권", "중상위권", "중하위권", "하위권", "최하위권"].map((o) => (
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>

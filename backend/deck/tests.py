@@ -259,7 +259,7 @@ class RecommendStepTest(TestCase):
         self.assertEqual(data["candidate_count"], 3)
         self.assertFalse(data["resolved"])
         av = data["available"]
-        self.assertEqual(av["s"], [0, 1, 2, 3, 4])   # tiers 0,1,3 -> bands (0,1),(1,2),(3,4)
+        self.assertEqual(av["s"], [0, 1, 2, 3])   # tiers 0,1,3 -> bands (0,1),(1,2),(2,3)
         self.assertEqual(av["d"], [0, 1, 2])
         self.assertEqual(av["t"], [0, 2])
         self.assertEqual(av["a"], [0, 1, 2])
@@ -290,8 +290,9 @@ class RecommendStepTest(TestCase):
     def test_strength_band_overlap(self):
         self.assertEqual(self.step("s=1")["candidate_count"], 2)   # band 1 = tiers 0,1 -> D1, D2
         self.assertEqual(self.step("s=0")["candidate_count"], 1)   # tier 0 only -> D1
-        data = self.step("s=2")                                     # tiers 1,2 -> D2
-        self.assertTrue(data["resolved"])
+        self.assertEqual(self.step("s=2")["candidate_count"], 2)   # band 2 = tiers 1,2,3 -> D2, D3
+        self.assertEqual(self.step("s=3")["candidate_count"], 1)   # band 3 = tiers 2,3,4 -> D3
+        self.assertEqual(self.step("s=4")["candidate_count"], 0)   # band 4 = tiers 4,5 -> none
 
     def test_summoning_method_and_tags(self):
         self.assertTrue(self.step("sm=6")["resolved"])
@@ -339,3 +340,46 @@ class RecommendStepTest(TestCase):
             resp = self.client.get("/api/deck/result", {"key": long_key})
             self.assertEqual(resp.status_code, 200, key)
             self.assertEqual(resp.json()["name"], expected, key)
+
+
+class SixTierStrengthTest(TestCase):
+    """Spec for the 2026-08-31 5->6 tier split (중위권 -> 중상위권/중하위권)."""
+
+    def test_tier_labels(self):
+        from .models import Deck
+        labels = [label for _, label in Deck._meta.get_field("strength").choices]
+        self.assertEqual(labels, ["최상위권", "상위권", "중상위권", "중하위권", "하위권", "최하위권"])
+
+    def test_band_to_tiers(self):
+        from .models import STRENGTH_BAND_TO_TIERS
+        self.assertEqual(STRENGTH_BAND_TO_TIERS, {
+            0: (0,),
+            1: (0, 1),
+            2: (1, 2, 3),
+            3: (2, 3, 4),
+            4: (4, 5),
+        })
+
+    def test_tier_to_bands_covers_all_six_tiers(self):
+        from .models import STRENGTH_TIER_TO_BANDS
+        self.assertEqual(set(STRENGTH_TIER_TO_BANDS), set(range(6)))
+        self.assertEqual(STRENGTH_TIER_TO_BANDS[2], (2, 3))   # new 중상위권 (old 중위권 slot)
+        self.assertEqual(STRENGTH_TIER_TO_BANDS[3], (2, 3))   # new 중하위권 (old 중위권 slot)
+        self.assertEqual(STRENGTH_TIER_TO_BANDS[5], (4,))
+
+    def test_migration_remap_semantics(self):
+        import importlib
+        mig = importlib.import_module("deck.migrations.0010_remap_strength_to_six_tiers")
+        d_top = _create_deck(name="탑", strength=0)
+        d_upper = _create_deck(name="중상", strength=1)
+        d_mid = _create_deck(name="중위", strength=2)
+        d_lower = _create_deck(name="중하", strength=3)
+        d_bottom = _create_deck(name="최하", strength=4)
+        from django.apps import apps
+        mig.forwards(apps, None)
+        refresh = lambda d: Deck.objects.get(id=d.id).strength
+        self.assertEqual(refresh(d_top), 0)      # 최상위권 -> 최상위권
+        self.assertEqual(refresh(d_upper), 1)    # 중상위권 -> 상위권
+        self.assertEqual(refresh(d_mid), 2)      # 중위권 -> 중상위권
+        self.assertEqual(refresh(d_lower), 4)    # 중하위권 -> 하위권
+        self.assertEqual(refresh(d_bottom), 5)   # 최하위권 -> 최하위권

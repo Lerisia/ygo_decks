@@ -19,10 +19,10 @@ def get_questions(request):
             "question": "원하는 덱 파워는?",
             "options": [
                 {"value": 0, "label": "최상위권의 강력한 티어 덱"},
-                {"value": 1, "label": "최상위~중상위권의 준수한 덱"},
-                {"value": 2, "label": "중상위~중위권의 무난한 덱"},
-                {"value": 3, "label": "중위~중하위권의 개성있는 덱"},
-                {"value": 4, "label": "중하위~최하위권의 도전적인 덱"},
+                {"value": 1, "label": "최상위~상위권의 준수한 덱"},
+                {"value": 2, "label": "상위~중하위권의 무난한 덱"},
+                {"value": 3, "label": "중상위~하위권의 개성있는 덱"},
+                {"value": 4, "label": "하위~최하위권의 도전적인 덱"},
                 {"value": None, "label": "상관 없음"}
             ]
         },
