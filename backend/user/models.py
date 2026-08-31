@@ -14,6 +14,7 @@ class User(AbstractUser):
 
     owned_decks = models.ManyToManyField(Deck, blank=True, related_name="owners")
     
+    md_uid = models.CharField(max_length=9, blank=True, default="", verbose_name="마스터듀얼 UID")
     use_custom_lookup = models.BooleanField(default=False)
     pending_deletion = models.BooleanField(default=False)
     deletion_requested_at = models.DateTimeField(null=True, blank=True)

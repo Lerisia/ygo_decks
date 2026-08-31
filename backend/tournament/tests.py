@@ -320,82 +320,54 @@ class StandingsAndCompleteTest(TournamentApiTestBase):
 
 
 class MdUidTest(TournamentApiTestBase):
-    def _tournament(self):
-        return Tournament.objects.get(id=self.create().json()["id"])
-
-    def test_register_requires_uid_when_profile_has_none(self):
-        t = self._tournament()
-        c = _auth(_user("nouid"))
-        resp = c.post(f"/api/tournaments/{t.id}/register/")
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("UID", resp.json()["error"])
-
-    def test_register_with_uid_saves_to_profile_and_entrant(self):
-        t = self._tournament()
-        u = _user("newuid")
-        c = _auth(u)
-        resp = c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "123456789"}, format="json")
-        self.assertEqual(resp.status_code, 200, resp.content)
-        u.refresh_from_db()
-        self.assertEqual(u.md_uid, "123456789")
-        self.assertEqual(Entrant.objects.get(tournament=t, user=u).md_uid, "123456789")
-
-    def test_register_uses_saved_profile_uid(self):
-        t = self._tournament()
-        u = _user("saved")
-        u.md_uid = "987654321"
-        u.save()
-        c = _auth(u)
-        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/").status_code, 200)
-        self.assertEqual(Entrant.objects.get(tournament=t, user=u).md_uid, "987654321")
-
-    def test_invalid_uid_rejected(self):
-        t = self._tournament()
-        c = _auth(_user("bad"))
-        for bad in ("12345678", "1234567890", "12345678a", "123 45678"):
-            resp = c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": bad}, format="json")
-            self.assertEqual(resp.status_code, 400, bad)
-
-    def test_uid_visible_only_to_participants_and_host(self):
-        t = self._tournament()
-        u = _user("visible")
-        _auth(u).post(f"/api/tournaments/{t.id}/register/", {"md_uid": "111222333"}, format="json")
-
-        anon = APIClient().get(f"/api/tournaments/{t.id}/").json()
-        self.assertIsNone(anon["entrants"][0]["md_uid"])
-
-        outsider = _auth(_user("outsider")).get(f"/api/tournaments/{t.id}/").json()
-        self.assertIsNone(outsider["entrants"][0]["md_uid"])
-
-        as_host = self.client.get(f"/api/tournaments/{t.id}/").json()
-        self.assertEqual(as_host["entrants"][0]["md_uid"], "111222333")
-
-        as_participant = _auth(u).get(f"/api/tournaments/{t.id}/").json()
-        self.assertEqual(as_participant["entrants"][0]["md_uid"], "111222333")
-
-
-class MdUidTest(TournamentApiTestBase):
     def _register(self, client, t, **payload):
         return client.post(f"/api/tournaments/{t.id}/register/", payload, format="json")
 
+    def _tournament(self):
+        return Tournament.objects.get(id=self.create().json()["id"])
+
     def test_register_requires_nine_digit_uid(self):
-        t = Tournament.objects.get(id=self.create().json()["id"])
+        t = self._tournament()
         c = _auth(_user("uid1"))
         self.assertEqual(self._register(c, t).status_code, 400)                      # missing
         self.assertEqual(self._register(c, t, md_uid="12345").status_code, 400)      # too short
+        self.assertEqual(self._register(c, t, md_uid="1234567890").status_code, 400) # too long
         self.assertEqual(self._register(c, t, md_uid="12345678a").status_code, 400)  # non-digit
         self.assertEqual(self._register(c, t, md_uid="123456789").status_code, 200)
         self.assertEqual(Entrant.objects.get(tournament=t).md_uid, "123456789")
 
-    def test_uid_visible_in_detail_and_kept_on_rejoin(self):
-        t = Tournament.objects.get(id=self.create().json()["id"])
-        c = _auth(_user("uid2"))
+    def test_uid_saved_to_profile_and_reused(self):
+        t = self._tournament()
+        u = _user("uid2")
+        c = _auth(u)
+        self.assertEqual(self._register(c, t, md_uid="123123123").status_code, 200)
+        u.refresh_from_db()
+        self.assertEqual(u.md_uid, "123123123")
+        t2 = Tournament.objects.get(id=self.create(name="2회").json()["id"])
+        self.assertEqual(self._register(c, t2).status_code, 200)  # no uid needed the second time
+        self.assertEqual(Entrant.objects.get(tournament=t2).md_uid, "123123123")
+
+    def test_uid_kept_on_rejoin_and_updatable(self):
+        t = self._tournament()
+        c = _auth(_user("uid3"))
         self._register(c, t, md_uid="987654321")
-        detail = APIClient().get(f"/api/tournaments/{t.id}/").json()
-        self.assertEqual(detail["entrants"][0]["md_uid"], "987654321")
         c.post(f"/api/tournaments/{t.id}/withdraw/")
         self.assertEqual(self._register(c, t, md_uid="111222333").status_code, 200)
         self.assertEqual(Entrant.objects.get(tournament=t).md_uid, "111222333")
+
+    def test_uid_visible_only_to_participants_and_host(self):
+        t = self._tournament()
+        u = _user("uid4")
+        _auth(u).post(f"/api/tournaments/{t.id}/register/", {"md_uid": "111222333"}, format="json")
+
+        anon = APIClient().get(f"/api/tournaments/{t.id}/").json()
+        self.assertIsNone(anon["entrants"][0]["md_uid"])
+        outsider = _auth(_user("uid5")).get(f"/api/tournaments/{t.id}/").json()
+        self.assertIsNone(outsider["entrants"][0]["md_uid"])
+        as_host = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(as_host["entrants"][0]["md_uid"], "111222333")
+        as_participant = _auth(u).get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(as_participant["entrants"][0]["md_uid"], "111222333")
 
 
 class AnnouncementTest(TournamentApiTestBase):

@@ -21,10 +21,15 @@ def user_avatar(user):
 class EntrantSerializer(serializers.ModelSerializer):
     avatar_icon = serializers.SerializerMethodField()
     border = serializers.SerializerMethodField()
+    md_uid = serializers.SerializerMethodField()
 
     class Meta:
         model = Entrant
         fields = ["id", "user", "name", "status", "md_uid", "seed", "avatar_icon", "border"]
+
+    def get_md_uid(self, obj):
+        # In-game friend code — shown to the host and fellow participants only.
+        return obj.md_uid if self.context.get("show_uid") else None
 
     def get_avatar_icon(self, obj):
         return user_avatar(obj.user)[0]
@@ -77,7 +82,7 @@ class TournamentDetailSerializer(TournamentListSerializer):
 
     def get_entrants(self, obj):
         qs = obj.entrants.exclude(status="kicked").select_related("user__avatar_icon", "user__equipped_border").order_by("created_at")
-        return EntrantSerializer(qs, many=True).data
+        return EntrantSerializer(qs, many=True, context=self.context).data
 
     def get_host_avatar_icon(self, obj):
         return user_avatar(obj.host)[0]

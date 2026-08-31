@@ -116,7 +116,10 @@ def tournament_detail(request, tournament_id):
         t = Tournament.objects.get(id=tournament_id)
     except Tournament.DoesNotExist:
         return _err("대회를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
-    return Response(TournamentDetailSerializer(t).data)
+    show_uid = request.user.is_authenticated and (
+        t.host_id == request.user.id or t.entrants.filter(user=request.user).exists()
+    )
+    return Response(TournamentDetailSerializer(t, context={"show_uid": show_uid}).data)
 
 
 def _get_tournament(tournament_id):
@@ -140,16 +143,19 @@ def register(request, tournament_id):
         return _err("이미 신청했습니다." if existing.status != "kicked" else "참가할 수 없는 대회입니다.")
     if active.count() >= t.capacity:
         return _err("정원이 가득 찼습니다.")
-    md_uid = str(request.data.get("md_uid") or "").strip()
-    if not re.fullmatch(r"\d{9}", md_uid):
+    md_uid = str(request.data.get("md_uid") or "").strip() or request.user.md_uid
+    if not re.fullmatch(r"\d{9}", md_uid or ""):
         return _err("마스터 듀얼 UID(숫자 9자리)를 입력해 주세요.")
+    if md_uid != request.user.md_uid:  # remember for the next tournament
+        request.user.md_uid = md_uid
+        request.user.save(update_fields=["md_uid"])
     if existing:  # withdrawn -> re-register on the same row
         existing.status = "registered"
         existing.md_uid = md_uid
         existing.save(update_fields=["status", "md_uid"])
-        return Response(EntrantSerializer(existing).data)
+        return Response(EntrantSerializer(existing, context={"show_uid": True}).data)
     entrant = Entrant.objects.create(tournament=t, user=request.user, name=request.user.username, md_uid=md_uid)
-    return Response(EntrantSerializer(entrant).data)
+    return Response(EntrantSerializer(entrant, context={"show_uid": True}).data)
 
 
 def _own_entrant(t, user):
@@ -236,7 +242,7 @@ def start_tournament(request, tournament_id):
     t.status = "ongoing"
     t.current_round = 1
     t.save(update_fields=["status", "current_round", "format_config"])
-    return Response(TournamentDetailSerializer(t).data)
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
 
 
 @api_view(["POST"])
@@ -290,7 +296,7 @@ def next_round(request, tournament_id):
     _create_matches(rnd, pairs)
     t.current_round += 1
     t.save(update_fields=["current_round"])
-    return Response(TournamentDetailSerializer(t).data)
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
 
 
 @api_view(["POST"])
@@ -308,7 +314,7 @@ def complete_tournament(request, tournament_id):
     Round.objects.filter(tournament=t, number=t.current_round).update(status="completed")
     t.status = "completed"
     t.save(update_fields=["status"])
-    return Response(TournamentDetailSerializer(t).data)
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
 
 
 @api_view(["GET"])
