@@ -8,8 +8,11 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from . import engine
-from .models import Entrant, Match, Round, Tournament
-from .serializers import (EntrantSerializer, TournamentDetailSerializer,
+import re
+
+from .models import Announcement, ChatMessage, Entrant, Match, Round, Tournament
+from .serializers import (AnnouncementSerializer, ChatMessageSerializer,
+                          EntrantSerializer, TournamentDetailSerializer,
                           TournamentListSerializer, user_avatar)
 
 VALID_FORMATS = {f for f, _ in Tournament.FORMAT_CHOICES}
@@ -137,11 +140,15 @@ def register(request, tournament_id):
         return _err("이미 신청했습니다." if existing.status != "kicked" else "참가할 수 없는 대회입니다.")
     if active.count() >= t.capacity:
         return _err("정원이 가득 찼습니다.")
+    md_uid = str(request.data.get("md_uid") or "").strip()
+    if not re.fullmatch(r"\d{9}", md_uid):
+        return _err("마스터 듀얼 UID(숫자 9자리)를 입력해 주세요.")
     if existing:  # withdrawn -> re-register on the same row
         existing.status = "registered"
-        existing.save(update_fields=["status"])
+        existing.md_uid = md_uid
+        existing.save(update_fields=["status", "md_uid"])
         return Response(EntrantSerializer(existing).data)
-    entrant = Entrant.objects.create(tournament=t, user=request.user, name=request.user.username)
+    entrant = Entrant.objects.create(tournament=t, user=request.user, name=request.user.username, md_uid=md_uid)
     return Response(EntrantSerializer(entrant).data)
 
 
@@ -409,3 +416,61 @@ def override_match(request, match_id):
     match.reported_by = request.user
     match.save()
     return Response({"ok": True, "result": match.result})
+
+
+@api_view(["GET", "POST"])
+def announcements(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if request.method == "GET":
+        return Response(AnnouncementSerializer(t.announcements.all(), many=True).data)
+    if not request.user.is_authenticated:
+        return _err("로그인이 필요합니다.", status.HTTP_401_UNAUTHORIZED)
+    if t.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    content = str(request.data.get("content") or "").strip()
+    if not content:
+        return _err("내용을 입력해 주세요.")
+    ann = Announcement.objects.create(
+        tournament=t, author=request.user, content=content,
+        pinned=bool(request.data.get("pinned", False)),
+    )
+    return Response(AnnouncementSerializer(ann).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_announcement(request, announcement_id):
+    try:
+        ann = Announcement.objects.select_related("tournament").get(id=announcement_id)
+    except Announcement.DoesNotExist:
+        return _err("공지를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    if ann.tournament.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    ann.delete()
+    return Response({"ok": True})
+
+
+@api_view(["GET", "POST"])
+def chat(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if request.method == "GET":
+        qs = t.chat_messages.select_related("user__avatar_icon", "user__equipped_border")
+        after = request.GET.get("after")
+        if after and str(after).isdigit():
+            qs = qs.filter(id__gt=int(after))
+        return Response(ChatMessageSerializer(qs[:200], many=True).data)
+    if not request.user.is_authenticated:
+        return _err("로그인이 필요합니다.", status.HTTP_401_UNAUTHORIZED)
+    is_host = t.host_id == request.user.id
+    entrant = t.entrants.filter(user=request.user).exclude(status="kicked").first()
+    if not is_host and entrant is None:
+        return _err("참가자만 채팅할 수 있습니다.", status.HTTP_403_FORBIDDEN)
+    content = str(request.data.get("content") or "").strip()
+    if not content or len(content) > 500:
+        return _err("내용은 1~500자여야 합니다.")
+    msg = ChatMessage.objects.create(tournament=t, user=request.user, content=content)
+    return Response(ChatMessageSerializer(msg).data, status=status.HTTP_201_CREATED)

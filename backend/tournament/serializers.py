@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from avatar.serializers import BorderSerializer, CardIconSerializer
 from avatar.views import _resolve_default_border, _resolve_default_icon
-from .models import Entrant, Match, Round, Tournament
+from .models import Announcement, ChatMessage, Entrant, Match, Round, Tournament
 
 
 def user_avatar(user):
@@ -24,7 +24,7 @@ class EntrantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Entrant
-        fields = ["id", "user", "name", "status", "seed", "avatar_icon", "border"]
+        fields = ["id", "user", "name", "status", "md_uid", "seed", "avatar_icon", "border"]
 
     def get_avatar_icon(self, obj):
         return user_avatar(obj.user)[0]
@@ -84,3 +84,25 @@ class TournamentDetailSerializer(TournamentListSerializer):
 
     def get_host_border(self, obj):
         return user_avatar(obj.host)[1]
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = ["id", "content", "pinned", "created_at"]
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    avatar_icon = serializers.SerializerMethodField()
+    border = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatMessage
+        fields = ["id", "user", "username", "content", "created_at", "avatar_icon", "border"]
+
+    def get_avatar_icon(self, obj):
+        return user_avatar(obj.user)[0]
+
+    def get_border(self, obj):
+        return user_avatar(obj.user)[1]

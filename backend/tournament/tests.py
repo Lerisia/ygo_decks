@@ -39,7 +39,7 @@ class TournamentApiTestBase(TestCase):
         for i in range(n):
             u = _user(f"p{i}_{tournament.id}")
             c = _auth(u)
-            assert c.post(f"/api/tournaments/{tournament.id}/register/").status_code == 200
+            assert c.post(f"/api/tournaments/{tournament.id}/register/", {"md_uid": f"{100000000 + i}"}, format="json").status_code == 200
             if check_in:
                 assert c.post(f"/api/tournaments/{tournament.id}/check-in/").status_code == 200
             players.append((u, c))
@@ -93,20 +93,20 @@ class CreateAndRecruitTest(TournamentApiTestBase):
         u1, c1 = _user("r1"), None
         c1 = _auth(u1)
         self.assertEqual(APIClient().post(f"/api/tournaments/{t.id}/register/").status_code, 401)
-        self.assertEqual(c1.post(f"/api/tournaments/{t.id}/register/").status_code, 200)
-        self.assertEqual(c1.post(f"/api/tournaments/{t.id}/register/").status_code, 400)  # duplicate
+        self.assertEqual(c1.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "111111111"}, format="json").status_code, 200)
+        self.assertEqual(c1.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "111111111"}, format="json").status_code, 400)  # duplicate
         c2 = _auth(_user("r2"))
-        self.assertEqual(c2.post(f"/api/tournaments/{t.id}/register/").status_code, 200)
+        self.assertEqual(c2.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "222222222"}, format="json").status_code, 200)
         c3 = _auth(_user("r3"))
-        self.assertEqual(c3.post(f"/api/tournaments/{t.id}/register/").status_code, 400)  # full
+        self.assertEqual(c3.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "333333333"}, format="json").status_code, 400)  # full
 
     def test_withdraw_and_rejoin(self):
         t = Tournament.objects.get(id=self.create().json()["id"])
         c = _auth(_user("w1"))
-        c.post(f"/api/tournaments/{t.id}/register/")
+        c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "444444444"}, format="json")
         self.assertEqual(c.post(f"/api/tournaments/{t.id}/withdraw/").status_code, 200)
         self.assertEqual(Entrant.objects.get(tournament=t).status, "withdrawn")
-        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/").status_code, 200)  # rejoin reuses row
+        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "444444444"}, format="json").status_code, 200)  # rejoin reuses row
         self.assertEqual(Entrant.objects.get(tournament=t).status, "registered")
 
     def test_check_in_requires_registration(self):
@@ -154,7 +154,7 @@ class StartTest(TournamentApiTestBase):
         t = Tournament.objects.get(id=self.create(format="swiss").json()["id"])
         self.make_players(t, 4)
         lazy = _auth(_user("lazy"))
-        lazy.post(f"/api/tournaments/{t.id}/register/")  # never checks in
+        lazy.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "555555555"}, format="json")  # never checks in
         self.start(t)
         seated = {m.entrant1_id for m in Match.objects.filter(round__tournament=t)} | \
                  {m.entrant2_id for m in Match.objects.filter(round__tournament=t)}
@@ -165,7 +165,7 @@ class StartTest(TournamentApiTestBase):
         self.make_players(t, 2)
         self.start(t)
         c = _auth(_user("late"))
-        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/").status_code, 400)
+        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "666666666"}, format="json").status_code, 400)
 
 
 class ReportFlowTest(TournamentApiTestBase):
@@ -317,3 +317,154 @@ class StandingsAndCompleteTest(TournamentApiTestBase):
         self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/complete/").status_code, 200)
         t.refresh_from_db()
         self.assertEqual(t.status, "completed")
+
+
+class MdUidTest(TournamentApiTestBase):
+    def _tournament(self):
+        return Tournament.objects.get(id=self.create().json()["id"])
+
+    def test_register_requires_uid_when_profile_has_none(self):
+        t = self._tournament()
+        c = _auth(_user("nouid"))
+        resp = c.post(f"/api/tournaments/{t.id}/register/")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("UID", resp.json()["error"])
+
+    def test_register_with_uid_saves_to_profile_and_entrant(self):
+        t = self._tournament()
+        u = _user("newuid")
+        c = _auth(u)
+        resp = c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "123456789"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        u.refresh_from_db()
+        self.assertEqual(u.md_uid, "123456789")
+        self.assertEqual(Entrant.objects.get(tournament=t, user=u).md_uid, "123456789")
+
+    def test_register_uses_saved_profile_uid(self):
+        t = self._tournament()
+        u = _user("saved")
+        u.md_uid = "987654321"
+        u.save()
+        c = _auth(u)
+        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/").status_code, 200)
+        self.assertEqual(Entrant.objects.get(tournament=t, user=u).md_uid, "987654321")
+
+    def test_invalid_uid_rejected(self):
+        t = self._tournament()
+        c = _auth(_user("bad"))
+        for bad in ("12345678", "1234567890", "12345678a", "123 45678"):
+            resp = c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": bad}, format="json")
+            self.assertEqual(resp.status_code, 400, bad)
+
+    def test_uid_visible_only_to_participants_and_host(self):
+        t = self._tournament()
+        u = _user("visible")
+        _auth(u).post(f"/api/tournaments/{t.id}/register/", {"md_uid": "111222333"}, format="json")
+
+        anon = APIClient().get(f"/api/tournaments/{t.id}/").json()
+        self.assertIsNone(anon["entrants"][0]["md_uid"])
+
+        outsider = _auth(_user("outsider")).get(f"/api/tournaments/{t.id}/").json()
+        self.assertIsNone(outsider["entrants"][0]["md_uid"])
+
+        as_host = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(as_host["entrants"][0]["md_uid"], "111222333")
+
+        as_participant = _auth(u).get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(as_participant["entrants"][0]["md_uid"], "111222333")
+
+
+class MdUidTest(TournamentApiTestBase):
+    def _register(self, client, t, **payload):
+        return client.post(f"/api/tournaments/{t.id}/register/", payload, format="json")
+
+    def test_register_requires_nine_digit_uid(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        c = _auth(_user("uid1"))
+        self.assertEqual(self._register(c, t).status_code, 400)                      # missing
+        self.assertEqual(self._register(c, t, md_uid="12345").status_code, 400)      # too short
+        self.assertEqual(self._register(c, t, md_uid="12345678a").status_code, 400)  # non-digit
+        self.assertEqual(self._register(c, t, md_uid="123456789").status_code, 200)
+        self.assertEqual(Entrant.objects.get(tournament=t).md_uid, "123456789")
+
+    def test_uid_visible_in_detail_and_kept_on_rejoin(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        c = _auth(_user("uid2"))
+        self._register(c, t, md_uid="987654321")
+        detail = APIClient().get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(detail["entrants"][0]["md_uid"], "987654321")
+        c.post(f"/api/tournaments/{t.id}/withdraw/")
+        self.assertEqual(self._register(c, t, md_uid="111222333").status_code, 200)
+        self.assertEqual(Entrant.objects.get(tournament=t).md_uid, "111222333")
+
+
+class AnnouncementTest(TournamentApiTestBase):
+    def setUp(self):
+        super().setUp()
+        self.t = Tournament.objects.get(id=self.create().json()["id"])
+
+    def test_host_only_can_post(self):
+        c = _auth(_user("annA"))
+        resp = c.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "hi"}, format="json")
+        self.assertEqual(resp.status_code, 403)
+        resp = self.client.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "1라운드 시작!"}, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+
+    def test_empty_content_rejected(self):
+        resp = self.client.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "  "}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_list_is_public_pinned_first(self):
+        self.client.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "일반"}, format="json")
+        self.client.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "중요", "pinned": True}, format="json")
+        rows = APIClient().get(f"/api/tournaments/{self.t.id}/announcements/").json()
+        self.assertEqual([r["content"] for r in rows], ["중요", "일반"])
+        self.assertTrue(rows[0]["pinned"])
+
+    def test_host_can_delete(self):
+        self.client.post(f"/api/tournaments/{self.t.id}/announcements/", {"content": "삭제될 공지"}, format="json")
+        ann_id = APIClient().get(f"/api/tournaments/{self.t.id}/announcements/").json()[0]["id"]
+        c = _auth(_user("annB"))
+        self.assertEqual(c.delete(f"/api/tournaments/announcements/{ann_id}/").status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/tournaments/announcements/{ann_id}/").status_code, 200)
+        self.assertEqual(APIClient().get(f"/api/tournaments/{self.t.id}/announcements/").json(), [])
+
+
+class ChatTest(TournamentApiTestBase):
+    def setUp(self):
+        super().setUp()
+        self.t = Tournament.objects.get(id=self.create().json()["id"])
+        self.u1 = _user("chat1")
+        self.c1 = _auth(self.u1)
+        self.c1.post(f"/api/tournaments/{self.t.id}/register/", {"md_uid": "123456789"}, format="json")
+
+    def post_chat(self, client, content="gg"):
+        return client.post(f"/api/tournaments/{self.t.id}/chat/", {"content": content}, format="json")
+
+    def test_entrant_and_host_can_chat(self):
+        self.assertEqual(self.post_chat(self.c1).status_code, 201)
+        self.assertEqual(self.post_chat(self.client, "주최자도 참여").status_code, 201)
+
+    def test_outsiders_cannot_chat(self):
+        self.assertEqual(self.post_chat(APIClient()).status_code, 401)
+        stranger = _auth(_user("chat2"))
+        self.assertEqual(self.post_chat(stranger).status_code, 403)
+
+    def test_kicked_entrant_cannot_chat(self):
+        entrant = Entrant.objects.get(tournament=self.t, user=self.u1)
+        self.client.post(f"/api/tournaments/{self.t.id}/kick/", {"entrant_id": entrant.id})
+        self.assertEqual(self.post_chat(self.c1).status_code, 403)
+
+    def test_empty_or_too_long_rejected(self):
+        self.assertEqual(self.post_chat(self.c1, "  ").status_code, 400)
+        self.assertEqual(self.post_chat(self.c1, "가" * 501).status_code, 400)
+
+    def test_list_public_with_incremental_polling(self):
+        for i in range(3):
+            self.post_chat(self.c1, f"msg{i}")
+        rows = APIClient().get(f"/api/tournaments/{self.t.id}/chat/").json()
+        self.assertEqual([r["content"] for r in rows], ["msg0", "msg1", "msg2"])
+        self.assertIn("avatar_icon", rows[0])
+        after = rows[0]["id"]
+        rows2 = APIClient().get(f"/api/tournaments/{self.t.id}/chat/", {"after": after}).json()
+        self.assertEqual([r["content"] for r in rows2], ["msg1", "msg2"])

@@ -47,6 +47,7 @@ class Entrant(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.CASCADE, related_name="tournament_entries")
     name = models.CharField(max_length=100)  # display snapshot; team name later
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="registered")
+    md_uid = models.CharField(max_length=9, blank=True, default="")  # Master Duel 9-digit UID
     seed = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -100,3 +101,30 @@ class Match(models.Model):
     def __str__(self):
         rival = self.entrant2.name if self.entrant2 else "(부전승)"
         return f"{self.round} {self.entrant1.name} vs {rival}"
+
+
+class Announcement(models.Model):
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="announcements")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    content = models.TextField()
+    pinned = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-pinned", "-created_at"]
+
+    def __str__(self):
+        return f"[{self.tournament.name}] {self.content[:30]}"
+
+
+class ChatMessage(models.Model):
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="chat_messages")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    content = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"[{self.tournament.name}] {self.user.username}: {self.content[:30]}"
