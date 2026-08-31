@@ -41,6 +41,17 @@
 |---|---|---|
 | `GET <id>/standings/` | 공개 | 순위표: `entrant_id, name, wins/draws/losses, points`(승3·무1), `buchholz`, 아바타. 승점→부흐홀츠→이름순 정렬 |
 
+## 덱 제출 (스캐너 + 수동 보정)
+
+| 메서드/경로 | 권한 | 설명 |
+|---|---|---|
+| `POST <id>/deck/` | 참가자 | 덱 스크린샷 업로드(multipart `image`) → 스캐너가 카드 자동 인식·목록화(수량 합산, 카드당 최대 3장, 매 업로드마다 목록 교체). 응답에 `cards[]`(카드·수량·신뢰도·auto/manual)와 `unmatched_count`(미인식 수) |
+| `GET <id>/deck/` | 본인·주최자 | 내 제출 덱 조회. 주최자는 `?entrant_id=`로 타인 것 열람. 미제출 시 404. `locked`(모집 종료 후 true) 포함 |
+| `POST <id>/deck/cards/` | 참가자 | 수동 추가/수정. body: `card_id`(카드 검색 API의 id), `quantity`(1~3). 같은 카드는 수량 갱신 |
+| `DELETE <id>/deck/cards/<row_id>/` | 참가자 | 카드 한 줄 삭제 |
+
+덱 수정은 **모집 중에만** 가능 — 대회 시작과 동시에 잠깁니다. 카드 검색은 기존 `/api/search/?q=` 재사용.
+
 ## 공지·채팅
 
 | 메서드/경로 | 권한 | 설명 |
@@ -52,4 +63,4 @@
 | `POST <id>/chat/` | 참가자·주최자 | 메시지 전송. body: `content` (추방자 불가, 길이 제한) |
 
 ## 미구현 (2차)
-덱 제출·잠금, 우승 보상(exclusive 테두리 발급), 조별+결선/더블 엘림/스위스 컷, 팀전(Entrant 추상화로 대비됨), 디스코드 알림.
+우승 보상(exclusive 테두리 발급), 조별+결선/더블 엘림/스위스 컷, 팀전(Entrant 추상화로 대비됨), 디스코드 알림.
