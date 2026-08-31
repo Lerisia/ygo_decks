@@ -262,12 +262,12 @@ function TournamentDetailPage() {
           ) : (
             <table className="w-full table-fixed text-sm">
               <thead>
-                <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400">
-                  <th className="text-left px-2 pb-1 w-[10%]">#</th>
-                  <th className="text-left px-2 pb-1 w-[42%]">참가자</th>
-                  <th className="text-right px-2 pb-1 w-[18%]">승-무-패</th>
-                  <th className="text-right px-2 pb-1 w-[14%]">승점</th>
-                  <th className="text-right px-2 pb-1 w-[16%]">부흐홀츠</th>
+                <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">
+                  <th className="text-left px-1.5 sm:px-2 pb-1 w-[8%]">#</th>
+                  <th className="text-left px-1.5 sm:px-2 pb-1 w-[40%]">참가자</th>
+                  <th className="text-right px-1.5 sm:px-2 pb-1 w-[20%]">승-무-패</th>
+                  <th className="text-right px-1.5 sm:px-2 pb-1 w-[13%]">승점</th>
+                  <th className="text-right px-1.5 sm:px-2 pb-1 w-[19%]">부흐홀츠</th>
                 </tr>
               </thead>
               <tbody>
