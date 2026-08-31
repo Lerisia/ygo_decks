@@ -46,9 +46,10 @@ export default function BracketTree({ rounds }: { rounds: RoundItem[] }) {
   while (2 ** total < r1.length * 2) total += 1;
   // columns: existing rounds first, placeholders for the rest of the tree
   const columns: Slot[][] = [];
+  const firstNumber = sorted[0].number;  // knockout may start after swiss rounds
   for (let k = 1; k <= total; k++) {
     const expected = Math.max(1, r1.length / 2 ** (k - 1));
-    const round = sorted.find((r) => r.number === k);
+    const round = sorted.find((r) => r.number === firstNumber + k - 1);
     if (round) {
       const ms = [...round.matches].sort((a, b) => a.bracket_pos - b.bracket_pos);
       columns.push(Array.from({ length: expected }, (_, i) => ({ match: ms[i] })));
