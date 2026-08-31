@@ -12,6 +12,7 @@ function CreateTournament() {
   const [capacity, setCapacity] = useState("8");
   const [eventDate, setEventDate] = useState("");
   const [swissRounds, setSwissRounds] = useState("");
+  const [cut, setCut] = useState(4);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,7 +31,8 @@ function CreateTournament() {
     setBusy(true);
     try {
       const config: Record<string, unknown> = {};
-      if (format === "swiss" && swissRounds.trim()) config.swiss_rounds = Number(swissRounds);
+      if ((format === "swiss" || format === "swiss_cut") && swissRounds.trim()) config.swiss_rounds = Number(swissRounds);
+      if (format === "swiss_cut") config.cut = cut;
       const t = await createTournament({
         name: name.trim(),
         description: description.trim(),
@@ -67,6 +69,7 @@ function CreateTournament() {
               <option value="swiss">스위스</option>
               <option value="single_elim">싱글 엘리미네이션</option>
               <option value="round_robin">라운드 로빈</option>
+              <option value="swiss_cut">스위스 + 결선 토너먼트</option>
             </select>
           </div>
           <div>
@@ -74,10 +77,18 @@ function CreateTournament() {
             <input type="number" min={2} max={128} className={inputCls} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
           </div>
         </div>
-        {format === "swiss" && (
+        {(format === "swiss" || format === "swiss_cut") && (
           <div>
             <label className="block text-sm font-semibold mb-1">스위스 라운드 수 (비우면 자동)</label>
             <input type="number" min={1} max={20} className={inputCls} value={swissRounds} onChange={(e) => setSwissRounds(e.target.value)} placeholder="예: 4" />
+          </div>
+        )}
+        {format === "swiss_cut" && (
+          <div>
+            <label className="block text-sm font-semibold mb-1">결선 진출 인원</label>
+            <select className={inputCls} value={cut} onChange={(e) => setCut(Number(e.target.value))}>
+              {[2, 4, 8, 16].map((n) => <option key={n} value={n}>{n}명</option>)}
+            </select>
           </div>
         )}
         <div>

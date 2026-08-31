@@ -98,7 +98,7 @@ function TournamentDetailPage() {
     return `${winner?.name} 승`;
   };
 
-  const renderMatch = (m: MatchItem) => {
+  const renderMatch = (m: MatchItem, allowDraw: boolean) => {
     const role = myRole(m);
     const confirmed = m.report_status === "confirmed";
     const canRespond = role && m.report_status === "reported" && m.reported_by !== myUserId;
@@ -121,7 +121,7 @@ function TournamentDetailPage() {
               <>
                 <button className={blueBtn} onClick={() => act(() => reportMatch(m.id, "win"))}>승리 보고</button>
                 <button className={grayBtn} onClick={() => act(() => reportMatch(m.id, "lose"))}>패배 보고</button>
-                {t.format !== "single_elim" && (
+                {allowDraw && (
                   <button className={grayBtn} onClick={() => act(() => reportMatch(m.id, "draw"))}>무승부</button>
                 )}
               </>
@@ -299,43 +299,56 @@ function TournamentDetailPage() {
         </section>
       )}
 
-      {tab === "bracket" && (
-        <section>
-          {t.rounds.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">대회가 시작되면 대진표가 생성됩니다.</p>
-          ) : t.format === "single_elim" ? (
-            <div>
-              <BracketTree rounds={t.rounds} />
-              {(() => {
-                const current = t.rounds.find((r) => r.number === t.current_round);
-                const open = current ? current.matches.filter((m) => m.report_status !== "confirmed") : [];
-                if (open.length === 0) return null;
-                return (
-                  <div className="mt-4">
-                    <h3 className="font-semibold mb-2">진행 중인 경기</h3>
+      {tab === "bracket" && (() => {
+        if (t.rounds.length === 0) {
+          return (
+            <section>
+              <p className="text-sm text-gray-500 dark:text-gray-400">대회가 시작되면 대진표가 생성됩니다.</p>
+            </section>
+          );
+        }
+        const knockoutRounds = t.rounds.filter((r) => r.stage === "knockout");
+        const listRounds = t.rounds.filter((r) => r.stage !== "knockout");
+        const current = t.rounds.find((r) => r.number === t.current_round);
+        const openKnockout = current && current.stage === "knockout"
+          ? current.matches.filter((m) => m.report_status !== "confirmed")
+          : [];
+        return (
+          <section>
+            {knockoutRounds.length > 0 && (
+              <div className="mb-5">
+                {listRounds.length > 0 && (
+                  <h3 className="font-semibold mb-2">결선 토너먼트</h3>
+                )}
+                <BracketTree rounds={knockoutRounds} />
+              </div>
+            )}
+            {openKnockout.length > 0 && (
+              <div className="mb-5">
+                <h3 className="font-semibold mb-2">진행 중인 경기</h3>
+                <div className="space-y-2">
+                  {[...openKnockout].sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => renderMatch(m, false))}
+                </div>
+              </div>
+            )}
+            {listRounds.length > 0 && (
+              <div className="space-y-4">
+                {[...listRounds].sort((a, b) => b.number - a.number).map((r) => (
+                  <div key={r.number}>
+                    <h3 className="font-semibold mb-2">
+                      {knockoutRounds.length > 0 ? "스위스 " : ""}{r.number}라운드{" "}
+                      {r.status === "completed" ? <span className="text-xs text-gray-400">(완료)</span> : null}
+                    </h3>
                     <div className="space-y-2">
-                      {[...open].sort((a, b) => a.bracket_pos - b.bracket_pos).map(renderMatch)}
+                      {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => renderMatch(m, r.stage !== "knockout"))}
                     </div>
                   </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {[...t.rounds].sort((a, b) => b.number - a.number).map((r) => (
-                <div key={r.number}>
-                  <h3 className="font-semibold mb-2">
-                    {r.number}라운드 {r.status === "completed" ? <span className="text-xs text-gray-400">(완료)</span> : null}
-                  </h3>
-                  <div className="space-y-2">
-                    {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map(renderMatch)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
     </div>
   );

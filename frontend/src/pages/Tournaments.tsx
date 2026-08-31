@@ -6,6 +6,7 @@ const FORMAT_LABELS: Record<string, string> = {
   single_elim: "싱글 엘리미네이션",
   swiss: "스위스",
   round_robin: "라운드 로빈",
+  swiss_cut: "스위스+결선",
 };
 
 const STATUS_BADGES: Record<string, { label: string; cls: string }> = {

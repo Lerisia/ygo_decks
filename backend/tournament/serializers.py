@@ -53,7 +53,7 @@ class RoundSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Round
-        fields = ["number", "status", "matches"]
+        fields = ["number", "status", "stage", "matches"]
 
 
 class TournamentListSerializer(serializers.ModelSerializer):

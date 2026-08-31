@@ -67,6 +67,15 @@ def _create_matches(rnd, pairs):
         )
 
 
+def _ranked_entrant_ids(stats):
+    """Standings order: points desc, buchholz desc, name."""
+    points = {eid: st["points"] for eid, st in stats.items()}
+    opponents = {eid: st["opponents"] for eid, st in stats.items()}
+    buch = engine.buchholz_scores(points, opponents)
+    return [eid for eid, _ in sorted(
+        stats.items(), key=lambda kv: (-kv[1]["points"], -buch.get(kv[0], 0), kv[1]["entrant"].name))]
+
+
 def _swiss_round_limit(tournament, entrant_count):
     configured = tournament.format_config.get("swiss_rounds")
     if configured:
@@ -260,13 +269,15 @@ def start_tournament(request, tournament_id):
         schedule = engine.round_robin_schedule(ids, rng)
         t.format_config = {**t.format_config, "rr_schedule": [[list(p) for p in rnd] for rnd in schedule]}
         pairs = [(a, b) for a, b in schedule[0]]
-        pairs = [(a, b) for a, b in pairs]
+        stage = "league"
     elif t.format == "single_elim":
         pairs = engine.single_elim_round1(ids, rng)
-    else:  # swiss
+        stage = "knockout"
+    else:  # swiss / swiss_cut both open with a swiss round
         pairs = engine.swiss_pairs([(i, 0) for i in ids], history=set(), prior_byes=set(), rng=rng)
+        stage = "swiss"
 
-    rnd = Round.objects.create(tournament=t, number=1, random_seed=seed)
+    rnd = Round.objects.create(tournament=t, number=1, random_seed=seed, stage=stage)
     _create_matches(rnd, pairs)
     t.status = "ongoing"
     t.current_round = 1
@@ -293,22 +304,15 @@ def next_round(request, tournament_id):
     seed = secrets.token_hex(8)
     rng = engine.make_rng(seed)
 
-    if t.format == "single_elim":
+    def knockout_advance():
         winners = []
         for m in current.matches.order_by("bracket_pos"):
             winners.append(m.entrant1_id if m.result in ("p1", "bye") else m.entrant2_id)
         if len(winners) < 2:
-            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
-        pairs = engine.pair_adjacent(winners)
-    elif t.format == "round_robin":
-        schedule = t.format_config.get("rr_schedule") or []
-        if t.current_round >= len(schedule):
-            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
-        pairs = [tuple(p) for p in schedule[t.current_round]]
-    else:  # swiss
-        limit = _swiss_round_limit(t, len(stats))
-        if t.current_round >= limit:
-            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+            return None
+        return engine.pair_adjacent(winners)
+
+    def swiss_pairs_next():
         history = set()
         prior_byes = set()
         for m in _tournament_matches(t):
@@ -316,12 +320,48 @@ def next_round(request, tournament_id):
                 history.add(frozenset((m.entrant1_id, m.entrant2_id)))
             else:
                 prior_byes.add(m.entrant1_id)
-        records = [(eid, s["points"]) for eid, s in stats.items()]
-        pairs = engine.swiss_pairs(records, history=history, prior_byes=prior_byes, rng=rng)
+        records = [(eid, st["points"]) for eid, st in stats.items()]
+        return engine.swiss_pairs(records, history=history, prior_byes=prior_byes, rng=rng)
+
+    if t.format == "single_elim":
+        pairs = knockout_advance()
+        if pairs is None:
+            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+        stage = "knockout"
+    elif t.format == "round_robin":
+        schedule = t.format_config.get("rr_schedule") or []
+        if t.current_round >= len(schedule):
+            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+        pairs = [tuple(p) for p in schedule[t.current_round]]
+        stage = "league"
+    elif t.format == "swiss_cut":
+        if current.stage == "knockout":
+            pairs = knockout_advance()
+            if pairs is None:
+                return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+            stage = "knockout"
+        elif t.current_round < _swiss_round_limit(t, len(stats)):
+            pairs = swiss_pairs_next()
+            stage = "swiss"
+        else:  # swiss stage done -> seed the cut
+            try:
+                cut = int(t.format_config.get("cut", 4))
+            except (TypeError, ValueError):
+                cut = 4
+            ranked = _ranked_entrant_ids(stats)[:max(2, cut)]
+            if len(ranked) < 2:
+                return _err("결선을 진행할 참가자가 부족합니다.")
+            pairs = engine.seeded_bracket(ranked)
+            stage = "knockout"
+    else:  # swiss
+        if t.current_round >= _swiss_round_limit(t, len(stats)):
+            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+        pairs = swiss_pairs_next()
+        stage = "swiss"
 
     current.status = "completed"
     current.save(update_fields=["status"])
-    rnd = Round.objects.create(tournament=t, number=t.current_round + 1, random_seed=seed)
+    rnd = Round.objects.create(tournament=t, number=t.current_round + 1, random_seed=seed, stage=stage)
     _create_matches(rnd, pairs)
     t.current_round += 1
     t.save(update_fields=["current_round"])
@@ -367,7 +407,20 @@ def standings(request, tournament_id):
             "buchholz": buchholz.get(eid, 0),
             "avatar_icon": icon, "border": border,
         })
-    rows.sort(key=lambda r: (-r["points"], -r["buchholz"], r["name"]))
+    tier = {}
+    knockout_rounds = list(Round.objects.filter(tournament=t, stage="knockout").order_by("number").prefetch_related("matches"))
+    if knockout_rounds:
+        last_number = knockout_rounds[-1].number
+        for r in knockout_rounds:
+            for m in r.matches.all():
+                for eid in (m.entrant1_id, m.entrant2_id):
+                    if eid:
+                        tier[eid] = last_number - r.number + 1  # deeper run -> lower tier
+        final = knockout_rounds[-1].matches.order_by("bracket_pos").first()
+        if final and final.report_status == "confirmed" and final.result in ("p1", "p2", "bye"):
+            champion = final.entrant1_id if final.result in ("p1", "bye") else final.entrant2_id
+            tier[champion] = 0
+    rows.sort(key=lambda r: (tier.get(r["entrant_id"], 10 ** 6), -r["points"], -r["buchholz"], r["name"]))
     return Response(rows)
 
 
@@ -393,8 +446,8 @@ def report_match(request, match_id):
     reported = request.data.get("result")
     if reported not in ("win", "lose", "draw"):
         return _err("result는 win/lose/draw 중 하나여야 합니다.")
-    if reported == "draw" and match.round.tournament.format == "single_elim":
-        return _err("엘리미네이션에서는 무승부가 허용되지 않습니다.")
+    if reported == "draw" and match.round.stage == "knockout":
+        return _err("결선 토너먼트에서는 무승부가 허용되지 않습니다.")
     role = _match_role(match, request.user)
     if reported == "draw":
         match.result = "draw"
@@ -447,8 +500,8 @@ def override_match(request, match_id):
     result = request.data.get("result")
     if result not in ("p1", "p2", "draw"):
         return _err("result는 p1/p2/draw 중 하나여야 합니다.")
-    if result == "draw" and match.round.tournament.format == "single_elim":
-        return _err("엘리미네이션에서는 무승부가 허용되지 않습니다.")
+    if result == "draw" and match.round.stage == "knockout":
+        return _err("결선 토너먼트에서는 무승부가 허용되지 않습니다.")
     match.result = result
     match.report_status = "confirmed"
     match.reported_by = request.user

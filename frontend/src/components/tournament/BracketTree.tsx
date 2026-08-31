@@ -63,7 +63,10 @@ export default function BracketTree({ rounds }: { rounds: RoundItem[] }) {
         {columns.map((col, k) => (
           <div key={k} className="flex flex-col w-44 shrink-0">
             <div className="text-xs text-gray-400 mb-1 text-center">
-              {k === columns.length - 1 ? "결승" : `${k + 1}라운드`}
+              {(() => {
+                const size = 2 ** (columns.length - k);
+                return size === 2 ? "결승" : size === 4 ? "준결승" : `${size}강`;
+              })()}
             </div>
             <div className="flex flex-col flex-1">
               {col.map((slot, i) => (

@@ -21,7 +21,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-export type TournamentFormat = "single_elim" | "swiss" | "round_robin";
+export type TournamentFormat = "single_elim" | "swiss" | "round_robin" | "swiss_cut";
 export type TournamentStatus = "recruiting" | "ongoing" | "completed" | "cancelled";
 
 export type Entrant = {
@@ -45,7 +45,7 @@ export type MatchItem = {
   reported_by: number | null;
 };
 
-export type RoundItem = { number: number; status: "ongoing" | "completed"; matches: MatchItem[] };
+export type RoundItem = { number: number; status: "ongoing" | "completed"; stage: "swiss" | "knockout" | "league" | "main"; matches: MatchItem[] };
 
 export type TournamentListItem = {
   id: number;

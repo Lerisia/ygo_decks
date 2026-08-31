@@ -7,6 +7,7 @@ class Tournament(models.Model):
         ("single_elim", "싱글 엘리미네이션"),
         ("swiss", "스위스"),
         ("round_robin", "라운드 로빈"),
+        ("swiss_cut", "스위스 + 결선 토너먼트"),
     ]
     STATUS_CHOICES = [
         ("recruiting", "모집 중"),
@@ -62,9 +63,11 @@ class Entrant(models.Model):
 
 class Round(models.Model):
     STATUS_CHOICES = [("ongoing", "진행 중"), ("completed", "완료")]
+    STAGE_CHOICES = [("swiss", "스위스"), ("knockout", "결선"), ("league", "리그"), ("main", "기본")]
 
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="rounds")
     number = models.PositiveIntegerField()
+    stage = models.CharField(max_length=10, choices=STAGE_CHOICES, default="main")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ongoing")
     random_seed = models.CharField(max_length=64, blank=True, default="")  # reproduces the draw
     created_at = models.DateTimeField(auto_now_add=True)

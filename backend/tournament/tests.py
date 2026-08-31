@@ -604,3 +604,90 @@ class CoverImageTest(TournamentApiTestBase):
         self.assertEqual(self.create(capacity=1).status_code, 400)
         self.assertEqual(self.create(capacity=129).status_code, 400)
         self.assertEqual(self.create(name="최대", capacity=128).status_code, 201)
+
+
+class SwissCutTest(TournamentApiTestBase):
+    """스위스 예선 후 상위 컷 결선 토너먼트."""
+
+    def _make(self, n_players, swiss_rounds=1, cut=4):
+        resp = self.create(name="스컷", format="swiss_cut",
+                           format_config={"swiss_rounds": swiss_rounds, "cut": cut})
+        assert resp.status_code == 201, resp.content
+        t = Tournament.objects.get(id=resp.json()["id"])
+        players = self.make_players(t, n_players)
+        self.start(t)
+        return t, players
+
+    def _confirm_all(self, t, players, winner_picker=None):
+        rnd = Round.objects.get(tournament=t, number=t.current_round)
+        for m in rnd.matches.exclude(report_status="confirmed"):
+            result = winner_picker(m) if winner_picker else "win"
+            self.confirm_match(m, players, result=result)
+
+    def test_swiss_stage_then_seeded_cut(self):
+        t, players = self._make(5, swiss_rounds=1, cut=4)
+        r1 = Round.objects.get(tournament=t, number=1)
+        self.assertEqual(r1.stage, "swiss")
+        self._confirm_all(t, players)
+        resp = self.client.post(f"/api/tournaments/{t.id}/next-round/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        t.refresh_from_db()
+        r2 = Round.objects.get(tournament=t, number=2)
+        self.assertEqual(r2.stage, "knockout")
+        matches = list(r2.matches.order_by("bracket_pos"))
+        self.assertEqual(len(matches), 2)          # cut 4 -> two semifinals
+        # seeded: standings 1위 vs 4위, 2위 vs 3위 — 5th player is out
+        seated = {m.entrant1_id for m in matches} | {m.entrant2_id for m in matches if m.entrant2_id}
+        self.assertEqual(len(seated), 4)
+
+    def test_knockout_rejects_draw_but_swiss_allows(self):
+        t, players = self._make(4, swiss_rounds=1, cut=4)
+        rnd = Round.objects.get(tournament=t, number=1)
+        m = rnd.matches.first()
+        by_user = {u.id: c for u, c in players}
+        c1 = by_user[m.entrant1.user_id]
+        self.assertEqual(c1.post(f"/api/tournaments/matches/{m.id}/report/", {"result": "draw"}, format="json").status_code, 200)
+        # finish swiss with wins to reach knockout
+        by_user[m.entrant2.user_id].post(f"/api/tournaments/matches/{m.id}/confirm/")
+        self._confirm_all(t, players)
+        assert self.client.post(f"/api/tournaments/{t.id}/next-round/").status_code == 200
+        t.refresh_from_db()
+        km = Round.objects.get(tournament=t, number=2).matches.first()
+        ck = by_user[km.entrant1.user_id]
+        resp = ck.post(f"/api/tournaments/matches/{km.id}/report/", {"result": "draw"}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_full_run_and_champion_ranked_first(self):
+        t, players = self._make(4, swiss_rounds=1, cut=4)
+        self._confirm_all(t, players)                        # swiss: entrant1s win
+        assert self.client.post(f"/api/tournaments/{t.id}/next-round/").status_code == 200
+        t.refresh_from_db()
+        semis = list(Round.objects.get(tournament=t, number=2).matches.order_by("bracket_pos"))
+        # 4번 시드(스위스 0점) 쪽이 계속 이기게 해서 승점 역전 상황을 만든다
+        def underdog_wins(m):
+            return "lose"  # entrant1(높은 시드)이 짐 -> entrant2 승
+        for m in semis:
+            self.confirm_match(m, players, result="lose")
+        assert self.client.post(f"/api/tournaments/{t.id}/next-round/").status_code == 200
+        t.refresh_from_db()
+        final = Round.objects.get(tournament=t, number=3)
+        self.assertEqual(final.stage, "knockout")
+        fm = final.matches.get()
+        self.confirm_match(fm, players, result="win")        # entrant1이 우승
+        champion_id = fm.entrant1_id
+        assert self.client.post(f"/api/tournaments/{t.id}/complete/").status_code == 200
+        standings = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(standings[0]["entrant_id"], champion_id)   # 결선 결과가 승점보다 우선
+        self.assertEqual(standings[1]["entrant_id"], fm.entrant2_id)
+
+    def test_round_stage_serialized(self):
+        t, players = self._make(4, swiss_rounds=1, cut=4)
+        detail = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(detail["rounds"][0]["stage"], "swiss")
+
+    def test_single_elim_rounds_are_knockout_stage(self):
+        resp = self.create(name="엘림스테이지", format="single_elim")
+        t = Tournament.objects.get(id=resp.json()["id"])
+        self.make_players(t, 2)
+        self.start(t)
+        self.assertEqual(Round.objects.get(tournament=t, number=1).stage, "knockout")

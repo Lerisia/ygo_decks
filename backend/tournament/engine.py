@@ -111,3 +111,25 @@ def swiss_pairs(records, history, prior_byes, rng):
 def buchholz_scores(points, opponents):
     """Tiebreak: sum of each player's opponents' points."""
     return {pid: sum(points.get(o, 0) for o in opponents.get(pid, [])) for pid in points}
+
+
+def seeded_bracket(ordered_ids):
+    """Rank-ordered entrants (best first) -> first knockout round in classic
+    bracket order (1 vs N, so top seeds can only meet late). Non-power-of-two
+    fields pad with byes, which land on the top seeds."""
+    n = len(ordered_ids)
+    size = 1
+    while size < n:
+        size *= 2
+    order = [1] if size == 1 else [1, 2]
+    while len(order) < size:
+        m = len(order) * 2
+        order = [x for s in order for x in (s, m + 1 - s)]
+    slots = [ordered_ids[s - 1] if s <= n else None for s in order]
+    pairs = []
+    for i in range(0, size, 2):
+        a, b = slots[i], slots[i + 1]
+        if a is None:
+            a, b = b, None
+        pairs.append((a, b))
+    return pairs

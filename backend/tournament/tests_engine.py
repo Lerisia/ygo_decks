@@ -118,3 +118,24 @@ class BuchholzTest(SimpleTestCase):
         self.assertEqual(scores[1], 6)   # 3 + 3
         self.assertEqual(scores[2], 6)   # 6 + 0
         self.assertEqual(scores[4], 6)   # 3 + 3
+
+
+class SeededBracketTest(SimpleTestCase):
+    def test_four_seeds_pair_one_v_four(self):
+        from .engine import seeded_bracket
+        self.assertEqual(seeded_bracket([10, 20, 30, 40]), [(10, 40), (20, 30)])
+
+    def test_eight_seeds_standard_order(self):
+        from .engine import seeded_bracket
+        ids = [1, 2, 3, 4, 5, 6, 7, 8]
+        pairs = seeded_bracket(ids)
+        self.assertEqual(pairs, [(1, 8), (4, 5), (2, 7), (3, 6)])
+
+    def test_non_power_of_two_gives_top_seeds_byes(self):
+        from .engine import seeded_bracket
+        pairs = seeded_bracket([1, 2, 3, 4, 5, 6])   # bracket of 8: seeds 1,2 get byes
+        self.assertEqual(pairs, [(1, None), (4, 5), (2, None), (3, 6)])
+
+    def test_two_seeds_is_the_final(self):
+        from .engine import seeded_bracket
+        self.assertEqual(seeded_bracket([7, 9]), [(7, 9)])
