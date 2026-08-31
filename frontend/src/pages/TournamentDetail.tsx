@@ -41,6 +41,7 @@ function TournamentDetailPage() {
   const [t, setT] = useState<TDetail | null>(null);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [me, setMe] = useState<string | null>(null);
+  const [tab, setTab] = useState<"players" | "bracket" | null>(null);
   const [uidInput, setUidInput] = useState("");
   const [error, setError] = useState("");
 
@@ -57,6 +58,13 @@ function TournamentDetailPage() {
     }
   }, []);
   useEffect(() => {
+    if (t && tab === null) {
+      setTab(t.status === "ongoing" ? "bracket" : "players");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
+
+  useEffect(() => {
     if (t?.status !== "ongoing") return;
     const id = setInterval(refresh, 20000);
     return () => clearInterval(id);
@@ -68,6 +76,9 @@ function TournamentDetailPage() {
   const myEntrant = me !== null ? t.entrants.find((e) => e.name === me) : undefined;
   const myUserId = myEntrant?.user ?? null;
   const activeEntrants = t.entrants.filter((e) => e.status === "registered" || e.status === "checked_in");
+  const uidByEntrant = new Map(t.entrants.map((e) => [e.id, e.md_uid]));
+  const tabClass = (k: "players" | "bracket") =>
+    `px-4 py-2 font-semibold ${tab === k ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
 
   const act = async (fn: () => Promise<unknown>) => {
     setError("");
@@ -214,82 +225,98 @@ function TournamentDetailPage() {
         )}
       </div>
 
-      {/* 참가자 그리드 */}
-      <section className="mb-6">
-        <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+      {/* 탭: 참가자(=순위) / 대진표 */}
+      <div className="flex justify-center gap-4 mb-4 border-b dark:border-gray-700 pb-2">
+        <button onClick={() => setTab("players")} className={tabClass("players")}>
           참가자 {activeEntrants.length}/{t.capacity}
-        </h2>
-        {t.entrants.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">아직 참가자가 없습니다.</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {t.entrants.map((e) => (
-              <div key={e.id} className="flex items-center justify-between border dark:border-gray-700 rounded-lg px-2.5 py-2 bg-white dark:bg-gray-800">
-                <EntrantChip e={e} />
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  {e.md_uid && <span className="text-[11px] text-gray-400 font-mono">{e.md_uid}</span>}
-                  {isHost && t.status === "recruiting" && e.status !== "kicked" && e.status !== "withdrawn" && (
-                    <button className="text-xs text-red-500 hover:underline" onClick={() => act(() => kickEntrant(t.id, e.id))}>추방</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+        </button>
+        <button onClick={() => setTab("bracket")} className={tabClass("bracket")}>대진표</button>
+      </div>
 
-      {/* 순위표 */}
-      {t.status !== "recruiting" && standings.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">순위</h2>
-          <table className="w-full table-fixed text-sm">
-            <thead>
-              <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400">
-                <th className="text-left px-2 pb-1 w-[8%]">#</th>
-                <th className="text-left px-2 pb-1 w-[44%]">참가자</th>
-                <th className="text-right px-2 pb-1 w-[16%]">승-무-패</th>
-                <th className="text-right px-2 pb-1 w-[16%]">승점</th>
-                <th className="text-right px-2 pb-1 w-[16%]">부흐홀츠</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map((s, i) => (
-                <tr key={s.entrant_id} className="border-b dark:border-gray-700/60">
-                  <td className="px-2 py-1.5">{i < 3 && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Avatar icon={s.avatar_icon} border={s.border} size={28} />
-                      <span className="truncate">{s.name}</span>
-                    </div>
-                  </td>
-                  <td className="text-right px-2 py-1.5">{s.wins}-{s.draws}-{s.losses}</td>
-                  <td className="text-right px-2 py-1.5 font-semibold">{s.points}</td>
-                  <td className="text-right px-2 py-1.5">{s.buchholz}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {/* 라운드/대진 */}
-      {t.rounds.length > 0 && (
+      {tab === "players" && t.status === "recruiting" && (
         <section>
-          <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">대진표</h2>
-          <div className="space-y-4">
-            {[...t.rounds].sort((a, b) => b.number - a.number).map((r) => (
-              <div key={r.number}>
-                <h3 className="font-semibold mb-2">
-                  {r.number}라운드 {r.status === "completed" ? <span className="text-xs text-gray-400">(완료)</span> : null}
-                </h3>
-                <div className="space-y-2">
-                  {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map(renderMatch)}
+          {t.entrants.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">아직 참가자가 없습니다.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {t.entrants.map((e) => (
+                <div key={e.id} className="flex items-center justify-between border dark:border-gray-700 rounded-lg px-2.5 py-2 bg-white dark:bg-gray-800">
+                  <EntrantChip e={e} />
+                  <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    {e.md_uid && <span className="text-[11px] text-gray-400 font-mono">{e.md_uid}</span>}
+                    {isHost && e.status !== "kicked" && e.status !== "withdrawn" && (
+                      <button className="text-xs text-red-500 hover:underline" onClick={() => act(() => kickEntrant(t.id, e.id))}>추방</button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
+
+      {tab === "players" && t.status !== "recruiting" && (
+        <section>
+          {standings.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">순위 정보가 없습니다.</p>
+          ) : (
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                  <th className="text-left px-2 pb-1 w-[10%]">#</th>
+                  <th className="text-left px-2 pb-1 w-[42%]">참가자</th>
+                  <th className="text-right px-2 pb-1 w-[18%]">승-무-패</th>
+                  <th className="text-right px-2 pb-1 w-[14%]">승점</th>
+                  <th className="text-right px-2 pb-1 w-[16%]">부흐홀츠</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((row, i) => (
+                  <tr key={row.entrant_id} className="border-b dark:border-gray-700/60">
+                    <td className="px-2 py-1.5">{i < 3 && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar icon={row.avatar_icon} border={row.border} size={28} />
+                        <div className="min-w-0">
+                          <div className="truncate">{row.name}</div>
+                          {uidByEntrant.get(row.entrant_id) && (
+                            <div className="text-[11px] text-gray-400 font-mono">{uidByEntrant.get(row.entrant_id)}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-right px-2 py-1.5">{row.wins}-{row.draws}-{row.losses}</td>
+                    <td className="text-right px-2 py-1.5 font-semibold">{row.points}</td>
+                    <td className="text-right px-2 py-1.5">{row.buchholz}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+
+      {tab === "bracket" && (
+        <section>
+          {t.rounds.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">대회가 시작되면 대진표가 생성됩니다.</p>
+          ) : (
+            <div className="space-y-4">
+              {[...t.rounds].sort((a, b) => b.number - a.number).map((r) => (
+                <div key={r.number}>
+                  <h3 className="font-semibold mb-2">
+                    {r.number}라운드 {r.status === "completed" ? <span className="text-xs text-gray-400">(완료)</span> : null}
+                  </h3>
+                  <div className="space-y-2">
+                    {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map(renderMatch)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
     </div>
   );
 }
