@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandCompoundJamo, getInitials, isInitialsOnly, matchesInitials } from "./hangul";
+import { expandCompoundJamo, getInitials, isInitialsOnly, matchesDeckQuery, matchesInitials } from "./hangul";
 
 describe("expandCompoundJamo", () => {
   it("expands compound jamo into component consonants", () => {
@@ -38,5 +38,25 @@ describe("matchesInitials", () => {
   });
   it("matches aliases too", () => {
     expect(matchesInitials("ㅄㄷ", "라뷰린스", ["백설 던전"])).toBe(true);
+  });
+});
+
+describe("matchesDeckQuery", () => {
+  it("ignores spaces in both query and deck name", () => {
+    expect(matchesDeckQuery("하얀숲", "하얀 숲")).toBe(true);
+    expect(matchesDeckQuery("하얀 숲", "하얀 숲")).toBe(true);
+    expect(matchesDeckQuery("얀숲", "하얀 숲")).toBe(true);      // substring still works
+    expect(matchesDeckQuery("블랙매", "블랙 매지션")).toBe(true);
+    expect(matchesDeckQuery("하얀숲", "크샤트리라")).toBe(false);
+  });
+  it("ignores spaces in aliases too", () => {
+    expect(matchesDeckQuery("블랙페더", "BF", ["블랙 페더"])).toBe(true);
+  });
+  it("still supports chosung search", () => {
+    expect(matchesDeckQuery("ㅎㅅ", "하얀 숲")).toBe(true);
+    expect(matchesDeckQuery("ㅋㄾ", "킬러튠")).toBe(true);
+  });
+  it("is case-insensitive", () => {
+    expect(matchesDeckQuery("bf", "BF")).toBe(true);
   });
 });

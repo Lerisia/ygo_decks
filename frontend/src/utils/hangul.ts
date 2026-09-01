@@ -32,3 +32,17 @@ export const matchesInitials = (query: string, text: string, aliases: string[] =
   const q = expandCompoundJamo(query);
   return [text, ...aliases].some((t) => getInitials(t).startsWith(q));
 };
+
+
+const squash = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+
+/** Deck-select search: chosung when the query is bare consonants, otherwise a
+ *  space- and case-insensitive substring match over the name and aliases. */
+export const matchesDeckQuery = (query: string, label: string, aliases: string[] = []): boolean => {
+  const compact = squash(query);
+  if (!compact) return true;
+  if (isInitialsOnly(compact)) {
+    return matchesInitials(compact, label.toLowerCase(), aliases.map((a) => a.toLowerCase()));
+  }
+  return [label, ...aliases].some((t) => squash(t).includes(compact));
+};

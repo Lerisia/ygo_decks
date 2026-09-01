@@ -7,7 +7,7 @@ import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
 import { getNextRankState, RANK_OPTIONS, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
-import { isInitialsOnly, matchesInitials } from "@/utils/hangul";
+import { matchesDeckQuery } from "@/utils/hangul";
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
@@ -546,17 +546,8 @@ const RecordGroupDetailPage = () => {
 
   // Shared search for both deck selects: name/alias substring, or initials
   // (with compound jamo expanded) when the query is all consonants.
-  const deckFilterOption = (option: { label: string; data: OptionType }, input: string) => {
-    const lowered = input.toLowerCase();
-    const label = option.label.toLowerCase();
-    const aliases = Array.isArray(option.data.aliases) ? option.data.aliases.map((a) => a.toLowerCase()) : [];
-
-    if (isInitialsOnly(lowered)) {
-      return matchesInitials(lowered, label, aliases);
-    }
-
-    return label.includes(lowered) || aliases.some((alias) => alias.includes(lowered));
-  };
+  const deckFilterOption = (option: { label: string; data: OptionType }, input: string) =>
+    matchesDeckQuery(input, option.label, Array.isArray(option.data.aliases) ? option.data.aliases : []);
 
   const handleOpponentDeckChange = (selectedOption: OptionType | null) => {
     setNewMatch((prev) => ({
