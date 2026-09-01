@@ -53,7 +53,7 @@ describe("matchesDeckQuery", () => {
     expect(matchesDeckQuery("블랙페더", "BF", ["블랙 페더"])).toBe(true);
   });
   it("still supports chosung search", () => {
-    expect(matchesDeckQuery("ㅎㅅ", "하얀 숲")).toBe(true);
+    expect(matchesDeckQuery("ㅎㅇㅅ", "하얀 숲")).toBe(true);
     expect(matchesDeckQuery("ㅋㄾ", "킬러튠")).toBe(true);
   });
   it("is case-insensitive", () => {
