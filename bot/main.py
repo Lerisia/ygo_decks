@@ -31,6 +31,8 @@ ALLOWED_USER_IDS = {int(x.strip()) for x in os.environ.get("ALLOWED_USER_IDS", "
 PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", "/home/elyss/ygo_decks"))
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or "claude"
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "900"))  # 15 min
+# Model for the spawned claude process (e.g. "claude-opus-5"); empty = CLI default.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "").strip()
 # asyncio's default StreamReader limit is 64KB; a single stream-json event
 # (e.g. a large tool result) easily exceeds that and readline() then raises
 # "ValueError: Separator is not found, and chunk exceed the limit".
@@ -346,6 +348,8 @@ async def run_claude_streaming(
         "--verbose",
         "--permission-mode", "bypassPermissions",
     ]
+    if CLAUDE_MODEL:
+        args.extend(["--model", CLAUDE_MODEL])
     if resume_id:
         args.extend(["-r", resume_id])
 
