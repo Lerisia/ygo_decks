@@ -639,6 +639,7 @@ def deck_submission(request, tournament_id):
     counts = {}
     best_conf = {}
     unmatched = 0
+    detections = [(str(cid), float(conf)) for cid, conf in detections]
     cards_by_scanner_id = {c.card_id: c for c in Card.objects.filter(card_id__in=[d[0] for d in detections])}
     for scanner_id, confidence in detections:
         card = cards_by_scanner_id.get(scanner_id)

@@ -21,5 +21,7 @@ def scan_deck_image(image_path, work_dir):
     for fname in sorted(f for f in os.listdir(illust_dir) if f.startswith("illust")):
         with open(os.path.join(illust_dir, fname), "rb") as f:
             card_id, confidence = predict_card_from_bytes(f.read())
-        results.append((card_id, confidence))
+        # The classifier hands back numpy scalars; normalise so callers can
+        # key dicts / compare with the CharField card_id.
+        results.append((str(card_id), float(confidence)))
     return results
