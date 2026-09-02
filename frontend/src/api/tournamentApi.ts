@@ -128,3 +128,51 @@ export const confirmMatch = (matchId: number) => req<{ ok: boolean }>(`/matches/
 export const disputeMatch = (matchId: number) => req<{ ok: boolean }>(`/matches/${matchId}/dispute/`, { method: "POST", body: "{}" });
 export const overrideMatch = (matchId: number, result: "p1" | "p2" | "draw") =>
   req<{ ok: boolean }>(`/matches/${matchId}/override/`, { method: "POST", body: JSON.stringify({ result }) });
+
+
+// --- deck submission / announcements / chat ---------------------------------
+
+export type DeckCard = {
+  id: number;
+  card: { id: number; name: string; image_url: string | null };
+  quantity: number;
+  confidence: number | null;
+  source: "auto" | "manual";
+};
+export type DeckSubmission = {
+  id: number;
+  entrant_id: number;
+  image: string | null;
+  unmatched_count: number;
+  cards: DeckCard[];
+  locked: boolean;
+  updated_at: string;
+};
+export type Announcement = { id: number; content: string; pinned: boolean; created_at: string };
+export type ChatMessage = {
+  id: number; user: number; username: string; content: string; created_at: string;
+  avatar_icon: AvatarIcon | null; border: Border | null;
+};
+
+export const getDeck = (id: number, entrantId?: number) =>
+  req<DeckSubmission>(`/${id}/deck/${entrantId ? `?entrant_id=${entrantId}` : ""}`);
+export const uploadDeck = (id: number, file: File) => {
+  const form = new FormData();
+  form.append("image", file);
+  return req<DeckSubmission>(`/${id}/deck/`, { method: "POST", body: form });
+};
+export const addDeckCard = (id: number, cardId: number, quantity: number) =>
+  req<DeckSubmission>(`/${id}/deck/cards/`, { method: "POST", body: JSON.stringify({ card_id: cardId, quantity }) });
+export const removeDeckCard = (id: number, rowId: number) =>
+  req<{ ok: boolean }>(`/${id}/deck/cards/${rowId}/`, { method: "DELETE" });
+
+export const getAnnouncements = (id: number) => req<Announcement[]>(`/${id}/announcements/`);
+export const postAnnouncement = (id: number, content: string, pinned: boolean) =>
+  req<Announcement>(`/${id}/announcements/`, { method: "POST", body: JSON.stringify({ content, pinned }) });
+export const deleteAnnouncement = (announcementId: number) =>
+  req<{ ok: boolean }>(`/announcements/${announcementId}/`, { method: "DELETE" });
+
+export const getChat = (id: number, after?: number) =>
+  req<ChatMessage[]>(`/${id}/chat/${after ? `?after=${after}` : ""}`);
+export const postChat = (id: number, content: string) =>
+  req<ChatMessage>(`/${id}/chat/`, { method: "POST", body: JSON.stringify({ content }) });

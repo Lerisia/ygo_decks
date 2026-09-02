@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import BracketTree from "@/components/tournament/BracketTree";
+import DeckTab from "@/components/tournament/DeckTab";
+import AnnouncementsTab from "@/components/tournament/AnnouncementsTab";
+import ChatTab from "@/components/tournament/ChatTab";
 import { getUserInfo } from "@/api/accountApi";
 import {
   checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
@@ -42,7 +45,7 @@ function TournamentDetailPage() {
   const [t, setT] = useState<TDetail | null>(null);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [me, setMe] = useState<string | null>(null);
-  const [tab, setTab] = useState<"players" | "bracket" | null>(null);
+  const [tab, setTab] = useState<"players" | "bracket" | "deck" | "notice" | "chat" | null>(null);
   const [uidInput, setUidInput] = useState("");
   const [error, setError] = useState("");
 
@@ -78,8 +81,8 @@ function TournamentDetailPage() {
   const myUserId = myEntrant?.user ?? null;
   const activeEntrants = t.entrants.filter((e) => e.status === "registered" || e.status === "checked_in");
   const uidByEntrant = new Map(t.entrants.map((e) => [e.id, e.md_uid]));
-  const tabClass = (k: "players" | "bracket") =>
-    `px-4 py-2 font-semibold ${tab === k ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
+  const tabClass = (k: "players" | "bracket" | "deck" | "notice" | "chat") =>
+    `px-3 sm:px-4 py-2 font-semibold whitespace-nowrap ${tab === k ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
 
   const act = async (fn: () => Promise<unknown>) => {
     setError("");
@@ -227,12 +230,35 @@ function TournamentDetailPage() {
       </div>
 
       {/* 탭: 참가자(=순위) / 대진표 */}
-      <div className="flex justify-center gap-4 mb-4 border-b dark:border-gray-700 pb-2">
+      <div className="flex justify-start sm:justify-center gap-1 sm:gap-3 mb-4 border-b dark:border-gray-700 pb-2 overflow-x-auto">
         <button onClick={() => setTab("players")} className={tabClass("players")}>
           참가자 {activeEntrants.length}/{t.capacity}
         </button>
         <button onClick={() => setTab("bracket")} className={tabClass("bracket")}>대진표</button>
+        <button onClick={() => setTab("deck")} className={tabClass("deck")}>덱</button>
+        <button onClick={() => setTab("notice")} className={tabClass("notice")}>공지</button>
+        <button onClick={() => setTab("chat")} className={tabClass("chat")}>채팅</button>
       </div>
+
+      {tab === "deck" && (
+        <section>
+          <DeckTab
+            tournamentId={t.id}
+            myEntrant={myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") ? myEntrant : undefined}
+            isHost={isHost}
+            entrants={t.entrants}
+            recruiting={t.status === "recruiting"}
+          />
+        </section>
+      )}
+      {tab === "notice" && (
+        <section><AnnouncementsTab tournamentId={t.id} isHost={isHost} /></section>
+      )}
+      {tab === "chat" && (
+        <section>
+          <ChatTab tournamentId={t.id} canWrite={isHost || !!(myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in"))} />
+        </section>
+      )}
 
       {tab === "players" && t.status === "recruiting" && (
         <section>

@@ -5,13 +5,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *  identical (UI + search algorithm) — per project rule, the card search
  *  must always behave the same in multi and solo. */
 
-type CardSearchResult = { id: number; name: string; image_url: string | null };
+export type CardSearchResult = { id: number; name: string; image_url: string | null };
 
 interface CardSearchModalProps {
   open: boolean;
   onClose: () => void;
   /** Called with the picked card's name. The modal closes itself after. */
   onPick: (name: string) => void;
+  /** Optional richer callback with the full card (id/name/image) — used by
+   *  flows that need the card id (e.g. tournament deck submission). */
+  onPickCard?: (card: CardSearchResult) => void;
   /** Pokemon-series rooms hit a different endpoint. Default "yugioh". */
   series?: "yugioh" | "pokemon";
   /** Where a tapped card's name lands — used in the header hint + tooltip.
@@ -32,7 +35,7 @@ function onImgErrorRetry(e: React.SyntheticEvent<HTMLImageElement>) {
 }
 
 export default function CardSearchModal({
-  open, onClose, onPick, series = "yugioh", copyTargetLabel,
+  open, onClose, onPick, onPickCard, series = "yugioh", copyTargetLabel,
 }: CardSearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardSearchResult[]>([]);
@@ -174,7 +177,7 @@ export default function CardSearchModal({
               <button
                 key={c.id}
                 type="button"
-                onClick={() => { onPick(c.name); onClose(); }}
+                onClick={() => { onPick(c.name); onPickCard?.(c); onClose(); }}
                 className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition"
                 title={`이 이름을 ${copyTargetLabel}에 입력`}
               >
