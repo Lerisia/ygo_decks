@@ -43,6 +43,25 @@ function Info() {
 
   return (
     <div className="flex flex-col px-2 py-4 sm:px-6 sm:py-6 md:p-10 h-auto min-h-screen max-w-xl md:max-w-2xl mx-auto text-gray-900 dark:text-white">
+      <section className="order-2 sm:order-1 mb-4 md:mb-5">
+        <a
+          href="https://www.youtube.com/@MD_Elite_Duelists"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800/40 rounded-xl shadow-sm p-4 md:p-5 hover:bg-pink-100 dark:hover:bg-pink-900/30 transition"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="shrink-0 w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center text-sm">▶</span>
+              <div className="min-w-0">
+                <p className="text-sm md:text-base font-semibold truncate">유희왕 종합 정보</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">MD Elite Duelists 유튜브 채널</p>
+              </div>
+            </div>
+            <span className="shrink-0 text-sm text-pink-600 dark:text-pink-300">바로가기 →</span>
+          </div>
+        </a>
+      </section>
       {latest && !dismissed && (
         <section className="order-2 sm:order-1 mb-6 md:mb-8">
           <div className="flex items-baseline justify-between mb-2">
