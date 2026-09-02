@@ -66,7 +66,7 @@ export default function ChatTab({ tournamentId, canWrite }: { tournamentId: numb
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) send(); }}
           />
-          <button className="px-4 py-2 text-sm rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50" disabled={!text.trim()} onClick={send}>전송</button>
+          <button className="shrink-0 whitespace-nowrap px-4 py-2 text-sm rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50" disabled={!text.trim()} onClick={send}>전송</button>
         </div>
       ) : (
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">참가자와 주최자만 채팅할 수 있습니다.</p>
