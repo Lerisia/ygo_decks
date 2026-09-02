@@ -70,12 +70,9 @@ function Info() {
             >
               ×
             </button>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="shrink-0 w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center text-sm">▶</span>
-                <p className="text-sm md:text-base font-semibold truncate">마스터 듀얼 종합 정보</p>
-              </div>
-              <span className="shrink-0 text-sm text-pink-600 dark:text-pink-300">바로가기 →</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="shrink-0 w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center text-sm">▶</span>
+              <p className="text-sm md:text-base font-semibold truncate">마스터 듀얼 종합 정보</p>
             </div>
           </a>
         </section>
