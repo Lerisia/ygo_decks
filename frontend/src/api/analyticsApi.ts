@@ -11,18 +11,34 @@ export const getVisitorId = (): string => {
   return id;
 };
 
-/** Fire-and-forget page-leave beacon. keepalive fetch survives navigation and
- *  unload like sendBeacon, but can also carry the Authorization header. */
-export const sendPageView = (path: string, durationMs: number) => {
-  const body = JSON.stringify({ visitor_id: getVisitorId(), path, duration_ms: Math.round(durationMs) });
+const authHeaders = (): Record<string, string> => {
   const token = localStorage.getItem("access_token");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+};
+
+/** Page entry: creates the row immediately so the view is counted even if
+ *  the leave beacon is lost (tab closed, Safari unload). Returns the row id. */
+export const startPageView = async (path: string): Promise<number | null> => {
   try {
-    fetch("/api/analytics/pageview/", { method: "POST", keepalive: true, body, headers }).catch(() => {});
-  } catch {
-    if (navigator.sendBeacon) navigator.sendBeacon("/api/analytics/pageview/", new Blob([body], { type: "application/json" }));
-  }
+    const res = await fetch("/api/analytics/pageview/", {
+      method: "POST", keepalive: true, headers: authHeaders(),
+      body: JSON.stringify({ visitor_id: getVisitorId(), path, duration_ms: 0 }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()).id ?? null;
+  } catch { return null; }
+};
+
+/** Page leave: attaches the dwell time to the row from startPageView. */
+export const leavePageView = (id: number, durationMs: number) => {
+  try {
+    fetch(`/api/analytics/pageview/${id}/leave/`, {
+      method: "POST", keepalive: true, headers: authHeaders(),
+      body: JSON.stringify({ visitor_id: getVisitorId(), duration_ms: Math.round(durationMs) }),
+    }).catch(() => {});
+  } catch { /* ignore */ }
 };
 
 export type DailyRow = { date: string; visitors: number; views: number; dwell_sec: number; avg_dwell_sec: number };

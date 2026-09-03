@@ -19,11 +19,28 @@ class BeaconTest(TestCase):
 
     def test_anonymous_beacon_is_stored(self):
         resp = self._send()
-        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(resp.status_code, 201)
         pv = PageView.objects.get()
+        self.assertEqual(resp.json()["id"], pv.id)
         self.assertEqual(pv.path, "/records")
         self.assertEqual(pv.duration_sec, 12)
         self.assertIsNone(pv.user)
+
+    def test_start_then_leave_updates_duration(self):
+        pv_id = self._send(duration_ms=0).json()["id"]
+        self.assertEqual(PageView.objects.get(id=pv_id).duration_sec, 0)
+        resp = self.client.post(f"/api/analytics/pageview/{pv_id}/leave/", {"visitor_id": "abcdef1234567890", "duration_ms": 45000}, format="json")
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(PageView.objects.get(id=pv_id).duration_sec, 45)
+        self.assertEqual(PageView.objects.count(), 1)   # no duplicate row
+
+    def test_leave_is_capped_and_visitor_checked(self):
+        pv_id = self._send(duration_ms=0).json()["id"]
+        self.client.post(f"/api/analytics/pageview/{pv_id}/leave/", {"visitor_id": "abcdef1234567890", "duration_ms": 99_999_999}, format="json")
+        self.assertEqual(PageView.objects.get(id=pv_id).duration_sec, 1800)
+        resp = self.client.post(f"/api/analytics/pageview/{pv_id}/leave/", {"visitor_id": "someoneelse123456", "duration_ms": 1000}, format="json")
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(self.client.post("/api/analytics/pageview/999999/leave/", {"visitor_id": "abcdef1234567890", "duration_ms": 1000}, format="json").status_code, 404)
 
     def test_logged_in_beacon_links_user(self):
         u = User.objects.create_user(email="u@t.com", username="u1", password="pass1234")

@@ -29,12 +29,31 @@ def pageview_beacon(request):
     except (TypeError, ValueError):
         duration_ms = 0
     duration_sec = max(0, min(duration_ms // 1000, MAX_DURATION_SEC))
-    PageView.objects.create(
+    pv = PageView.objects.create(
         visitor_id=visitor,
         user=request.user if request.user.is_authenticated else None,
         path=path,
         duration_sec=duration_sec,
     )
+    return Response({"id": pv.id}, status=201)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def pageview_leave(request, pageview_id):
+    """Second half of a page visit: set the dwell time on the row created at
+    page entry. Visitor id must match so strangers can't edit rows."""
+    visitor = str(request.data.get("visitor_id") or "")
+    if not VISITOR_RE.match(visitor):
+        return Response({"error": "invalid beacon"}, status=400)
+    try:
+        duration_ms = int(request.data.get("duration_ms") or 0)
+    except (TypeError, ValueError):
+        duration_ms = 0
+    duration_sec = max(0, min(duration_ms // 1000, MAX_DURATION_SEC))
+    updated = PageView.objects.filter(id=pageview_id, visitor_id=visitor).update(duration_sec=duration_sec)
+    if not updated:
+        return Response({"error": "not found"}, status=404)
     return HttpResponse(status=204)
 
 

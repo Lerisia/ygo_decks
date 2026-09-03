@@ -1,38 +1,51 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { sendPageView } from "@/api/analyticsApi";
+import { leavePageView, startPageView } from "@/api/analyticsApi";
 
-/** Reports each SPA page visit with its dwell time when the user leaves it
- *  (route change, tab hidden, or page unload). Time spent while the tab is
- *  hidden is not counted. */
+type Visit = { path: string; id: number | null; startedAt: number; accumulated: number; reported: number };
+
+/** Counts each SPA page visit at entry and attaches the dwell time (visible
+ *  tab only, cumulative) whenever the user leaves: route change, tab hidden,
+ *  or page unload. Losing the final leave beacon only loses that page's
+ *  dwell time, never the view itself. */
 export function usePageTracking() {
   const { pathname } = useLocation();
-  const current = useRef<{ path: string; startedAt: number; accumulated: number } | null>(null);
+  const current = useRef<Visit | null>(null);
 
   useEffect(() => {
+    const report = (v: Visit) => {
+      const visible = document.visibilityState === "visible";
+      const total = v.accumulated + (visible ? Date.now() - v.startedAt : 0);
+      if (v.id !== null && total > v.reported) {
+        v.reported = total;
+        leavePageView(v.id, total);
+      }
+    };
     const flush = () => {
-      const c = current.current;
-      if (!c) return;
-      const total = c.accumulated + (document.visibilityState === "visible" ? Date.now() - c.startedAt : 0);
-      if (total >= 500) sendPageView(c.path, total);
-      current.current = null;
+      const v = current.current;
+      if (v) report(v);
     };
     const onVisibility = () => {
-      const c = current.current;
-      if (!c) return;
+      const v = current.current;
+      if (!v) return;
       if (document.visibilityState === "hidden") {
-        c.accumulated += Date.now() - c.startedAt;
-        // report now — mobile browsers may never fire pagehide/unload
-        sendPageView(c.path, c.accumulated);
-        c.accumulated = 0;
-        c.startedAt = Date.now();
+        v.accumulated += Date.now() - v.startedAt;
+        report(v);
       } else {
-        c.startedAt = Date.now();
+        v.startedAt = Date.now();
       }
     };
 
     flush();
-    current.current = { path: pathname, startedAt: Date.now(), accumulated: 0 };
+    const visit: Visit = { path: pathname, id: null, startedAt: Date.now(), accumulated: 0, reported: 0 };
+    current.current = visit;
+    startPageView(pathname).then((id) => {
+      if (current.current === visit) visit.id = id;
+      else if (id !== null) {
+        // user already left this page before the entry call returned
+        leavePageView(id, visit.accumulated || Date.now() - visit.startedAt);
+      }
+    });
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flush);
     return () => {
