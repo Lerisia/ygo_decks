@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/', include('user.urls')),
     path('api/', include('tool.urls')),
     path('api/tournaments/', include('tournament.urls')),
+    path('api/analytics/', include('analytics.urls')),
     path('api/multiplayer/', include('multiplayer.urls')),
     path('api/avatar/', include('avatar.urls')),
     path('api/solo/', include('solo.urls')),

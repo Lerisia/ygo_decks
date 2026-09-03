@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'card',
     'question',
     'tournament',
+    'analytics',
     'userstatistics',
     'user',
     'tool',

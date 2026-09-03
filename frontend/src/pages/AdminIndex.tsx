@@ -2,6 +2,12 @@ import { Link, useNavigate } from "react-router-dom";
 
 const tiles = [
   {
+    to: "/manage/analytics",
+    icon: "📈",
+    label: "사이트 통계",
+    description: "일 방문자·페이지뷰·체류 시간 요약",
+  },
+  {
     to: "/manage/card-icons",
     icon: "🎴",
     label: "아이콘 관리",

@@ -20,6 +20,8 @@ import Login from "./pages/Login";
 import Mypage from "./pages/Mypage";
 import PointsHistory from "./pages/PointsHistory";
 import AdminPointsGrant from "./pages/AdminPointsGrant";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import { usePageTracking } from "./hooks/usePageTracking";
 import AdminIndex from "./pages/AdminIndex";
 import Mydecks from "./pages/Mydecks";
 import Noresults from "./pages/Noresults";
@@ -58,6 +60,7 @@ import Tracker from "./pages/Tracker";
 function App() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  usePageTracking();
   const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
   // While a player is actively drawing (DuchMind turn / Solo draw page),
   // all site chrome is hidden so nothing overlaps the canvas.
@@ -108,6 +111,7 @@ function App() {
           <Route path="/manage/effect-tags" element={<AdminEffectTags />} />
           <Route path="/manage/duchmind-words" element={<AdminDuchMindWords />} />
           <Route path="/manage/points-grant" element={<AdminPointsGrant />} />
+          <Route path="/manage/analytics" element={<AdminAnalytics />} />
           <Route path="/duchmind-wordpacks" element={<DuchMindWordPacks />} />
           <Route path="/duchmind-wordpacks/:packId" element={<DuchMindWordPackDetail />} />
           <Route path="/mypage/avatar" element={<MyAvatar />} />
