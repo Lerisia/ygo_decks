@@ -2,7 +2,6 @@ from dj_rest_auth.registration.views import RegisterView, ConfirmEmailView
 from .serializers import CustomRegisterSerializer
 from allauth.account.utils import send_email_confirmation
 from django.shortcuts import redirect
-from django.core.management import call_command
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -276,12 +275,7 @@ def update_user_decks(request):
     owned_decks = Deck.objects.filter(id__in=deck_ids)
 
     user.owned_decks.set(owned_decks)
-
-    try:
-        call_command("generate_lookup", user_id=user.id)
-        return Response({"message": "보유 덱이 저장되었습니다."})
-    except Exception as e:
-        return Response({"message": "보유 덱이 저장되었지만 Look-up Table 갱신에 실패했습니다.", "error": str(e)}, status=500)
+    return Response({"message": "보유 덱이 저장되었습니다."})
     
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -292,12 +286,6 @@ def update_user_settings(request):
     if use_custom_lookup is not None:
         user.use_custom_lookup = use_custom_lookup
         user.save()
-
-        if use_custom_lookup and user.owned_decks.exists():
-            try:
-                call_command("generate_lookup", user_id=user.id)
-            except Exception:
-                pass
 
     return Response({"message": "설정이 저장되었습니다.", "use_custom_lookup": user.use_custom_lookup})
 

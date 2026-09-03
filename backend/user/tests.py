@@ -1,5 +1,4 @@
 from datetime import timedelta
-from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 from django.core.management import call_command
@@ -58,19 +57,15 @@ class UpdateSettingsLUTTest(TestCase):
         self.deck = Deck.objects.create(name="덱A", strength=0, difficulty=0, deck_type=0, art_style=0)
         self.user.owned_decks.add(self.deck)
 
-    @patch("user.views.call_command")
-    def test_enabling_custom_lookup_triggers_lut_generation(self, mock_cmd):
+    def test_toggle_custom_lookup_setting(self):
         resp = self.client.post("/api/user/update-settings/", {"use_custom_lookup": True}, format="json")
         self.assertEqual(resp.status_code, 200)
-        mock_cmd.assert_called_once_with("generate_lookup", user_id=self.user.id)
-
-    @patch("user.views.call_command")
-    def test_disabling_custom_lookup_does_not_trigger_lut(self, mock_cmd):
-        self.user.use_custom_lookup = True
-        self.user.save()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.use_custom_lookup)
         resp = self.client.post("/api/user/update-settings/", {"use_custom_lookup": False}, format="json")
         self.assertEqual(resp.status_code, 200)
-        mock_cmd.assert_not_called()
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.use_custom_lookup)
 
 
 class DeleteAccountTest(TestCase):

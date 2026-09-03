@@ -255,31 +255,6 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-@api_view(["GET"])
-def get_lookup_table(request):
-    base_lookup_path = os.path.join(settings.MEDIA_ROOT, "lookup_tables", "lookup_table.json")
-
-    # Case 1: Not logged in -> default look-up table
-    if not request.user.is_authenticated:
-        with open(base_lookup_path, "r") as f:
-            return Response({"lookup_table": json.load(f)})
-
-    # Case 2: Logged in but not use custom test -> default look-up table
-    user = request.user
-    if not user.use_custom_lookup:
-        with open(base_lookup_path, "r") as f:
-            return Response({"lookup_table": json.load(f)})
-
-    # Case 3: Logged in and use custom test -> custom look-up table
-    user_lookup_path = os.path.join(settings.MEDIA_ROOT, "lookup_tables", f"lookup_table_{user.id}.json")
-    
-    if os.path.exists(user_lookup_path):
-        with open(user_lookup_path, "r") as f:
-            return Response({"lookup_table": json.load(f)})
-
-    with open(base_lookup_path, "r") as f:
-        return Response({"lookup_table": json.load(f), "message": "Custom Look-up Table이 아직 생성되지 않아 기본 테이블을 제공합니다."})
-
 def get_tags(request):
     aesthetic_tags = list(AestheticTag.objects.values_list("name", flat=True))
     performance_tags = list(PerformanceTag.objects.values_list("name", flat=True))
