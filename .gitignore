@@ -73,3 +73,5 @@ logs/
 temp/
 backend/logs/
 backend/tournament_legacy_backup_*.sql
+
+backend/db.sqlite3-*
