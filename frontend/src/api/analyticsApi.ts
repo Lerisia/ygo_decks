@@ -11,23 +11,17 @@ export const getVisitorId = (): string => {
   return id;
 };
 
-/** Fire-and-forget page-leave beacon; survives navigation/unload. */
+/** Fire-and-forget page-leave beacon. keepalive fetch survives navigation and
+ *  unload like sendBeacon, but can also carry the Authorization header. */
 export const sendPageView = (path: string, durationMs: number) => {
   const body = JSON.stringify({ visitor_id: getVisitorId(), path, duration_ms: Math.round(durationMs) });
   const token = localStorage.getItem("access_token");
-  // sendBeacon can't carry the Authorization header, so logged-in users are
-  // only attributed when fetch/keepalive is available; both are fine.
-  if (token && typeof fetch === "function") {
-    fetch("/api/analytics/pageview/", {
-      method: "POST", keepalive: true, body,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    }).catch(() => {});
-    return;
-  }
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/analytics/pageview/", new Blob([body], { type: "application/json" }));
-  } else {
-    fetch("/api/analytics/pageview/", { method: "POST", keepalive: true, body, headers: { "Content-Type": "application/json" } }).catch(() => {});
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  try {
+    fetch("/api/analytics/pageview/", { method: "POST", keepalive: true, body, headers }).catch(() => {});
+  } catch {
+    if (navigator.sendBeacon) navigator.sendBeacon("/api/analytics/pageview/", new Blob([body], { type: "application/json" }));
   }
 };
 
