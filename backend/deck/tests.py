@@ -383,3 +383,24 @@ class SixTierStrengthTest(TestCase):
         self.assertEqual(refresh(d_mid), 2)      # 중위권 -> 중상위권
         self.assertEqual(refresh(d_lower), 4)    # 중하위권 -> 하위권
         self.assertEqual(refresh(d_bottom), 5)   # 최하위권 -> 최하위권
+
+
+class DeckEngineFlagTest(TestCase):
+    """'용병 덱' flag: decks mostly splashed into other decks rather than played alone."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.main = _create_deck(name="메인덱")
+        self.engine = _create_deck(name="용병엔진", is_engine=True)
+
+    def test_list_exposes_flag(self):
+        decks = {d["name"]: d for d in self.client.get("/api/deck/").json()["decks"]}
+        self.assertFalse(decks["메인덱"]["is_engine"])
+        self.assertTrue(decks["용병엔진"]["is_engine"])
+
+    def test_detail_exposes_flag(self):
+        self.assertTrue(self.client.get(f"/api/deck/{self.engine.id}/").json()["is_engine"])
+        self.assertFalse(self.client.get(f"/api/deck/{self.main.id}/").json()["is_engine"])
+
+    def test_default_is_false(self):
+        self.assertFalse(Deck.objects.get(id=self.main.id).is_engine)

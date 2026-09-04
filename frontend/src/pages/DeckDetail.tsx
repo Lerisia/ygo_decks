@@ -26,6 +26,7 @@ interface Deck {
   performance_tags: string[];
   aesthetic_tags: string[];
   wiki_content: string | null;
+  is_engine?: boolean;
   stats?: DeckStats;
 }
 
@@ -106,6 +107,12 @@ export default function DeckDetail() {
                 colSpan={2}
               >
                 {deck.name}
+                {deck.is_engine && (
+                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300">
+                    <span className="inline-block px-1.5 py-0.5 rounded bg-amber-400 text-black font-semibold mr-1">용병 덱</span>
+                    단일 덱보다 다른 덱에 섞어 쓰는 혼합 구축용
+                  </div>
+                )}
               </td>
             </tr>
             {deck.cover_image && (

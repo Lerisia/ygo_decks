@@ -8,6 +8,7 @@ from .models import Deck, SummoningMethod, PerformanceTag, AestheticTag, DeckAli
 class DeckAdmin(admin.ModelAdmin):
     list_display = (
         'name',
+        'is_engine',
         'strength',
         'difficulty',
         'deck_type',
@@ -22,6 +23,7 @@ class DeckAdmin(admin.ModelAdmin):
         'display_aesthetic_tags'
     )
     list_editable = (
+        'is_engine',
         'stat_consistency',
         'stat_breakthrough',
         'stat_interruption',
@@ -29,7 +31,7 @@ class DeckAdmin(admin.ModelAdmin):
         'stat_deck_space',
     )
     search_fields = ('name', )
-    list_filter = ('strength', 'difficulty', 'deck_type', 'art_style')
+    list_filter = ('is_engine', 'strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
 
     def display_summoning_methods(self, obj):

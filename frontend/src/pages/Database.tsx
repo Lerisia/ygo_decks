@@ -14,6 +14,7 @@ interface Deck {
   performance_tags: string[];
   aesthetic_tags: string[];
   aliases: string[];
+  is_engine: boolean;
 }
 
 export default function DatabasePage() {
@@ -26,6 +27,7 @@ export default function DatabasePage() {
   const [performanceTags, setPerformanceTags] = useState<string[]>([]);
   const [aestheticTags, setAestheticTags] = useState<string[]>([]);
   const [selectedStrength, setSelectedStrength] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);  // "main" | "engine"
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export default function DatabasePage() {
       selectedDifficulty,
       selectedDeckType,
       selectedArtStyle,
+      selectedRole,
     };
     localStorage.setItem("deck_filters", JSON.stringify(filters));
   };
@@ -83,6 +86,7 @@ export default function DatabasePage() {
         setSelectedDifficulty(parsed.selectedDifficulty || null);
         setSelectedDeckType(parsed.selectedDeckType || null);
         setSelectedArtStyle(parsed.selectedArtStyle || null);
+        setSelectedRole(parsed.selectedRole || null);
   
         const hasAnyFilter =
           (parsed.selectedPerformanceTags?.length ?? 0) > 0 ||
@@ -91,7 +95,8 @@ export default function DatabasePage() {
           parsed.selectedStrength ||
           parsed.selectedDifficulty ||
           parsed.selectedDeckType ||
-          parsed.selectedArtStyle;
+          parsed.selectedArtStyle ||
+          parsed.selectedRole;
   
         if (hasAnyFilter) {
           setFilterExpanded(true);
@@ -143,6 +148,11 @@ export default function DatabasePage() {
       );
     }
 
+    if (selectedRole === "engine") {
+      filtered = filtered.filter((deck) => deck.is_engine);
+    } else if (selectedRole === "main") {
+      filtered = filtered.filter((deck) => !deck.is_engine);
+    }
     if (selectedStrength) {
       filtered = filtered.filter((deck) => deck.strength === selectedStrength);
     }
@@ -226,6 +236,18 @@ export default function DatabasePage() {
                 {["쉬움", "보통", "어려움"].map((o) => (
                   <option key={o} value={o}>{o}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">구축 형태</label>
+              <select
+                value={selectedRole || ""}
+                onChange={(e) => setSelectedRole(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                <option value="main">단일 덱</option>
+                <option value="engine">용병 덱 (혼합 구축용)</option>
               </select>
             </div>
             <div>
@@ -324,11 +346,18 @@ export default function DatabasePage() {
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filteredDecks.map((deck) => (
           <div key={deck.id} className="text-center cursor-pointer" onClick={() => navigate(`/database/${deck.id}`)}>
-            <img
-              src={deck.cover_image || "/default_cover.png"}
-              alt={deck.name}
-              className="w-full h-24 md:h-28 object-cover rounded-lg"
-            />
+            <div className="relative">
+              <img
+                src={deck.cover_image || "/default_cover.png"}
+                alt={deck.name}
+                className="w-full h-24 md:h-28 object-cover rounded-lg"
+              />
+              {deck.is_engine && (
+                <span className="absolute top-1 left-1 text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-400 text-black shadow" title="단일 덱보다 다른 덱에 용병으로 섞어 쓰는 덱">
+                  용병
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm sm:text-base">{deck.name}</p>
           </div>
         ))}
