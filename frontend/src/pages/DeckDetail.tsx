@@ -108,9 +108,9 @@ export default function DeckDetail() {
               >
                 {deck.name}
                 {deck.is_engine && (
-                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300">
-                    <span className="inline-block px-1.5 py-0.5 rounded bg-amber-400 text-black font-semibold mr-1">용병 덱</span>
-                    단일 덱보다 다른 덱에 섞어 쓰는 혼합 구축용
+                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
+                    <span className="inline-flex w-5 h-5 rounded-full bg-amber-400 text-black font-extrabold text-[11px] leading-none items-center justify-center" aria-label="Engine">E</span>
+                    <span><span className="font-semibold">Engine</span> — 단일 덱보다 다른 덱에 섞어 쓰는 엔진</span>
                   </div>
                 )}
               </td>

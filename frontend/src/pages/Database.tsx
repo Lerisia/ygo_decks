@@ -246,7 +246,7 @@ export default function DatabasePage() {
               >
                 <option value="">전체</option>
                 <option value="main">단일 덱</option>
-                <option value="engine">용병 덱 (혼합 구축용)</option>
+                <option value="engine">Engine (혼합 구축용)</option>
               </select>
             </div>
             <div>
@@ -352,8 +352,12 @@ export default function DatabasePage() {
                 className="w-full h-24 md:h-28 object-cover rounded-lg"
               />
               {deck.is_engine && (
-                <span className="absolute top-1 left-1 text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-400 text-black shadow" title="단일 덱보다 다른 덱에 용병으로 섞어 쓰는 덱">
-                  용병
+                <span
+                  className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-400 text-black text-[11px] sm:text-xs font-extrabold leading-none flex items-center justify-center shadow ring-2 ring-white dark:ring-gray-900"
+                  title="Engine — 단일 덱보다 다른 덱에 섞어 쓰는 엔진"
+                  aria-label="Engine"
+                >
+                  E
                 </span>
               )}
             </div>

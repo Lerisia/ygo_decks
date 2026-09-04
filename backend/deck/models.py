@@ -99,7 +99,7 @@ class Deck(models.Model):
     deck_type = models.IntegerField(choices=_DeckType.choices)
     art_style = models.IntegerField(choices=_ArtStyle.choices)
     # 단일 덱으로는 드물고 다른 덱에 용병(엔진)으로 섞여 쓰이는 덱
-    is_engine = models.BooleanField(default=False, verbose_name="용병 덱")
+    is_engine = models.BooleanField(default=False, verbose_name="Engine (용병)")
     summoning_methods = models.ManyToManyField(SummoningMethod)
     performance_tags = models.ManyToManyField(PerformanceTag)
     aesthetic_tags = models.ManyToManyField(AestheticTag)
