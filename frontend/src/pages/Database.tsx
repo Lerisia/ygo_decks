@@ -70,8 +70,7 @@ export default function DatabasePage() {
     selectedStrength,
     selectedDifficulty,
     selectedDeckType,
-    selectedArtStyle,
-  ]);
+    selectedArtStyle,, selectedRole]);
 
   useEffect(() => {
     const saved = localStorage.getItem("deck_filters");
@@ -178,7 +177,7 @@ export default function DatabasePage() {
     selectedDifficulty,
     selectedDeckType,
     selectedArtStyle,
-    decks]);
+    decks, selectedRole]);
 
 
   // Filter section toggle
