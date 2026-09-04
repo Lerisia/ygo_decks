@@ -70,7 +70,7 @@ export default function DatabasePage() {
     selectedStrength,
     selectedDifficulty,
     selectedDeckType,
-    selectedArtStyle,, selectedRole]);
+    selectedArtStyle, selectedRole]);
 
   useEffect(() => {
     const saved = localStorage.getItem("deck_filters");
