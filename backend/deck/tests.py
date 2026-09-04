@@ -404,3 +404,27 @@ class DeckEngineFlagTest(TestCase):
 
     def test_default_is_false(self):
         self.assertFalse(Deck.objects.get(id=self.main.id).is_engine)
+
+
+class EngineExcludedFromRecommendationTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.main = _create_deck(name="메인", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.engine = _create_deck(name="엔진", strength=0, difficulty=0, deck_type=0, art_style=0, is_engine=True)
+
+    def test_step_ignores_engine_decks(self):
+        data = self.client.get("/api/deck/recommend/step").json()
+        self.assertEqual(data["candidate_count"], 1)
+        self.assertTrue(data["resolved"])
+
+    def test_result_never_returns_engine_deck(self):
+        for _ in range(5):
+            resp = self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.json()["name"], "메인")
+
+    def test_empty_key_random_pick_skips_engine_decks(self):
+        for _ in range(5):
+            resp = self.client.get("/api/deck/result", {"key": "empty"})
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.json()["name"], "메인")

@@ -79,7 +79,9 @@ def filter_decks(criteria, user=None):
     if criteria.get("aesthetic_tags"):
         query &= Q(aesthetic_tags__id__in=criteria["aesthetic_tags"])
 
-    decks = Deck.objects.filter(query).distinct()
+    # Engine (용병) decks are splashed into other decks, not played alone —
+    # never recommend them.
+    decks = Deck.objects.filter(query).exclude(is_engine=True).distinct()
     if user is not None and user.is_authenticated and user.use_custom_lookup:
         owned = list(user.owned_decks.values_list("id", flat=True))
         if owned:
@@ -144,8 +146,8 @@ def get_deck_result(request):
     print("Filtered QuerySet count:", decks.count())
 
     if answer_key == "empty":
-        all_decks = Deck.objects.all()
-        deck = random.choice(all_decks) if all_decks.exists() else None
+        all_decks = Deck.objects.exclude(is_engine=True)
+        deck = random.choice(list(all_decks)) if all_decks.exists() else None
 
     if not decks.exists():
         print("No matching decks found!")
