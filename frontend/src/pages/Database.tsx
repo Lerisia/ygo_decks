@@ -354,7 +354,7 @@ export default function DatabasePage() {
               {deck.is_engine && (
                 <span
                   className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-400 text-black text-[11px] sm:text-xs font-extrabold leading-none flex items-center justify-center shadow ring-2 ring-white dark:ring-gray-900"
-                  title="Engine — 단일 덱보다 다른 덱에 섞어 쓰는 엔진"
+                  title="Engine — 다양한 덱에 섞어 사용할 수 있는 엔진"
                   aria-label="Engine"
                 >
                   E
