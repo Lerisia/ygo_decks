@@ -246,7 +246,7 @@ export default function DatabasePage() {
               >
                 <option value="">전체</option>
                 <option value="main">단일 덱</option>
-                <option value="engine">Engine (혼합 구축용)</option>
+                <option value="engine">엔진</option>
               </select>
             </div>
             <div>
