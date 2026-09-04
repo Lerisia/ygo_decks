@@ -110,7 +110,7 @@ export default function DeckDetail() {
                 {deck.is_engine && (
                   <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
                     <span className="inline-flex w-5 h-5 rounded-full bg-amber-400 text-black font-extrabold text-[11px] leading-none items-center justify-center" aria-label="Engine">E</span>
-                    <span><span className="font-semibold">Engine</span> — 다양한 덱에 섞어 사용할 수 있는 엔진</span>
+                    <span><span className="font-semibold">Engine</span> — 다양한 덱에 섞어 사용할 수 있는 덱</span>
                   </div>
                 )}
               </td>
