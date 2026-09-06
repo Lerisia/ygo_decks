@@ -167,8 +167,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, "db.sqlite3"),
-        # Wait longer for the write lock before raising "database is locked".
-        'OPTIONS': {'timeout': 20},
+        # Wait longer for the write lock before raising "database is locked",
+        # and open transactions as BEGIN IMMEDIATE so a read->write upgrade
+        # can't hit an instant SQLITE_BUSY (WAL snapshot conflict).
+        'OPTIONS': {'timeout': 20, 'transaction_mode': 'IMMEDIATE'},
     }
 }
 
