@@ -382,3 +382,42 @@ class AdminPointsGrantAPITest(TestCase):
         self.user.refresh_from_db()
         # Clamp to 0 so user.points stays a PositiveIntegerField.
         self.assertEqual(self.user.points, 0)
+
+
+
+class UpdateOwnedDecksTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="od@test.com", username="od", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.d1 = Deck.objects.create(name="덱1", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.d2 = Deck.objects.create(name="덱2", strength=0, difficulty=0, deck_type=0, art_style=0)
+
+    def _save(self, ids):
+        return self.client.post("/api/user-decks/update/", {"deck_ids": ids}, format="json")
+
+    def test_save_replaces_owned_set(self):
+        self.assertEqual(self._save([self.d1.id]).status_code, 200)
+        self.assertEqual(set(self.user.owned_decks.values_list("id", flat=True)), {self.d1.id})
+        self.assertEqual(self._save([self.d2.id]).status_code, 200)
+        self.assertEqual(set(self.user.owned_decks.values_list("id", flat=True)), {self.d2.id})
+
+    def test_numeric_strings_and_duplicates_are_tolerated(self):
+        resp = self._save([str(self.d1.id), self.d1.id, self.d2.id])
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(set(self.user.owned_decks.values_list("id", flat=True)), {self.d1.id, self.d2.id})
+
+    def test_garbage_ids_return_400_not_500(self):
+        self.assertEqual(self._save(["abc"]).status_code, 400)
+        self.assertEqual(self._save("notalist").status_code, 400)
+        self.assertEqual(self._save([None, 1.5]).status_code, 400)
+
+    def test_unknown_ids_are_ignored(self):
+        self.assertEqual(self._save([self.d1.id, 999999]).status_code, 200)
+        self.assertEqual(set(self.user.owned_decks.values_list("id", flat=True)), {self.d1.id})
+
+    def test_rerunning_same_save_is_idempotent(self):
+        # simulates the second of two racing identical saves: rows already present
+        self.user.owned_decks.add(self.d1, self.d2)
+        self.assertEqual(self._save([self.d1.id, self.d2.id]).status_code, 200)
+        self.assertEqual(self.user.owned_decks.count(), 2)

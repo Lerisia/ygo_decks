@@ -1,3 +1,4 @@
+from django.db import transaction
 from dj_rest_auth.registration.views import RegisterView, ConfirmEmailView
 from .serializers import CustomRegisterSerializer
 from allauth.account.utils import send_email_confirmation
@@ -271,10 +272,25 @@ def update_user_decks(request):
 
     if not isinstance(deck_ids, list):
         return Response({"error": "deck_ids must be a list."}, status=400)
+    wanted = set()
+    for x in deck_ids:
+        if isinstance(x, int) and not isinstance(x, bool):
+            wanted.add(x)
+        elif isinstance(x, str) and x.strip().isdigit():
+            wanted.add(int(x))
+        else:
+            return Response({"error": "deck_ids must be integer deck ids."}, status=400)
 
-    owned_decks = Deck.objects.filter(id__in=deck_ids)
-
-    user.owned_decks.set(owned_decks)
+    wanted &= set(Deck.objects.filter(id__in=wanted).values_list("id", flat=True))
+    through = user.owned_decks.through
+    # Replace without .set(): concurrent identical saves (double-clicked 저장)
+    # used to race between its SELECT and INSERT and die on the unique index.
+    with transaction.atomic():
+        current = set(through.objects.filter(user=user).values_list("deck_id", flat=True))
+        through.objects.filter(user=user, deck_id__in=current - wanted).delete()
+        through.objects.bulk_create(
+            [through(user=user, deck_id=d) for d in wanted - current], ignore_conflicts=True
+        )
     return Response({"message": "보유 덱이 저장되었습니다."})
     
 @api_view(["POST"])

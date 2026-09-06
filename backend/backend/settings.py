@@ -242,3 +242,18 @@ CSRF_USE_SESSIONS = False
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 2MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 2MB
+
+
+# Surface unhandled 500s in the gunicorn journal even with DEBUG=False
+# (Django's default console handler is gated on DEBUG=True).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.db.backends": {"level": "ERROR"},
+    },
+}

@@ -20,6 +20,7 @@ const Mydecks = () => {
   const [showOwnedDecksOnly, setShowOwnedDecksOnly] = useState(false);
   const [excludeOwnedDecks, setExcludeOwnedDecks] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const navigate = useNavigate();
@@ -71,6 +72,8 @@ const Mydecks = () => {
   };
 
   const handleSave = async () => {
+    if (saving) return;  // double-clicks used to fire racing saves
+    setSaving(true);
     setMessage("저장 중...");
     try {
       await Promise.all([
@@ -82,6 +85,8 @@ const Mydecks = () => {
     } catch (error) {
       console.error("저장 중 오류 발생:", error);
       setMessage("저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -160,7 +165,7 @@ const Mydecks = () => {
       <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3 z-40">
         <div className="max-w-md mx-auto flex items-center gap-3">
           <button
-            onClick={handleSave}
+            onClick={handleSave} disabled={saving}
             className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             저장
