@@ -588,9 +588,16 @@ class LooserTitleMatchingTest(TestCase):
         deck = _create_deck(name="메탈화")
         self.assertFalse(self._match(deck, "#메탈포제 덱 - 유희왕 플레이 영상"))
 
-    def test_deck_named_in_prose_matches_even_with_other_hashtag(self):
-        deck = _create_deck(name="티아라멘츠")
-        self.assertTrue(self._match(deck, "티아라멘츠 전용 낙인 융합? #브릴퓨티아라 덱 - 유희왕 플레이 영상"))
+    def test_prose_mention_next_to_another_hashtag_does_not_match(self):
+        """2026-09-07 특이점: '맬리스' 목록에 '#제외사이킥' 영상이 섞임 — 해시태그가 분류 기준."""
+        malice = _create_deck(name="M∀LICE")
+        DeckAlias.objects.create(deck=malice, name="맬리스")
+        psychic = _create_deck(name="제외 사이킥")
+        title = "맬리스보다 강한 제외 테마? #제외사이킥 덱 - 유희왕 플레이 영상"
+        self.assertFalse(self._match(malice, title))
+        self.assertTrue(self._match(psychic, title))
+        tiara = _create_deck(name="티아라멘츠")
+        self.assertFalse(self._match(tiara, "티아라멘츠 전용 낙인 융합? #브릴퓨티아라 덱 - 유희왕 플레이 영상"))
 
     def test_two_char_key_in_prose_still_ignored(self):
         deck = _create_deck(name="제왕")

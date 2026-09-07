@@ -84,26 +84,31 @@ def _segment(token, pieces):
 
 
 def decks_for_title(title, index):
-    """Deck ids a video title refers to.
+    """Deck ids a video title refers to. The hashtag is the classifier:
 
     1. hashtag contains a deck key ('#낙인상검' → 낙인, 상검) or is contained in one ('#엑조디아' → 천년 엑조디아)
     2. hashtag decomposes into abbreviations/keys/generic words ('#섬도천배' → 섬도희 + 천배룡)
-    3. any 3+ char key mentioned anywhere in the title (hybrids and matchups named in prose)
+    3. only titles with no hashtag at all fall back to a 3+ char key anywhere in the title
+
+    Deck names mentioned in prose next to another deck's hashtag ('맬리스를 잡는 #제외사이킥 덱')
+    deliberately do not count — the video is about the hashtagged deck.
     """
     keys, prefixes = index["keys"], index["prefixes"]
     found = set()
     tokens = hashtag_tokens(title)
+    if not tokens:
+        body = normalize(title)
+        for key, ids in keys.items():
+            if len(key) >= 3 and key in body:
+                found |= ids
+        return found
+    pieces = {**prefixes, **keys, **{g: set() for g in GENERIC_PIECES}}
     for token in tokens:
         for key, ids in keys.items():
             if key in token or token in key:
                 found |= ids
-        pieces = {**prefixes, **keys, **{g: set() for g in GENERIC_PIECES}}
         for piece in _segment(token, pieces) or []:
             found |= pieces[piece]
-    body = normalize(title)
-    for key, ids in keys.items():
-        if len(key) >= 3 and key in body:
-            found |= ids
     return found
 
 
