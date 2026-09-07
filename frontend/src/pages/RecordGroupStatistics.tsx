@@ -111,10 +111,18 @@ const OppDeckTick = ({ x, y, payload, entries }: {
   );
 };
 
-const DeckRow = ({ image, name, children }: { image: string | null; name: string; children: React.ReactNode }) => (
+// Solid slice colors for the my-deck pie (deck banners were too washed out to tell apart)
+const PIE_COLORS = [
+  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899",
+  "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#f43f5e",
+];
+const pieColor = (index: number) => PIE_COLORS[index % PIE_COLORS.length];
+
+const DeckRow = ({ image, name, color, children }: { image: string | null; name: string; color?: string; children: React.ReactNode }) => (
   <tr>
     <td className="px-2 py-1.5">
       <div className="flex items-center gap-2">
+        {color && <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />}
         <img src={image || UNKNOWN_DECK_IMAGE} alt={name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
         <span className="truncate">{name}</span>
       </div>
@@ -360,19 +368,12 @@ const StatisticsPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart style={{ overflow: 'visible' }}>
-                  <Pie data={myDecks} dataKey="ratio" nameKey="deck.name" cx="50%" cy="50%" outerRadius={110} label={false}>
-                    {myDecks.map((entry) => (
-                      <Cell key={entry.deck.id} fill={`url(#image-${entry.deck.id})`} />
+                  <Pie data={myDecks} dataKey="ratio" nameKey="deck.name" cx="50%" cy="50%" outerRadius={110} label={false} stroke="#ffffff" strokeWidth={1.5}>
+                    {myDecks.map((entry, index) => (
+                      <Cell key={entry.deck.id} fill={pieColor(index)} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} contentStyle={{ fontSize: '0.875rem' }} />
-                  <defs>
-                    {myDecks.map((entry) => (
-                      <pattern id={`image-${entry.deck.id}`} key={entry.deck.id} patternUnits="objectBoundingBox" width={1} height={1}>
-                        <image href={entry.deck.cover_image_small || ""} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
-                      </pattern>
-                    ))}
-                  </defs>
                 </PieChart>
               </ResponsiveContainer>
               <table className="w-full table-fixed text-sm">
@@ -383,8 +384,8 @@ const StatisticsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {myDecks.map((entry) => (
-                    <DeckRow key={entry.deck.id} image={entry.deck.cover_image_small} name={entry.deck.name}>
+                  {myDecks.map((entry, index) => (
+                    <DeckRow key={entry.deck.id} image={entry.deck.cover_image_small} name={entry.deck.name} color={pieColor(index)}>
                       <td className="text-right px-2 py-1.5">{entry.ratio.toFixed(1)}%</td>
                     </DeckRow>
                   ))}
