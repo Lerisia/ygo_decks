@@ -439,3 +439,118 @@ class PlayVideoUrlTest(TestCase):
         with_video = _create_deck(name="영상있음", play_video_url="https://www.youtube.com/watch?v=abc123")
         self.assertEqual(self.client.get(f"/api/deck/{plain.id}/").json()["play_video_url"], "")
         self.assertEqual(self.client.get(f"/api/deck/{with_video.id}/").json()["play_video_url"], "https://www.youtube.com/watch?v=abc123")
+
+
+from datetime import datetime, timedelta, timezone as dt_timezone
+from .models import ChannelVideo
+from .youtube import hashtag_tokens, title_matches, deck_keys, videos_for_deck, sync_channel_videos
+
+
+def _video(video_id, title, published_at=None, position=0, **kw):
+    return ChannelVideo.objects.create(video_id=video_id, title=title, published_at=published_at, position=position, **kw)
+
+
+class YoutubeTitleMatchingTest(TestCase):
+    def test_hashtag_tokens_strip_deck_suffix_and_spaces(self):
+        self.assertEqual(hashtag_tokens("설명 #사이버드래곤 덱 - 유희왕 플레이 영상"), ["사이버드래곤"])
+        self.assertEqual(hashtag_tokens("#낙인상검 덱 #ABC 덱"), ["낙인상검", "abc"])
+        self.assertEqual(hashtag_tokens("해시태그 없음"), [])
+
+    def test_space_insensitive_name_match(self):
+        deck = _create_deck(name="사이버 드래곤")
+        self.assertTrue(title_matches("16000 공격력 #사이버드래곤 덱 - 유희왕 플레이 영상", deck_keys(deck)))
+
+    def test_alias_match(self):
+        deck = _create_deck(name="드래곤테일")
+        DeckAlias.objects.create(deck=deck, name="드테")
+        self.assertTrue(title_matches("낙인 용병 #드테 덱 - 유희왕 플레이 영상", deck_keys(deck)))
+
+    def test_hybrid_hashtag_matches_each_component_deck(self):
+        keys_a, keys_b = deck_keys(_create_deck(name="낙인")), deck_keys(_create_deck(name="상검"))
+        title = "인맥 총동원 #낙인상검 덱 - 유희왕 플레이 영상"
+        self.assertTrue(title_matches(title, keys_a))
+        self.assertTrue(title_matches(title, keys_b))
+
+    def test_prose_does_not_match_when_hashtag_present(self):
+        keys = deck_keys(_create_deck(name="제왕"))
+        self.assertFalse(title_matches("황제왕의 귀환 #크라운클랜 덱 - 유희왕 플레이 영상", keys))
+
+    def test_no_hashtag_falls_back_to_title_with_long_keys_only(self):
+        self.assertTrue(title_matches("A Crazy Theme - Materiactor", deck_keys(_create_deck(name="Materiactor"))))
+        self.assertFalse(title_matches("황제왕의 귀환", deck_keys(_create_deck(name="제왕"))))
+
+    def test_one_character_keys_are_ignored(self):
+        deck = _create_deck(name="숲")
+        self.assertEqual(deck_keys(deck), set())
+        self.assertEqual(videos_for_deck(deck), [])
+
+
+class DeckVideosEndpointTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.deck = _create_deck(name="크라운 클랜")
+        _create_deck(name="십이수")
+        t0 = datetime(2026, 9, 1, tzinfo=dt_timezone.utc)
+        _video("old", "구축 #크라운클랜 덱 - 유희왕 플레이 영상", t0, position=2, view_count=10, duration=700, thumbnail_url="https://i.ytimg.com/vi/old/hqdefault.jpg")
+        _video("new", "도파민 #크라운클랜 덱 - 유희왕 플레이 영상", t0 + timedelta(days=5), position=0)
+        _video("nodate", "옛날 #크라운클랜 덱", None, position=1)
+        _video("other", "우승 #십이수 덱 - 유희왕 플레이 영상", t0 + timedelta(days=9), position=3)
+
+    def test_lists_only_matching_videos_newest_first_dateless_last(self):
+        res = self.client.get(f"/api/deck/{self.deck.id}/videos/")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual([v["video_id"] for v in body["videos"]], ["new", "old", "nodate"])
+        self.assertEqual(body["channel"]["name"], "김빠방")
+        old = body["videos"][1]
+        self.assertEqual(old["url"], "https://www.youtube.com/watch?v=old")
+        self.assertEqual(old["view_count"], 10)
+        self.assertEqual(old["duration"], 700)
+        self.assertTrue(old["published_at"].startswith("2026-09-01"))
+
+    def test_unknown_deck_404(self):
+        self.assertEqual(self.client.get("/api/deck/999999/videos/").status_code, 404)
+
+    def test_detail_exposes_video_count(self):
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 3)
+        empty = _create_deck(name="영상없는덱")
+        self.assertEqual(self.client.get(f"/api/deck/{empty.id}/").json()["video_count"], 0)
+
+
+class SyncChannelVideosTest(TestCase):
+    def test_creates_updates_and_removes(self):
+        _video("gone", "삭제될 영상", position=0)
+        _video("kept", "옛 제목", datetime(2026, 1, 1, tzinfo=dt_timezone.utc), position=1)
+        listing = lambda: [
+            {"id": "fresh", "title": "새 영상 #덱 덱", "duration": 600},
+            {"id": "kept", "title": "새 제목", "duration": 500},
+        ]
+        calls = []
+        def details(vid):
+            calls.append(vid)
+            return {"published_at": datetime(2026, 9, 6, tzinfo=dt_timezone.utc), "view_count": 42, "duration": 601, "thumbnail_url": "https://i.ytimg.com/vi/fresh/maxresdefault.jpg"}
+        created, updated, removed = sync_channel_videos(fetch_listing=listing, fetch_details=details)
+        self.assertEqual((created, updated, removed), (1, 1, 1))
+        self.assertEqual(calls, ["fresh"])  # existing dated rows are not refetched
+        fresh = ChannelVideo.objects.get(video_id="fresh")
+        self.assertEqual((fresh.position, fresh.view_count, fresh.duration), (0, 42, 601))
+        self.assertEqual(fresh.published_at.date().isoformat(), "2026-09-06")
+        kept = ChannelVideo.objects.get(video_id="kept")
+        self.assertEqual((kept.title, kept.position), ("새 제목", 1))
+        self.assertFalse(ChannelVideo.objects.filter(video_id="gone").exists())
+
+    def test_detail_failure_still_creates_row_with_default_thumbnail(self):
+        def boom(vid):
+            raise RuntimeError("blocked")
+        created, _, _ = sync_channel_videos(fetch_listing=lambda: [{"id": "x1", "title": "t", "duration": 30}], fetch_details=boom)
+        self.assertEqual(created, 1)
+        row = ChannelVideo.objects.get(video_id="x1")
+        self.assertEqual(row.thumbnail_url, "https://i.ytimg.com/vi/x1/hqdefault.jpg")
+        self.assertEqual(row.duration, 30)
+        self.assertIsNone(row.published_at)
+
+    def test_empty_listing_leaves_cache_untouched(self):
+        _video("keep", "유지")
+        with self.assertRaises(RuntimeError):
+            sync_channel_videos(fetch_listing=lambda: [], fetch_details=lambda v: {})
+        self.assertTrue(ChannelVideo.objects.filter(video_id="keep").exists())

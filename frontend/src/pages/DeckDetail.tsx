@@ -5,6 +5,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
+import DeckVideosModal from "@/components/DeckVideosModal";
 
 interface DeckStats {
   consistency: number;
@@ -28,6 +29,7 @@ interface Deck {
   wiki_content: string | null;
   is_engine?: boolean;
   play_video_url?: string | null;
+  video_count?: number;
   stats?: DeckStats;
 }
 
@@ -48,6 +50,7 @@ export default function DeckDetail() {
   const [wikiContent, setWikiContent] = useState("");
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [showVideos, setShowVideos] = useState(false);
 
   const mdeOptions = useMemo(() => {
     return {
@@ -238,7 +241,17 @@ export default function DeckDetail() {
       {/* 본문 섹션 */}
       <div className="text-left rounded-lg">
         <div className="overflow-hidden mb-4">
-          {deck.play_video_url ? (
+          {deck.video_count ? (
+            <button
+              type="button"
+              onClick={() => setShowVideos(true)}
+              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
+              플레이 영상 보러 가기
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">{deck.video_count}</span>
+            </button>
+          ) : deck.play_video_url ? (
             <a
               href={deck.play_video_url}
               target="_blank"
@@ -260,6 +273,9 @@ export default function DeckDetail() {
             </button>
           )}
         </div>
+        {showVideos && (
+          <DeckVideosModal deckId={deck.id} deckName={deck.name} onClose={() => setShowVideos(false)} />
+        )}
         {editing ? (
           <>
             {/* react-simplemde-editor로 마크다운 작성 */}

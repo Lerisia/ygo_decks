@@ -154,3 +154,26 @@ class DeckAlias(models.Model):
 
     def __str__(self):
         return self.name
+
+class ChannelVideo(models.Model):
+    """Cached upload from 김빠방's YouTube channel (see deck/youtube.py)."""
+    video_id = models.CharField(max_length=20, unique=True)
+    title = models.CharField(max_length=300)
+    position = models.PositiveIntegerField(default=0, help_text="채널 영상 탭 순서 (0 = 최신)")
+    published_at = models.DateTimeField(null=True, blank=True)
+    duration = models.PositiveIntegerField(null=True, blank=True, help_text="초")
+    view_count = models.PositiveIntegerField(null=True, blank=True)
+    thumbnail_url = models.URLField(max_length=500, blank=True, default="")
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position"]
+        verbose_name = "김빠방 영상"
+        verbose_name_plural = "김빠방 영상"
+
+    @property
+    def url(self):
+        return f"https://www.youtube.com/watch?v={self.video_id}"
+
+    def __str__(self):
+        return self.title
