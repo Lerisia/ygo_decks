@@ -554,3 +554,44 @@ class SyncChannelVideosTest(TestCase):
         with self.assertRaises(RuntimeError):
             sync_channel_videos(fetch_listing=lambda: [], fetch_details=lambda v: {})
         self.assertTrue(ChannelVideo.objects.filter(video_id="keep").exists())
+
+
+class LooserTitleMatchingTest(TestCase):
+    """2026-09-07: 특이점 asked for a more lenient filter so more videos show up."""
+
+    def _match(self, deck, title):
+        return [v for v in videos_for_deck(deck, [ChannelVideo(video_id="t", title=title)])]
+
+    def test_hashtag_contained_in_deck_name(self):
+        deck = _create_deck(name="천년 엑조디아")
+        self.assertTrue(self._match(deck, "전설의 카드 #엑조디아 덱 - 유희왕 플레이 영상"))
+
+    def test_hybrid_abbreviation_hashtag_resolves_each_component(self):
+        a, b = _create_deck(name="섬도희"), _create_deck(name="천배룡")
+        title = "접점이 없는 두 테마 #섬도천배 덱 - 유희왕 플레이 영상"
+        self.assertTrue(self._match(a, title))
+        self.assertTrue(self._match(b, title))
+
+    def test_generic_piece_lets_rest_of_hashtag_resolve(self):
+        deck = _create_deck(name="식물GS")
+        _create_deck(name="식물족비트")  # makes '식물' prefix ambiguous → only full-key path works
+        plant = _create_deck(name="식물")
+        self.assertTrue(self._match(plant, "#식물링크 덱"))
+        self.assertFalse(self._match(deck, "#식물링크 덱"))
+
+    def test_ambiguous_prefix_does_not_match(self):
+        tail, maid = _create_deck(name="드래곤테일"), _create_deck(name="드래곤메이드")
+        self.assertFalse(self._match(tail, "돌아온 킬러 #드래그마 덱 - 유희왕 플레이 영상"))
+        self.assertFalse(self._match(maid, "돌아온 킬러 #드래그마 덱 - 유희왕 플레이 영상"))
+
+    def test_partially_decomposable_hashtag_does_not_match(self):
+        deck = _create_deck(name="메탈화")
+        self.assertFalse(self._match(deck, "#메탈포제 덱 - 유희왕 플레이 영상"))
+
+    def test_deck_named_in_prose_matches_even_with_other_hashtag(self):
+        deck = _create_deck(name="티아라멘츠")
+        self.assertTrue(self._match(deck, "티아라멘츠 전용 낙인 융합? #브릴퓨티아라 덱 - 유희왕 플레이 영상"))
+
+    def test_two_char_key_in_prose_still_ignored(self):
+        deck = _create_deck(name="제왕")
+        self.assertFalse(self._match(deck, "황제왕의 귀환 #크라운클랜 덱 - 유희왕 플레이 영상"))

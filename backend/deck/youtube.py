@@ -37,24 +37,91 @@ def deck_keys(deck):
     return {k for k in keys if len(k) >= 2}
 
 
-def title_matches(title, keys):
-    """Hashtags are the primary signal; titles without hashtags fall back to a
-    whole-title search with keys of 3+ characters to avoid prose false positives."""
+# Generic words that may appear inside a hybrid hashtag ('#60낙인', '#식물링크')
+# without naming a deck; they let the rest of the token be recognized.
+GENERIC_PIECES = {"60", "40", "gs", "ftk", "otk", "링크", "싱크론", "융합", "원석", "비트", "순수",
+                  "엔진", "컨트롤", "메타", "카오스", "펜듈럼", "엑시즈", "의식"}
+
+
+def build_index(decks):
+    """Matching dictionary for a set of decks.
+
+    keys:     normalized name/alias → deck ids
+    prefixes: 2–3 char abbreviations that identify exactly one deck
+              ('섬도' → 섬도희); ambiguous ones ('드래' → 드래곤테일/드래곤메이드…) are dropped
+    """
+    keys, prefixes = {}, {}
+    for deck in decks:
+        for key in deck_keys(deck):
+            keys.setdefault(key, set()).add(deck.id)
+            for n in (2, 3):
+                if len(key) > n:
+                    prefixes.setdefault(key[:n], set()).add(deck.id)
+    prefixes = {p: ids for p, ids in prefixes.items() if len(ids) == 1 and p not in keys}
+    return {"keys": keys, "prefixes": prefixes}
+
+
+def _segment(token, pieces):
+    """Split token into dictionary pieces covering it entirely (longest-first); None if impossible."""
+    memo = {}
+
+    def solve(i):
+        if i == len(token):
+            return []
+        if i in memo:
+            return memo[i]
+        for j in range(len(token), i, -1):
+            piece = token[i:j]
+            if piece in pieces:
+                rest = solve(j)
+                if rest is not None:
+                    memo[i] = [piece] + rest
+                    return memo[i]
+        memo[i] = None
+        return None
+
+    return solve(0)
+
+
+def decks_for_title(title, index):
+    """Deck ids a video title refers to.
+
+    1. hashtag contains a deck key ('#낙인상검' → 낙인, 상검) or is contained in one ('#엑조디아' → 천년 엑조디아)
+    2. hashtag decomposes into abbreviations/keys/generic words ('#섬도천배' → 섬도희 + 천배룡)
+    3. any 3+ char key mentioned anywhere in the title (hybrids and matchups named in prose)
+    """
+    keys, prefixes = index["keys"], index["prefixes"]
+    found = set()
     tokens = hashtag_tokens(title)
-    if tokens:
-        return any(key in token for token in tokens for key in keys)
+    for token in tokens:
+        for key, ids in keys.items():
+            if key in token or token in key:
+                found |= ids
+        pieces = {**prefixes, **keys, **{g: set() for g in GENERIC_PIECES}}
+        for piece in _segment(token, pieces) or []:
+            found |= pieces[piece]
     body = normalize(title)
-    return any(key in body for key in keys if len(key) >= 3)
+    for key, ids in keys.items():
+        if len(key) >= 3 and key in body:
+            found |= ids
+    return found
+
+
+def title_matches(title, keys):
+    """Single-deck check used by tests/debugging; `keys` are that deck's normalized keys."""
+    index = {"keys": {k: {0} for k in keys}, "prefixes": {}}
+    return 0 in decks_for_title(title, index)
 
 
 def videos_for_deck(deck, queryset=None):
-    from .models import ChannelVideo
+    """This deck's videos, matched against every deck so hybrid hashtags resolve properly."""
+    from .models import ChannelVideo, Deck
 
-    keys = deck_keys(deck)
-    if not keys:
+    if not deck_keys(deck):
         return []
+    index = build_index(Deck.objects.prefetch_related("aliases"))
     qs = queryset if queryset is not None else ChannelVideo.objects.all()
-    return [v for v in qs if title_matches(v.title, keys)]
+    return [v for v in qs if deck.id in decks_for_title(v.title, index)]
 
 
 def serialize_video(video):
