@@ -245,18 +245,18 @@ export default function DeckDetail() {
             <button
               type="button"
               onClick={() => setShowVideos(true)}
-              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800/40 text-gray-900 dark:text-gray-100 rounded-lg font-semibold shadow-sm hover:bg-pink-100 dark:hover:bg-pink-900/30 transition"
+              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
             >
               <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
               플레이 영상 보러 가기
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-pink-200/70 dark:bg-pink-800/50 text-xs">{deck.video_count}</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">{deck.video_count}</span>
             </button>
           ) : deck.play_video_url ? (
             <a
               href={deck.play_video_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800/40 text-gray-900 dark:text-gray-100 rounded-lg font-semibold shadow-sm hover:bg-pink-100 dark:hover:bg-pink-900/30 transition"
+              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
             >
               <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
               플레이 영상 보러 가기
