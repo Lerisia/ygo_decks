@@ -100,6 +100,8 @@ class Deck(models.Model):
     art_style = models.IntegerField(choices=_ArtStyle.choices)
     # 단일 덱으로는 드물고 다른 덱에 용병(엔진)으로 섞여 쓰이는 덱
     is_engine = models.BooleanField(default=False, verbose_name="Engine (용병)")
+    # 덱 플레이 참고 영상 (예: 김빠방 유튜브). 비어 있으면 상세 페이지 버튼이 '준비 중'.
+    play_video_url = models.URLField(max_length=300, blank=True, default="", verbose_name="플레이 영상 URL")
     summoning_methods = models.ManyToManyField(SummoningMethod)
     performance_tags = models.ManyToManyField(PerformanceTag)
     aesthetic_tags = models.ManyToManyField(AestheticTag)

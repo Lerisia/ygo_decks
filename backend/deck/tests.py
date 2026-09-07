@@ -428,3 +428,14 @@ class EngineExcludedFromRecommendationTest(TestCase):
             resp = self.client.get("/api/deck/result", {"key": "empty"})
             self.assertEqual(resp.status_code, 200)
             self.assertEqual(resp.json()["name"], "메인")
+
+
+class PlayVideoUrlTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_detail_exposes_play_video_url(self):
+        plain = _create_deck(name="영상없음")
+        with_video = _create_deck(name="영상있음", play_video_url="https://www.youtube.com/watch?v=abc123")
+        self.assertEqual(self.client.get(f"/api/deck/{plain.id}/").json()["play_video_url"], "")
+        self.assertEqual(self.client.get(f"/api/deck/{with_video.id}/").json()["play_video_url"], "https://www.youtube.com/watch?v=abc123")

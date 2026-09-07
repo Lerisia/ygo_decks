@@ -31,6 +31,7 @@ class DeckAdmin(admin.ModelAdmin):
         'stat_deck_space',
     )
     search_fields = ('name', )
+    list_display_links = ('name',)
     list_filter = ('is_engine', 'strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
 

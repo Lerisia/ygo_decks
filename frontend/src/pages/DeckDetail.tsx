@@ -27,6 +27,7 @@ interface Deck {
   aesthetic_tags: string[];
   wiki_content: string | null;
   is_engine?: boolean;
+  play_video_url?: string | null;
   stats?: DeckStats;
 }
 
@@ -126,6 +127,31 @@ export default function DeckDetail() {
                 </td>
               </tr>
             )}
+            <tr className="border-b">
+              <td className="p-2" colSpan={2}>
+                {deck.play_video_url ? (
+                  <a
+                    href={deck.play_video_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  >
+                    <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
+                    플레이 보러 가기
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    title="플레이 영상 준비 중"
+                    className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-semibold cursor-not-allowed"
+                  >
+                    <span className="inline-flex w-5 h-5 rounded-full bg-gray-400 dark:bg-gray-600 text-white text-[10px] items-center justify-center">▶</span>
+                    플레이 보러 가기 (준비 중)
+                  </button>
+                )}
+              </td>
+            </tr>
             <tr className="border-b">
               <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-32">덱 파워</td>
               <td className="p-2">

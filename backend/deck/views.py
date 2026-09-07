@@ -235,6 +235,7 @@ def get_deck_data(request, deck_id):
         "deck_type": deck.get_deck_type_display(),
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
+        "play_video_url": deck.play_video_url,
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
