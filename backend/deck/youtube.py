@@ -17,7 +17,8 @@ _HASHTAG_SUFFIX_RE = re.compile(r"덱$")
 
 
 def normalize(text):
-    return re.sub(r"\s+", "", text or "").lower()
+    """Lower-case and keep only letters/digits/hangul: 'F.A.' → 'fa', 'R-ACE' → 'race', '@이그니스터' → '이그니스터'."""
+    return re.sub(r"[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]", "", (text or "").lower())
 
 
 def hashtag_tokens(title):

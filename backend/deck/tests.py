@@ -599,6 +599,14 @@ class LooserTitleMatchingTest(TestCase):
         tiara = _create_deck(name="티아라멘츠")
         self.assertFalse(self._match(tiara, "티아라멘츠 전용 낙인 융합? #브릴퓨티아라 덱 - 유희왕 플레이 영상"))
 
+    def test_punctuation_in_deck_name_is_ignored(self):
+        """2026-09-09 특이점: '#FA' 영상이 F.A.(포뮬러 애슬리트)에 안 붙던 문제."""
+        fa = _create_deck(name="F.A.")
+        DeckAlias.objects.create(deck=fa, name="포뮬러 애슬리트")
+        self.assertTrue(self._match(fa, "서킷의 지배자 #FA 덱 - 유희왕 플레이 영상"))
+        race = _create_deck(name="R-ACE")
+        self.assertTrue(self._match(race, "#RACE 덱 - 유희왕 플레이 영상"))
+
     def test_two_char_key_in_prose_still_ignored(self):
         deck = _create_deck(name="제왕")
         self.assertFalse(self._match(deck, "황제왕의 귀환 #크라운클랜 덱 - 유희왕 플레이 영상"))
