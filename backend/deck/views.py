@@ -237,7 +237,8 @@ def get_deck_data(request, deck_id):
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
         "play_video_url": deck.play_video_url,
-        "video_count": 1 if _featured(deck) else 0,  # 엘리스 지시(2026-09-12): 대표 영상만 노출, 김빠방·한국 유튜버 제외
+        "video_count": 1 if _featured(deck) else 0,
+        "note_count": deck.notes.filter(is_active=True).count(),  # 엘리스 지시(2026-09-12): 대표 영상만 노출, 김빠방·한국 유튜버 제외
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -303,3 +304,26 @@ def update_wiki_content(request, deck_id):
     deck.save()
 
     return Response({"message": "Wiki content updated successfully."})
+
+def serialize_note(n):
+    return {
+        "id": n.id,
+        "title": n.title,
+        "author": n.author,
+        "url": n.url,
+        "source": n.source,
+        "source_label": n.get_source_display(),
+        "game": n.game,
+        "game_label": n.get_game_display(),
+        "is_paid": n.is_paid,
+        "price": n.price,
+        "published_at": n.published_at.isoformat() if n.published_at else None,
+        "summary": n.summary,
+    }
+
+
+@api_view(["GET"])
+def get_deck_notes(request, deck_id):
+    """한국어 강의노트 목록 (활성만, 정렬순)."""
+    deck = get_object_or_404(Deck, id=deck_id)
+    return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in deck.notes.filter(is_active=True)]})

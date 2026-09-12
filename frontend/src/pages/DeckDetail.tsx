@@ -6,6 +6,7 @@ import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
+import DeckNotesSection from "@/components/DeckNotesSection";
 
 interface DeckStats {
   consistency: number;
@@ -276,6 +277,7 @@ export default function DeckDetail() {
         {showVideos && (
           <DeckVideosModal deckId={deck.id} deckName={deck.name} onClose={() => setShowVideos(false)} />
         )}
+        <DeckNotesSection deckId={deck.id} />
         {editing ? (
           <>
             {/* react-simplemde-editor로 마크다운 작성 */}
