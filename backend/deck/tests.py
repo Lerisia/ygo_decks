@@ -511,10 +511,9 @@ class DeckVideosEndpointTest(TestCase):
     def test_unknown_deck_404(self):
         self.assertEqual(self.client.get("/api/deck/999999/videos/").status_code, 404)
 
-    def test_detail_exposes_video_count(self):
-        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 3)
-        empty = _create_deck(name="영상없는덱")
-        self.assertEqual(self.client.get(f"/api/deck/{empty.id}/").json()["video_count"], 0)
+    def test_detail_video_count_ignores_channel_videos(self):
+        """2026-09-12 엘리스: 김빠방·한국 유튜버 영상은 버튼 활성 기준에서 제외."""
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)
 
 
 class SyncChannelVideosTest(TestCase):

@@ -237,7 +237,7 @@ def get_deck_data(request, deck_id):
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
         "play_video_url": deck.play_video_url,
-        "video_count": len(videos_for_deck(deck)) + (1 if _featured(deck) else 0),
+        "video_count": 1 if _featured(deck) else 0,  # 엘리스 지시(2026-09-12): 대표 영상만 노출, 김빠방·한국 유튜버 제외
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],

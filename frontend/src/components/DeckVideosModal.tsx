@@ -129,9 +129,7 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
           <div className="min-w-0 flex-1 text-left">
             <p className="font-bold text-gray-900 dark:text-gray-100 truncate">{deckName} 플레이 영상</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {data?.featured ? "대표 영상" : ""}
-              {data?.featured && data.videos.length > 0 ? " + " : ""}
-              {data && data.videos.length > 0 ? `${channelName} 채널 ${data.videos.length}개 · 최신순` : !data ? `${channelName} 채널` : ""}
+              {data?.featured ? `${data.featured.lang_label} 유튜브 · 조회수 기준 대표 영상` : "대표 영상"}
             </p>
           </div>
           <button
@@ -160,37 +158,25 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
                 </div>
               ))}
             </div>
-          ) : !data.featured && data.videos.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">아직 이 덱의 영상이 없습니다.</p>
+          ) : !data.featured ? (
+            <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">아직 이 덱의 대표 영상이 없습니다.</p>
           ) : (
-            <div className="space-y-3">
-              {data.featured && <FeaturedCard video={data.featured} />}
-              {data.videos.length > 0 && (
-                <div>
-                  {data.featured && (
-                    <p className="px-2 pb-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{channelName} 플레이 영상</p>
-                  )}
-                  <div className="space-y-1">
-                    {data.videos.map((v) => (
-                      <VideoCard key={v.video_id} video={v} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <FeaturedCard video={data.featured} />
           )}
         </div>
 
-        <div className="px-4 py-2.5 border-t border-gray-200 dark:border-gray-700 text-right">
-          <a
-            href={channelUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            {channelName} 채널 바로가기 ↗
-          </a>
-        </div>
+        {data?.featured?.channel_url && (
+          <div className="px-4 py-2.5 border-t border-gray-200 dark:border-gray-700 text-right">
+            <a
+              href={data.featured.channel_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              {data.featured.channel} 채널 바로가기 ↗
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
