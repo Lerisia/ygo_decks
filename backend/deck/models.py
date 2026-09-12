@@ -205,3 +205,32 @@ class DeckFeaturedVideo(models.Model):
 
     def __str__(self):
         return f"{self.deck.name}: {self.title}"
+
+
+class DeckNote(models.Model):
+    """Korean-language '강의노트' (deck guide) links shown on the deck detail page."""
+    SOURCE_CHOICES = [("postype", "포스타입"), ("dcinside", "디시인사이드"), ("notion", "노션"), ("gdocs", "구글 문서"),
+                      ("blog", "블로그"), ("twitter", "X(트위터)"), ("other", "기타")]
+    GAME_CHOICES = [("md", "마스터 듀얼"), ("ocg", "OCG"), ("both", "공통")]
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="notes")
+    title = models.CharField(max_length=300)
+    author = models.CharField(max_length=100, blank=True, default="")
+    url = models.URLField(max_length=500)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default="other")
+    game = models.CharField(max_length=8, choices=GAME_CHOICES, default="md")
+    is_paid = models.BooleanField(default=False, verbose_name="유료")
+    price = models.CharField(max_length=50, blank=True, default="", help_text="예: 3,000원")
+    published_at = models.DateField(null=True, blank=True)
+    summary = models.CharField(max_length=300, blank=True, default="")
+    sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "-published_at", "id"]
+        verbose_name = "덱 강의노트"
+        verbose_name_plural = "덱 강의노트"
+        constraints = [models.UniqueConstraint(fields=["deck", "url"], name="uniq_deck_note_url")]
+
+    def __str__(self):
+        return f"{self.deck.name}: {self.title}"

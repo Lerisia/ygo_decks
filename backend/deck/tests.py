@@ -633,3 +633,28 @@ class FeaturedVideoTest(TestCase):
         self.assertEqual(body["featured"]["thumbnail_url"], "https://i.ytimg.com/vi/feat1/hqdefault.jpg")
         self.assertEqual(body["videos"], [])
         self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 1)
+
+
+from .models import DeckNote
+
+
+class DeckNotesTest(TestCase):
+    """2026-09-12 엘리스: 덱별 한국어 강의노트 섹션 (유료 표시 포함)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.deck = _create_deck(name="노트덱")
+
+    def test_notes_listed_with_paid_flag_and_inactive_hidden(self):
+        DeckNote.objects.create(deck=self.deck, title="입문 노트", author="A", url="https://www.postype.com/@a/post/1", source="postype", is_paid=True, price="3,000원", published_at=datetime(2026, 4, 1).date(), sort_order=1)
+        DeckNote.objects.create(deck=self.deck, title="정보글 모음", author="B", url="https://gall.dcinside.com/mgallery/board/view/?id=x&no=1", source="dcinside", sort_order=0)
+        DeckNote.objects.create(deck=self.deck, title="숨김", url="https://example.com/x", is_active=False)
+        body = self.client.get(f"/api/deck/{self.deck.id}/notes/").json()
+        self.assertEqual([n["title"] for n in body["notes"]], ["정보글 모음", "입문 노트"])
+        paid = body["notes"][1]
+        self.assertTrue(paid["is_paid"]); self.assertEqual(paid["price"], "3,000원"); self.assertEqual(paid["source_label"], "포스타입")
+        self.assertEqual(paid["published_at"], "2026-04-01")
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["note_count"], 2)
+
+    def test_unknown_deck_404(self):
+        self.assertEqual(self.client.get("/api/deck/999999/notes/").status_code, 404)

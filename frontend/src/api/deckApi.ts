@@ -95,3 +95,25 @@ export const getDeckVideos = async (deckId: number): Promise<DeckVideosResponse>
   if (!response.ok) throw new Error("Failed to fetch deck videos");
   return response.json();
 };
+
+
+export type DeckNote = {
+  id: number;
+  title: string;
+  author: string;
+  url: string;
+  source: string;
+  source_label: string;
+  game: "md" | "ocg" | "both";
+  game_label: string;
+  is_paid: boolean;
+  price: string;
+  published_at: string | null;
+  summary: string;
+};
+
+export const getDeckNotes = async (deckId: number): Promise<{ deck_id: number; notes: DeckNote[] }> => {
+  const response = await fetch(`/api/deck/${deckId}/notes/`);
+  if (!response.ok) throw new Error("Failed to fetch deck notes");
+  return response.json();
+};

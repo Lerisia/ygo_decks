@@ -110,3 +110,15 @@ class DeckFeaturedVideoAdmin(admin.ModelAdmin):
     list_filter = ("lang",)
     search_fields = ("deck__name", "title", "channel")
     autocomplete_fields = ("deck",)
+
+
+from .models import DeckNote
+
+
+@admin.register(DeckNote)
+class DeckNoteAdmin(admin.ModelAdmin):
+    list_display = ("deck", "title", "author", "source", "game", "is_paid", "price", "published_at", "is_active", "sort_order")
+    list_filter = ("source", "game", "is_paid", "is_active")
+    list_editable = ("is_active", "sort_order")
+    search_fields = ("deck__name", "title", "author", "url")
+    autocomplete_fields = ("deck",)
