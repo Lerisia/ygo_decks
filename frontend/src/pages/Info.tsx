@@ -18,22 +18,11 @@ function formatDate(iso: string): string {
 }
 
 const DISMISSED_KEY = "dismissed_changelog_id";
-// YouTube promo tile: hideable per browser, and gone for everyone after this date (KST).
-const PROMO_DISMISSED_KEY = "dismissed_youtube_promo";
-const PROMO_UNTIL = new Date("2026-10-31T23:59:59+09:00");
 
 function Info() {
   const navigate = useNavigate();
   const [latest, setLatest] = useState<ChangelogEntry | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [promoDismissed, setPromoDismissed] = useState(() => localStorage.getItem(PROMO_DISMISSED_KEY) === "1");
-  const promoActive = !promoDismissed && new Date() <= PROMO_UNTIL;
-  const handlePromoDismiss = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    localStorage.setItem(PROMO_DISMISSED_KEY, "1");
-    setPromoDismissed(true);
-  };
 
   useEffect(() => {
     getLatestChangelog()
@@ -54,29 +43,6 @@ function Info() {
 
   return (
     <div className="flex flex-col px-2 py-4 sm:px-6 sm:py-6 md:p-10 h-auto min-h-screen max-w-xl md:max-w-2xl mx-auto text-gray-900 dark:text-white">
-      {promoActive && (
-        <section className="order-2 sm:order-1 mb-4 md:mb-5">
-          <a
-            href="https://www.youtube.com/@MD_Elite_Duelists"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="relative block bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800/40 rounded-xl shadow-sm p-4 md:p-5 pr-10 hover:bg-pink-100 dark:hover:bg-pink-900/30 transition"
-          >
-            <button
-              type="button"
-              onClick={handlePromoDismiss}
-              aria-label="홍보 배너 닫기"
-              className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-pink-100 dark:hover:bg-pink-800/30 transition"
-            >
-              ×
-            </button>
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="shrink-0 w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center text-sm">▶</span>
-              <p className="text-sm md:text-base font-semibold truncate">마스터 듀얼 종합 정보 확인하기</p>
-            </div>
-          </a>
-        </section>
-      )}
       {latest && !dismissed && (
         <section className="order-2 sm:order-1 mb-6 md:mb-8">
           <div className="flex items-baseline justify-between mb-2">
