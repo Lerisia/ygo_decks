@@ -23,17 +23,6 @@ const formatViews = (n: number | null) => {
   return `조회수 ${n}회`;
 };
 
-const formatDate = (iso: string | null) => {
-  if (!iso) return null;
-  const d = new Date(iso);
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  const abs = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-  if (days < 1) return `오늘 · ${abs}`;
-  if (days < 30) return `${days}일 전 · ${abs}`;
-  if (days < 365) return `${Math.floor(days / 30)}개월 전 · ${abs}`;
-  return `${Math.floor(days / 365)}년 전 · ${abs}`;
-};
-
 function FeaturedCard({ video }: { video: FeaturedVideo }) {
   const duration = formatDuration(video.duration);
   const views = formatViews(video.view_count);
