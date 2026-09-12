@@ -645,6 +645,154 @@ class DeckNotesTest(TestCase):
         self.client = APIClient()
         self.deck = _create_deck(name="노트덱")
 
+    def test_free_notes_listed_paid_and_inactive_hidden(self):
+        """2026-09-13 특이점: 유료 노트는 도감에 노출하지 않음(데이터는 유지)."""
+        DeckNote.objects.create(deck=self.deck, title="입문 노트", author="A", url="https://www.postype.com/@a/post/1", source="postype", is_paid=True, price="3,000원", published_at=datetime(2026, 4, 1).date(), sort_order=1)
+        DeckNote.objects.create(deck=self.deck, title="정보글 모음", author="B", url="https://gall.dcinside.com/mgallery/board/view/?id=x&no=1", source="dcinside", published_at=datetime(2026, 3, 1).date(), sort_order=0)
+        DeckNote.objects.create(deck=self.deck, title="숨김", url="https://example.com/x", is_active=False)
+        body = self.client.get(f"/api/deck/{self.deck.id}/notes/").json()
+        self.assertEqual([n["title"] for n in body["notes"]], ["정보글 모음"])
+        free = body["notes"][0]
+        self.assertFalse(free["is_paid"]); self.assertEqual(free["source_label"], "디시인사이드"); self.assertEqual(free["published_at"], "2026-03-01")
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["note_count"], 1)
+
+    def test_unknown_deck_404(self):
+        self.assertEqual(self.client.get("/api/deck/999999/videos/").status_code, 404)
+
+    def test_detail_video_count_ignores_channel_videos(self):
+        """2026-09-12 엘리스: 김빠방·한국 유튜버 영상은 버튼 활성 기준에서 제외."""
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)
+
+
+class SyncChannelVideosTest(TestCase):
+    def test_creates_updates_and_removes(self):
+        _video("gone", "삭제될 영상", position=0)
+        _video("kept", "옛 제목", datetime(2026, 1, 1, tzinfo=dt_timezone.utc), position=1)
+        listing = lambda: [
+            {"id": "fresh", "title": "새 영상 #덱 덱", "duration": 600},
+            {"id": "kept", "title": "새 제목", "duration": 500},
+        ]
+        calls = []
+        def details(vid):
+            calls.append(vid)
+            return {"published_at": datetime(2026, 9, 6, tzinfo=dt_timezone.utc), "view_count": 42, "duration": 601, "thumbnail_url": "https://i.ytimg.com/vi/fresh/maxresdefault.jpg"}
+        created, updated, removed = sync_channel_videos(fetch_listing=listing, fetch_details=details)
+        self.assertEqual((created, updated, removed), (1, 1, 1))
+        self.assertEqual(calls, ["fresh"])  # existing dated rows are not refetched
+        fresh = ChannelVideo.objects.get(video_id="fresh")
+        self.assertEqual((fresh.position, fresh.view_count, fresh.duration), (0, 42, 601))
+        self.assertEqual(fresh.published_at.date().isoformat(), "2026-09-06")
+        kept = ChannelVideo.objects.get(video_id="kept")
+        self.assertEqual((kept.title, kept.position), ("새 제목", 1))
+        self.assertFalse(ChannelVideo.objects.filter(video_id="gone").exists())
+
+    def test_detail_failure_still_creates_row_with_default_thumbnail(self):
+        def boom(vid):
+            raise RuntimeError("blocked")
+        created, _, _ = sync_channel_videos(fetch_listing=lambda: [{"id": "x1", "title": "t", "duration": 30}], fetch_details=boom)
+        self.assertEqual(created, 1)
+        row = ChannelVideo.objects.get(video_id="x1")
+        self.assertEqual(row.thumbnail_url, "https://i.ytimg.com/vi/x1/hqdefault.jpg")
+        self.assertEqual(row.duration, 30)
+        self.assertIsNone(row.published_at)
+
+    def test_empty_listing_leaves_cache_untouched(self):
+        _video("keep", "유지")
+        with self.assertRaises(RuntimeError):
+            sync_channel_videos(fetch_listing=lambda: [], fetch_details=lambda v: {})
+        self.assertTrue(ChannelVideo.objects.filter(video_id="keep").exists())
+
+
+class LooserTitleMatchingTest(TestCase):
+    """2026-09-07: 특이점 asked for a more lenient filter so more videos show up."""
+
+    def _match(self, deck, title):
+        return [v for v in videos_for_deck(deck, [ChannelVideo(video_id="t", title=title)])]
+
+    def test_hashtag_contained_in_deck_name(self):
+        deck = _create_deck(name="천년 엑조디아")
+        self.assertTrue(self._match(deck, "전설의 카드 #엑조디아 덱 - 유희왕 플레이 영상"))
+
+    def test_hybrid_abbreviation_hashtag_resolves_each_component(self):
+        a, b = _create_deck(name="섬도희"), _create_deck(name="천배룡")
+        title = "접점이 없는 두 테마 #섬도천배 덱 - 유희왕 플레이 영상"
+        self.assertTrue(self._match(a, title))
+        self.assertTrue(self._match(b, title))
+
+    def test_generic_piece_lets_rest_of_hashtag_resolve(self):
+        deck = _create_deck(name="식물GS")
+        _create_deck(name="식물족비트")  # makes '식물' prefix ambiguous → only full-key path works
+        plant = _create_deck(name="식물")
+        self.assertTrue(self._match(plant, "#식물링크 덱"))
+        self.assertFalse(self._match(deck, "#식물링크 덱"))
+
+    def test_ambiguous_prefix_does_not_match(self):
+        tail, maid = _create_deck(name="드래곤테일"), _create_deck(name="드래곤메이드")
+        self.assertFalse(self._match(tail, "돌아온 킬러 #드래그마 덱 - 유희왕 플레이 영상"))
+        self.assertFalse(self._match(maid, "돌아온 킬러 #드래그마 덱 - 유희왕 플레이 영상"))
+
+    def test_partially_decomposable_hashtag_does_not_match(self):
+        deck = _create_deck(name="메탈화")
+        self.assertFalse(self._match(deck, "#메탈포제 덱 - 유희왕 플레이 영상"))
+
+    def test_prose_mention_next_to_another_hashtag_does_not_match(self):
+        """2026-09-07 특이점: '맬리스' 목록에 '#제외사이킥' 영상이 섞임 — 해시태그가 분류 기준."""
+        malice = _create_deck(name="M∀LICE")
+        DeckAlias.objects.create(deck=malice, name="맬리스")
+        psychic = _create_deck(name="제외 사이킥")
+        title = "맬리스보다 강한 제외 테마? #제외사이킥 덱 - 유희왕 플레이 영상"
+        self.assertFalse(self._match(malice, title))
+        self.assertTrue(self._match(psychic, title))
+        tiara = _create_deck(name="티아라멘츠")
+        self.assertFalse(self._match(tiara, "티아라멘츠 전용 낙인 융합? #브릴퓨티아라 덱 - 유희왕 플레이 영상"))
+
+    def test_punctuation_in_deck_name_is_ignored(self):
+        """2026-09-09 특이점: '#FA' 영상이 F.A.(포뮬러 애슬리트)에 안 붙던 문제."""
+        fa = _create_deck(name="F.A.")
+        DeckAlias.objects.create(deck=fa, name="포뮬러 애슬리트")
+        self.assertTrue(self._match(fa, "서킷의 지배자 #FA 덱 - 유희왕 플레이 영상"))
+        race = _create_deck(name="R-ACE")
+        self.assertTrue(self._match(race, "#RACE 덱 - 유희왕 플레이 영상"))
+
+    def test_two_char_key_in_prose_still_ignored(self):
+        deck = _create_deck(name="제왕")
+        self.assertFalse(self._match(deck, "황제왕의 귀환 #크라운클랜 덱 - 유희왕 플레이 영상"))
+
+
+from .models import DeckFeaturedVideo
+
+
+class FeaturedVideoTest(TestCase):
+    """2026-09-12 엘리스: 덱마다 영미권/일본 최다 조회 대표 영상을 걸기."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.deck = _create_deck(name="대표덱")
+
+    def test_featured_video_is_returned_and_counted(self):
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/videos/").json()["featured"], None)
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)
+        DeckFeaturedVideo.objects.create(deck=self.deck, video_id="feat1", title="Best combo", channel="Pro Player", lang="en", view_count=120000, duration=600, published_at=datetime(2026, 5, 3).date())
+        body = self.client.get(f"/api/deck/{self.deck.id}/videos/").json()
+        self.assertEqual(body["featured"]["url"], "https://www.youtube.com/watch?v=feat1")
+        self.assertEqual(body["featured"]["lang_label"], "영어권")
+        self.assertEqual(body["featured"]["channel"], "Pro Player")
+        self.assertEqual(body["featured"]["published_at"], "2026-05-03")
+        self.assertEqual(body["featured"]["thumbnail_url"], "https://i.ytimg.com/vi/feat1/hqdefault.jpg")
+        self.assertEqual(body["videos"], [])
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 1)
+
+
+from .models import DeckNote
+
+
+class DeckNotesTest(TestCase):
+    """2026-09-12 엘리스: 덱별 한국어 강의노트 섹션 (유료 표시 포함)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.deck = _create_deck(name="노트덱")
+
     def test_notes_listed_with_paid_flag_and_inactive_hidden(self):
         DeckNote.objects.create(deck=self.deck, title="입문 노트", author="A", url="https://www.postype.com/@a/post/1", source="postype", is_paid=True, price="3,000원", published_at=datetime(2026, 4, 1).date(), sort_order=1)
         DeckNote.objects.create(deck=self.deck, title="정보글 모음", author="B", url="https://gall.dcinside.com/mgallery/board/view/?id=x&no=1", source="dcinside", sort_order=0)

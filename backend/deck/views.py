@@ -238,7 +238,7 @@ def get_deck_data(request, deck_id):
         "is_engine": deck.is_engine,
         "play_video_url": deck.play_video_url,
         "video_count": 1 if _featured(deck) else 0,
-        "note_count": deck.notes.filter(is_active=True).count(),  # 엘리스 지시(2026-09-12): 대표 영상만 노출, 김빠방·한국 유튜버 제외
+        "note_count": _visible_notes(deck).count(),
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -322,8 +322,17 @@ def serialize_note(n):
     }
 
 
+# 특이점 지시(2026-09-13): 도감에는 유료 노트를 노출하지 않음. 데이터는 유지하므로 True로 바꾸면 유료 배지와 함께 다시 보임.
+SHOW_PAID_NOTES = False
+
+
+def _visible_notes(deck):
+    qs = deck.notes.filter(is_active=True)
+    return qs if SHOW_PAID_NOTES else qs.filter(is_paid=False)
+
+
 @api_view(["GET"])
 def get_deck_notes(request, deck_id):
-    """한국어 강의노트 목록 (활성만, 정렬순)."""
+    """한국어 강의노트 목록 (활성·무료만, 정렬순)."""
     deck = get_object_or_404(Deck, id=deck_id)
-    return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in deck.notes.filter(is_active=True)]})
+    return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in _visible_notes(deck)]})
