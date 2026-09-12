@@ -106,7 +106,7 @@ from .models import DeckFeaturedVideo
 
 @admin.register(DeckFeaturedVideo)
 class DeckFeaturedVideoAdmin(admin.ModelAdmin):
-    list_display = ("deck", "title", "channel", "lang", "view_count", "updated_at")
+    list_display = ("deck", "title", "channel", "lang", "view_count", "published_at", "updated_at")
     list_filter = ("lang",)
     search_fields = ("deck__name", "title", "channel")
     autocomplete_fields = ("deck",)

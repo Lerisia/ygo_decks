@@ -624,11 +624,12 @@ class FeaturedVideoTest(TestCase):
     def test_featured_video_is_returned_and_counted(self):
         self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/videos/").json()["featured"], None)
         self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)
-        DeckFeaturedVideo.objects.create(deck=self.deck, video_id="feat1", title="Best combo", channel="Pro Player", lang="en", view_count=120000, duration=600)
+        DeckFeaturedVideo.objects.create(deck=self.deck, video_id="feat1", title="Best combo", channel="Pro Player", lang="en", view_count=120000, duration=600, published_at=datetime(2026, 5, 3).date())
         body = self.client.get(f"/api/deck/{self.deck.id}/videos/").json()
         self.assertEqual(body["featured"]["url"], "https://www.youtube.com/watch?v=feat1")
         self.assertEqual(body["featured"]["lang_label"], "영어권")
         self.assertEqual(body["featured"]["channel"], "Pro Player")
+        self.assertEqual(body["featured"]["published_at"], "2026-05-03")
         self.assertEqual(body["featured"]["thumbnail_url"], "https://i.ytimg.com/vi/feat1/hqdefault.jpg")
         self.assertEqual(body["videos"], [])
         self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 1)

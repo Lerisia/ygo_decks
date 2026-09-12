@@ -141,6 +141,7 @@ def serialize_featured(fv):
         "lang_label": fv.get_lang_display(),
         "thumbnail_url": fv.thumbnail_url or default_thumbnail(fv.video_id),
         "view_count": fv.view_count,
+        "published_at": fv.published_at.isoformat() if fv.published_at else None,
         "duration": fv.duration,
         "note": fv.note,
     }
