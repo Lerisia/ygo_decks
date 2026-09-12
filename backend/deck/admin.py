@@ -99,3 +99,14 @@ class ChannelVideoAdmin(admin.ModelAdmin):
     search_fields = ("title", "video_id")
     ordering = ("position",)
     readonly_fields = ("video_id", "title", "position", "published_at", "duration", "view_count", "thumbnail_url", "fetched_at")
+
+
+from .models import DeckFeaturedVideo
+
+
+@admin.register(DeckFeaturedVideo)
+class DeckFeaturedVideoAdmin(admin.ModelAdmin):
+    list_display = ("deck", "title", "channel", "lang", "view_count", "updated_at")
+    list_filter = ("lang",)
+    search_fields = ("deck__name", "title", "channel")
+    autocomplete_fields = ("deck",)

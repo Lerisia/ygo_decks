@@ -130,6 +130,22 @@ def videos_for_deck(deck, queryset=None):
     return [v for v in qs if deck.id in decks_for_title(v.title, index)]
 
 
+def serialize_featured(fv):
+    return {
+        "video_id": fv.video_id,
+        "title": fv.title,
+        "url": fv.url,
+        "channel": fv.channel,
+        "channel_url": fv.channel_url,
+        "lang": fv.lang,
+        "lang_label": fv.get_lang_display(),
+        "thumbnail_url": fv.thumbnail_url or default_thumbnail(fv.video_id),
+        "view_count": fv.view_count,
+        "duration": fv.duration,
+        "note": fv.note,
+    }
+
+
 def serialize_video(video):
     return {
         "video_id": video.video_id,

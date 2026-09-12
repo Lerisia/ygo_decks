@@ -68,8 +68,23 @@ export type DeckVideo = {
   view_count: number | null;
 };
 
+export type FeaturedVideo = {
+  video_id: string;
+  title: string;
+  url: string;
+  channel: string;
+  channel_url: string;
+  lang: "en" | "ja" | "ko" | "other";
+  lang_label: string;
+  thumbnail_url: string;
+  view_count: number | null;
+  duration: number | null;
+  note: string;
+};
+
 export type DeckVideosResponse = {
   deck_id: number;
+  featured: FeaturedVideo | null;
   channel: { name: string; url: string };
   videos: DeckVideo[];
 };

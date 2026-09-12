@@ -177,3 +177,30 @@ class ChannelVideo(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class DeckFeaturedVideo(models.Model):
+    """One hand-picked / auto-picked representative YouTube video per deck (global, any channel)."""
+    LANG_CHOICES = [("en", "영어권"), ("ja", "일본"), ("ko", "한국"), ("other", "기타")]
+    deck = models.OneToOneField(Deck, on_delete=models.CASCADE, related_name="featured_video")
+    video_id = models.CharField(max_length=20)
+    title = models.CharField(max_length=300)
+    channel = models.CharField(max_length=200, blank=True, default="")
+    channel_url = models.URLField(max_length=300, blank=True, default="")
+    lang = models.CharField(max_length=8, choices=LANG_CHOICES, default="en")
+    view_count = models.PositiveIntegerField(null=True, blank=True)
+    duration = models.PositiveIntegerField(null=True, blank=True, help_text="초")
+    thumbnail_url = models.URLField(max_length=500, blank=True, default="")
+    note = models.CharField(max_length=300, blank=True, default="", help_text="선정 사유 메모")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "덱 대표 영상"
+        verbose_name_plural = "덱 대표 영상"
+
+    @property
+    def url(self):
+        return f"https://www.youtube.com/watch?v={self.video_id}"
+
+    def __str__(self):
+        return f"{self.deck.name}: {self.title}"
