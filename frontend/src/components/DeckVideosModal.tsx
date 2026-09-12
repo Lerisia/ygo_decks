@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getDeckVideos, DeckVideo, DeckVideosResponse, FeaturedVideo } from "@/api/deckApi";
+import { getDeckVideos, DeckVideosResponse, FeaturedVideo } from "@/api/deckApi";
 
 type Props = {
   deckId: number;
@@ -33,35 +33,6 @@ const formatDate = (iso: string | null) => {
   if (days < 365) return `${Math.floor(days / 30)}개월 전 · ${abs}`;
   return `${Math.floor(days / 365)}년 전 · ${abs}`;
 };
-
-function VideoCard({ video }: { video: DeckVideo }) {
-  const duration = formatDuration(video.duration);
-  const meta = [formatDate(video.published_at), formatViews(video.view_count)].filter(Boolean).join(" · ");
-  return (
-    <a
-      href={video.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60 transition group"
-    >
-      <div className="relative flex-shrink-0 w-36 sm:w-44 aspect-video rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700">
-        <img
-          src={video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`}
-          alt=""
-          loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-        />
-        {duration && (
-          <span className="absolute bottom-1 right-1 px-1 rounded bg-black/80 text-white text-[11px] font-semibold">{duration}</span>
-        )}
-      </div>
-      <div className="min-w-0 flex-1 flex flex-col justify-center text-left">
-        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">{video.title}</p>
-        {meta && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{meta}</p>}
-      </div>
-    </a>
-  );
-}
 
 function FeaturedCard({ video }: { video: FeaturedVideo }) {
   const duration = formatDuration(video.duration);
@@ -109,8 +80,6 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const channelName = data?.channel.name ?? "김빠방";
-  const channelUrl = data?.channel.url ?? "https://www.youtube.com/@%EA%B9%80%EB%B9%A0%EB%B0%A9";
 
   return (
     <div
