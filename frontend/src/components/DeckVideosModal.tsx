@@ -123,18 +123,6 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
           )}
         </div>
 
-        {data?.featured?.channel_url && (
-          <div className="px-4 py-2.5 border-t border-gray-200 dark:border-gray-700 text-right">
-            <a
-              href={data.featured.channel_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              {data.featured.channel} 채널 바로가기 ↗
-            </a>
-          </div>
-        )}
       </div>
     </div>
   );
