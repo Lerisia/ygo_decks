@@ -26,6 +26,8 @@ const formatViews = (n: number | null) => {
 function FeaturedCard({ video }: { video: FeaturedVideo }) {
   const duration = formatDuration(video.duration);
   const views = formatViews(video.view_count);
+  const published = video.published_at ? `${video.published_at.slice(0, 4)}.${video.published_at.slice(5, 7)}` : null;
+  const meta = [video.channel, views, published].filter(Boolean).join(" · ");
   return (
     <a
       href={video.url}
@@ -40,10 +42,7 @@ function FeaturedCard({ video }: { video: FeaturedVideo }) {
       </div>
       <div className="p-3 text-left">
         <p className="font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2">{video.title}</p>
-        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-          {video.channel}
-          {views ? ` · ${views}` : ""}
-        </p>
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{meta}</p>
       </div>
     </a>
   );

@@ -78,6 +78,7 @@ export type FeaturedVideo = {
   lang_label: string;
   thumbnail_url: string;
   view_count: number | null;
+  published_at: string | null;
   duration: number | null;
   note: string;
 };

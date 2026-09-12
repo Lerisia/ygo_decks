@@ -189,6 +189,7 @@ class DeckFeaturedVideo(models.Model):
     channel_url = models.URLField(max_length=300, blank=True, default="")
     lang = models.CharField(max_length=8, choices=LANG_CHOICES, default="en")
     view_count = models.PositiveIntegerField(null=True, blank=True)
+    published_at = models.DateField(null=True, blank=True, help_text="업로드일")
     duration = models.PositiveIntegerField(null=True, blank=True, help_text="초")
     thumbnail_url = models.URLField(max_length=500, blank=True, default="")
     note = models.CharField(max_length=300, blank=True, default="", help_text="선정 사유 메모")
