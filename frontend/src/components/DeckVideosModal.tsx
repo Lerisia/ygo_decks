@@ -16,18 +16,10 @@ const formatDuration = (sec: number | null) => {
   return `${h > 0 ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 };
 
-const formatViews = (n: number | null) => {
-  if (n == null) return null;
-  if (n >= 10000) return `조회수 ${(n / 10000).toFixed(n >= 100000 ? 0 : 1)}만회`;
-  if (n >= 1000) return `조회수 ${(n / 1000).toFixed(1)}천회`;
-  return `조회수 ${n}회`;
-};
-
 function FeaturedCard({ video }: { video: FeaturedVideo }) {
   const duration = formatDuration(video.duration);
-  const views = formatViews(video.view_count);
   const published = video.published_at ? `${video.published_at.slice(0, 4)}.${video.published_at.slice(5, 7)}` : null;
-  const meta = [video.channel, views, published].filter(Boolean).join(" · ");
+  const meta = [video.channel, published].filter(Boolean).join(" · ");
   return (
     <a
       href={video.url}
@@ -85,9 +77,6 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
           <span className="inline-flex w-7 h-7 rounded-full bg-red-600 text-white text-xs items-center justify-center flex-shrink-0">▶</span>
           <div className="min-w-0 flex-1 text-left">
             <p className="font-bold text-gray-900 dark:text-gray-100 truncate">{deckName} 플레이 영상</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              유튜브 조회수 기준 대표 영상
-            </p>
           </div>
           <button
             type="button"
