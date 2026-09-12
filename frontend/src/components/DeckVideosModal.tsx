@@ -35,7 +35,7 @@ function FeaturedCard({ video }: { video: FeaturedVideo }) {
     >
       <div className="relative aspect-video bg-gray-200 dark:bg-gray-700">
         <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
-        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-bold shadow">★ 대표 영상 · {video.lang_label}</span>
+        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-bold shadow">★ 대표 영상</span>
         {duration && <span className="absolute bottom-2 right-2 px-1.5 rounded bg-black/80 text-white text-xs font-semibold">{duration}</span>}
       </div>
       <div className="p-3 text-left">
@@ -87,7 +87,7 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
           <div className="min-w-0 flex-1 text-left">
             <p className="font-bold text-gray-900 dark:text-gray-100 truncate">{deckName} 플레이 영상</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {data?.featured ? `${data.featured.lang_label} 유튜브 · 조회수 기준 대표 영상` : "대표 영상"}
+              유튜브 조회수 기준 대표 영상
             </p>
           </div>
           <button
