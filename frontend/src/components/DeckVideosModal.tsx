@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getDeckVideos, DeckVideo, DeckVideosResponse } from "@/api/deckApi";
+import { getDeckVideos, DeckVideo, DeckVideosResponse, FeaturedVideo } from "@/api/deckApi";
 
 type Props = {
   deckId: number;
@@ -63,6 +63,32 @@ function VideoCard({ video }: { video: DeckVideo }) {
   );
 }
 
+function FeaturedCard({ video }: { video: FeaturedVideo }) {
+  const duration = formatDuration(video.duration);
+  const views = formatViews(video.view_count);
+  return (
+    <a
+      href={video.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700/60 bg-amber-50/60 dark:bg-amber-900/10 hover:bg-amber-100/70 dark:hover:bg-amber-900/20 transition group"
+    >
+      <div className="relative aspect-video bg-gray-200 dark:bg-gray-700">
+        <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-bold shadow">★ 대표 영상 · {video.lang_label}</span>
+        {duration && <span className="absolute bottom-2 right-2 px-1.5 rounded bg-black/80 text-white text-xs font-semibold">{duration}</span>}
+      </div>
+      <div className="p-3 text-left">
+        <p className="font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2">{video.title}</p>
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+          {video.channel}
+          {views ? ` · ${views}` : ""}
+        </p>
+      </div>
+    </a>
+  );
+}
+
 export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
   const [data, setData] = useState<DeckVideosResponse | null>(null);
   const [error, setError] = useState(false);
@@ -103,8 +129,9 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
           <div className="min-w-0 flex-1 text-left">
             <p className="font-bold text-gray-900 dark:text-gray-100 truncate">{deckName} 플레이 영상</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {channelName} 채널
-              {data ? ` · ${data.videos.length}개 · 최신순` : ""}
+              {data?.featured ? "대표 영상" : ""}
+              {data?.featured && data.videos.length > 0 ? " + " : ""}
+              {data && data.videos.length > 0 ? `${channelName} 채널 ${data.videos.length}개 · 최신순` : !data ? `${channelName} 채널` : ""}
             </p>
           </div>
           <button
@@ -133,13 +160,23 @@ export default function DeckVideosModal({ deckId, deckName, onClose }: Props) {
                 </div>
               ))}
             </div>
-          ) : data.videos.length === 0 ? (
+          ) : !data.featured && data.videos.length === 0 ? (
             <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">아직 이 덱의 영상이 없습니다.</p>
           ) : (
-            <div className="space-y-1">
-              {data.videos.map((v) => (
-                <VideoCard key={v.video_id} video={v} />
-              ))}
+            <div className="space-y-3">
+              {data.featured && <FeaturedCard video={data.featured} />}
+              {data.videos.length > 0 && (
+                <div>
+                  {data.featured && (
+                    <p className="px-2 pb-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{channelName} 플레이 영상</p>
+                  )}
+                  <div className="space-y-1">
+                    {data.videos.map((v) => (
+                      <VideoCard key={v.video_id} video={v} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

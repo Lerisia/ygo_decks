@@ -610,3 +610,26 @@ class LooserTitleMatchingTest(TestCase):
     def test_two_char_key_in_prose_still_ignored(self):
         deck = _create_deck(name="제왕")
         self.assertFalse(self._match(deck, "황제왕의 귀환 #크라운클랜 덱 - 유희왕 플레이 영상"))
+
+
+from .models import DeckFeaturedVideo
+
+
+class FeaturedVideoTest(TestCase):
+    """2026-09-12 엘리스: 덱마다 영미권/일본 최다 조회 대표 영상을 걸기."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.deck = _create_deck(name="대표덱")
+
+    def test_featured_video_is_returned_and_counted(self):
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/videos/").json()["featured"], None)
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)
+        DeckFeaturedVideo.objects.create(deck=self.deck, video_id="feat1", title="Best combo", channel="Pro Player", lang="en", view_count=120000, duration=600)
+        body = self.client.get(f"/api/deck/{self.deck.id}/videos/").json()
+        self.assertEqual(body["featured"]["url"], "https://www.youtube.com/watch?v=feat1")
+        self.assertEqual(body["featured"]["lang_label"], "영어권")
+        self.assertEqual(body["featured"]["channel"], "Pro Player")
+        self.assertEqual(body["featured"]["thumbnail_url"], "https://i.ytimg.com/vi/feat1/hqdefault.jpg")
+        self.assertEqual(body["videos"], [])
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 1)

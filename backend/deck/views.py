@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
-from .youtube import CHANNEL_NAME, CHANNEL_URL, videos_for_deck, serialize_video
+from .youtube import CHANNEL_NAME, CHANNEL_URL, videos_for_deck, serialize_video, serialize_featured
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -237,7 +237,7 @@ def get_deck_data(request, deck_id):
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
         "play_video_url": deck.play_video_url,
-        "video_count": len(videos_for_deck(deck)),
+        "video_count": len(videos_for_deck(deck)) + (1 if _featured(deck) else 0),
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -255,14 +255,23 @@ def get_deck_data(request, deck_id):
     return Response(deck_data)
 
 
+def _featured(deck):
+    try:
+        return deck.featured_video
+    except Exception:
+        return None
+
+
 @api_view(["GET"])
 def get_deck_videos(request, deck_id):
     """김빠방 채널 영상 중 이 덱(이름·별칭)에 해당하는 것만 최신순으로."""
     deck = get_object_or_404(Deck, id=deck_id)
     videos = videos_for_deck(deck)
     videos.sort(key=lambda v: (v.published_at is None, -(v.published_at.timestamp() if v.published_at else 0), v.position))
+    featured = _featured(deck)
     return Response({
         "deck_id": deck.id,
+        "featured": serialize_featured(featured) if featured else None,
         "channel": {"name": CHANNEL_NAME, "url": CHANNEL_URL},
         "videos": [serialize_video(v) for v in videos],
     })
