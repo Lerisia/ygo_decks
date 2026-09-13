@@ -381,6 +381,13 @@ const RecordGroupDetailPage = () => {
     loadPending();
   }, [page, pageSize]);
 
+  // Games deferred from the tracker overlay show up without a reload.
+  useEffect(() => {
+    if (!isOwner) return;
+    const id = setInterval(loadPending, 15000);
+    return () => clearInterval(id);
+  }, [isOwner]);
+
   // Tracker capture → register form. A suggested deck not in the owned list is added to the options for this pick.
   const fillFromPending = (p: TrackerPendingMatch) => {
     const deckId = p.suggested_deck?.deck_id ?? null;
