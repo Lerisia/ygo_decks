@@ -78,3 +78,9 @@ backend/db.sqlite3-*
 
 # raw PC tracker snapshots (research data, may contain player info)
 backend/data/tracker_snapshots/
+
+# tracker-client (.NET) build outputs
+tracker-client/**/bin/
+tracker-client/**/obj/
+tracker-client/**/publish/
+tracker-client/**/publish-linux/

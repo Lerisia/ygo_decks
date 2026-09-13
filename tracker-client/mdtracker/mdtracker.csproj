@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyName>mdtracker</AssemblyName>
+    <RootNamespace>MdTracker</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../mdpeek/Mem.cs" Link="core/Mem.cs" />
+    <Compile Include="../mdpeek/Native.cs" Link="core/Native.cs" />
+    <Compile Include="../mdpeek/Il2Cpp.cs" Link="core/Il2Cpp.cs" />
+    <Compile Include="../mdpeek/Game.cs" Link="core/Game.cs" />
+  </ItemGroup>
+
+</Project>
