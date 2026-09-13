@@ -155,6 +155,23 @@ class DeckAlias(models.Model):
     def __str__(self):
         return self.name
 
+class DeckArchetype(models.Model):
+    """Card.archetype values (YGOPRODeck English names) that identify this deck.
+    Used by the PC tracker to infer decks from card IDs; several decks may share an archetype."""
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="archetypes")
+    name = models.CharField(max_length=100, db_index=True)
+    # 0..1 multiplier — lower for engines/splash themes so they don't outvote the main theme
+    weight = models.FloatField(default=1.0)
+
+    class Meta:
+        verbose_name = "덱 아키타입"
+        verbose_name_plural = "덱 아키타입"
+        constraints = [models.UniqueConstraint(fields=["deck", "name"], name="uniq_deck_archetype")]
+
+    def __str__(self):
+        return f"{self.deck.name}: {self.name}"
+
+
 class DeckFeaturedVideo(models.Model):
     """One hand-picked / auto-picked representative YouTube video per deck (global, any channel)."""
     LANG_CHOICES = [("en", "영어권"), ("ja", "일본"), ("ko", "한국"), ("other", "기타")]

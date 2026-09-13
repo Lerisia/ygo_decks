@@ -111,3 +111,14 @@ class DeckNoteAdmin(admin.ModelAdmin):
     list_editable = ("is_active", "sort_order")
     search_fields = ("deck__name", "title", "author", "url")
     autocomplete_fields = ("deck",)
+
+
+from .models import DeckArchetype
+
+
+@admin.register(DeckArchetype)
+class DeckArchetypeAdmin(admin.ModelAdmin):
+    list_display = ("deck", "name", "weight")
+    list_editable = ("weight",)
+    search_fields = ("deck__name", "name")
+    autocomplete_fields = ("deck",)

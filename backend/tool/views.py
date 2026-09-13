@@ -1,8 +1,14 @@
+import json
+import os
+import re
+import uuid
+from django.conf import settings
+from django.utils import timezone
 from django.db.models import Count, Q, F, FloatField, ExpressionWrapper
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from .models import RecordGroup, MatchRecord, SiteConfig
 from deck.models import Deck
@@ -409,3 +415,41 @@ def get_record_group_rank_history(request, record_group_id):
 
     return Response({"matches": data}, status=status.HTTP_200_OK)
 
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def tracker_infer(request):
+    """PC tracker: card ids (Konami cid) for both players → site deck candidates."""
+    from .tracker import infer_decks
+
+    def _ids(key):
+        v = request.data.get(key) or []
+        return [int(x) for x in v if str(x).isdigit()]
+
+    out = {}
+    for key in ("my", "opp"):
+        cands, unknown = infer_decks(_ids(f"{key}_cards"))
+        out[key] = {"candidates": cands, "unknown_ids": unknown}
+    return Response(out)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def tracker_snapshot(request):
+    """Collector build of the tracker: store a raw game snapshot (JSON) for schema research.
+    Auth: X-Tracker-Key header must equal settings.TRACKER_SNAPSHOT_KEY (unset → endpoint disabled)."""
+    key = getattr(settings, "TRACKER_SNAPSHOT_KEY", "")
+    if not key or request.headers.get("X-Tracker-Key") != key:
+        return Response({"error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+    body = request.data
+    if not isinstance(body, dict):
+        return Response({"error": "json object expected"}, status=status.HTTP_400_BAD_REQUEST)
+    tag = re.sub(r"[^A-Za-z0-9_-]", "", str(body.get("tag") or "snapshot"))[:40] or "snapshot"
+    sender = re.sub(r"[^A-Za-z0-9_-]", "", str(body.get("sender") or "anon"))[:40] or "anon"
+    out_dir = os.path.join(settings.BASE_DIR, "data", "tracker_snapshots")
+    os.makedirs(out_dir, exist_ok=True)
+    name = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{sender}_{tag}_{uuid.uuid4().hex[:6]}.json"
+    with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=1)
+    return Response({"stored": name}, status=status.HTTP_201_CREATED)

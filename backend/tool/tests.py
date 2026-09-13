@@ -667,3 +667,81 @@ class AggregateStatisticsTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["basic"]["total_games"], 2)
         self.assertEqual(resp.json()["record_group_name"], "시즌1")
+
+
+class TrackerInferTest(TestCase):
+    """POST /api/tracker/infer/ — card ids → deck candidates for the PC tracker."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="t@test.com", username="tracker", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.blue = _create_deck("푸른 눈")
+        self.reso = _create_deck("레조네이터")
+        self.dragon_link = _create_deck("드래곤 링크")
+        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes")
+        DeckArchetype.objects.create(deck=self.reso, name="Resonator")
+        DeckArchetype.objects.create(deck=self.reso, name="Red Dragon Archfiend")
+        DeckArchetype.objects.create(deck=self.dragon_link, name="Blue-Eyes", weight=0.3)
+        for kid, name, arch in [("4007", "Blue-Eyes White Dragon", "Blue-Eyes"), ("12292", "Sage with Eyes of Blue", "Blue-Eyes"),
+                                ("9015", "Red Lotus King", "Red Dragon Archfiend"), ("19014", "Soul Resonator", "Resonator"),
+                                ("9279", "Droll & Lock Bird", None)]:
+            Card.objects.create(card_id=f"c{kid}", konami_id=kid, name=name, archetype=arch)
+
+    def test_infer_votes_by_card_copies_and_weight(self):
+        res = self.client.post("/api/tracker/infer/",
+                               {"my_cards": [4007, 4007, 4007, 12292, 9279], "opp_cards": [9015, 19014]}, format="json")
+        self.assertEqual(res.status_code, 200)
+        my = res.data["my"]["candidates"]
+        self.assertEqual(my[0]["name"], "푸른 눈")
+        self.assertEqual(my[0]["score"], 4.0)
+        self.assertEqual(my[1]["name"], "드래곤 링크")
+        self.assertAlmostEqual(my[1]["score"], 1.2)
+        self.assertAlmostEqual(my[0]["share"], 1.0)
+        self.assertEqual(res.data["opp"]["candidates"][0]["name"], "레조네이터")
+        self.assertEqual(res.data["opp"]["candidates"][0]["score"], 2.0)
+
+    def test_unknown_ids_and_empty(self):
+        res = self.client.post("/api/tracker/infer/", {"my_cards": [999999], "opp_cards": []}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["my"]["candidates"], [])
+        self.assertEqual(res.data["my"]["unknown_ids"], [999999])
+        self.assertEqual(res.data["opp"]["candidates"], [])
+
+    def test_requires_auth(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.post("/api/tracker/infer/", {"my_cards": [4007]}, format="json")
+        self.assertEqual(res.status_code, 401)
+
+    def test_rank_code(self):
+        from .tracker import rank_code
+        self.assertEqual(rank_code(1, 2), "rookie2")
+        self.assertEqual(rank_code(4, 3), "gold3")
+        self.assertEqual(rank_code(7, 1), "master1")
+        self.assertIsNone(rank_code(9, 1))
+        self.assertIsNone(rank_code(2, 0))
+
+
+class TrackerSnapshotTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_disabled_without_key(self):
+        from django.test import override_settings
+        with override_settings(TRACKER_SNAPSHOT_KEY=""):
+            res = self.client.post("/api/tracker/snapshot/", {"tag": "x"}, format="json", HTTP_X_TRACKER_KEY="")
+        self.assertEqual(res.status_code, 403)
+
+    def test_stores_json_with_key(self):
+        import os, tempfile, glob
+        from django.test import override_settings
+        with tempfile.TemporaryDirectory() as tmp, override_settings(TRACKER_SNAPSHOT_KEY="secret", BASE_DIR=tmp):
+            res = self.client.post("/api/tracker/snapshot/", {"tag": "duel_result", "sender": "friend", "data": {"a": 1}},
+                                   format="json", HTTP_X_TRACKER_KEY="secret")
+            self.assertEqual(res.status_code, 201)
+            files = glob.glob(os.path.join(tmp, "data", "tracker_snapshots", "*_friend_duel_result_*.json"))
+            self.assertEqual(len(files), 1)
+            res = self.client.post("/api/tracker/snapshot/", {"tag": "x"}, format="json", HTTP_X_TRACKER_KEY="wrong")
+            self.assertEqual(res.status_code, 403)

@@ -4,7 +4,7 @@ from .views import (
     delete_record_group, delete_match_record, get_record_group_statistics,
     get_record_group_matches, get_record_group_statistics_full, update_record_group_name, update_match_record,
     recent_meta_deck_stats, get_record_group_rank_history, update_record_group_visibility,
-    get_user_statistics_full
+    get_user_statistics_full, tracker_infer, tracker_snapshot
 )
 
 urlpatterns = [
@@ -21,5 +21,7 @@ urlpatterns = [
     path("record-groups/<int:record_group_id>/update-visibility/", update_record_group_visibility, name="update_record_group_visibility"),
     path("match-records/<int:match_id>/update/", update_match_record, name="update-match-record"),\
     path("recent-meta-deck-stats/", recent_meta_deck_stats, name="recent_meta_deck_stats"),
+    path("tracker/infer/", tracker_infer, name="tracker-infer"),
+    path("tracker/snapshot/", tracker_snapshot, name="tracker-snapshot"),
     path("record-groups/<int:record_group_id>/rank-history/", get_record_group_rank_history, name="record-group-rank-history"),
 ]
