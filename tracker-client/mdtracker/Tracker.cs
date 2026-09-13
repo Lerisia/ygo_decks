@@ -1,0 +1,173 @@
+using System.IO;
+using MdPeek;
+
+namespace MdTracker;
+
+/// Background orchestration: watch the game, enrich each captured duel, hand it to the UI (overlay), save.
+public sealed class Tracker
+{
+    public readonly Store Store;
+    public readonly Api Api;
+    public event Action<string>? StatusChanged;
+    public event Action<PendingMatch>? MatchCaptured;
+    public event Action? MatchesChanged;
+    public string Status { get; private set; } = "마스터듀얼 실행을 기다리는 중…";
+    public bool GameConnected { get; private set; }
+
+    public Tracker(Store store, Api api)
+    {
+        Store = store; Api = api;
+        Log.Sink = line => { try { File.AppendAllText(store.LogPath, line + Environment.NewLine); } catch { } };
+    }
+
+    public void Start()
+    {
+        new Thread(GameLoop) { IsBackground = true, Name = "game" }.Start();
+        new Thread(RetryLoop) { IsBackground = true, Name = "retry" }.Start();
+        new Thread(() => { try { RefreshDecks(); } catch { } }) { IsBackground = true }.Start();
+    }
+
+    private void SetStatus(string s, bool connected)
+    {
+        Status = s; GameConnected = connected; StatusChanged?.Invoke(s);
+    }
+
+    private void GameLoop()
+    {
+        while (true)
+        {
+            Mem? mem = null;
+            try
+            {
+                SetStatus("마스터듀얼 실행을 기다리는 중…", false);
+                mem = Mem.Open();
+                var g = new Game(mem);
+                SetStatus("마스터듀얼 연결됨 — 랭크/레이트 게임을 자동으로 기록합니다", true);
+                Log.Info("game connected");
+                var rec = new Recorder(g, OnMatch, did => Store.Has(did));
+                rec.Run();
+            }
+            catch (Exception ex)
+            {
+                if (!ex.Message.Contains("not found")) Log.Info("game: " + ex.Message);
+            }
+            finally { mem?.Dispose(); }
+            Thread.Sleep(5000);
+        }
+    }
+
+    private void OnMatch(PendingMatch m)
+    {
+        if (m.GameMode == 3) ApplyGauge(m);
+        Enrich(m);
+        Store.Save(m);
+        MatchesChanged?.Invoke();
+        MatchCaptured?.Invoke(m);
+    }
+
+    public void RefreshDecks()
+    {
+        if (Store.Decks.Count > 0 && DateTime.Now - Store.DecksLoadedAt < TimeSpan.FromHours(12)) return;
+        Store.SaveDecks(Api.Decks());
+    }
+
+    /// Ask the server for deck candidates / card names; my-deck suggestion prefers the remembered mapping.
+    public void Enrich(PendingMatch m)
+    {
+        try
+        {
+            if (Store.Config.Token != null)
+            {
+                var inf = Api.Infer(m.MyCards, m.OppCards);
+                m.MyCandidates = inf.My.Candidates; m.OppCandidates = inf.Opp.Candidates;
+                m.MyCardNames = inf.My.Cards; m.OppCardNames = inf.Opp.Cards;
+                m.SuggestedOppDeckId = inf.Opp.Candidates.FirstOrDefault()?.DeckId;
+                m.Error = null;
+            }
+        }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); m.Error = "로그인이 만료되었습니다"; }
+        catch (Exception ex) { m.Error = "서버 조회 실패: " + ex.Message; }
+        if (m.MyMdDeckId != null && Store.Config.DeckMap.TryGetValue(m.MyMdDeckId, out var mapped)) m.SuggestedMyDeckId = mapped;
+        else m.SuggestedMyDeckId = m.MyCandidates.FirstOrDefault()?.DeckId;
+    }
+
+    /// Save to the selected record group. Returns null on success, else an error message.
+    public string? Save(PendingMatch m, int deckId, int? oppDeckId, string? notes)
+    {
+        if (Store.Config.RecordGroupId is not int gid) return "기록할 시트가 선택되지 않았습니다";
+        try
+        {
+            int id = Api.AddMatch(gid, m, deckId, oppDeckId, notes);
+            m.Status = "saved"; m.MatchId = id; m.Error = null; m.Notes = notes;
+            m.SavedDeckName = Store.Decks.FirstOrDefault(d => d.Id == deckId)?.Name;
+            m.SavedOppDeckName = oppDeckId.HasValue ? Store.Decks.FirstOrDefault(d => d.Id == oppDeckId)?.Name : null;
+            if (m.MyMdDeckId != null) { Store.Config.DeckMap[m.MyMdDeckId] = deckId; Store.SaveConfig(); }
+            Store.Save(m); MatchesChanged?.Invoke();
+            Log.Info($"saved match {id}: {m.Result} vs {m.OppName} ({m.SavedOppDeckName ?? "?"})");
+            return null;
+        }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); m.Status = "failed"; m.Error = "로그인 만료"; }
+        catch (Exception ex) { m.Status = "failed"; m.Error = ex.Message; Log.Info("save failed: " + ex.Message); }
+        Store.Save(m); MatchesChanged?.Invoke();
+        return m.Error;
+    }
+
+    /// "나중에": park it on the site's record page as 확인 대기.
+    public string? Defer(PendingMatch m)
+    {
+        try { Api.UploadPending(m); m.Status = "pending"; m.Error = null; }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); m.Status = "failed"; m.Error = "로그인 만료"; }
+        catch (Exception ex) { m.Status = "failed"; m.Error = ex.Message; }
+        Store.Save(m); MatchesChanged?.Invoke();
+        return m.Error;
+    }
+
+    public void Discard(PendingMatch m) { m.Status = "discarded"; Store.Save(m); MatchesChanged?.Invoke(); }
+
+    /// Games whose save failed (network hiccup) are parked on the site once a minute so nothing is lost.
+    private void RetryLoop()
+    {
+        while (true)
+        {
+            Thread.Sleep(60_000);
+            if (Store.Config.Token == null) continue;
+            foreach (var m in Store.Matches.Where(x => x.Status == "failed").ToList()) Defer(m);
+        }
+    }
+
+    /// Ranked ladder state, kept locally with the site's rules (RankRules). The site stores the rank/wins
+    /// *after* each game, so the record gets NextState(before, result); a promotion/demotion reported by the
+    /// game overrides the computed rank (and resets wins to 0) so drift can't accumulate.
+    public void ApplyGauge(PendingMatch m)
+    {
+        if (m.RankCode == null || m.RankBefore is not int rb || m.TierBefore is not int tb) return;
+        var g = Store.Config.Gauge;
+        if (g == null || g.Rank != rb || g.Tier != tb) g = new Gauge { Rank = rb, Tier = tb, Wins = 0 };
+        var next = RankRules.NextState(m.RankCode, g.Wins, m.Result);
+        var gameAfter = m.RankAfter is int ra && m.TierAfter is int ta ? Recorder.RankCode(ra, ta) : null;
+        if (gameAfter != null && gameAfter != next.rank) { Log.Info($"ladder resync: rules said {next.rank}, game says {gameAfter}"); next = (gameAfter, 0); }
+        m.RankCode = next.rank;
+        var valid = RankRules.ValidWins(next.rank);
+        m.Wins = valid.Length == 0 ? null : next.wins is int w && valid.Contains(w) ? w : valid[0];
+        m.WinsEstimated = valid.Length > 0;
+        var (nr, nt) = Recorder.ParseRankCode(next.rank) ?? (rb, tb);
+        Store.Config.Gauge = new Gauge { Rank = nr, Tier = nt, Wins = next.wins ?? 0 };
+        Store.SaveConfig();
+    }
+
+    /// A fake game (real ids from the 2026-09-13 recon game) to exercise the overlay without the game.
+    public PendingMatch DemoMatch()
+    {
+        var m = new PendingMatch
+        {
+            Did = DateTime.Now.Ticks.ToString(), StartedAt = DateTime.Now.AddMinutes(-9).ToString("s"), EndedAt = DateTime.Now.ToString("s"),
+            GameMode = 3, GameModeName = "Rank", Result = "win", Finish = "Normal", CoinWin = true, First = true, MyId = 0,
+            MyName = "Elyss", OppName = "ヤヤトゥーレ", RankBefore = 2, TierBefore = 3, RankAfter = 2, TierAfter = 2, RankCode = "bronze3", Turn = 2,
+            MyMdDeckId = "28860507",
+            MyCards = new() { 4007, 3801, 8933, 8933, 9279, 9279, 12292, 12292, 12292, 20602, 20602, 20602, 9455, 3891, 3891, 3891, 3892, 3892, 20607, 11931, 16653, 12331, 16842, 11123, 20780, 16386, 19184, 20609, 13496, 19188, 18825, 20500, 20536 },
+            OppCards = new() { 9015, 15060, 12695, 19014, 9518 },
+        };
+        OnMatch(m);
+        return m;
+    }
+}

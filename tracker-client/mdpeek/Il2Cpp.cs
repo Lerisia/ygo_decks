@@ -317,10 +317,12 @@ internal static class Log
 {
     // Recent lines are attached to uploaded snapshots so the server sees the same trace as the console.
     private static readonly List<string> _buf = new();
+    public static Action<string>? Sink;
     public static void Info(string s)
     {
         var line = $"[{DateTime.Now:HH:mm:ss}] {s}";
         Console.Error.WriteLine(line);
+        Sink?.Invoke(line);
         lock (_buf) { _buf.Add(line); if (_buf.Count > 500) _buf.RemoveRange(0, _buf.Count - 500); }
     }
     public static List<string> Drain() { lock (_buf) { var l = new List<string>(_buf); _buf.Clear(); return l; } }

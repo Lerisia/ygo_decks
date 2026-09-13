@@ -8,6 +8,13 @@ public sealed class Config
     public string ServerUrl { get; set; } = "https://ygodecks.com";
     public string? Token { get; set; }
     public string? Email { get; set; }
+    public int? RecordGroupId { get; set; }
+    public string? RecordGroupName { get; set; }
+    /// Master Duel deck id → site deck id, remembered after the first save.
+    public Dictionary<string, int> DeckMap { get; set; } = new();
+    /// Seconds the overlay waits before saving with the suggested values.
+    public int OverlaySeconds { get; set; } = 20;
+    public bool ShowedFullscreenTip { get; set; }
     /// Locally tracked ranked win gauge (the game only reports promotions/demotions at low ranks).
     public Gauge? Gauge { get; set; }
 }
@@ -19,12 +26,52 @@ public sealed class Gauge
     public int Wins { get; set; }
 }
 
-public sealed class PendingUploadResponse
+public sealed class DeckCandidate
+{
+    [JsonPropertyName("deck_id")] public int DeckId { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("score")] public double Score { get; set; }
+    [JsonPropertyName("share")] public double Share { get; set; }
+}
+
+public sealed class CardInfo
 {
     [JsonPropertyName("id")] public int Id { get; set; }
-    [JsonPropertyName("status")] public string? Status { get; set; }
-    [JsonPropertyName("suggested_deck")] public JsonElement? SuggestedDeck { get; set; }
-    [JsonPropertyName("suggested_opp_deck")] public JsonElement? SuggestedOppDeck { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("count")] public int Count { get; set; }
+}
+
+public sealed class InferSide
+{
+    [JsonPropertyName("candidates")] public List<DeckCandidate> Candidates { get; set; } = new();
+    [JsonPropertyName("unknown_ids")] public List<int> UnknownIds { get; set; } = new();
+    [JsonPropertyName("cards")] public List<CardInfo> Cards { get; set; } = new();
+}
+
+public sealed class InferResponse
+{
+    [JsonPropertyName("my")] public InferSide My { get; set; } = new();
+    [JsonPropertyName("opp")] public InferSide Opp { get; set; } = new();
+}
+
+public sealed class SiteDeck
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("aliases")] public List<string> Aliases { get; set; } = new();
+    public override string ToString() => Name;
+}
+
+public sealed class DecksResponse
+{
+    [JsonPropertyName("decks")] public List<SiteDeck> Decks { get; set; } = new();
+}
+
+public sealed class RecordGroup
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    public override string ToString() => Name;
 }
 
 public sealed class TokenResponse
@@ -40,7 +87,12 @@ public sealed class AddMatchResponse
     [JsonPropertyName("error")] public JsonElement? Error { get; set; }
 }
 
-/// One duel captured from memory, waiting for the user's confirmation in the UI.
+public sealed class PendingUploadResponse
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+}
+
+/// One duel captured from memory.
 public sealed class PendingMatch
 {
     public string Did { get; set; } = "";
@@ -59,9 +111,9 @@ public sealed class PendingMatch
     public int? TierBefore { get; set; }
     public int? RankAfter { get; set; }
     public int? TierAfter { get; set; }
-    public string? RankCode { get; set; }
-    public int? Wins { get; set; }              // site's tier win gauge after this match (-4 demotion … 5 promotion)
-    public bool WinsEstimated { get; set; }     // true when computed locally rather than read from the game
+    public string? RankCode { get; set; }       // post-game rank code (site convention)
+    public int? Wins { get; set; }              // post-game gauge (site convention)
+    public bool WinsEstimated { get; set; }
     public string? RawDuelResult { get; set; }  // $.DuelResult as captured (kept locally for schema research)
     public double? RatingBefore { get; set; }
     public double? RatingAfter { get; set; }
@@ -69,23 +121,29 @@ public sealed class PendingMatch
     public string? MyMdDeckId { get; set; }
     public List<int> MyCards { get; set; } = new();
     public List<int> OppCards { get; set; } = new();
-    public string Status { get; set; } = "captured";  // captured / uploaded / failed
-    public int? ServerId { get; set; }
-    public string? SuggestedDeckName { get; set; }
-    public string? SuggestedOppDeckName { get; set; }
+    public List<DeckCandidate> MyCandidates { get; set; } = new();
+    public List<DeckCandidate> OppCandidates { get; set; } = new();
+    public List<CardInfo> MyCardNames { get; set; } = new();
+    public List<CardInfo> OppCardNames { get; set; } = new();
+    public int? SuggestedMyDeckId { get; set; }
+    public int? SuggestedOppDeckId { get; set; }
+    public string Status { get; set; } = "captured";  // captured / saved / pending / failed / discarded
+    public int? MatchId { get; set; }
     public string? Error { get; set; }
+    public string? SavedDeckName { get; set; }
+    public string? SavedOppDeckName { get; set; }
+    public string? Notes { get; set; }
 }
-
-
-
-
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true)]
 [JsonSerializable(typeof(Config))]
 [JsonSerializable(typeof(Gauge))]
-[JsonSerializable(typeof(PendingUploadResponse))]
+[JsonSerializable(typeof(InferResponse))]
+[JsonSerializable(typeof(DecksResponse))]
+[JsonSerializable(typeof(List<RecordGroup>))]
+[JsonSerializable(typeof(RecordGroup))]
 [JsonSerializable(typeof(TokenResponse))]
 [JsonSerializable(typeof(AddMatchResponse))]
+[JsonSerializable(typeof(PendingUploadResponse))]
 [JsonSerializable(typeof(PendingMatch))]
-[JsonSerializable(typeof(List<PendingMatch>))]
 public partial class J : JsonSerializerContext { }
