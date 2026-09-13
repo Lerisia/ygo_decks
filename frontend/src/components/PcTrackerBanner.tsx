@@ -1,12 +1,16 @@
 import { useState } from "react";
 
 const DOWNLOAD_URL = "/media/tracker/mdtracker.exe";
+const DISMISS_KEY = "pc_tracker_banner_dismissed";
 
-// Desktop-only card on the record-sheet list: download + how-to for the PC Master Duel tracker.
-export default function PcTrackerBanner() {
+// Desktop-only card on the record pages: download + how-to for the PC Master Duel tracker.
+// `dismissible` is used on the sheet detail page, where it would otherwise sit above the form every visit.
+export default function PcTrackerBanner({ dismissible = false }: { dismissible?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(() => dismissible && localStorage.getItem(DISMISS_KEY) === "1");
+  if (hidden) return null;
   return (
-    <div className="hidden sm:block mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
+    <div className="hidden sm:block mb-4 max-w-2xl w-full mx-auto bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-semibold">PC 마스터듀얼 트래커 <span className="text-xs font-normal text-blue-600 dark:text-blue-300">베타</span></div>
@@ -31,6 +35,16 @@ export default function PcTrackerBanner() {
           >
             다운로드
           </a>
+          {dismissible && (
+            <button
+              type="button"
+              aria-label="닫기"
+              onClick={() => { localStorage.setItem(DISMISS_KEY, "1"); setHidden(true); }}
+              className="px-2 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
       {open && (

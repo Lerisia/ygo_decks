@@ -5,6 +5,7 @@ import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
 import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
+import PcTrackerBanner from "@/components/PcTrackerBanner";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -765,6 +766,7 @@ const RecordGroupDetailPage = () => {
           )}
         </div>
       )}
+      {isOwner && <PcTrackerBanner dismissible />}
       {isOwner && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}
