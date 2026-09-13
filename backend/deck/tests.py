@@ -498,3 +498,17 @@ class DeckNotesTest(TestCase):
 from .models import DeckFeaturedVideo
 
 
+
+
+class UntaggedDeckSaveTest(TestCase):
+    """2026-09-13 특이점: '해당 없음' 태그를 없앤 뒤 관리자에서 태그 없이 저장하면 오류가 나던 문제."""
+
+    def test_admin_form_accepts_empty_tag_selection(self):
+        from django.forms import modelform_factory
+        deck = _create_deck(name="무태그덱")
+        Form = modelform_factory(Deck, fields=["name", "performance_tags", "aesthetic_tags"])
+        form = Form({"name": "무태그덱", "performance_tags": [], "aesthetic_tags": []}, instance=deck)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        deck.refresh_from_db()
+        self.assertEqual(deck.performance_tags.count(), 0)

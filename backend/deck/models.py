@@ -103,8 +103,8 @@ class Deck(models.Model):
     # 덱 플레이 참고 영상 (예: 김빠방 유튜브). 비어 있으면 상세 페이지 버튼이 '준비 중'.
     play_video_url = models.URLField(max_length=300, blank=True, default="", verbose_name="플레이 영상 URL")
     summoning_methods = models.ManyToManyField(SummoningMethod)
-    performance_tags = models.ManyToManyField(PerformanceTag)
-    aesthetic_tags = models.ManyToManyField(AestheticTag)
+    performance_tags = models.ManyToManyField(PerformanceTag, blank=True)  # 태그 없음 = 해당 없음 (2026-09-13)
+    aesthetic_tags = models.ManyToManyField(AestheticTag, blank=True)
     stat_consistency = models.PositiveSmallIntegerField(null=True, blank=True, help_text="안정성 (0~10)")
     stat_breakthrough = models.PositiveSmallIntegerField(null=True, blank=True, help_text="돌파력 (0~10)")
     stat_interruption = models.PositiveSmallIntegerField(null=True, blank=True, help_text="견제력 (0~10)")
