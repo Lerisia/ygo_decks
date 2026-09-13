@@ -79,6 +79,9 @@ export default function StatInfoButton({ className = "" }: { className?: string 
               </div>
             ))}
           </dl>
+          <p className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+            *해당 스탯 그래프 및 덱 파워는 개발자의 주관이 들어간 수치이며, 객관성이 결여되어 있으므로 참고용으로만 사용해 주시면 감사드리겠습니다.
+          </p>
         </div>
       )}
     </div>
