@@ -15,6 +15,7 @@ const formatDate = (iso: string | null) => (iso ? `${iso.slice(0, 4)}.${iso.slic
 
 export default function DeckNotesSection({ deckId }: { deckId: number }) {
   const [notes, setNotes] = useState<DeckNote[] | null>(null);
+  const [open, setOpen] = useState(false); // 특이점 요청(2026-09-13): 기본 접힘
 
   useEffect(() => {
     let alive = true;
@@ -30,11 +31,20 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
 
   return (
     <section className="mb-5">
-      <div className="flex items-baseline justify-between mb-2">
-        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">📝 강의노트</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{notes.length}개 · 외부 링크</span>
-      </div>
-      <ul className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition"
+      >
+        <span className="text-base font-bold text-gray-900 dark:text-gray-100">📝 강의노트</span>
+        <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          {notes.length}개 · 외부 링크
+          <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        </span>
+      </button>
+      {open && (
+      <ul className="mt-2 space-y-2">
         {notes.map((n) => (
           <li key={n.id}>
             <a
@@ -67,6 +77,7 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }
