@@ -90,17 +90,6 @@ class DeckAliasAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
-from .models import ChannelVideo
-
-
-@admin.register(ChannelVideo)
-class ChannelVideoAdmin(admin.ModelAdmin):
-    list_display = ("position", "title", "published_at", "view_count", "fetched_at")
-    search_fields = ("title", "video_id")
-    ordering = ("position",)
-    readonly_fields = ("video_id", "title", "position", "published_at", "duration", "view_count", "thumbnail_url", "fetched_at")
-
-
 from .models import DeckFeaturedVideo
 
 

@@ -58,16 +58,6 @@ export const getDeckData = async (deckId: number) => {
   return response.json();
 };
 
-export type DeckVideo = {
-  video_id: string;
-  title: string;
-  url: string;
-  thumbnail_url: string;
-  published_at: string | null;
-  duration: number | null;
-  view_count: number | null;
-};
-
 export type FeaturedVideo = {
   video_id: string;
   title: string;
@@ -86,8 +76,6 @@ export type FeaturedVideo = {
 export type DeckVideosResponse = {
   deck_id: number;
   featured: FeaturedVideo | null;
-  channel: { name: string; url: string };
-  videos: DeckVideo[];
 };
 
 export const getDeckVideos = async (deckId: number): Promise<DeckVideosResponse> => {

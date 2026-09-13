@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
-from .youtube import CHANNEL_NAME, CHANNEL_URL, videos_for_deck, serialize_video, serialize_featured
+from .youtube import serialize_featured
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -265,17 +265,10 @@ def _featured(deck):
 
 @api_view(["GET"])
 def get_deck_videos(request, deck_id):
-    """김빠방 채널 영상 중 이 덱(이름·별칭)에 해당하는 것만 최신순으로."""
+    """이 덱의 대표 영상(영미권/일본 유튜브에서 선정) 하나."""
     deck = get_object_or_404(Deck, id=deck_id)
-    videos = videos_for_deck(deck)
-    videos.sort(key=lambda v: (v.published_at is None, -(v.published_at.timestamp() if v.published_at else 0), v.position))
     featured = _featured(deck)
-    return Response({
-        "deck_id": deck.id,
-        "featured": serialize_featured(featured) if featured else None,
-        "channel": {"name": CHANNEL_NAME, "url": CHANNEL_URL},
-        "videos": [serialize_video(v) for v in videos],
-    })
+    return Response({"deck_id": deck.id, "featured": serialize_featured(featured) if featured else None})
 
 
 import os
