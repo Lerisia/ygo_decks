@@ -123,7 +123,7 @@ export default function DatabasePage() {
       .then((data) => {
         // 특이점 요청(2026-09-13): 도감 필터에서 '해당 없음' 버튼은 숨김
         setPerformanceTags(data.performance_tags.filter((t: string) => t !== "해당 없음"));
-        setAestheticTags(data.aesthetic_tags);
+        setAestheticTags(data.aesthetic_tags.filter((t: string) => t !== "해당 없음"));
       });
   }, []);
 
