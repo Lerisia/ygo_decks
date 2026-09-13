@@ -264,12 +264,16 @@ class TrackerWinBonusTest(TestCase):
         self.assertEqual(res2.json()["points_added"], 0)
         self.assertEqual(self._points(), 5)
 
-    def test_loss_or_forged_win_pays_nothing(self):
+    def test_forged_win_pays_nothing_but_honest_loss_pays_one(self):
         self.client.post("/api/tracker/games/", {**self.base, "result": "lose"}, format="json")
         res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", self.record, format="json")  # user says win, capture says lose
         self.assertEqual(res.json()["points_added"], 0)
         self.assertEqual(self._points(), 0)
-        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, "result": "lose", "tracker_did": "1"}, format="json")
+        self.client.post("/api/tracker/games/", {**self.base, "did": "7709189150693852087", "result": "lose"}, format="json")
+        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, "result": "lose", "tracker_did": "7709189150693852087"}, format="json")
+        self.assertEqual(res.json()["points_added"], 1)
+        self.assertEqual(self._points(), 1)
+        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, "result": "lose", "tracker_did": "1"}, format="json")  # no capture
         self.assertEqual(res.json()["points_added"], 0)
 
     def test_pending_confirm_path_also_pays(self):

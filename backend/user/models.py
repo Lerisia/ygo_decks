@@ -63,6 +63,7 @@ class PointTransaction(models.Model):
         ("border_purchase", "테두리 구매"),
         ("admin_grant", "관리자 지급"),
         ("tracker_win", "트래커 승리 기록"),
+        ("tracker_loss", "트래커 패배 기록"),
         ("other", "기타"),
     ]
     user = models.ForeignKey(

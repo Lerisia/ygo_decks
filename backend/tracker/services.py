@@ -110,12 +110,13 @@ def upsert_game(user, data):
 
 
 TRACKER_WIN_POINTS = 5
+TRACKER_LOSS_POINTS = 1
 
 
 def link_game(user, did, match):
-    """Attach a saved MatchRecord to its raw capture (called from add-match) and pay the win bonus once.
-    The bonus needs the tracker's own capture to say "win" too, so a hand-edited result can't farm it.
-    Returns points awarded (0 or TRACKER_WIN_POINTS)."""
+    """Attach a saved MatchRecord to its raw capture (called from add-match) and pay the record bonus once
+    (5P win / 1P loss). The bonus needs the tracker's own capture to agree with the saved result, so a
+    hand-edited result can't farm it. Returns points awarded."""
     from django.db import transaction
     from user.points import award_points
     from .models import TrackerGame
@@ -129,7 +130,10 @@ def link_game(user, did, match):
         first_link = game.match_id is None
         game.match = match
         game.save(update_fields=["match"])
-        if first_link and game.result == "win" and match.result == "win":
+        if first_link and game.result == match.result == "win":
             award_points(user, TRACKER_WIN_POINTS, kind="tracker_win", note=f"트래커 승리 기록 #{match.id}")
             return TRACKER_WIN_POINTS
+        if first_link and game.result == match.result == "lose":
+            award_points(user, TRACKER_LOSS_POINTS, kind="tracker_loss", note=f"트래커 패배 기록 #{match.id}")
+            return TRACKER_LOSS_POINTS
     return 0
