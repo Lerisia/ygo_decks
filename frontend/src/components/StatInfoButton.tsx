@@ -26,14 +26,14 @@ export default function StatInfoButton({ className = "" }: { className?: string 
       </button>
       <div
         role="tooltip"
-        className={`absolute right-0 top-8 z-30 w-72 sm:w-80 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3 text-left text-xs leading-relaxed ${
+        className={`absolute right-0 top-8 z-30 w-[min(92vw,20rem)] sm:w-[40rem] max-w-[92vw] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3 sm:p-4 text-left text-xs sm:text-sm leading-relaxed ${
           pinned ? "block" : "hidden group-hover:block"
         }`}
       >
-        <p className="font-bold text-sm text-gray-900 dark:text-gray-100 mb-2">스탯 설명</p>
-        <dl className="space-y-2">
+        <p className="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 mb-2">스탯 설명</p>
+        <dl className="space-y-2 sm:space-y-2.5">
           {STAT_DESCRIPTIONS.map((s) => (
-            <div key={s.label}>
+            <div key={s.label} className="sm:grid sm:grid-cols-[6rem_1fr] sm:gap-3">
               <dt className="font-semibold text-gray-800 dark:text-gray-200">{s.label}</dt>
               <dd className="text-gray-600 dark:text-gray-400">{s.text}</dd>
             </div>
