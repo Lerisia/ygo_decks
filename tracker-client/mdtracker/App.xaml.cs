@@ -89,20 +89,10 @@ public partial class App : System.Windows.Application
         Shutdown();
     }
 
-    /// Simple generated tray icon (blue rounded square with "Y") so no asset file is needed.
+    /// Tray icon = the site's logo (embedded app.ico).
     private static Icon MakeIcon()
     {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(Color.Transparent);
-            using var brush = new SolidBrush(Color.FromArgb(37, 99, 235));
-            g.FillEllipse(brush, 1, 1, 30, 30);
-            using var font = new Font("Segoe UI", 15, System.Drawing.FontStyle.Bold, GraphicsUnit.Pixel);
-            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString("Y", font, Brushes.White, new RectangleF(0, 1, 32, 32), sf);
-        }
-        return Icon.FromHandle(bmp.GetHicon());
+        using var st = typeof(App).Assembly.GetManifestResourceStream("app.ico")!;
+        return new Icon(st, 32, 32);
     }
 }
