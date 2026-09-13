@@ -7,6 +7,7 @@ import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
+import StatInfoButton from "@/components/StatInfoButton";
 
 interface DeckStats {
   consistency: number;
@@ -194,6 +195,7 @@ export default function DeckDetail() {
           }));
           return (
             <div className="mt-4 relative">
+              <StatInfoButton className="absolute top-0 right-0 z-20" />
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={data} outerRadius="75%">
                   <PolarGrid />
