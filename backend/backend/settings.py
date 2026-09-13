@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'avatar',
     'solo',
     'changelog',
+    'tracker',
 ]
 
 MIDDLEWARE = [

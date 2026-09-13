@@ -38,6 +38,7 @@ urlpatterns = [
     path('api/avatar/', include('avatar.urls')),
     path('api/solo/', include('solo.urls')),
     path('api/', include('changelog.urls')),
+    path('api/tracker/', include('tracker.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

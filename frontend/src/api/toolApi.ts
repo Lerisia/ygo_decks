@@ -138,6 +138,7 @@ type NewMatchPayload = {
   wins?: number | null;
   score?: number;
   score_type?: string | null;
+  tracker_pending_id?: number | null;
 };
 
 export const addMatchToRecordGroup = async (

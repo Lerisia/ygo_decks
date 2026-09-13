@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
          updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility } from "@/api/toolApi";
+import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
+import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
+import TrackerPendingPanel from "@/components/TrackerPendingPanel";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -328,6 +331,9 @@ const RecordGroupDetailPage = () => {
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
   const [showRegisterForm, setShowRegisterForm] = useState(true);
+  const [pending, setPending] = useState<TrackerPendingMatch[]>([]);
+  const [activePendingId, setActivePendingId] = useState<number | null>(null);
+  const [extraDeck, setExtraDeck] = useState<DeckData | null>(null);
 
   // RANK_OPTIONS imported from utils/rankUtils
 
@@ -361,12 +367,56 @@ const RecordGroupDetailPage = () => {
     } catch {}
   };
 
+  const loadPending = async () => {
+    try {
+      setPending(await getTrackerPending());
+    } catch {}
+  };
+
   useEffect(() => {
     loadMatches();
     loadDecks();
     loadUserDecks();
     loadLastMatch();
+    loadPending();
   }, [page, pageSize]);
+
+  // Tracker capture → register form. A suggested deck not in the owned list is added to the options for this pick.
+  const fillFromPending = (p: TrackerPendingMatch) => {
+    const deckId = p.suggested_deck?.deck_id ?? null;
+    if (deckId && !owned_decks.some((d) => d.id === deckId)) {
+      const d = decks.find((x) => x.id === deckId);
+      if (d) setExtraDeck(d);
+    }
+    const isRate = p.game_mode === 19;
+    setUseRankOrScore(isRate ? "rating" : "rank");
+    setNewMatch((prev) => ({
+      ...prev,
+      deck: deckId ? String(deckId) : "",
+      opponent_deck: p.suggested_opp_deck ? String(p.suggested_opp_deck.deck_id) : "null",
+      opponent_deck_name: "",
+      coin_toss_result: p.coin_win ? "win" : "lose",
+      first_or_second: p.first ? "first" : "second",
+      result: p.result === "lose" ? "lose" : "win",
+      rank: isRate ? "" : p.rank_code || "",
+      wins: isRate ? null : p.wins,
+      score: isRate && p.rating_after != null ? String(Math.round(p.rating_after)) : "",
+      score_type: isRate ? "rating" : "",
+      notes: "",
+    }));
+    setActivePendingId(p.id);
+    setShowRegisterForm(true);
+  };
+
+  const discardPending = async (id: number) => {
+    try {
+      await discardTrackerPending(id);
+      setPending((list) => list.filter((p) => p.id !== id));
+      if (activePendingId === id) setActivePendingId(null);
+    } catch (error) {
+      console.error("버리기 실패:", error);
+    }
+  };
 
   const loadMatches = async () => {
     try {
@@ -529,8 +579,13 @@ const RecordGroupDetailPage = () => {
         score_type: newMatch.score_type || null,
         rank: newMatch.rank,
         wins: newMatch.wins,
-        notes: newMatch.notes
+        notes: newMatch.notes,
+        tracker_pending_id: activePendingId,
       });
+      if (activePendingId) {
+        setPending((list) => list.filter((p) => p.id !== activePendingId));
+        setActivePendingId(null);
+      }
       await loadMatches();
       await loadLastMatch();
     } catch (error) {
@@ -538,7 +593,8 @@ const RecordGroupDetailPage = () => {
     }
   };
 
-  const deckOptions: OptionType[] = owned_decks.map((deck) => ({
+  const deckSource = extraDeck && !owned_decks.some((d) => d.id === extraDeck.id) ? [...owned_decks, extraDeck] : owned_decks;
+  const deckOptions: OptionType[] = deckSource.map((deck) => ({
     value: String(deck.id),
     label: deck.name,
     aliases: decks.find((d) => d.id === deck.id)?.aliases || [],
@@ -701,6 +757,9 @@ const RecordGroupDetailPage = () => {
             </button>
           )}
         </div>
+      )}
+      {isOwner && (
+        <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}
       {isOwner && <div className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
         <button
