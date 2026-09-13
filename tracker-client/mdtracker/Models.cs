@@ -133,6 +133,7 @@ public sealed class PendingMatch
     public string? SavedDeckName { get; set; }
     public string? SavedOppDeckName { get; set; }
     public string? Notes { get; set; }
+    public bool IsDemo { get; set; }   // preview: never saved, never sent
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true)]

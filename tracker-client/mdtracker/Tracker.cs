@@ -42,7 +42,7 @@ public sealed class Tracker
                 SetStatus("마스터듀얼 실행을 기다리는 중…", false);
                 mem = Mem.Open();
                 var g = new Game(mem);
-                SetStatus("마스터듀얼 연결됨 — 랭크/레이트 게임을 자동으로 기록합니다", true);
+                SetStatus("마스터듀얼 연결됨 — 랭크/레이팅 게임을 자동으로 기록합니다", true);
                 Log.Info("game connected");
                 var rec = new Recorder(g, OnMatch, did => Store.Has(did));
                 rec.Run();
@@ -58,9 +58,9 @@ public sealed class Tracker
 
     private void OnMatch(PendingMatch m)
     {
-        if (m.GameMode == 3) ApplyGauge(m);
+        if (m.GameMode == 3 && !m.IsDemo) ApplyGauge(m);
         Enrich(m);
-        Store.Save(m);
+        if (!m.IsDemo) Store.Save(m);
         MatchesChanged?.Invoke();
         MatchCaptured?.Invoke(m);
     }
@@ -94,6 +94,7 @@ public sealed class Tracker
     /// Save to the selected record group. Returns null on success, else an error message.
     public string? Save(PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
+        if (m.IsDemo) { Thread.Sleep(400); m.Status = "discarded"; return null; }
         if (Store.Config.RecordGroupId is not int gid) return "기록할 시트가 선택되지 않았습니다";
         try
         {
@@ -115,6 +116,7 @@ public sealed class Tracker
     /// "나중에": park it on the site's record page as 확인 대기.
     public string? Defer(PendingMatch m)
     {
+        if (m.IsDemo) { m.Status = "discarded"; return null; }
         try { Api.UploadPending(m); m.Status = "pending"; m.Error = null; }
         catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); m.Status = "failed"; m.Error = "로그인 만료"; }
         catch (Exception ex) { m.Status = "failed"; m.Error = ex.Message; }
@@ -122,7 +124,7 @@ public sealed class Tracker
         return m.Error;
     }
 
-    public void Discard(PendingMatch m) { m.Status = "discarded"; Store.Save(m); MatchesChanged?.Invoke(); }
+    public void Discard(PendingMatch m) { m.Status = "discarded"; if (!m.IsDemo) { Store.Save(m); MatchesChanged?.Invoke(); } }
 
     /// Games whose save failed (network hiccup) are parked on the site once a minute so nothing is lost.
     private void RetryLoop()
@@ -160,7 +162,7 @@ public sealed class Tracker
     {
         var m = new PendingMatch
         {
-            Did = DateTime.Now.Ticks.ToString(), StartedAt = DateTime.Now.AddMinutes(-9).ToString("s"), EndedAt = DateTime.Now.ToString("s"),
+            IsDemo = true, Did = "demo-" + DateTime.Now.Ticks, StartedAt = DateTime.Now.AddMinutes(-9).ToString("s"), EndedAt = DateTime.Now.ToString("s"),
             GameMode = 3, GameModeName = "Rank", Result = "win", Finish = "Normal", CoinWin = true, First = true, MyId = 0,
             MyName = "Elyss", OppName = "ヤヤトゥーレ", RankBefore = 2, TierBefore = 3, RankAfter = 2, TierAfter = 2, RankCode = "bronze3", Turn = 2,
             MyMdDeckId = "28860507",

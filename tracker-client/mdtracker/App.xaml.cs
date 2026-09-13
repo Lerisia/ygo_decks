@@ -13,9 +13,25 @@ public partial class App : System.Windows.Application
     private WinForms.NotifyIcon? _tray;
     private bool _balloonShown;
 
+    private static string CrashLog => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mdtracker", "crash.log");
+
+    private static void ReportCrash(object? ex)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(CrashLog)!);
+            System.IO.File.AppendAllText(CrashLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch { }
+        try { System.Windows.MessageBox.Show($"트래커에 오류가 발생했습니다.\n\n{(ex as Exception)?.Message ?? ex}\n\n자세한 내용: {CrashLog}", "YGO Decks 트래커", MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        AppDomain.CurrentDomain.UnhandledException += (_, a) => ReportCrash(a.ExceptionObject);
+        DispatcherUnhandledException += (_, a) => { ReportCrash(a.Exception); a.Handled = true; };
+        TaskScheduler.UnobservedTaskException += (_, a) => { ReportCrash(a.Exception); a.SetObserved(); };
         var store = new Store();
         var api = new Api(store);
         Tracker = new Tracker(store, api);
@@ -38,7 +54,7 @@ public partial class App : System.Windows.Application
 
     private void OnMatchCaptured(PendingMatch m)
     {
-        if (Tracker.Store.Config.Token == null || Tracker.Store.Config.RecordGroupId == null)
+        if (!m.IsDemo && (Tracker.Store.Config.Token == null || Tracker.Store.Config.RecordGroupId == null))
         {
             // Not set up yet: keep the game and show the main window so the user can finish setup.
             Tracker.Defer(m);

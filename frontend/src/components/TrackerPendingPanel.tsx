@@ -38,7 +38,7 @@ export default function TrackerPendingPanel({ items, activeId, onFill, onDiscard
                   {p.my_name || "나"} vs {p.opp_name || "?"}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {fmtTime(p.ended_at)} · {isRate ? "레이트" : "랭크"} · {p.turn}턴
+                  {fmtTime(p.ended_at)} · {isRate ? "레이팅" : "랭크"} · {p.turn}턴
                 </span>
               </div>
               <div className="flex flex-wrap gap-1 mt-1">

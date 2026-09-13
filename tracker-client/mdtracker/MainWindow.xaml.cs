@@ -40,13 +40,16 @@ public partial class MainWindow : Window
 
     private void RefreshRecent()
     {
-        RecentList.ItemsSource = T.Store.Recent().Select(m => new
+        RecentList.ItemsSource = T.Store.Recent().Where(m => m.Status != "discarded").Select(m => new
         {
-            Time = (m.EndedAt ?? "").Replace("T", " ").Substring(Math.Min(5, (m.EndedAt ?? "").Length)).Split('.')[0],
+            Time = DateTime.TryParse(m.EndedAt, out var t) ? t.ToString("MM-dd HH:mm") : "",
             Opp = m.OppName,
             Result = m.Result == "win" ? "승" : m.Result == "lose" ? "패" : m.Result,
-            Decks = $"{m.SavedDeckName ?? DeckName(m.SuggestedMyDeckId) ?? "?"} / {m.SavedOppDeckName ?? (m.Status == "saved" ? "모름" : DeckName(m.SuggestedOppDeckId) ?? "모름")}",
-            State = m.Status switch { "saved" => "기록됨", "pending" => "사이트 확인 대기", "failed" => "실패", "discarded" => "버림", _ => "확인 중" },
+            MyDeck = m.SavedDeckName ?? DeckName(m.SuggestedMyDeckId) ?? "?",
+            OppDeck = m.SavedOppDeckName ?? (m.Status == "saved" ? "모름" : DeckName(m.SuggestedOppDeckId) ?? "모름"),
+            Rank = m.GameMode == 19
+                ? (m.RatingAfter is double r ? $"레이팅 {r:0.##}" : "레이팅")
+                : $"{OverlayWindow.RankLabel(m.RankCode)}{(m.Wins is int w ? $" · {w}승" : "")}",
         }).ToList();
     }
 
@@ -117,8 +120,6 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { SetupMsg.Text = ex.Message; }
     }
-
-    private void Demo_Click(object sender, RoutedEventArgs e) => Task.Run(() => T.DemoMatch());
 
     private void OpenSite_Click(object sender, RoutedEventArgs e)
     {

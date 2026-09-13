@@ -31,7 +31,7 @@ public partial class OverlayWindow : Window
         _timer.Start();
     }
 
-    private static string RankLabel(string? code)
+    public static string RankLabel(string? code)
     {
         if (code == null) return "";
         var m = System.Text.RegularExpressions.Regex.Match(code, "^([a-z]+)([1-5])$");
@@ -45,7 +45,7 @@ public partial class OverlayWindow : Window
         ResultBadge.Background = new SolidColorBrush(win ? Color.FromRgb(34, 197, 94) : Color.FromRgb(239, 68, 68));
         Headline.Text = $"vs {_m.OppName}";
         var parts = new List<string> { _m.CoinWin ? "코인 승" : "코인 패", _m.First ? "선공" : "후공" };
-        if (_m.GameMode == 19) parts.Add(_m.RatingAfter is double r ? $"레이팅 {_m.RatingBefore:0.##} → {r:0.##}" : "레이트");
+        if (_m.GameMode == 19) parts.Add(_m.RatingAfter is double r ? $"레이팅 {_m.RatingBefore:0.##} → {r:0.##}" : "레이팅");
         else if (_m.RankCode != null) parts.Add($"{RankLabel(_m.RankCode)}{(_m.Wins is int w ? $" · {w}승" : "")}");
         parts.Add($"{_m.Turn}턴");
         SubLine.Text = string.Join(" · ", parts);
@@ -58,6 +58,7 @@ public partial class OverlayWindow : Window
         var top = _m.OppCandidates.FirstOrDefault();
         OppHint.Text = top != null ? $"추천 {top.Name} {Math.Round(top.Share * 100)}%" : "판독 근거 없음";
         if (_m.Error != null) Msg.Text = _m.Error;
+        if (_m.IsDemo) { Headline.Text += "   (미리보기 — 저장되지 않음)"; }
 
         CardsPanel.Children.Clear();
         foreach (var c in _m.OppCardNames.Take(14))
@@ -163,7 +164,7 @@ public partial class OverlayWindow : Window
             return;
         }
         Msg.Foreground = new SolidColorBrush(Color.FromRgb(134, 239, 172));
-        Msg.Text = $"기록됨 ✓ {(_oppUnknown || _oppDeck == null ? "상대 모름" : _oppDeck.Name)}";
+        Msg.Text = _m.IsDemo ? "미리보기 종료 (저장 안 됨)" : $"기록됨 ✓ {(_oppUnknown || _oppDeck == null ? "상대 모름" : _oppDeck.Name)}";
         await Task.Delay(1500);
         Close();
     }
