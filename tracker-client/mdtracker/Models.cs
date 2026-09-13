@@ -84,6 +84,7 @@ public sealed class TokenResponse
 public sealed class AddMatchResponse
 {
     [JsonPropertyName("match_id")] public int? MatchId { get; set; }
+    [JsonPropertyName("points_added")] public int PointsAdded { get; set; }
     [JsonPropertyName("error")] public JsonElement? Error { get; set; }
 }
 
@@ -142,6 +143,7 @@ public sealed class PendingMatch
     public string? SavedDeckName { get; set; }
     public string? SavedOppDeckName { get; set; }
     public string? Notes { get; set; }
+    public int PointsAdded { get; set; }
     public bool IsDemo { get; set; }   // preview: never saved, never sent
 }
 

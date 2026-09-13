@@ -116,14 +116,16 @@ def add_match_to_record_group(request, record_group_id):
     except ValidationError as e:
         return Response({"error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
 
+    points_added = 0
     if data.get("tracker_pending_id"):
         from tracker.services import consume_pending
-        consume_pending(user, data.get("tracker_pending_id"), match)
-    if data.get("tracker_did"):
+        pending = consume_pending(user, data.get("tracker_pending_id"), match)
+        points_added = getattr(pending, "points_added", 0) or 0
+    elif data.get("tracker_did"):
         from tracker.services import link_game
-        link_game(user, data.get("tracker_did"), match)
+        points_added = link_game(user, data.get("tracker_did"), match)
 
-    return Response({"match_id": match.id}, status=status.HTTP_201_CREATED)
+    return Response({"match_id": match.id, "points_added": points_added}, status=status.HTTP_201_CREATED)
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])

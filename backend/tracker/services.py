@@ -46,7 +46,7 @@ def consume_pending(user, pending_id, match):
         return None
     obj.status, obj.match = "confirmed", match
     obj.save(update_fields=["status", "match", "updated_at"])
-    link_game(user, obj.did, match)
+    obj.points_added = link_game(user, obj.did, match)
     md_deck_id = str((obj.payload or {}).get("md_deck_id") or "")
     if md_deck_id and match.deck_id:
         TrackerDeckMap.objects.update_or_create(user=user, md_deck_id=md_deck_id, defaults={"deck_id": match.deck_id})
@@ -109,10 +109,27 @@ def upsert_game(user, data):
     return obj, created
 
 
+TRACKER_WIN_POINTS = 5
+
+
 def link_game(user, did, match):
-    """Attach a saved MatchRecord to its raw capture (called from add-match)."""
+    """Attach a saved MatchRecord to its raw capture (called from add-match) and pay the win bonus once.
+    The bonus needs the tracker's own capture to say "win" too, so a hand-edited result can't farm it.
+    Returns points awarded (0 or TRACKER_WIN_POINTS)."""
+    from django.db import transaction
+    from user.points import award_points
     from .models import TrackerGame
     did = str(did or "").strip()
     if not did:
         return 0
-    return TrackerGame.objects.filter(user=user, did=did).update(match=match)
+    with transaction.atomic():
+        game = TrackerGame.objects.select_for_update().filter(user=user, did=did).first()
+        if not game:
+            return 0
+        first_link = game.match_id is None
+        game.match = match
+        game.save(update_fields=["match"])
+        if first_link and game.result == "win" and match.result == "win":
+            award_points(user, TRACKER_WIN_POINTS, kind="tracker_win", note=f"트래커 승리 기록 #{match.id}")
+            return TRACKER_WIN_POINTS
+    return 0

@@ -108,8 +108,8 @@ public sealed class Tracker
         if (Store.Config.RecordGroupId is not int gid) return "기록할 시트가 선택되지 않았습니다";
         try
         {
-            int id = Api.AddMatch(gid, m, deckId, oppDeckId, notes);
-            m.Status = "saved"; m.MatchId = id; m.Error = null; m.Notes = notes;
+            var (id, points) = Api.AddMatch(gid, m, deckId, oppDeckId, notes);
+            m.Status = "saved"; m.MatchId = id; m.PointsAdded = points; m.Error = null; m.Notes = notes;
             m.SavedDeckName = Store.Decks.FirstOrDefault(d => d.Id == deckId)?.Name;
             m.SavedOppDeckName = oppDeckId.HasValue ? Store.Decks.FirstOrDefault(d => d.Id == oppDeckId)?.Name : null;
             if (m.MyMdDeckId != null) { Store.Config.DeckMap[m.MyMdDeckId] = deckId; Store.SaveConfig(); }

@@ -83,8 +83,8 @@ public sealed class Api
         return JsonSerializer.Deserialize(text, J.Default.InferResponse) ?? new();
     }
 
-    /// Creates the record; returns match id or throws with the server's message.
-    public int AddMatch(int groupId, PendingMatch m, int deckId, int? oppDeckId, string? notes)
+    /// Creates the record; returns (match id, points awarded) or throws with the server's message.
+    public (int id, int points) AddMatch(int groupId, PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
         bool rate = m.GameMode == 19;
         var o = new JsonObject
@@ -105,7 +105,7 @@ public sealed class Api
         if (status == 401) throw new UnauthorizedAccessException();
         var res = SafeParse(text, J.Default.AddMatchResponse);
         if (status != 201 || res?.MatchId == null) throw new Exception(res?.Error?.ToString() ?? $"add-match {status}: {text}");
-        return res.MatchId.Value;
+        return (res.MatchId.Value, res.PointsAdded);
     }
 
     private static JsonNode? RankObj(int? rank, int? tier) => rank is int r && tier is int t ? new JsonObject { ["rank"] = r, ["tier"] = t } : null;

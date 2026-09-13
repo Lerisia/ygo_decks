@@ -164,7 +164,7 @@ public partial class OverlayWindow : Window
             return;
         }
         Msg.Foreground = new SolidColorBrush(Color.FromRgb(134, 239, 172));
-        Msg.Text = _m.IsDemo ? "미리보기 종료 (저장 안 됨)" : $"기록됨 ✓ {(_oppUnknown || _oppDeck == null ? "상대 모름" : _oppDeck.Name)}";
+        Msg.Text = _m.IsDemo ? "미리보기 종료 (저장 안 됨)" : $"기록됨 ✓ {(_oppUnknown || _oppDeck == null ? "상대 모름" : _oppDeck.Name)}{(_m.PointsAdded > 0 ? $"  +{_m.PointsAdded}P" : "")}";
         await Task.Delay(1500);
         Close();
     }
