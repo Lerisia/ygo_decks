@@ -168,13 +168,11 @@ export default function DeckDetail() {
             <tr className="border-b">
               <td className="p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-24">태그</td>
               <td className="p-2">
-                {[...deck.performance_tags, ...deck.aesthetic_tags].filter(
-                  (t) => t !== "해당 없음"
-                ).length > 0
-                  ? [...deck.performance_tags, ...deck.aesthetic_tags]
-                      .filter((t) => t !== "해당 없음")
-                      .join(", ")
-                  : ""}
+                {[...deck.performance_tags, ...deck.aesthetic_tags].length > 0 ? (
+                  [...deck.performance_tags, ...deck.aesthetic_tags].join(", ")
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">해당 없음</span>
+                )}
               </td>
             </tr>
           </tbody>
