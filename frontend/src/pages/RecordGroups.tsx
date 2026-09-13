@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PcTrackerBanner from "@/components/PcTrackerBanner";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -218,6 +219,7 @@ const RecordGroups = () => {
         )}
       </div>
 
+      {isLoggedIn && <PcTrackerBanner />}
       {Capacitor.isNativePlatform() && isLoggedIn && (
         <button
           onClick={() => navigate("/tracker")}
