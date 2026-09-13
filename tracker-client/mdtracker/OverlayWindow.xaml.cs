@@ -169,15 +169,6 @@ public partial class OverlayWindow : Window
         Close();
     }
 
-    private async void Later_Click(object sender, RoutedEventArgs e)
-    {
-        _timer.Stop(); Pause();
-        var err = await Task.Run(() => _t.Defer(_m));
-        Msg.Text = err == null ? "사이트 '확인 대기'로 보냈습니다" : "보내기 실패: " + err;
-        await Task.Delay(1200);
-        Close();
-    }
-
     private void Discard_Click(object sender, RoutedEventArgs e) { _timer.Stop(); _t.Discard(_m); Close(); }
 
     protected override void OnClosed(EventArgs e) { _timer.Stop(); base.OnClosed(e); }

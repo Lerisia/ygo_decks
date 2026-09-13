@@ -56,7 +56,6 @@
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                     <Button x:Name="SaveBtn" Content="저장" Click="Save_Click" Margin="0,0,6,0"/>
-                    <Button Content="나중에" Style="{StaticResource Ghost}" Click="Later_Click" Margin="0,0,6,0"/>
                     <Button Content="기록 안 함" Style="{StaticResource Ghost}" Click="Discard_Click"/>
                 </StackPanel>
                 <TextBlock x:Name="Msg" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#FCA5A5" TextWrapping="Wrap" MaxWidth="150"/>
