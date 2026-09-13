@@ -290,3 +290,18 @@ class CardDetection(models.Model):
     card = models.ForeignKey(Card, on_delete=models.CASCADE)
     confidence = models.FloatField()
     illust_image = models.ImageField(upload_to='illusts/')
+
+
+class CardIdAlias(models.Model):
+    """Master Duel card IDs that are not Konami DB IDs (alternate artworks etc.) → the base card.
+    The PC tracker reports unknown IDs; admins map them here so deck inference counts them."""
+    md_id = models.PositiveIntegerField(unique=True, help_text="Master Duel 내부 카드 ID")
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="md_aliases")
+    note = models.CharField(max_length=100, blank=True, default="", help_text="예: 대체 일러스트")
+
+    class Meta:
+        verbose_name = "MD 카드 ID 별칭"
+        verbose_name_plural = "MD 카드 ID 별칭"
+
+    def __str__(self):
+        return f"{self.md_id} → {self.card.korean_name or self.card.name}"

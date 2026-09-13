@@ -98,3 +98,13 @@ class CardDetectionAdmin(admin.ModelAdmin):
     list_filter = ('card', 'confidence')
     search_fields = ('record__id', 'card__name')
     raw_id_fields = ('record', 'card')
+
+
+from .models import CardIdAlias
+
+
+@admin.register(CardIdAlias)
+class CardIdAliasAdmin(admin.ModelAdmin):
+    list_display = ("md_id", "card", "note")
+    search_fields = ("md_id", "card__name", "card__korean_name")
+    autocomplete_fields = ("card",)

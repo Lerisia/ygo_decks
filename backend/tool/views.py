@@ -421,7 +421,7 @@ def get_record_group_rank_history(request, record_group_id):
 @permission_classes([IsAuthenticated])
 def tracker_infer(request):
     """PC tracker: card ids (Konami cid) for both players → site deck candidates."""
-    from .tracker import infer_decks
+    from .tracker import infer_decks, card_names
 
     def _ids(key):
         v = request.data.get(key) or []
@@ -429,8 +429,9 @@ def tracker_infer(request):
 
     out = {}
     for key in ("my", "opp"):
-        cands, unknown = infer_decks(_ids(f"{key}_cards"))
-        out[key] = {"candidates": cands, "unknown_ids": unknown}
+        ids = _ids(f"{key}_cards")
+        cands, unknown = infer_decks(ids)
+        out[key] = {"candidates": cands, "unknown_ids": unknown, "cards": card_names(ids)}
     return Response(out)
 
 

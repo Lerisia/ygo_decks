@@ -1,0 +1,7 @@
+# MD alt-art IDs still unmapped (Yugipedia category has 72 cards; alt_arts.json 2026-08-30 covers 68)
+# Add via admin (CardIdAlias) once the MD id is known, or re-import a newer alt_arts.json.
+Cyber Dragon Infinity
+Effect Veiler
+Lightning Storm
+Limiter Removal
+# unknown id seen in a Dracotail/Branded extra deck on 2026-09-13: 22811

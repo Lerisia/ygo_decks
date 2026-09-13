@@ -75,3 +75,6 @@ backend/logs/
 backend/tournament_legacy_backup_*.sql
 
 backend/db.sqlite3-*
+
+# raw PC tracker snapshots (research data, may contain player info)
+backend/data/tracker_snapshots/

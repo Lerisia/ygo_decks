@@ -1,7 +1,7 @@
 """Deck inference for the PC tracker: card IDs (Konami cid == Card.konami_id) → site decks."""
 from collections import Counter, defaultdict
 
-from card.models import Card
+from card.models import Card, CardIdAlias
 from deck.models import DeckArchetype
 
 RANK_NAMES = {1: "rookie", 2: "bronze", 3: "silver", 4: "gold", 5: "platinum", 6: "diamond", 7: "master"}
@@ -15,13 +15,22 @@ def rank_code(rank, rate):
     return f"{name}{rate}"
 
 
+def resolve_aliases(card_ids):
+    """Replace Master Duel-only IDs (alt artworks) with the base card's Konami ID."""
+    ids = [int(c) for c in card_ids if str(c).isdigit()]
+    if not ids:
+        return []
+    alias = {a.md_id: int(a.card.konami_id) for a in CardIdAlias.objects.filter(md_id__in=set(ids)).select_related("card") if str(a.card.konami_id).isdigit()}
+    return [alias.get(c, c) for c in ids]
+
+
 def infer_decks(card_ids, limit=3):
     """Vote decks from a list of Konami card IDs (duplicates count).
 
     Returns (candidates, unknown_ids): candidates = [{"deck_id", "name", "score", "share"}] sorted by score,
     share = score / total votes (0..1). Cards without an archetype contribute nothing.
     """
-    counts = Counter(str(c) for c in card_ids if c)
+    counts = Counter(str(c) for c in resolve_aliases(card_ids) if c)
     if not counts:
         return [], []
     cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype")}
@@ -41,3 +50,18 @@ def infer_decks(card_ids, limit=3):
     total = sum(arch_votes.values())
     ranked = sorted(scores.items(), key=lambda kv: (-kv[1], names[kv[0]]))[:limit]
     return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3)} for d, s in ranked], unknown
+
+
+def card_names(card_ids):
+    """Distinct ids in first-seen order → [{"id", "name", "count"}] using Korean names when available."""
+    order, counts = [], Counter()
+    for c in resolve_aliases(card_ids):
+        if c and c not in counts:
+            order.append(c)
+        counts[c] += 1
+    cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name")}
+    out = []
+    for c in order:
+        card = cards.get(str(c))
+        out.append({"id": c, "name": (card.korean_name or card.name) if card else f"#{c}", "count": counts[c]})
+    return out

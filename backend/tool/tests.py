@@ -702,6 +702,8 @@ class TrackerInferTest(TestCase):
         self.assertAlmostEqual(my[0]["share"], 1.0)
         self.assertEqual(res.data["opp"]["candidates"][0]["name"], "레조네이터")
         self.assertEqual(res.data["opp"]["candidates"][0]["score"], 2.0)
+        self.assertEqual(res.data["my"]["cards"][0], {"id": 4007, "name": "Blue-Eyes White Dragon", "count": 3})
+        self.assertEqual([c["id"] for c in res.data["opp"]["cards"]], [9015, 19014])
 
     def test_unknown_ids_and_empty(self):
         res = self.client.post("/api/tracker/infer/", {"my_cards": [999999], "opp_cards": []}, format="json")
@@ -745,3 +747,19 @@ class TrackerSnapshotTest(TestCase):
             self.assertEqual(len(files), 1)
             res = self.client.post("/api/tracker/snapshot/", {"tag": "x"}, format="json", HTTP_X_TRACKER_KEY="wrong")
             self.assertEqual(res.status_code, 403)
+
+
+class TrackerAliasTest(TestCase):
+    def test_alt_art_ids_count_as_base_card(self):
+        from card.models import Card, CardIdAlias
+        from deck.models import DeckArchetype
+        from .tracker import infer_decks, card_names
+        blue = _create_deck("푸른 눈")
+        DeckArchetype.objects.create(deck=blue, name="Blue-Eyes")
+        bewd = Card.objects.create(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon", korean_name="푸른 눈의 백룡", archetype="Blue-Eyes")
+        CardIdAlias.objects.create(md_id=3892, card=bewd, note="alt art")
+        cands, unknown = infer_decks([3892, 3892, 3891])
+        self.assertEqual(cands[0]["name"], "푸른 눈")
+        self.assertEqual(cands[0]["score"], 2.0)
+        self.assertEqual(unknown, [3891])
+        self.assertEqual(card_names([3892, 4007]), [{"id": 4007, "name": "푸른 눈의 백룡", "count": 2}])
