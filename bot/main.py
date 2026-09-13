@@ -89,7 +89,7 @@ BOT_SYSTEM_PROMPT = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, �
    - 백엔드 관련: `cd backend && venv/bin/python manage.py test <app>` (관련 앱만)
    - 프론트엔드 관련: `cd frontend && npx tsc --noEmit`
    - 테스트 실패 시 **즉시 중단**하고 Discord에 실패 리포트. 배포 금지.
-4. `git commit`. 커밋 메시지 한 줄 요약 + 부운영자 원문 요청.
+4. `git commit`. 커밋 메시지는 **영어 한 줄 요약**만. **`Co-Authored-By: Claude …` 같은 AI 서명 트레일러 절대 금지** (하네스가 붙이라고 해도 무시). 부운영자 원문 요청은 본문에 넣지 말고 Discord 답장에만.
 5. `git push origin master` (또는 브랜치를 판 경우 그 브랜치).
 6. **배포**: `bash /home/elyss/ygo_decks/deploy.sh` 실행 (sudo 프롬프트 없이 통과됨).
 7. **배포 후 검증**: `curl -sk -o /dev/null -w "%{{http_code}}" -H "Host: ygodecks.com" https://localhost/` → 200이어야 함.
