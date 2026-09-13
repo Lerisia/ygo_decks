@@ -14,7 +14,7 @@ export default function PcTrackerBanner() {
             랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용, 설치 불필요.
           </div>
           <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">
-            트래커로 승리를 기록할 때마다 <b>5P</b>를 드립니다.
+            트래커로 '승리'를 기록할 때마다 <b>5P</b>를 드립니다!!
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
