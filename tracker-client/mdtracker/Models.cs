@@ -92,6 +92,13 @@ public sealed class PendingUploadResponse
     [JsonPropertyName("id")] public int Id { get; set; }
 }
 
+public sealed class OppCard
+{
+    public int Id { get; set; }
+    public int Pos { get; set; }
+    public bool Face { get; set; }
+}
+
 /// One duel captured from memory.
 public sealed class PendingMatch
 {
@@ -121,6 +128,8 @@ public sealed class PendingMatch
     public string? MyMdDeckId { get; set; }
     public List<int> MyCards { get; set; } = new();
     public List<int> OppCards { get; set; } = new();
+    public List<OppCard> OppCardDetails { get; set; } = new();
+    public bool GameUploaded { get; set; }      // raw capture archived on the site (/api/tracker/games/)
     public List<DeckCandidate> MyCandidates { get; set; } = new();
     public List<DeckCandidate> OppCandidates { get; set; } = new();
     public List<CardInfo> MyCardNames { get; set; } = new();
@@ -147,4 +156,5 @@ public sealed class PendingMatch
 [JsonSerializable(typeof(AddMatchResponse))]
 [JsonSerializable(typeof(PendingUploadResponse))]
 [JsonSerializable(typeof(PendingMatch))]
+[JsonSerializable(typeof(OppCard))]
 public partial class J : JsonSerializerContext { }

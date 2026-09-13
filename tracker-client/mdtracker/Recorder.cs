@@ -137,7 +137,11 @@ internal sealed class Recorder
         if (string.IsNullOrEmpty(m.OppName)) m.OppName = d.Rival ?? "";
         if (string.IsNullOrEmpty(m.MyName)) m.MyName = d.Me ?? "";
         foreach (var c in _g.ReadPvpCards())
-            if ((c.pos & 0xFF) != m.MyId) m.OppCards.Add(c.cardId);
+            if ((c.pos & 0xFF) != m.MyId)
+            {
+                m.OppCards.Add(c.cardId);
+                m.OppCardDetails.Add(new OppCard { Id = c.cardId, Pos = c.pos, Face = c.face });
+            }
         using var res = ReadJson("$.DuelResult");
         if (res != null) m.RawDuelResult = res.RootElement.GetRawText();
         if (res != null && Get(res.RootElement, "resultInfo") is { } info)

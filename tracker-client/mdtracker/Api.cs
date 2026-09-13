@@ -99,6 +99,7 @@ public sealed class Api
             ["score"] = rate && m.RatingAfter is double r ? (int)Math.Round(r) : null,
             ["score_type"] = rate ? "rating" : null,
             ["notes"] = string.IsNullOrWhiteSpace(notes) ? null : notes,
+            ["tracker_did"] = m.Did,
         };
         var (status, text) = Send(Req(HttpMethod.Post, $"/api/record-groups/{groupId}/add-match/", o.ToJsonString()));
         if (status == 401) throw new UnauthorizedAccessException();
@@ -107,10 +108,32 @@ public sealed class Api
         return res.MatchId.Value;
     }
 
+    private static JsonNode? RankObj(int? rank, int? tier) => rank is int r && tier is int t ? new JsonObject { ["rank"] = r, ["tier"] = t } : null;
+
+    /// Archive the raw capture (full decklist + revealed opponent cards) — sent for every game, confirmed or not.
+    public void UploadGame(PendingMatch m)
+    {
+        var opp = new JsonArray(m.OppCardDetails.Select(c => (JsonNode)new JsonObject { ["id"] = c.Id, ["pos"] = c.Pos, ["face"] = c.Face }).ToArray());
+        if (m.OppCardDetails.Count == 0) opp = new JsonArray(m.OppCards.Select(x => (JsonNode)x).ToArray());
+        var o = new JsonObject
+        {
+            ["did"] = m.Did, ["game_mode"] = m.GameMode, ["result"] = m.Result, ["finish"] = m.Finish,
+            ["coin_win"] = m.CoinWin, ["first"] = m.First, ["my_name"] = m.MyName, ["opp_name"] = m.OppName,
+            ["rank_before"] = RankObj(m.RankBefore, m.TierBefore), ["rank_after"] = RankObj(m.RankAfter, m.TierAfter),
+            ["rank_code"] = m.RankCode, ["wins"] = m.Wins, ["rating_before"] = m.RatingBefore, ["rating_after"] = m.RatingAfter,
+            ["turn"] = m.Turn, ["md_deck_id"] = m.MyMdDeckId,
+            ["my_cards"] = new JsonArray(m.MyCards.Select(x => (JsonNode)x).ToArray()),
+            ["opp_cards"] = opp,
+            ["started_at"] = m.StartedAt, ["ended_at"] = m.EndedAt,
+        };
+        var (status, text) = Send(Req(HttpMethod.Post, "/api/tracker/games/", o.ToJsonString()));
+        if (status == 401) throw new UnauthorizedAccessException();
+        if (status is not (200 or 201)) throw new Exception($"games {status}");
+    }
+
     /// Park the game on the site ("확인 대기") instead of saving now.
     public int UploadPending(PendingMatch m)
     {
-        static JsonNode? RankObj(int? rank, int? tier) => rank is int r && tier is int t ? new JsonObject { ["rank"] = r, ["tier"] = t } : null;
         var o = new JsonObject
         {
             ["did"] = m.Did, ["game_mode"] = m.GameMode, ["result"] = m.Result, ["finish"] = m.Finish,

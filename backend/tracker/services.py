@@ -46,6 +46,7 @@ def consume_pending(user, pending_id, match):
         return None
     obj.status, obj.match = "confirmed", match
     obj.save(update_fields=["status", "match", "updated_at"])
+    link_game(user, obj.did, match)
     md_deck_id = str((obj.payload or {}).get("md_deck_id") or "")
     if md_deck_id and match.deck_id:
         TrackerDeckMap.objects.update_or_create(user=user, md_deck_id=md_deck_id, defaults={"deck_id": match.deck_id})
@@ -54,3 +55,64 @@ def consume_pending(user, pending_id, match):
 
 def serialize_pending(obj):
     return {"id": obj.id, "did": obj.did, "status": obj.status, "created_at": obj.created_at, **(obj.payload or {})}
+
+
+def _dt(value):
+    from django.utils.dateparse import parse_datetime
+    from django.utils import timezone
+    if not value:
+        return None
+    dt = parse_datetime(str(value))
+    if dt is None:
+        return None
+    return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
+
+
+def upsert_game(user, data):
+    """Archive a captured duel (idempotent per did). Opponent cards may be ints or {id,pos,face} dicts."""
+    from .inference import resolve_aliases
+    from .models import TrackerGame
+    did = str(data.get("did") or "").strip()
+    if not did or not did.isdigit():
+        raise ValueError("did required")
+    my_cards = resolve_aliases(data.get("my_cards") or [])
+    opp_raw = data.get("opp_cards") or []
+    opp_ids = resolve_aliases([c.get("id") if isinstance(c, dict) else c for c in opp_raw])
+    opp_cards = []
+    for c, cid in zip(opp_raw, opp_ids):
+        if isinstance(c, dict):
+            opp_cards.append({"id": cid, "pos": c.get("pos"), "face": c.get("face")})
+        else:
+            opp_cards.append({"id": cid})
+    fields = {
+        "game_mode": int(data.get("game_mode") or 0),
+        "result": str(data.get("result") or "")[:8],
+        "finish": str(data.get("finish") or "")[:32],
+        "coin_win": data.get("coin_win"),
+        "first": data.get("first"),
+        "my_name": str(data.get("my_name") or "")[:64],
+        "opp_name": str(data.get("opp_name") or "")[:64],
+        "rank_before": data.get("rank_before"),
+        "rank_after": data.get("rank_after"),
+        "rank_code": str(data.get("rank_code") or "")[:16],
+        "wins": data.get("wins"),
+        "rating_before": data.get("rating_before"),
+        "rating_after": data.get("rating_after"),
+        "turn": int(data.get("turn") or 0),
+        "md_deck_id": str(data.get("md_deck_id") or "")[:32],
+        "my_cards": my_cards,
+        "opp_cards": opp_cards,
+        "started_at": _dt(data.get("started_at")),
+        "ended_at": _dt(data.get("ended_at")),
+    }
+    obj, created = TrackerGame.objects.update_or_create(user=user, did=did, defaults=fields)
+    return obj, created
+
+
+def link_game(user, did, match):
+    """Attach a saved MatchRecord to its raw capture (called from add-match)."""
+    from .models import TrackerGame
+    did = str(did or "").strip()
+    if not did:
+        return 0
+    return TrackerGame.objects.filter(user=user, did=did).update(match=match)

@@ -79,3 +79,16 @@ def pending_discard(request, pending_id):
         obj.status = "discarded"
         obj.save(update_fields=["status", "updated_at"])
     return Response({"id": obj.id, "status": obj.status})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def games(request):
+    """Tracker: archive one captured duel (full decklist + revealed opponent cards). Idempotent per did."""
+    from .services import upsert_game
+
+    try:
+        obj, created = upsert_game(request.user, request.data)
+    except (ValueError, TypeError) as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"id": obj.id, "did": obj.did}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

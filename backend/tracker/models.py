@@ -36,3 +36,40 @@ class TrackerDeckMap(models.Model):
 
     def __str__(self):
         return f"{self.user.username}: {self.md_deck_id} → {self.deck.name}"
+
+
+class TrackerGame(models.Model):
+    """Raw capture of every duel the tracker sees — full own decklist and every opponent card revealed —
+    kept regardless of whether the user confirmed a record. Card ids are Konami ids (alt arts resolved)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tracker_games")
+    did = models.CharField(max_length=32)
+    game_mode = models.IntegerField(help_text="3 rank, 19 rate")
+    result = models.CharField(max_length=8, blank=True, default="")
+    finish = models.CharField(max_length=32, blank=True, default="")
+    coin_win = models.BooleanField(null=True)
+    first = models.BooleanField(null=True)
+    my_name = models.CharField(max_length=64, blank=True, default="")
+    opp_name = models.CharField(max_length=64, blank=True, default="")
+    rank_before = models.JSONField(null=True, blank=True)
+    rank_after = models.JSONField(null=True, blank=True)
+    rank_code = models.CharField(max_length=16, blank=True, default="")
+    wins = models.IntegerField(null=True, blank=True)
+    rating_before = models.FloatField(null=True, blank=True)
+    rating_after = models.FloatField(null=True, blank=True)
+    turn = models.IntegerField(default=0)
+    md_deck_id = models.CharField(max_length=32, blank=True, default="")
+    my_cards = models.JSONField(default=list, help_text="main+extra card ids as listed by the game")
+    opp_cards = models.JSONField(default=list, help_text="[{id, pos, face}] every opponent card the engine revealed")
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    match = models.ForeignKey("tool.MatchRecord", on_delete=models.SET_NULL, null=True, blank=True, related_name="tracker_games")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-ended_at"]
+        constraints = [models.UniqueConstraint(fields=["user", "did"], name="uniq_tracker_game_user_did")]
+        verbose_name = "트래커 게임 원본"
+        verbose_name_plural = "트래커 게임 원본"
+
+    def __str__(self):
+        return f"{self.user.username} {self.did} {self.result}"

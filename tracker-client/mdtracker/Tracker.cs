@@ -63,6 +63,16 @@ public sealed class Tracker
         if (!m.IsDemo) Store.Save(m);
         MatchesChanged?.Invoke();
         MatchCaptured?.Invoke(m);
+        if (!m.IsDemo) new Thread(() => ArchiveGame(m)) { IsBackground = true }.Start();
+    }
+
+    /// Raw capture → site archive; failures are retried by RetryLoop.
+    private void ArchiveGame(PendingMatch m)
+    {
+        if (m.GameUploaded || Store.Config.Token == null) return;
+        try { Api.UploadGame(m); m.GameUploaded = true; Store.Save(m); }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); }
+        catch (Exception ex) { Log.Info("archive failed: " + ex.Message); }
     }
 
     public void RefreshDecks()
@@ -134,6 +144,7 @@ public sealed class Tracker
             Thread.Sleep(60_000);
             if (Store.Config.Token == null) continue;
             foreach (var m in Store.Matches.Where(x => x.Status == "failed").ToList()) Defer(m);
+            foreach (var m in Store.Matches.Where(x => !x.GameUploaded && !x.IsDemo && x.Status != "discarded").ToList()) ArchiveGame(m);
         }
     }
 

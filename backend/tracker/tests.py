@@ -182,3 +182,52 @@ class TrackerPendingTest(TestCase):
         self.assertEqual(self.client.post("/api/tracker/pending/", {"result": "win"}, format="json").status_code, 400)
         self.client.force_authenticate(user=None)
         self.assertEqual(self.client.get("/api/tracker/pending/").status_code, 401)
+
+
+class TrackerGameArchiveTest(TestCase):
+    """Every captured duel is archived with its card lists; saving a record links it."""
+
+    def setUp(self):
+        from card.models import Card, CardIdAlias
+        from tool.models import RecordGroup
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="g@test.com", username="games", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck("푸른 눈")
+        self.group = RecordGroup.objects.create(user=self.user, name="테스트")
+        bewd = Card.objects.create(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon")
+        CardIdAlias.objects.create(md_id=3801, card=bewd)
+        self.capture = {
+            "did": "7709189150693852086", "game_mode": 3, "result": "win", "finish": "Surrender", "coin_win": True, "first": True,
+            "my_name": "Elyss", "opp_name": "gg_", "rank_before": {"rank": 2, "tier": 4}, "rank_after": {"rank": 2, "tier": 3},
+            "rank_code": "bronze3", "wins": 0, "turn": 2, "md_deck_id": "28860507",
+            "my_cards": [4007, 3801, 8933], "opp_cards": [{"id": 9455, "pos": 4097, "face": True}, 19014],
+            "started_at": "2026-09-13T23:00:00", "ended_at": "2026-09-13T23:05:00",
+        }
+
+    def test_archive_normalizes_alt_arts_and_is_idempotent(self):
+        from tracker.models import TrackerGame
+        res = self.client.post("/api/tracker/games/", self.capture, format="json")
+        self.assertEqual(res.status_code, 201)
+        g = TrackerGame.objects.get(user=self.user, did=self.capture["did"])
+        self.assertEqual(g.my_cards, [4007, 4007, 8933])          # 3801 (alt art) → 4007
+        self.assertEqual(g.opp_cards, [{"id": 9455, "pos": 4097, "face": True}, {"id": 19014}])
+        from django.utils import timezone
+        self.assertEqual(timezone.localtime(g.ended_at).strftime("%Y-%m-%dT%H:%M"), "2026-09-13T23:05")
+        res2 = self.client.post("/api/tracker/games/", {**self.capture, "turn": 5}, format="json")
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(TrackerGame.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(TrackerGame.objects.get(id=g.id).turn, 5)
+
+    def test_add_match_links_the_capture(self):
+        from tracker.models import TrackerGame
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": self.deck.id, "opponent_deck": None, "first_or_second": "first", "result": "win",
+            "coin_toss_result": "win", "rank": "bronze3", "wins": 0, "tracker_did": self.capture["did"],
+        }, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(TrackerGame.objects.get(user=self.user, did=self.capture["did"]).match_id, res.json()["match_id"])
+
+    def test_requires_did(self):
+        self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)

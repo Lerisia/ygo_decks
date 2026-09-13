@@ -119,6 +119,9 @@ def add_match_to_record_group(request, record_group_id):
     if data.get("tracker_pending_id"):
         from tracker.services import consume_pending
         consume_pending(user, data.get("tracker_pending_id"), match)
+    if data.get("tracker_did"):
+        from tracker.services import link_game
+        link_game(user, data.get("tracker_did"), match)
 
     return Response({"match_id": match.id}, status=status.HTTP_201_CREATED)
 
