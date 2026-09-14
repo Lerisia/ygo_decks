@@ -92,8 +92,9 @@ public partial class MainWindow : Window
             GroupBox.ItemsSource = groups;
             GroupBox.DisplayMemberPath = "Name";
             var cur = groups.FirstOrDefault(g => g.Id == T.Store.Config.RecordGroupId);
-            // One sheet and nothing chosen yet: pick it, so games never pile up unrecorded.
-            if (cur == null && groups.Count == 1) cur = groups[0];
+            // Nothing chosen yet: take the newest sheet (the API returns them newest-first),
+            // so games never pile up unrecorded.
+            if (cur == null && groups.Count > 0) cur = groups[0];
             GroupBox.SelectedItem = cur;
             if (cur != null && T.Store.Config.RecordGroupId != cur.Id)
             {
