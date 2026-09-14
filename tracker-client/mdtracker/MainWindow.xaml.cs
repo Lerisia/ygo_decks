@@ -35,7 +35,10 @@ public partial class MainWindow : Window
         LoginPanel.Visibility = loggedIn ? Visibility.Collapsed : Visibility.Visible;
         SetupPanel.Visibility = loggedIn ? Visibility.Visible : Visibility.Collapsed;
         AccountText.Text = loggedIn ? $"로그인됨: {T.Store.Config.Email}" : "";
-        SetupMsg.Text = T.Store.Config.RecordGroupId == null ? "게임을 기록할 시트를 선택하세요. 선택 전에는 게임이 사이트의 '확인 대기'로만 올라갑니다." : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
+        bool noSheet = T.Store.Config.RecordGroupId == null;
+        SetupMsg.Text = noSheet ? "⚠ 기록할 시트를 먼저 골라주세요. 시트가 없으면 아래에서 새로 만들면 됩니다. (고르기 전까지는 게임이 사이트의 '확인 대기'로만 쌓입니다.)"
+                                : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
+        SetupMsg.Foreground = noSheet ? System.Windows.Media.Brushes.OrangeRed : (System.Windows.Media.Brush)FindResource("Muted");
     }
 
     private void RefreshRecent()
@@ -89,8 +92,15 @@ public partial class MainWindow : Window
             GroupBox.ItemsSource = groups;
             GroupBox.DisplayMemberPath = "Name";
             var cur = groups.FirstOrDefault(g => g.Id == T.Store.Config.RecordGroupId);
+            // One sheet and nothing chosen yet: pick it, so games never pile up unrecorded.
+            if (cur == null && groups.Count == 1) cur = groups[0];
             GroupBox.SelectedItem = cur;
-            if (groups.Count == 0) SetupMsg.Text = "시트가 없습니다. 아래에서 새 시트를 만들어 주세요.";
+            if (cur != null && T.Store.Config.RecordGroupId != cur.Id)
+            {
+                T.Store.Config.RecordGroupId = cur.Id; T.Store.Config.RecordGroupName = cur.Name; T.Store.SaveConfig();
+            }
+            if (groups.Count == 0 && NewGroupBox.Text.Length == 0) NewGroupBox.Text = $"{DateTime.Now:yyyy-MM} 시즌";
+            RefreshPanels();
         }
         catch (UnauthorizedAccessException) { T.Store.Config.Token = null; T.Store.SaveConfig(); RefreshPanels(); LoginMsg.Text = "로그인이 만료되었습니다. 다시 로그인하세요."; }
         catch (Exception ex) { SetupMsg.Text = "시트 목록을 불러오지 못했습니다: " + ex.Message; }

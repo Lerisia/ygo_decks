@@ -59,6 +59,8 @@ public partial class App : System.Windows.Application
             // Not set up yet: keep the game and show the main window so the user can finish setup.
             Tracker.Defer(m);
             ShowMain();
+            _tray?.ShowBalloonTip(6000, "YGO Decks 트래커",
+                "기록할 시트를 먼저 골라주세요. 방금 게임은 사이트의 '확인 대기'에 보관했습니다.", WinForms.ToolTipIcon.Warning);
             return;
         }
         try { new OverlayWindow(Tracker, m).Show(); }

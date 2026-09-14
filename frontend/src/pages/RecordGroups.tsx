@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PcTrackerBanner from "@/components/PcTrackerBanner";
+import { getTrackerPending } from "@/api/trackerPendingApi";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -204,6 +205,13 @@ const RecordGroups = () => {
   };
 
   const isLoggedIn = localStorage.getItem("access_token");
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Games the PC tracker uploaded while no sheet was selected — they are invisible on this page otherwise.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    getTrackerPending().then((list) => setPendingCount(list.length)).catch(() => {});
+  }, [isLoggedIn]);
 
   return (
     <div className="px-0 sm:px-6 py-6 min-h-screen">
@@ -219,6 +227,16 @@ const RecordGroups = () => {
         )}
       </div>
 
+      {isLoggedIn && pendingCount > 0 && (
+        <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-3">
+          <div className="font-semibold">트래커에서 올라온 게임 {pendingCount}건이 확인을 기다리고 있습니다</div>
+          <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+            {recordGroups.length === 0
+              ? "아래에서 시트를 먼저 만들면, 그 시트에서 확인하고 기록할 수 있습니다."
+              : "아래 시트를 열면 맨 위에서 확인하고 기록할 수 있습니다."}
+          </div>
+        </div>
+      )}
       {isLoggedIn && <PcTrackerBanner />}
       {Capacitor.isNativePlatform() && isLoggedIn && (
         <button
