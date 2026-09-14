@@ -30,7 +30,7 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
   if (!notes || notes.length === 0) return null;
 
   return (
-    <section className="mb-5">
+    <section className="mb-5 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
