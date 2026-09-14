@@ -820,6 +820,19 @@ class SharedSheetTest(TestCase):
         plain = self._as(self.owner).post("/api/record-groups/create/", {"name": "혼자"}, format="json")
         self.assertEqual(plain.json()["kind"], "solo")
 
+    def test_staff_may_read_a_private_sheet_but_not_change_it(self):
+        staff = User.objects.create_user(email="s@s.com", username="staff", password="pass1234", is_staff=True)
+        self._add_match(self.owner)
+        self.assertFalse(self.group.is_public)
+
+        body = self._as(staff).get(f"/api/record-groups/{self.group.id}/matches/").json()
+        self.assertEqual((body["my_role"], body["can_write"], body["is_owner"]), ("admin", False, False))
+        self.assertEqual(len(body["matches"]), 1)
+
+        self.assertEqual(self._add_match(staff).status_code, 403)
+        self.assertEqual(self._as(staff).patch(
+            f"/api/record-groups/{self.group.id}/update-name/", {"name": "바꿈"}, format="json").status_code, 404)
+
     def test_viewer_may_read_but_not_write(self):
         self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
                                   {"user_id": self.mate.id, "role": "viewer"}, format="json")

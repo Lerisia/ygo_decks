@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models import Count, Q, F, FloatField, ExpressionWrapper
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes, parser_classes
@@ -27,6 +29,9 @@ def _get_accessible_group(request, record_group_id, need="view"):
             return None, Response({"error": "그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
         return None, Response({"error": "접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
     group.viewer_role = role
+    if role == "admin":
+        logging.getLogger("tool.admin_access").info(
+            "staff %s read sheet %s (owner %s)", request.user.id, group.id, group.user_id)
     return group, None
 
 

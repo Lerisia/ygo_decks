@@ -5,9 +5,9 @@ so nothing about existing solo sheets changes.
 """
 from .models import RecordGroupMember
 
-OWNER, EDITOR, VIEWER, PUBLIC = "owner", "editor", "viewer", "public"
+OWNER, EDITOR, VIEWER, PUBLIC, ADMIN = "owner", "editor", "viewer", "public", "admin"
 _NEEDS = {
-    "view": {OWNER, EDITOR, VIEWER, PUBLIC},
+    "view": {OWNER, EDITOR, VIEWER, PUBLIC, ADMIN},
     "write": {OWNER, EDITOR},
     "manage": {OWNER},
 }
@@ -23,6 +23,11 @@ def role_of(user, group):
                 .values_list("role", flat=True).first())
         if role:
             return role
+        if group.is_public:
+            return PUBLIC
+        # Site staff may read any sheet for support and moderation, never write to one.
+        if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+            return ADMIN
     return PUBLIC if group.is_public else None
 
 
