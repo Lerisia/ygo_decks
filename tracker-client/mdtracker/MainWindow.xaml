@@ -106,12 +106,13 @@
                 <ListView x:Name="RecentList" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="시간" Width="90" DisplayMemberBinding="{Binding Time}"/>
-                            <GridViewColumn Header="결과" Width="45" DisplayMemberBinding="{Binding Result}"/>
-                            <GridViewColumn Header="내 덱" Width="150" DisplayMemberBinding="{Binding MyDeck}"/>
-                            <GridViewColumn Header="상대 덱" Width="150" DisplayMemberBinding="{Binding OppDeck}"/>
-                            <GridViewColumn Header="상대" Width="120" DisplayMemberBinding="{Binding Opp}"/>
-                            <GridViewColumn Header="랭크 / 레이팅" Width="130" DisplayMemberBinding="{Binding Rank}"/>
+                            <GridViewColumn Header="시간" Width="80" DisplayMemberBinding="{Binding Time}"/>
+                            <GridViewColumn Header="결과" Width="40" DisplayMemberBinding="{Binding Result}"/>
+                            <GridViewColumn Header="코인 / 선후공" Width="100" DisplayMemberBinding="{Binding Coin}"/>
+                            <GridViewColumn Header="내 덱" Width="120" DisplayMemberBinding="{Binding MyDeck}"/>
+                            <GridViewColumn Header="상대 덱" Width="120" DisplayMemberBinding="{Binding OppDeck}"/>
+                            <GridViewColumn Header="상대" Width="90" DisplayMemberBinding="{Binding Opp}"/>
+                            <GridViewColumn Header="랭크 / 레이팅" Width="120" DisplayMemberBinding="{Binding Rank}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
