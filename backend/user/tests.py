@@ -421,3 +421,59 @@ class UpdateOwnedDecksTest(TestCase):
         self.user.owned_decks.add(self.d1, self.d2)
         self.assertEqual(self._save([self.d1.id, self.d2.id]).status_code, 200)
         self.assertEqual(self.user.owned_decks.count(), 2)
+
+class TypablePasswordTest(TestCase):
+    """A password nobody can type is a locked account: reject invisible characters."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.c = APIClient()
+        self.user = User.objects.create_user(
+            email="typable@test.com", username="typable", password="Zx9-korea-tree")
+
+    def test_validator_accepts_visible_characters_including_an_inner_space(self):
+        from .validators import validate_password_characters
+        for good in ["3:LmZ!=?U 37", "qwer1234", "한글비밀번호", "a b c"]:
+            self.assertEqual(validate_password_characters(good), good)
+
+    def test_validator_rejects_characters_that_do_not_show(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .validators import validate_password_characters
+        for bad in ["3:LmZ\x00!=?U 37", "pass\x01word", "zero\u200bwidth", "tab\there"]:
+            with self.assertRaises(DjangoValidationError):
+                validate_password_characters(bad)
+
+    def test_validator_rejects_surrounding_space_because_login_trims_it(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .validators import validate_password_characters
+        for bad in [" leading", "trailing ", "  both  "]:
+            with self.assertRaises(DjangoValidationError):
+                validate_password_characters(bad)
+
+    def test_change_password_refuses_an_untypable_password(self):
+        self.c.force_authenticate(user=self.user)
+        res = self.c.post("/api/change-password/", {
+            "current_password": "Zx9-korea-tree",
+            "new_password": "3:LmZ\x00!=?U 37",
+        }, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Zx9-korea-tree"))
+
+    def test_password_reset_refuses_an_untypable_password_but_takes_a_clean_one(self):
+        from django.contrib.auth.tokens import default_token_generator
+        token = default_token_generator.make_token(self.user)
+
+        bad = self.c.post("/api/password-reset/confirm/", {
+            "uid": self.user.pk, "token": token, "new_password": "sneaky\u200bpass",
+        }, format="json")
+        self.assertEqual(bad.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Zx9-korea-tree"))
+
+        ok = self.c.post("/api/password-reset/confirm/", {
+            "uid": self.user.pk, "token": token, "new_password": "3:LmZ!=?U 37",
+        }, format="json")
+        self.assertEqual(ok.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("3:LmZ!=?U 37"))

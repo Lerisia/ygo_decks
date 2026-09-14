@@ -15,11 +15,20 @@ class CustomRegisterSerializer(RegisterSerializer):
     
     def validate_password1(self, value):
         # 기본에서는 여기서 validate_password(value)를 호출함
-        # 그걸 막고 그냥 그대로 반환하면 검사 통과
-        return value
+        # 세기 검사는 그대로 건너뛰되, 입력할 수 없는 문자만 걸러낸다
+        return self._typable(value)
 
     def validate_password2(self, value):
-        return value
+        return self._typable(value)
+
+    @staticmethod
+    def _typable(value):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .validators import validate_password_characters
+        try:
+            return validate_password_characters(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
 
     def get_cleaned_data(self):
         data = super().get_cleaned_data()

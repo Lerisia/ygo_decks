@@ -10,6 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from django.utils import timezone
 from .serializers import CustomTokenObtainPairSerializer
+from .validators import validate_password_characters
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -53,6 +54,7 @@ def change_password(request):
         return Response({"error": "현재 비밀번호가 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        validate_password_characters(new_password)
         validate_password(new_password, user=user)
     except ValidationError as e:
         return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
@@ -361,6 +363,11 @@ def confirm_password_reset(request):
 
     if not default_token_generator.check_token(user, token):
         return Response({"error": "만료되었거나 유효하지 않은 링크입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        validate_password_characters(new_password)
+    except ValidationError as e:
+        return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
     user.set_password(new_password)
     user.save()
