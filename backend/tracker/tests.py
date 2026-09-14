@@ -317,8 +317,18 @@ class TrackerVersionTest(TestCase):
         self.assertEqual(body["version"], ver.LATEST)
         self.assertFalse(body["outdated"])
 
+    def test_site_calls_without_the_header_do_not_clear_a_known_version(self):
+        from tracker import version as ver
+        self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
+                         HTTP_X_TRACKER_VERSION=ver.LATEST)
+        self.client.get("/api/tracker/pending/")          # the website polls this every 15s
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertEqual(body["version"], ver.LATEST)
+        self.assertFalse(body["outdated"])
+
     def test_build_without_version_header_counts_as_outdated(self):
-        self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json")
+        self.client.post("/api/tracker/games/", {"did": "1", "game_mode": 3, "result": "win"}, format="json")
         body = self.client.get("/api/tracker/client-status/").json()
         self.assertIsNone(body["version"])
+        self.assertTrue(body["used_tracker"])
         self.assertTrue(body["outdated"])

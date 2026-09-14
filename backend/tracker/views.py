@@ -110,9 +110,10 @@ def version_info(request):
 @permission_classes([IsAuthenticated])
 def client_status(request):
     """Whether this user's tracker build is out of date (the site warns old builds that can't warn themselves)."""
-    from .models import TrackerClient, TrackerGame
+    from .models import TrackerClient, TrackerGame, TrackerPendingMatch
     c = TrackerClient.objects.filter(user=request.user).first()
-    used = bool(c) or TrackerGame.objects.filter(user=request.user).exists()
+    used = bool(c) or TrackerGame.objects.filter(user=request.user).exists() \
+        or TrackerPendingMatch.objects.filter(user=request.user).exists()
     v = (c.version if c else "") or None
     return Response({
         "version": v,
