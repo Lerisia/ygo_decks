@@ -18,7 +18,7 @@ export const getUserRecordGroups = async () => {
   return response.json();
 };
 
-export const createRecordGroup = async (name: string) => {
+export const createRecordGroup = async (name: string, kind: "solo" | "shared" = "solo") => {
   const token = localStorage.getItem("access_token");
   const response = await fetch(`${API_BASE_URL}/record-groups/create/`, {
     method: "POST",
@@ -26,7 +26,7 @@ export const createRecordGroup = async (name: string) => {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, kind }),
     credentials: "include",
   });
 

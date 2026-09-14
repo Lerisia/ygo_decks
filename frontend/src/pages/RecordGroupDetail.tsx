@@ -7,7 +7,6 @@ import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
 import PcTrackerBanner from "@/components/PcTrackerBanner";
 import SheetMembersPanel from "@/components/SheetMembersPanel";
-import { sharePreviewEnabled } from "@/lib/sharePreview";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -337,7 +336,6 @@ const RecordGroupDetailPage = () => {
   const [myRole, setMyRole] = useState<string | null>(null);
   const [sheetKind, setSheetKind] = useState<"solo" | "shared">("solo");
   const [memberFilter, setMemberFilter] = useState<number | null>(null);
-  const [sharePreview] = useState(sharePreviewEnabled);
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
@@ -783,7 +781,7 @@ const RecordGroupDetailPage = () => {
       {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}
-      {(sheetKind === "shared" || sharePreview) && (
+      {sheetKind === "shared" && (
         <SheetMembersPanel
           recordGroupId={Number(recordGroupId)}
           memberFilter={memberFilter}

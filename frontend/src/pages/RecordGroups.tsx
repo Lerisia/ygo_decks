@@ -13,7 +13,6 @@ import {
   MetaDeckStat,
 } from "@/api/toolApi";
 import { getDeckData } from "@/api/deckApi";
-import { sharePreviewEnabled } from "@/lib/sharePreview";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
@@ -126,7 +125,8 @@ const RecordGroups = () => {
   const [totalMatches, setTotalMatches] = useState<number>(0);
   const [joinCode, setJoinCode] = useState("");
   const [joinMsg, setJoinMsg] = useState("");
-  const [sharePreview] = useState(sharePreviewEnabled);
+  const [showJoin, setShowJoin] = useState(false);
+  const [newGroupKind, setNewGroupKind] = useState<"solo" | "shared">("solo");
   const navigate = useNavigate();
 
   const joinByCode = async () => {
@@ -215,7 +215,7 @@ const RecordGroups = () => {
     if (!newGroupName.trim()) return;
 
     try {
-      await createRecordGroup(newGroupName);
+      await createRecordGroup(newGroupName, newGroupKind);
       setNewGroupName("");
       setIsModalOpen(false);
 
@@ -360,7 +360,7 @@ const RecordGroups = () => {
           >
             + 시트 추가하기
           </button>
-          {(sharePreview || recordGroups.some((g) => g.kind === "shared")) && (
+          {showJoin ? (
           <>
           <input
             value={joinCode}
@@ -377,6 +377,13 @@ const RecordGroups = () => {
           </button>
           {joinMsg && <span className="text-sm text-red-600">{joinMsg}</span>}
           </>
+          ) : (
+            <button
+              onClick={() => setShowJoin(true)}
+              className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+            >
+              초대 코드로 참여
+            </button>
           )}
         </div>
       ) : (
@@ -475,6 +482,31 @@ const RecordGroups = () => {
               placeholder="시트 이름"
               className="p-2 border rounded w-full bg-white dark:bg-gray-800 text-black dark:text-white"
             />
+            <div className="mt-3 space-y-2">
+              {([
+                { key: "solo", title: "개인 시트", desc: "나 혼자 기록합니다." },
+                { key: "shared", title: "그룹 시트", desc: "친구를 초대해 함께 기록하고, 사람별로 전적을 나눠 봅니다." },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.key}
+                  className={`flex gap-2 items-start p-2 border rounded-lg cursor-pointer ${
+                    newGroupKind === opt.key ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30" : "border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="record-group-kind"
+                    className="mt-1"
+                    checked={newGroupKind === opt.key}
+                    onChange={() => setNewGroupKind(opt.key)}
+                  />
+                  <span>
+                    <span className="block font-medium">{opt.title}</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">{opt.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
             <div className="flex justify-end mt-4">
               <button
                 onClick={() => setIsModalOpen(false)}

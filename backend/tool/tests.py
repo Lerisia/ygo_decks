@@ -809,6 +809,17 @@ class SharedSheetTest(TestCase):
         self.assertEqual(
             self._as(self.owner).get("/api/record-groups/statistics/full/").json()["basic"]["total_games"], 1)
 
+    def test_a_sheet_can_be_born_as_a_group(self):
+        res = self._as(self.owner).post("/api/record-groups/create/", {"name": "크루", "kind": "shared"}, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json()["kind"], "shared")
+
+        listed = self._as(self.owner).get("/api/record-groups/").json()
+        self.assertIn(("크루", "shared"), [(g["name"], g["kind"]) for g in listed])
+
+        plain = self._as(self.owner).post("/api/record-groups/create/", {"name": "혼자"}, format="json")
+        self.assertEqual(plain.json()["kind"], "solo")
+
     def test_viewer_may_read_but_not_write(self):
         self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
                                   {"user_id": self.mate.id, "role": "viewer"}, format="json")

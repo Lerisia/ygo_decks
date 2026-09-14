@@ -62,7 +62,7 @@ export default function SheetMembersPanel({ recordGroupId, memberFilter, onFilte
   if (!data) return null;
   const isOwner = data.my_role === "owner";
   const isShared = data.kind === "shared" || data.members.length > 0;
-  if (!isShared && !isOwner) return null;
+  if (!isShared) return null;
 
   const invite = async (disable = false) => {
     setMsg("");
@@ -111,6 +111,7 @@ export default function SheetMembersPanel({ recordGroupId, memberFilter, onFilte
       </button>
 
       {/* per-person record — the reason a crew shares a sheet */}
+      {contributors.length > 1 && (
       <div className="flex flex-wrap gap-2 mt-2">
         <button
           type="button"
@@ -137,6 +138,7 @@ export default function SheetMembersPanel({ recordGroupId, memberFilter, onFilte
           ) : null
         )}
       </div>
+      )}
 
       {open && (
         <div className="mt-3 space-y-3">
