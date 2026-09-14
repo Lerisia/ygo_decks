@@ -332,3 +332,67 @@ class TrackerVersionTest(TestCase):
         self.assertIsNone(body["version"])
         self.assertTrue(body["used_tracker"])
         self.assertTrue(body["outdated"])
+
+
+class TrackerStatsTest(TestCase):
+    """Matchup record and today's summary shown in the tracker."""
+
+    def setUp(self):
+        from tool.models import RecordGroup
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="s@test.com", username="stats", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.mine = _create_deck("사이버 드래곤")
+        self.opp = _create_deck("낙인")
+        self.other = _create_deck("열차")
+        self.group = RecordGroup.objects.create(user=self.user, name="시트")
+
+    def _match(self, opponent, result, first="first"):
+        from tool.models import MatchRecord
+        return MatchRecord.objects.create(record_group=self.group, deck=self.mine, opponent_deck=opponent,
+                                          result=result, first_or_second=first, coin_toss_result="win")
+
+    def test_matchup_splits_by_going_first(self):
+        self._match(self.opp, "win", "first")
+        self._match(self.opp, "lose", "first")
+        self._match(self.opp, "lose", "second")
+        self._match(self.other, "win", "first")
+        body = self.client.get(f"/api/tracker/matchup/?deck={self.mine.id}&opponent={self.opp.id}").json()
+        self.assertEqual(body["deck"], "사이버 드래곤")
+        self.assertEqual(body["opponent"], "낙인")
+        self.assertEqual(body["matchup"], {"games": 3, "wins": 1, "win_rate": 33.3})
+        self.assertEqual(body["first"], {"games": 2, "wins": 1, "win_rate": 50.0})
+        self.assertEqual(body["second"], {"games": 1, "wins": 0, "win_rate": 0.0})
+        self.assertEqual(body["total"]["games"], 4)
+
+    def test_matchup_without_opponent_returns_deck_total_only(self):
+        self._match(self.opp, "win")
+        body = self.client.get(f"/api/tracker/matchup/?deck={self.mine.id}").json()
+        self.assertEqual(body["total"], {"games": 1, "wins": 1, "win_rate": 100.0})
+        self.assertNotIn("matchup", body)
+
+    def test_matchup_requires_a_deck(self):
+        self.assertEqual(self.client.get("/api/tracker/matchup/").status_code, 400)
+
+    def test_today_summarizes_tracker_games(self):
+        from django.utils import timezone
+        from tracker.models import TrackerGame
+        now = timezone.now()
+        TrackerGame.objects.create(user=self.user, did="1", game_mode=3, result="win", coin_win=True, first=True,
+                                   turn=3, rank_code="master5", ended_at=now)
+        TrackerGame.objects.create(user=self.user, did="2", game_mode=3, result="lose", coin_win=False, first=False,
+                                   turn=1, rank_code="master4", ended_at=now)
+        TrackerGame.objects.create(user=self.user, did="3", game_mode=3, result="win", coin_win=True, first=False,
+                                   turn=2, rank_code="master4", ended_at=now - timezone.timedelta(days=1))
+        body = self.client.get("/api/tracker/today/").json()
+        self.assertEqual((body["games"], body["wins"], body["win_rate"]), (2, 1, 50.0))
+        self.assertEqual(body["coin_win_rate"], 50.0)
+        self.assertEqual(body["first"], {"games": 1, "wins": 1, "win_rate": 100.0})
+        self.assertEqual(body["second"], {"games": 1, "wins": 0, "win_rate": 0.0})
+        self.assertEqual(body["avg_turns"], 2.0)
+        self.assertEqual(body["rank"], {"from": "master5", "to": "master4"})
+
+    def test_today_empty(self):
+        body = self.client.get("/api/tracker/today/").json()
+        self.assertEqual(body["games"], 0)
+        self.assertIsNone(body["win_rate"])

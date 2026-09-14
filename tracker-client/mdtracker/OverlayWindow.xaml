@@ -43,6 +43,8 @@
             <ListBox x:Name="OppDeckList" Visibility="Collapsed" MaxHeight="130" Background="#111827" Foreground="White" BorderBrush="#374151"
                      Margin="0,-8,0,8" SelectionChanged="OppDeckList_SelectionChanged"/>
 
+            <TextBlock x:Name="MatchupText" Foreground="#93C5FD" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
             <!-- opponent cards -->
             <TextBlock x:Name="CardsLabel" Text="상대가 보여준 카드" Foreground="#9CA3AF" FontSize="11"/>
             <WrapPanel x:Name="CardsPanel" Margin="0,2,0,8"/>

@@ -17,7 +17,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         Title = $"YGO Decks 트래커 {App.Version}";
         T.StatusChanged += _ => Dispatcher.BeginInvoke(RefreshStatus);
-        T.MatchesChanged += () => Dispatcher.BeginInvoke(RefreshRecent);
+        T.MatchesChanged += () => Dispatcher.BeginInvoke(() => { RefreshRecent(); RefreshToday(); });
         Loaded += (_, _) => { RefreshAll(); if (T.Store.Config.Token != null) LoadGroups(); CheckVersion(); };
     }
 
@@ -47,7 +47,7 @@ public partial class MainWindow : Window
         try { Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true }); } catch { }
     }
 
-    private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); }
+    private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); RefreshToday(); }
 
     /// Called after the tracker creates a sheet on its own.
     public void Refresh() => Dispatcher.BeginInvoke(() => { RefreshPanels(); LoadGroups(); });
@@ -84,6 +84,25 @@ public partial class MainWindow : Window
                 ? (m.RatingAfter is double r ? $"레이팅 {r:0.##}" : "레이팅")
                 : $"{OverlayWindow.RankLabel(m.RankCode)}{(m.Wins is int w ? $" · {w}승" : "")}",
         }).ToList();
+    }
+
+    /// Today's record, straight from the server so it follows the account across PCs.
+    private async void RefreshToday()
+    {
+        if (T.Store.Config.Token == null) { TodayPanel.Visibility = Visibility.Collapsed; return; }
+        var t = await Task.Run(() => { try { return T.Api.Today(); } catch { return null; } });
+        TodayPanel.Visibility = Visibility.Visible;
+        if (t == null) { TodayText.Text = "불러오지 못했습니다."; return; }
+        if (t.Games == 0) { TodayText.Text = "오늘 기록된 게임이 없습니다."; return; }
+        var parts = new List<string> { $"{t.Games}전 {t.Wins}승 {t.Losses}패 ({t.WinRate}%)" };
+        if (t.CoinWinRate != null) parts.Add($"코인 {t.CoinWinRate}%");
+        if (t.First is { Games: > 0 } f) parts.Add($"선공 {f.Wins}/{f.Games}");
+        if (t.Second is { Games: > 0 } s) parts.Add($"후공 {s.Wins}/{s.Games}");
+        if (t.AvgTurns != null) parts.Add($"평균 {t.AvgTurns}턴");
+        var line = string.Join("   ·   ", parts);
+        if (t.Rank?.From != null) line += $"\n랭크 {OverlayWindow.RankLabel(t.Rank.From)} → {OverlayWindow.RankLabel(t.Rank.To)}";
+        else if (t.Rating?.To != null) line += $"\n레이팅 {t.Rating.From:0.##} → {t.Rating.To:0.##}";
+        TodayText.Text = line;
     }
 
     private string? DeckName(int? id) => id == null ? null : T.Store.Decks.FirstOrDefault(d => d.Id == id)?.Name;

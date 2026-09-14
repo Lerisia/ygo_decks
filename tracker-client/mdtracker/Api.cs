@@ -55,6 +55,22 @@ public sealed class Api
         return status == 200 ? SafeParse(text, J.Default.VersionResponse) : null;
     }
 
+    /// This user's record with the deck, and against one opponent deck when given.
+    public MatchupResponse? Matchup(int deckId, int? oppDeckId)
+    {
+        var path = $"/api/tracker/matchup/?deck={deckId}" + (oppDeckId.HasValue ? $"&opponent={oppDeckId.Value}" : "");
+        var (status, text) = Send(Req(HttpMethod.Get, path));
+        if (status == 401) throw new UnauthorizedAccessException();
+        return status == 200 ? SafeParse(text, J.Default.MatchupResponse) : null;
+    }
+
+    public TodayResponse? Today()
+    {
+        var (status, text) = Send(Req(HttpMethod.Get, "/api/tracker/today/"));
+        if (status == 401) throw new UnauthorizedAccessException();
+        return status == 200 ? SafeParse(text, J.Default.TodayResponse) : null;
+    }
+
     public List<RecordGroup> Groups()
     {
         var (status, text) = Send(Req(HttpMethod.Get, "/api/record-groups/"));

@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.3.3";
+    public const string Version = "0.4.0";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private WinForms.NotifyIcon? _tray;

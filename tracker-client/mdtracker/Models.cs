@@ -95,6 +95,49 @@ public sealed class VersionResponse
     [JsonPropertyName("url")] public string Url { get; set; } = "";
 }
 
+public sealed class StatBlock
+{
+    [JsonPropertyName("games")] public int Games { get; set; }
+    [JsonPropertyName("wins")] public int Wins { get; set; }
+    [JsonPropertyName("win_rate")] public double? WinRate { get; set; }
+}
+
+public sealed class MatchupResponse
+{
+    [JsonPropertyName("deck")] public string? Deck { get; set; }
+    [JsonPropertyName("opponent")] public string? Opponent { get; set; }
+    [JsonPropertyName("total")] public StatBlock? Total { get; set; }
+    [JsonPropertyName("matchup")] public StatBlock? Matchup { get; set; }
+    [JsonPropertyName("first")] public StatBlock? First { get; set; }
+    [JsonPropertyName("second")] public StatBlock? Second { get; set; }
+}
+
+public sealed class RankSpan
+{
+    [JsonPropertyName("from")] public string? From { get; set; }
+    [JsonPropertyName("to")] public string? To { get; set; }
+}
+
+public sealed class RatingSpan
+{
+    [JsonPropertyName("from")] public double? From { get; set; }
+    [JsonPropertyName("to")] public double? To { get; set; }
+}
+
+public sealed class TodayResponse
+{
+    [JsonPropertyName("games")] public int Games { get; set; }
+    [JsonPropertyName("wins")] public int Wins { get; set; }
+    [JsonPropertyName("losses")] public int Losses { get; set; }
+    [JsonPropertyName("win_rate")] public double? WinRate { get; set; }
+    [JsonPropertyName("coin_win_rate")] public double? CoinWinRate { get; set; }
+    [JsonPropertyName("first")] public StatBlock? First { get; set; }
+    [JsonPropertyName("second")] public StatBlock? Second { get; set; }
+    [JsonPropertyName("avg_turns")] public double? AvgTurns { get; set; }
+    [JsonPropertyName("rank")] public RankSpan? Rank { get; set; }
+    [JsonPropertyName("rating")] public RatingSpan? Rating { get; set; }
+}
+
 public sealed class PendingUploadResponse
 {
     [JsonPropertyName("id")] public int Id { get; set; }
@@ -165,6 +208,8 @@ public sealed class PendingMatch
 [JsonSerializable(typeof(AddMatchResponse))]
 [JsonSerializable(typeof(PendingUploadResponse))]
 [JsonSerializable(typeof(VersionResponse))]
+[JsonSerializable(typeof(MatchupResponse))]
+[JsonSerializable(typeof(TodayResponse))]
 [JsonSerializable(typeof(PendingMatch))]
 [JsonSerializable(typeof(OppCard))]
 public partial class J : JsonSerializerContext { }

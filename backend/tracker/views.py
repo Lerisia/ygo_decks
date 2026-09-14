@@ -123,3 +123,68 @@ def client_status(request):
         "url": ver.DOWNLOAD_URL,
         "last_seen": c.last_seen if c else None,
     })
+
+
+def _rate(w, n):
+    return round(w / n * 100, 1) if n else None
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def matchup(request):
+    """This user's record with one deck, overall and against a specific opponent deck."""
+    from deck.models import Deck
+    from tool.models import MatchRecord
+
+    deck_id = request.GET.get("deck") or ""
+    if not deck_id.isdigit():
+        return Response({"error": "deck required"}, status=status.HTTP_400_BAD_REQUEST)
+    opp_id = request.GET.get("opponent") or ""
+    base = MatchRecord.objects.filter(record_group__user=request.user, deck_id=int(deck_id), is_deleted=False)
+
+    def agg(qs):
+        n = qs.count()
+        w = qs.filter(result="win").count()
+        return {"games": n, "wins": w, "win_rate": _rate(w, n)}
+
+    names = dict(Deck.objects.filter(id__in=[x for x in (deck_id, opp_id) if x.isdigit()]).values_list("id", "name"))
+    out = {"deck": names.get(int(deck_id)), "total": agg(base)}
+    if opp_id.isdigit():
+        m = base.filter(opponent_deck_id=int(opp_id))
+        out["opponent"] = names.get(int(opp_id))
+        out["matchup"] = agg(m)
+        out["first"] = agg(m.filter(first_or_second="first"))
+        out["second"] = agg(m.filter(first_or_second="second"))
+    return Response(out)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def today(request):
+    """Everything the tracker saw for this user since local midnight."""
+    from django.utils import timezone
+
+    from .models import TrackerGame
+
+    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    games = list(TrackerGame.objects.filter(user=request.user, ended_at__gte=start).order_by("ended_at"))
+    n = len(games)
+    w = sum(1 for g in games if g.result == "win")
+    firsts = [g for g in games if g.first]
+    seconds = [g for g in games if g.first is False]
+    out = {
+        "games": n, "wins": w, "losses": n - w, "win_rate": _rate(w, n),
+        "coin_win_rate": _rate(sum(1 for g in games if g.coin_win), n),
+        "first": {"games": len(firsts), "wins": sum(1 for g in firsts if g.result == "win"),
+                  "win_rate": _rate(sum(1 for g in firsts if g.result == "win"), len(firsts))},
+        "second": {"games": len(seconds), "wins": sum(1 for g in seconds if g.result == "win"),
+                   "win_rate": _rate(sum(1 for g in seconds if g.result == "win"), len(seconds))},
+        "avg_turns": round(sum(g.turn for g in games) / n, 1) if n else None,
+    }
+    ranked = [g for g in games if g.game_mode == 3 and g.rank_code]
+    if ranked:
+        out["rank"] = {"from": ranked[0].rank_code, "to": ranked[-1].rank_code}
+    rated = [g for g in games if g.game_mode == 19 and g.rating_after]
+    if rated:
+        out["rating"] = {"from": rated[0].rating_before or rated[0].rating_after, "to": rated[-1].rating_after}
+    return Response(out)

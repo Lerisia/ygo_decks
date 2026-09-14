@@ -70,6 +70,27 @@ public partial class OverlayWindow : Window
         if (_m.OppCardNames.Count == 0) CardsLabel.Text = "상대가 보여준 카드 없음";
         else if (_m.OppCardNames.Count > 14) CardsLabel.Text = $"상대가 보여준 카드 (상위 14장 / {_m.OppCardNames.Count})";
         UpdateCountdown();
+        LoadMatchup();
+    }
+
+    /// This user's history in the matchup now shown in the card (refreshed whenever the decks change).
+    private async void LoadMatchup()
+    {
+        var deck = _myDeck;
+        var opp = _oppUnknown ? null : _oppDeck;
+        if (deck == null) { MatchupText.Text = ""; return; }
+        var r = await Task.Run(() => { try { return _t.Api.Matchup(deck.Id, opp?.Id); } catch { return null; } });
+        if (r == null) { MatchupText.Text = ""; return; }
+        if (r.Matchup is { Games: > 0 } m)
+        {
+            var parts = $"{r.Deck} vs {r.Opponent}  {m.Games}전 {m.Wins}승 ({m.WinRate}%)";
+            if (r.First is { Games: > 0 } f) parts += $"   ·   선공 {f.Wins}/{f.Games}";
+            if (r.Second is { Games: > 0 } s2) parts += $"   후공 {s2.Wins}/{s2.Games}";
+            MatchupText.Text = parts;
+        }
+        else if (r.Total is { Games: > 0 } t)
+            MatchupText.Text = $"{r.Deck} 전체 {t.Games}전 {t.Wins}승 ({t.WinRate}%)   ·   이 상대와는 첫 대결";
+        else MatchupText.Text = "";
     }
 
     /// Top-center of the game window; falls back to the primary screen.
@@ -128,17 +149,17 @@ public partial class OverlayWindow : Window
 
     private void MyDeckList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (MyDeckList.SelectedItem is SiteDeck d) { _myDeck = d; MyDeckBox.Text = d.Name; MyDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); }
+        if (MyDeckList.SelectedItem is SiteDeck d) { _myDeck = d; MyDeckBox.Text = d.Name; MyDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); LoadMatchup(); }
     }
 
     private void OppDeckList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (OppDeckList.SelectedItem is SiteDeck d) { _oppDeck = d; _oppUnknown = false; OppDeckBox.Text = d.Name; OppDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); }
+        if (OppDeckList.SelectedItem is SiteDeck d) { _oppDeck = d; _oppUnknown = false; OppDeckBox.Text = d.Name; OppDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); LoadMatchup(); }
     }
 
     private void Unknown_Click(object sender, RoutedEventArgs e)
     {
-        Pause(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed;
+        Pause(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed; LoadMatchup();
     }
 
     // ---- actions ----
