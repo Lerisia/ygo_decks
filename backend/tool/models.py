@@ -46,17 +46,42 @@ RANK_CHOICES = [
 ]
 
 class RecordGroup(models.Model):
+    KIND_CHOICES = [("solo", "개인 시트"), ("shared", "공유 시트")]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     is_public = models.BooleanField(default=False)
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES, default="solo")
+    invite_code = models.CharField(max_length=12, blank=True, default="", db_index=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.name}"
 
+
+class RecordGroupMember(models.Model):
+    """Someone other than the owner who may use a shared sheet."""
+    ROLE_CHOICES = [("editor", "기록 가능"), ("viewer", "보기 전용")]
+
+    record_group = models.ForeignKey(RecordGroup, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="record_group_memberships")
+    role = models.CharField(max_length=8, choices=ROLE_CHOICES, default="editor")
+    invited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["record_group", "user"], name="uniq_record_group_member")]
+        verbose_name = "시트 멤버"
+        verbose_name_plural = "시트 멤버"
+
+    def __str__(self):
+        return f"{self.record_group.name}: {self.user.username} ({self.role})"
+
 class MatchRecord(models.Model):
     record_group = models.ForeignKey("RecordGroup", on_delete=models.CASCADE, related_name="matches")
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="recorded_matches",
+                                    help_text="이 기록을 넣은 사람 (공유 시트에서 기여자 구분)")
     deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="player_matches",)
     opponent_deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="opponent_matches", blank=True, null=True)
     opponent_deck_name = models.CharField(max_length=100, blank=True, null=True)

@@ -140,7 +140,7 @@ def matchup(request):
     if not deck_id.isdigit():
         return Response({"error": "deck required"}, status=status.HTTP_400_BAD_REQUEST)
     opp_id = request.GET.get("opponent") or ""
-    base = MatchRecord.objects.filter(record_group__user=request.user, deck_id=int(deck_id), is_deleted=False)
+    base = MatchRecord.objects.filter(recorded_by=request.user, deck_id=int(deck_id), is_deleted=False)
 
     def agg(qs):
         n = qs.count()

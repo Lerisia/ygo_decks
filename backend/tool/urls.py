@@ -4,12 +4,18 @@ from .views import (
     delete_record_group, delete_match_record, get_record_group_statistics,
     get_record_group_matches, get_record_group_statistics_full, update_record_group_name, update_match_record,
     recent_meta_deck_stats, get_record_group_rank_history, update_record_group_visibility,
-    get_user_statistics_full
+    get_user_statistics_full, record_group_invite, join_record_group, record_group_members,
+    remove_record_group_member, record_group_contributors
 )
 
 urlpatterns = [
     path("record-groups/create/", create_record_group, name="create-record-group"),
     path("record-groups/", get_user_record_groups, name="get-user-record-groups"),
+    path("record-groups/join/", join_record_group, name="join-record-group"),
+    path("record-groups/<int:record_group_id>/invite/", record_group_invite, name="record-group-invite"),
+    path("record-groups/<int:record_group_id>/members/", record_group_members, name="record-group-members"),
+    path("record-groups/<int:record_group_id>/members/<int:user_id>/", remove_record_group_member, name="record-group-member-remove"),
+    path("record-groups/<int:record_group_id>/contributors/", record_group_contributors, name="record-group-contributors"),
     path("record-groups/<int:record_group_id>/add-match/", add_match_to_record_group, name="add-match-to-record-group"),
     path("record-groups/<int:record_group_id>/delete/", delete_record_group, name="delete-record-group"),
     path("record-groups/<int:record_group_id>/statistics/", get_record_group_statistics, name="record-group-statistics"),

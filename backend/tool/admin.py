@@ -49,3 +49,13 @@ class SiteConfigAdmin(admin.ModelAdmin):
         )
         messages.success(request, f"메타 통계가 초기화되었습니다. ({now})")
         return redirect("admin:tool_siteconfig_changelist")
+
+
+from .models import RecordGroupMember
+
+
+@admin.register(RecordGroupMember)
+class RecordGroupMemberAdmin(admin.ModelAdmin):
+    list_display = ("record_group", "user", "role", "joined_at")
+    list_filter = ("role",)
+    search_fields = ("record_group__name", "user__username")

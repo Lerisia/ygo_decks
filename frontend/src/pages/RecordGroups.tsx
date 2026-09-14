@@ -9,14 +9,20 @@ import {
   createRecordGroup,
   getRecordGroupStatistics,
   getMetaDeckStats,
+  joinSheetByCode,
   MetaDeckStat,
 } from "@/api/toolApi";
 import { getDeckData } from "@/api/deckApi";
+import { sharePreviewEnabled } from "@/lib/sharePreview";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
   id: number;
   name: string;
+  kind?: "solo" | "shared";
+  role?: "owner" | "editor" | "viewer";
+  member_count?: number;
+  owner?: { id: number; username: string; icon: string | null; border: string | null } | null;
 };
 
 type RecordGroupWithStats = RecordGroupBasic & {
@@ -118,7 +124,22 @@ const RecordGroups = () => {
   const [showMetaStats, setShowMetaStats] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
   const [totalMatches, setTotalMatches] = useState<number>(0);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinMsg, setJoinMsg] = useState("");
+  const [sharePreview] = useState(sharePreviewEnabled);
   const navigate = useNavigate();
+
+  const joinByCode = async () => {
+    const code = joinCode.trim();
+    if (!code) return;
+    setJoinMsg("");
+    try {
+      const joined = await joinSheetByCode(code);
+      navigate(`/record-groups/${joined.record_group_id}`);
+    } catch (e) {
+      setJoinMsg((e as Error).message);
+    }
+  };
 
   useEffect(() => {
     const fetchGroupsWithStats = async () => {
@@ -332,12 +353,32 @@ const RecordGroups = () => {
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">메타 덱 통계를 불러오는 중입니다...</div>
       )}
       {isLoggedIn ? (
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600"
-        >
-          + 시트 추가하기
-        </button>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600"
+          >
+            + 시트 추가하기
+          </button>
+          {(sharePreview || recordGroups.some((g) => g.kind === "shared")) && (
+          <>
+          <input
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && joinByCode()}
+            placeholder="초대 코드"
+            className="w-36 px-3 py-2 border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+          />
+          <button
+            onClick={joinByCode}
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+          >
+            참여
+          </button>
+          {joinMsg && <span className="text-sm text-red-600">{joinMsg}</span>}
+          </>
+          )}
+        </div>
       ) : (
         <p className="text-sm text-gray-600 dark:text-gray-400">로그인 후 사용해주세요.</p>
       )}
@@ -353,7 +394,18 @@ const RecordGroups = () => {
               className="relative p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition group"
             >
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">{group.name}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold truncate">{group.name}</h2>
+                  {group.kind === "shared" && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">공유</span>
+                      <span>{group.member_count ?? 1}명</span>
+                      {group.role !== "owner" && group.owner && <span className="truncate">· {group.owner.username}님의 시트</span>}
+                      {group.role === "viewer" && <span>· 보기 전용</span>}
+                    </p>
+                  )}
+                </div>
+                {group.role !== undefined && group.role !== "owner" ? null : (
                 <button
                   className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow"
                   aria-label="이 시트 삭제"
@@ -383,6 +435,7 @@ const RecordGroups = () => {
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </button>
+                )}
               </div>
 
               <div className="text-2xl font-bold mb-1">

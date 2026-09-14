@@ -349,8 +349,9 @@ class TrackerStatsTest(TestCase):
 
     def _match(self, opponent, result, first="first"):
         from tool.models import MatchRecord
-        return MatchRecord.objects.create(record_group=self.group, deck=self.mine, opponent_deck=opponent,
-                                          result=result, first_or_second=first, coin_toss_result="win")
+        return MatchRecord.objects.create(record_group=self.group, recorded_by=self.user, deck=self.mine,
+                                          opponent_deck=opponent, result=result, first_or_second=first,
+                                          coin_toss_result="win")
 
     def test_matchup_splits_by_going_first(self):
         self._match(self.opp, "win", "first")

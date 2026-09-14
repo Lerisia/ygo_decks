@@ -14,6 +14,7 @@ def _create_deck(name="테스트 덱", **kwargs):
 def _create_match(group, deck, opponent_deck=None, **kwargs):
     defaults = {
         "record_group": group,
+        "recorded_by": group.user,
         "deck": deck,
         "opponent_deck": opponent_deck,
         "first_or_second": "first",
@@ -667,3 +668,127 @@ class AggregateStatisticsTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["basic"]["total_games"], 2)
         self.assertEqual(resp.json()["record_group_name"], "시즌1")
+
+
+class SharedSheetTest(TestCase):
+    """Shared sheets: membership, who may write, and per-contributor attribution."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.owner = User.objects.create_user(email="o@s.com", username="owner", password="pass1234")
+        self.mate = User.objects.create_user(email="m@s.com", username="mate", password="pass1234")
+        self.stranger = User.objects.create_user(email="x@s.com", username="stranger", password="pass1234")
+        self.deck = _create_deck("내 덱")
+        self.opp = _create_deck("상대 덱")
+        self.group = RecordGroup.objects.create(user=self.owner, name="크루 시트")
+
+    def _as(self, user):
+        self.c.force_authenticate(user=user)
+        return self.c
+
+    def _invite_code(self):
+        return self._as(self.owner).post(f"/api/record-groups/{self.group.id}/invite/", {}, format="json").json()["invite_code"]
+
+    def _join(self, user):
+        code = self._invite_code()          # issued as the owner, so grab it before switching users
+        return self._as(user).post("/api/record-groups/join/", {"code": code}, format="json")
+
+    def _add_match(self, user, result="win"):
+        return self._as(user).post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": self.deck.id, "opponent_deck": self.opp.id, "first_or_second": "first",
+            "result": result, "coin_toss_result": "win",
+        }, format="json")
+
+    def test_invite_code_turns_sheet_shared_and_lets_someone_join(self):
+        code = self._invite_code()
+        self.assertTrue(code)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.kind, "shared")
+        res = self._as(self.mate).post("/api/record-groups/join/", {"code": code}, format="json")
+        self.assertEqual(res.json()["role"], "editor")
+        listed = self._as(self.mate).get("/api/record-groups/").json()
+        self.assertEqual([(g["id"], g["role"], g["kind"]) for g in listed], [(self.group.id, "editor", "shared")])
+        self.assertEqual(listed[0]["owner"]["username"], "owner")
+        self.assertEqual(listed[0]["member_count"], 2)
+
+    def test_bad_code_and_owner_rejoining(self):
+        self.assertEqual(self._as(self.mate).post("/api/record-groups/join/", {"code": "nope"}, format="json").status_code, 404)
+        code = self._invite_code()
+        self.assertEqual(self._as(self.owner).post("/api/record-groups/join/", {"code": code}, format="json").json()["role"], "owner")
+
+    def test_member_records_are_attributed_to_them(self):
+        self._join(self.mate)
+        mid = self._add_match(self.mate).json()["match_id"]
+        self.assertEqual(MatchRecord.objects.get(id=mid).recorded_by, self.mate)
+        rows = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/matches/").json()["matches"]
+        self.assertEqual(rows[0]["recorded_by"]["username"], "mate")
+
+    def test_stranger_cannot_read_or_write(self):
+        self.assertEqual(self._add_match(self.stranger).status_code, 403)
+        self.assertEqual(self._as(self.stranger).get(f"/api/record-groups/{self.group.id}/matches/").status_code, 403)
+
+    def test_matches_response_tells_an_editor_they_may_record(self):
+        self._join(self.mate)
+        body = self._as(self.mate).get(f"/api/record-groups/{self.group.id}/matches/").json()
+        self.assertEqual((body["is_owner"], body["my_role"], body["can_write"], body["kind"]),
+                         (False, "editor", True, "shared"))
+        viewer_group = RecordGroup.objects.create(user=self.owner, name="공개 시트", is_public=True)
+        body = self._as(self.stranger).get(f"/api/record-groups/{viewer_group.id}/matches/").json()
+        self.assertEqual((body["my_role"], body["can_write"]), ("public", False))
+
+    def test_owner_can_invite_by_username(self):
+        res = self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
+                                        {"username": "mate"}, format="json")
+        self.assertEqual([m["username"] for m in res.json()["members"]], ["mate"])
+        self.assertEqual(self._add_match(self.mate).status_code, 201)
+
+    def test_viewer_may_read_but_not_write(self):
+        self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
+                                  {"user_id": self.mate.id, "role": "viewer"}, format="json")
+        self.assertEqual(self._as(self.mate).get(f"/api/record-groups/{self.group.id}/matches/").status_code, 200)
+        self.assertEqual(self._add_match(self.mate).status_code, 403)
+
+    def test_members_cannot_manage_the_sheet(self):
+        self._join(self.mate)
+        self.assertEqual(self._as(self.mate).patch(f"/api/record-groups/{self.group.id}/update-name/",
+                                                   {"name": "바꾸기"}, format="json").status_code, 404)
+        self.assertEqual(self._as(self.mate).delete(f"/api/record-groups/{self.group.id}/delete/").status_code, 404)
+        self.assertEqual(self._as(self.mate).post(f"/api/record-groups/{self.group.id}/invite/", {}, format="json").status_code, 404)
+
+    def test_edit_own_records_only_but_owner_edits_anything(self):
+        self._join(self.mate)
+        mate_match = self._add_match(self.mate).json()["match_id"]
+        owner_match = self._add_match(self.owner).json()["match_id"]
+        self.assertEqual(self._as(self.mate).patch(f"/api/match-records/{owner_match}/update/",
+                                                   {"result": "lose"}, format="json").status_code, 404)
+        self.assertEqual(self._as(self.mate).patch(f"/api/match-records/{mate_match}/update/",
+                                                   {"result": "lose"}, format="json").status_code, 200)
+        self.assertEqual(self._as(self.owner).patch(f"/api/match-records/{mate_match}/update/",
+                                                    {"result": "win"}, format="json").status_code, 200)
+
+    def test_contributors_and_member_filter(self):
+        self._join(self.mate)
+        self._add_match(self.mate, "win")
+        self._add_match(self.mate, "lose")
+        self._add_match(self.owner, "win")
+        body = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/contributors/").json()["contributors"]
+        self.assertEqual([(c["user"]["username"], c["games"], c["wins"]) for c in body],
+                         [("mate", 2, 1), ("owner", 1, 1)])
+        only_mate = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/matches/?member={self.mate.id}").json()
+        self.assertEqual(len(only_mate["matches"]), 2)
+
+    def test_my_stats_count_only_my_own_records(self):
+        self._join(self.mate)
+        self._add_match(self.owner, "win")
+        self._add_match(self.owner, "win")
+        self._add_match(self.mate, "lose")
+        body = self._as(self.mate).get(f"/api/tracker/matchup/?deck={self.deck.id}&opponent={self.opp.id}").json()
+        self.assertEqual(body["matchup"], {"games": 1, "wins": 0, "win_rate": 0.0})
+
+    def test_member_can_leave_and_owner_can_remove(self):
+        self._join(self.mate)
+        self.assertEqual(self._as(self.mate).delete(f"/api/record-groups/{self.group.id}/members/{self.mate.id}/").status_code, 204)
+        self.assertEqual(self._as(self.mate).get(f"/api/record-groups/{self.group.id}/matches/").status_code, 403)
+        self._join(self.mate)
+        self.assertEqual(self._as(self.owner).delete(f"/api/record-groups/{self.group.id}/members/{self.mate.id}/").status_code, 204)
+        self.assertEqual(self._as(self.stranger).delete(f"/api/record-groups/{self.group.id}/members/{self.owner.id}/").status_code, 403)

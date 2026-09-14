@@ -6,6 +6,8 @@ import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingAp
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
 import PcTrackerBanner from "@/components/PcTrackerBanner";
+import SheetMembersPanel from "@/components/SheetMembersPanel";
+import { sharePreviewEnabled } from "@/lib/sharePreview";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
@@ -63,8 +65,11 @@ type DeckData = DeckBase & {
 };
 
 
+type Contributor = { id: number; username: string; icon: string | null; border: string | null };
+
 type MatchRecord = {
   id: number;
+  recorded_by?: Contributor | null;
   deck: DeckShortData;
   opponent_deck: DeckShortData | null;
   opponent_deck_name: string | null;
@@ -328,6 +333,11 @@ const RecordGroupDetailPage = () => {
   const [editingMatch, setEditingMatch] = useState<any | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [canWrite, setCanWrite] = useState(false);
+  const [myRole, setMyRole] = useState<string | null>(null);
+  const [sheetKind, setSheetKind] = useState<"solo" | "shared">("solo");
+  const [memberFilter, setMemberFilter] = useState<number | null>(null);
+  const [sharePreview] = useState(sharePreviewEnabled);
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
@@ -380,7 +390,7 @@ const RecordGroupDetailPage = () => {
     loadUserDecks();
     loadLastMatch();
     loadPending();
-  }, [page, pageSize]);
+  }, [page, pageSize, memberFilter]);
 
   // Games deferred from the tracker overlay show up without a reload.
   useEffect(() => {
@@ -428,12 +438,15 @@ const RecordGroupDetailPage = () => {
 
   const loadMatches = async () => {
     try {
-      const response = await getRecordGroupMatches(Number(recordGroupId), page, pageSize)
+      const response = await getRecordGroupMatches(Number(recordGroupId), page, pageSize, memberFilter)
       setMatches(response.matches);
       setTotalPages(response.total_pages);
       setRecordGroupName(response.record_group_name);
       setIsPublic(response.is_public);
       setIsOwner(response.is_owner);
+      setCanWrite(response.can_write ?? response.is_owner);
+      setMyRole(response.my_role ?? null);
+      setSheetKind(response.kind === "shared" ? "shared" : "solo");
     } catch (error) {
       console.error("게임 데이터를 불러오지 못했습니다:", error);
     }
@@ -714,7 +727,7 @@ const RecordGroupDetailPage = () => {
 
   return (
     <div className="px-0 sm:px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
-      {isOwner && (
+      {myRole && myRole !== "public" && (
         <button
           onClick={() => navigate("/records")}
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2"
@@ -766,11 +779,19 @@ const RecordGroupDetailPage = () => {
           )}
         </div>
       )}
-      {isOwner && <PcTrackerBanner dismissible />}
-      {isOwner && (
+      {canWrite && <PcTrackerBanner dismissible />}
+      {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}
-      {isOwner && <div className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
+      {(sheetKind === "shared" || sharePreview) && myRole && myRole !== "public" && (
+        <SheetMembersPanel
+          recordGroupId={Number(recordGroupId)}
+          memberFilter={memberFilter}
+          onFilterChange={(id) => { setMemberFilter(id); setPage(1); }}
+          onLeft={() => navigate("/records")}
+        />
+      )}
+      {canWrite && <div className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
         <button
           type="button"
           onClick={() => setShowRegisterForm((v) => !v)}
@@ -1031,6 +1052,20 @@ const RecordGroupDetailPage = () => {
               key={match.id}
               className={`rounded-lg border border-gray-200 dark:border-gray-700 border-l-4 ${borderColor} ${resultBg} overflow-hidden`}
             >
+              {sheetKind === "shared" && match.recorded_by && (
+                <div className="flex items-center gap-1.5 px-2 pt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {match.recorded_by.icon ? (
+                    <img
+                      src={match.recorded_by.icon}
+                      alt=""
+                      className={`w-5 h-5 rounded-full object-cover ${match.recorded_by.border ? "ring-2 ring-blue-400" : ""}`}
+                    />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
+                  )}
+                  <span>{match.recorded_by.username}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between p-2 sm:p-3">
                 <div className="w-12 sm:w-16 flex justify-center flex-shrink-0">
                   {coinImg && (

@@ -212,8 +212,9 @@ export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId
   return response.json();
 };
 
-export const getRecordGroupMatches = async (recordGroupId: number, page: number, pageSize: number) => {
-  const url = `/api/record-groups/${recordGroupId}/matches/?page=${page}&page_size=${pageSize}`;
+export const getRecordGroupMatches = async (recordGroupId: number, page: number, pageSize: number, memberId?: number | null) => {
+  const url = `/api/record-groups/${recordGroupId}/matches/?page=${page}&page_size=${pageSize}`
+    + (memberId ? `&member=${memberId}` : "");
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -290,3 +291,72 @@ export const getRecordGroupRankHistory = async (recordGroupId: number) => {
 
   return await response.json();
 };
+
+// ---- shared sheets ----
+export type SheetMember = {
+  id: number;
+  username: string;
+  icon: string | null;
+  border: string | null;
+  role: "editor" | "viewer";
+  joined_at: string;
+};
+
+export type SheetMembers = {
+  kind: "solo" | "shared";
+  my_role: "owner" | "editor" | "viewer" | "public" | null;
+  owner: { id: number; username: string; icon: string | null; border: string | null };
+  members: SheetMember[];
+  invite_code: string;
+};
+
+export type SheetContributor = {
+  user: { id: number; username: string; icon: string | null; border: string | null } | null;
+  games: number;
+  wins: number;
+  win_rate: number | null;
+};
+
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+});
+
+const jsonOrThrow = async (res: Response) => {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `API 요청 실패: ${res.status}`);
+  }
+  return res.status === 204 ? null : res.json();
+};
+
+export const getSheetMembers = async (recordGroupId: number): Promise<SheetMembers> =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/members/`, { headers: authHeaders(), credentials: "include" }));
+
+export const addSheetMember = async (
+  recordGroupId: number,
+  who: { userId?: number; username?: string },
+  role: "editor" | "viewer" = "editor"
+): Promise<SheetMembers> =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/members/`, {
+    method: "POST", headers: authHeaders(), credentials: "include",
+    body: JSON.stringify({ user_id: who.userId, username: who.username, role }),
+  }));
+
+export const removeSheetMember = async (recordGroupId: number, userId: number) =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/members/${userId}/`, {
+    method: "DELETE", headers: authHeaders(), credentials: "include",
+  }));
+
+export const issueSheetInvite = async (recordGroupId: number, disable = false): Promise<{ invite_code: string; kind: string }> =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/invite/`, {
+    method: "POST", headers: authHeaders(), credentials: "include", body: JSON.stringify({ disable }),
+  }));
+
+export const joinSheetByCode = async (code: string): Promise<{ record_group_id: number; name: string; role: string }> =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/join/`, {
+    method: "POST", headers: authHeaders(), credentials: "include", body: JSON.stringify({ code }),
+  }));
+
+export const getSheetContributors = async (recordGroupId: number): Promise<{ contributors: SheetContributor[] }> =>
+  jsonOrThrow(await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/contributors/`, { headers: authHeaders(), credentials: "include" }));
