@@ -52,3 +52,18 @@ export const discardTrackerPending = async (id: number) => {
   if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
   return res.json();
 };
+
+export type TrackerClientStatus = {
+  version: string | null;
+  latest: string;
+  outdated: boolean;
+  used_tracker: boolean;
+  url: string;
+  last_seen: string | null;
+};
+
+export const getTrackerClientStatus = async (): Promise<TrackerClientStatus> => {
+  const res = await fetch(`${API_BASE_URL}/tracker/client-status/`, { headers: authHeaders(), credentials: "include" });
+  if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
+  return res.json();
+};

@@ -88,6 +88,13 @@ public sealed class AddMatchResponse
     [JsonPropertyName("error")] public JsonElement? Error { get; set; }
 }
 
+public sealed class VersionResponse
+{
+    [JsonPropertyName("latest")] public string Latest { get; set; } = "";
+    [JsonPropertyName("min_supported")] public string MinSupported { get; set; } = "";
+    [JsonPropertyName("url")] public string Url { get; set; } = "";
+}
+
 public sealed class PendingUploadResponse
 {
     [JsonPropertyName("id")] public int Id { get; set; }
@@ -157,6 +164,7 @@ public sealed class PendingMatch
 [JsonSerializable(typeof(TokenResponse))]
 [JsonSerializable(typeof(AddMatchResponse))]
 [JsonSerializable(typeof(PendingUploadResponse))]
+[JsonSerializable(typeof(VersionResponse))]
 [JsonSerializable(typeof(PendingMatch))]
 [JsonSerializable(typeof(OppCard))]
 public partial class J : JsonSerializerContext { }

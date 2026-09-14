@@ -19,6 +19,7 @@ public sealed class Api
     private HttpRequestMessage Req(HttpMethod m, string path, string? json = null, bool auth = true)
     {
         var r = new HttpRequestMessage(m, Url(path));
+        r.Headers.Add("X-Tracker-Version", App.Version);
         if (auth && _store.Config.Token != null) r.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _store.Config.Token);
         if (json != null) r.Content = new StringContent(json, Encoding.UTF8, "application/json");
         return r;
@@ -45,6 +46,13 @@ public sealed class Api
         if (status != 200 || tok?.Access == null) return tok?.Detail ?? $"로그인 실패 ({status})";
         _store.Config.Token = tok.Access; _store.Config.Email = email; _store.SaveConfig();
         return null;
+    }
+
+    /// What the server says the current build is (used to nudge users running an old exe).
+    public VersionResponse? LatestVersion()
+    {
+        var (status, text) = Send(Req(HttpMethod.Get, "/api/tracker/version/", auth: false));
+        return status == 200 ? SafeParse(text, J.Default.VersionResponse) : null;
     }
 
     public List<RecordGroup> Groups()

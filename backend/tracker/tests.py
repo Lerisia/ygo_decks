@@ -282,3 +282,43 @@ class TrackerWinBonusTest(TestCase):
         res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, "tracker_did": None, "tracker_pending_id": pid}, format="json")
         self.assertEqual(res.json()["points_added"], 5)
         self.assertEqual(self._points(), 5)
+
+
+class TrackerVersionTest(TestCase):
+    """Old builds can't warn themselves, so the site does it from the reported version."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="v@test.com", username="veruser", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+
+    def test_version_endpoint_is_public(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.get("/api/tracker/version/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("latest", res.json())
+        self.assertTrue(res.json()["url"].endswith("mdtracker.exe"))
+
+    def test_status_before_any_tracker_use(self):
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertFalse(body["used_tracker"])
+        self.assertFalse(body["outdated"])
+
+    def test_header_version_is_remembered_and_compared(self):
+        from tracker import version as ver
+        self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
+                         HTTP_X_TRACKER_VERSION="0.0.1")
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertEqual(body["version"], "0.0.1")
+        self.assertTrue(body["outdated"])
+        self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
+                         HTTP_X_TRACKER_VERSION=ver.LATEST)
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertEqual(body["version"], ver.LATEST)
+        self.assertFalse(body["outdated"])
+
+    def test_build_without_version_header_counts_as_outdated(self):
+        self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json")
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertIsNone(body["version"])
+        self.assertTrue(body["outdated"])

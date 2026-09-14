@@ -73,3 +73,18 @@ class TrackerGame(models.Model):
 
     def __str__(self):
         return f"{self.user.username} {self.did} {self.result}"
+
+
+class TrackerClient(models.Model):
+    """Last PC tracker build a user was seen running (from the X-Tracker-Version header).
+    An empty version means a build from before version reporting existed."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="tracker_client")
+    version = models.CharField(max_length=20, blank=True, default="")
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "트래커 클라이언트"
+        verbose_name_plural = "트래커 클라이언트"
+
+    def __str__(self):
+        return f"{self.user.username} {self.version or '(구버전)'}"

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import TrackerDeckMap, TrackerGame, TrackerPendingMatch
+from .models import TrackerClient, TrackerDeckMap, TrackerGame, TrackerPendingMatch
 
 
 @admin.register(TrackerPendingMatch)
@@ -24,3 +24,9 @@ class TrackerGameAdmin(admin.ModelAdmin):
     list_filter = ("game_mode", "result")
     search_fields = ("user__username", "did", "opp_name")
     readonly_fields = ("my_cards", "opp_cards")
+
+
+@admin.register(TrackerClient)
+class TrackerClientAdmin(admin.ModelAdmin):
+    list_display = ("user", "version", "last_seen")
+    search_fields = ("user__username", "version")

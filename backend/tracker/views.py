@@ -11,12 +11,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .inference import card_names, infer_decks
+from .services import touch_client
+from . import version as ver
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def tracker_infer(request):
     """PC tracker: card ids (Konami cid) for both players → site deck candidates."""
+    touch_client(request.user, request.headers.get("X-Tracker-Version"))
     def _ids(key):
         v = request.data.get(key) or []
         return [int(x) for x in v if str(x).isdigit()]
@@ -54,6 +57,7 @@ def tracker_snapshot(request):
 @permission_classes([IsAuthenticated])
 def pending_matches(request):
     """GET: this user's games waiting for confirmation. POST (tracker): upload/refresh one captured game."""
+    touch_client(request.user, request.headers.get("X-Tracker-Version"))
     from .models import TrackerPendingMatch
     from .services import serialize_pending, upsert_pending
 
@@ -85,6 +89,7 @@ def pending_discard(request, pending_id):
 @permission_classes([IsAuthenticated])
 def games(request):
     """Tracker: archive one captured duel (full decklist + revealed opponent cards). Idempotent per did."""
+    touch_client(request.user, request.headers.get("X-Tracker-Version"))
     from .services import upsert_game
 
     try:
@@ -92,3 +97,28 @@ def games(request):
     except (ValueError, TypeError) as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     return Response({"id": obj.id, "did": obj.did}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def version_info(request):
+    """What the tracker should be running; the client checks this at startup."""
+    return Response({"latest": ver.LATEST, "min_supported": ver.MIN_SUPPORTED, "url": ver.DOWNLOAD_URL})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def client_status(request):
+    """Whether this user's tracker build is out of date (the site warns old builds that can't warn themselves)."""
+    from .models import TrackerClient, TrackerGame
+    c = TrackerClient.objects.filter(user=request.user).first()
+    used = bool(c) or TrackerGame.objects.filter(user=request.user).exists()
+    v = (c.version if c else "") or None
+    return Response({
+        "version": v,
+        "latest": ver.LATEST,
+        "outdated": bool(used and ver.is_outdated(v)),
+        "used_tracker": used,
+        "url": ver.DOWNLOAD_URL,
+        "last_seen": c.last_seen if c else None,
+    })

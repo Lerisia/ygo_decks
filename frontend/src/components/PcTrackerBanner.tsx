@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getTrackerClientStatus } from "@/api/trackerPendingApi";
+import type { TrackerClientStatus } from "@/api/trackerPendingApi";
 
 const DOWNLOAD_URL = "/media/tracker/mdtracker.exe";
 const DISMISS_KEY = "pc_tracker_banner_dismissed";
@@ -8,14 +10,28 @@ const DISMISS_KEY = "pc_tracker_banner_dismissed";
 export default function PcTrackerBanner({ dismissible = false }: { dismissible?: boolean }) {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(() => dismissible && localStorage.getItem(DISMISS_KEY) === "1");
-  if (hidden) return null;
+  const [status, setStatus] = useState<TrackerClientStatus | null>(null);
+
+  useEffect(() => {
+    getTrackerClientStatus().then(setStatus).catch(() => {});
+  }, []);
+
+  const outdated = !!status?.outdated;
+  if (hidden && !outdated) return null;   // an out-of-date tracker is worth showing even if dismissed
   return (
-    <div className="hidden sm:block mb-4 max-w-2xl w-full mx-auto bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
+    <div className={`hidden sm:block mb-4 max-w-2xl w-full mx-auto border rounded-xl px-4 py-3 ${outdated ? "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-800" : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="font-semibold">PC 마스터듀얼 트래커 <span className="text-xs font-normal text-blue-600 dark:text-blue-300">베타</span></div>
+          <div className="font-semibold">
+            PC 마스터듀얼 트래커{" "}
+            {outdated
+              ? <span className="text-xs font-normal text-amber-700 dark:text-amber-300">구버전 사용 중 — 새 버전으로 교체해 주세요</span>
+              : <span className="text-xs font-normal text-blue-600 dark:text-blue-300">베타</span>}
+          </div>
           <div className="text-sm text-gray-600 dark:text-gray-300">
-            랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용.
+            {outdated
+              ? `쓰고 계신 버전(${status?.version ?? "구버전"})은 오래된 빌드입니다. 최신 ${status?.latest}로 교체하면 기록 오류가 없습니다.`
+              : "랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용."}
           </div>
           <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">
             트래커로 '승리'를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다!!
@@ -31,11 +47,11 @@ export default function PcTrackerBanner({ dismissible = false }: { dismissible?:
           </button>
           <a
             href={DOWNLOAD_URL}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+            className={`px-3 py-1.5 text-sm text-white rounded-lg font-semibold transition ${outdated ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`}
           >
-            다운로드
+            {outdated ? "새 버전 받기" : "다운로드"}
           </a>
-          {dismissible && (
+          {dismissible && !outdated && (
             <button
               type="button"
               aria-label="닫기"

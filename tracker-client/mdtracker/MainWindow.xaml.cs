@@ -18,7 +18,33 @@ public partial class MainWindow : Window
         Title = $"YGO Decks 트래커 {App.Version}";
         T.StatusChanged += _ => Dispatcher.BeginInvoke(RefreshStatus);
         T.MatchesChanged += () => Dispatcher.BeginInvoke(RefreshRecent);
-        Loaded += (_, _) => { RefreshAll(); if (T.Store.Config.Token != null) LoadGroups(); };
+        Loaded += (_, _) => { RefreshAll(); if (T.Store.Config.Token != null) LoadGroups(); CheckVersion(); };
+    }
+
+    private string _updateUrl = "https://ygodecks.com/media/tracker/mdtracker.exe";
+
+    /// Compare this build against the server's current one and show the update banner if behind.
+    private async void CheckVersion()
+    {
+        var info = await Task.Run(() => T.Api.LatestVersion());
+        if (info == null || string.IsNullOrEmpty(info.Latest)) return;
+        static int[] P(string v) => v.Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
+        var mine = P(App.Version); var theirs = P(info.Latest);
+        bool behind = false;
+        for (int i = 0; i < Math.Max(mine.Length, theirs.Length); i++)
+        {
+            int a = i < mine.Length ? mine[i] : 0, b = i < theirs.Length ? theirs[i] : 0;
+            if (a != b) { behind = a < b; break; }
+        }
+        if (!behind) return;
+        if (!string.IsNullOrEmpty(info.Url)) _updateUrl = info.Url;
+        UpdateText.Text = $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version}) 받아서 교체해 주세요.";
+        UpdateBanner.Visibility = Visibility.Visible;
+    }
+
+    private void Update_Click(object sender, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true }); } catch { }
     }
 
     private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); }

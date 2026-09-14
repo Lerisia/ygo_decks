@@ -137,3 +137,17 @@ def link_game(user, did, match):
             award_points(user, TRACKER_LOSS_POINTS, kind="tracker_loss", note=f"트래커 패배 기록 #{match.id}")
             return TRACKER_LOSS_POINTS
     return 0
+
+
+def touch_client(user, version):
+    """Remember which tracker build this user is running (called from every tracker API call)."""
+    from .models import TrackerClient
+    if not user or not user.is_authenticated:
+        return
+    v = (version or "").strip()[:20]
+    obj, created = TrackerClient.objects.get_or_create(user=user, defaults={"version": v})
+    if not created and obj.version != v:
+        obj.version = v
+        obj.save(update_fields=["version", "last_seen"])
+    elif not created:
+        obj.save(update_fields=["last_seen"])
