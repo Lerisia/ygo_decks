@@ -788,7 +788,7 @@ class SharedSheetTest(TestCase):
         as_mate = self._as(self.mate).get(f"/api/record-groups/{self.group.id}/rank-history/").json()
         self.assertEqual([m["rank"] for m in as_mate["matches"]], ["master1"])
 
-    def test_my_totals_keep_games_i_recorded_after_i_leave(self):
+    def test_leaving_drops_my_games_from_my_totals_but_the_sheet_keeps_my_name(self):
         self._join(self.mate)
         self._add_match(self.mate)
         before = self._as(self.mate).get("/api/record-groups/statistics/full/").json()
@@ -797,7 +797,10 @@ class SharedSheetTest(TestCase):
         self.assertEqual(
             self._as(self.mate).delete(f"/api/record-groups/{self.group.id}/members/{self.mate.id}/").status_code, 204)
         after = self._as(self.mate).get("/api/record-groups/statistics/full/").json()
-        self.assertEqual(after["basic"]["total_games"], 1)
+        self.assertEqual(after["basic"]["total_games"], 0)
+
+        rows = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/matches/").json()["matches"]
+        self.assertEqual(rows[0]["recorded_by"]["username"], "mate")
 
     def test_my_totals_ignore_records_other_people_wrote(self):
         self._join(self.mate)

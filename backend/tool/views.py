@@ -287,13 +287,11 @@ def get_user_statistics_full(request):
         groups = groups.filter(id__in=wanted)
 
     group_list = list(groups.order_by("-created_at").values("id", "name"))
+    group_ids = [g["id"] for g in group_list]
 
-    # Counted by author, not by membership: games you recorded stay yours even after
-    # you leave the group sheet you recorded them in.
-    matches = MatchRecord.objects.filter(
-        is_deleted=False, recorded_by=request.user, record_group__is_deleted=False)
-    if raw_ids:
-        matches = matches.filter(record_group_id__in=wanted)
+    # Your own records inside sheets you can still reach. Leaving a group sheet drops
+    # those games from your totals; the sheet keeps them under your name.
+    matches = MatchRecord.objects.filter(record_group_id__in=group_ids, is_deleted=False, recorded_by=request.user)
     deck_id = request.GET.get("deck_id")
     if deck_id:
         matches = matches.filter(deck_id=deck_id)
