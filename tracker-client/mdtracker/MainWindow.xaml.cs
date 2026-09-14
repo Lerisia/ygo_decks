@@ -78,7 +78,7 @@ public partial class MainWindow : Window
             Time = DateTime.TryParse(m.EndedAt, out var t) ? t.ToString("MM-dd HH:mm") : "",
             Opp = m.OppName,
             Result = m.Result == "win" ? "승" : m.Result == "lose" ? "패" : m.Result,
-            Coin = m.CoinWin ? "승" : "패",
+            Coin = m.CoinWin ? "앞면" : "뒷면",
             Turn = m.First ? "선공" : "후공",
             MyDeck = m.SavedDeckName ?? DeckName(m.SuggestedMyDeckId) ?? "?",
             OppDeck = m.SavedOppDeckName ?? (m.Status == "saved" ? "모름" : DeckName(m.SuggestedOppDeckId) ?? "모름"),

@@ -44,7 +44,7 @@ public partial class OverlayWindow : Window
         ResultText.Text = win ? "승리" : _m.Result == "lose" ? "패배" : _m.Result;
         ResultBadge.Background = new SolidColorBrush(win ? Color.FromRgb(34, 197, 94) : Color.FromRgb(239, 68, 68));
         Headline.Text = $"vs {_m.OppName}";
-        var parts = new List<string> { _m.CoinWin ? "코인 승" : "코인 패", _m.First ? "선공" : "후공" };
+        var parts = new List<string> { _m.CoinWin ? "코인 앞면" : "코인 뒷면", _m.First ? "선공" : "후공" };
         if (_m.GameMode == 19) parts.Add(_m.RatingAfter is double r ? $"레이팅 {_m.RatingBefore:0.##} → {r:0.##}" : "레이팅");
         else if (_m.RankCode != null) parts.Add($"{RankLabel(_m.RankCode)}{(_m.Wins is int w ? $" · {w}승" : "")}");
         parts.Add($"{_m.Turn}턴");

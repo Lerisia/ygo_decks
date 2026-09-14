@@ -108,7 +108,7 @@
                         <GridView>
                             <GridViewColumn Header="시간" Width="75" DisplayMemberBinding="{Binding Time}"/>
                             <GridViewColumn Header="결과" Width="40" DisplayMemberBinding="{Binding Result}"/>
-                            <GridViewColumn Header="코인" Width="55" DisplayMemberBinding="{Binding Coin}"/>
+                            <GridViewColumn Header="코인" Width="60" DisplayMemberBinding="{Binding Coin}"/>
                             <GridViewColumn Header="선후공" Width="60" DisplayMemberBinding="{Binding Turn}"/>
                             <GridViewColumn Header="내 덱" Width="120" DisplayMemberBinding="{Binding MyDeck}"/>
                             <GridViewColumn Header="상대 덱" Width="120" DisplayMemberBinding="{Binding OppDeck}"/>
