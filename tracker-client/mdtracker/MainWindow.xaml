@@ -49,6 +49,10 @@
                     <TextBlock x:Name="AccountText" Foreground="{StaticResource Muted}" DockPanel.Dock="Left"/>
                     <Button Content="로그아웃" Style="{StaticResource Secondary}" HorizontalAlignment="Right" Padding="10,4" Click="Logout_Click"/>
                 </DockPanel>
+                <Border x:Name="NoSheetWarn" Background="#FEE2E2" CornerRadius="8" Padding="10,8" Margin="0,0,0,8" Visibility="Collapsed">
+                    <TextBlock Foreground="#991B1B" TextWrapping="Wrap" FontWeight="SemiBold"
+                               Text="⚠ 기록할 시트가 없어 게임이 기록되지 않습니다. 아래에서 시트를 만들어 주세요."/>
+                </Border>
                 <TextBlock Text="기록할 시트" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>

@@ -56,11 +56,14 @@ public partial class App : System.Windows.Application
     {
         if (!m.IsDemo && (Tracker.Store.Config.Token == null || Tracker.Store.Config.RecordGroupId == null))
         {
-            // Not set up yet: keep the game and show the main window so the user can finish setup.
-            Tracker.Defer(m);
+            // Not set up yet: record nothing rather than leaving a half-saved state on the site, and say so plainly.
+            // (The raw capture is still archived for card statistics.)
             ShowMain();
             _tray?.ShowBalloonTip(6000, "YGO Decks 트래커",
-                "기록할 시트를 먼저 골라주세요. 방금 게임은 사이트의 '확인 대기'에 보관했습니다.", WinForms.ToolTipIcon.Warning);
+                Tracker.Store.Config.Token == null
+                    ? "로그인하지 않아 이번 게임은 기록되지 않았습니다."
+                    : "기록할 시트가 없어 이번 게임은 기록되지 않았습니다. 시트를 만들어 주세요.",
+                WinForms.ToolTipIcon.Warning);
             return;
         }
         try { new OverlayWindow(Tracker, m).Show(); }

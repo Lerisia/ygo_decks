@@ -35,10 +35,11 @@ public partial class MainWindow : Window
         LoginPanel.Visibility = loggedIn ? Visibility.Collapsed : Visibility.Visible;
         SetupPanel.Visibility = loggedIn ? Visibility.Visible : Visibility.Collapsed;
         AccountText.Text = loggedIn ? $"로그인됨: {T.Store.Config.Email}" : "";
-        bool noSheet = T.Store.Config.RecordGroupId == null;
-        SetupMsg.Text = noSheet ? "⚠ 기록할 시트를 먼저 골라주세요. 시트가 없으면 아래에서 새로 만들면 됩니다. (고르기 전까지는 게임이 사이트의 '확인 대기'로만 쌓입니다.)"
+        bool noSheet = loggedIn && T.Store.Config.RecordGroupId == null;
+        NoSheetWarn.Visibility = noSheet ? Visibility.Visible : Visibility.Collapsed;
+        SetupMsg.Text = noSheet ? "시트를 만들면 다음 게임부터 기록됩니다."
                                 : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
-        SetupMsg.Foreground = noSheet ? System.Windows.Media.Brushes.OrangeRed : (System.Windows.Media.Brush)FindResource("Muted");
+        SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
     }
 
     private void RefreshRecent()
