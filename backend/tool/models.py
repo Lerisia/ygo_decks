@@ -46,7 +46,7 @@ RANK_CHOICES = [
 ]
 
 class RecordGroup(models.Model):
-    KIND_CHOICES = [("solo", "개인 시트"), ("shared", "공유 시트")]
+    KIND_CHOICES = [("solo", "개인 시트"), ("shared", "그룹 시트")]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
@@ -61,7 +61,7 @@ class RecordGroup(models.Model):
 
 
 class RecordGroupMember(models.Model):
-    """Someone other than the owner who may use a shared sheet."""
+    """Someone other than the owner who may use a group sheet."""
     ROLE_CHOICES = [("editor", "기록 가능"), ("viewer", "보기 전용")]
 
     record_group = models.ForeignKey(RecordGroup, on_delete=models.CASCADE, related_name="members")

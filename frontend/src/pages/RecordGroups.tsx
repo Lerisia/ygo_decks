@@ -398,7 +398,7 @@ const RecordGroups = () => {
                   <h2 className="text-lg font-semibold truncate">{group.name}</h2>
                   {group.kind === "shared" && (
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">공유</span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">그룹</span>
                       <span>{group.member_count ?? 1}명</span>
                       {group.role !== "owner" && group.owner && <span className="truncate">· {group.owner.username}님의 시트</span>}
                       {group.role === "viewer" && <span>· 보기 전용</span>}

@@ -742,6 +742,32 @@ class SharedSheetTest(TestCase):
         self.assertEqual([m["username"] for m in res.json()["members"]], ["mate"])
         self.assertEqual(self._add_match(self.mate).status_code, 201)
 
+    def test_invite_prefers_the_exact_nickname_over_case_variants(self):
+        lower = User.objects.create_user(email="h1@s.com", username="haru", password="pass1234")
+        User.objects.create_user(email="h2@s.com", username="Haru", password="pass1234")
+        res = self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
+                                        {"username": "haru"}, format="json")
+        self.assertEqual([m["id"] for m in res.json()["members"]], [lower.id])
+
+    def test_invite_refuses_a_nickname_that_matches_several_people(self):
+        User.objects.create_user(email="h1@s.com", username="haru", password="pass1234")
+        User.objects.create_user(email="h2@s.com", username="Haru", password="pass1234")
+        res = self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
+                                        {"username": "HARU"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        listed = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/members/").json()
+        self.assertEqual(listed["members"], [])
+
+    def test_public_group_sheet_shows_its_members_to_a_visitor(self):
+        self._join(self.mate)
+        self.group.refresh_from_db()
+        self.group.is_public = True
+        self.group.save(update_fields=["is_public"])
+        body = APIClient().get(f"/api/record-groups/{self.group.id}/members/").json()
+        self.assertEqual(body["owner"]["username"], "owner")
+        self.assertEqual([m["username"] for m in body["members"]], ["mate"])
+        self.assertEqual(body["invite_code"], "")
+
     def test_viewer_may_read_but_not_write(self):
         self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
                                   {"user_id": self.mate.id, "role": "viewer"}, format="json")

@@ -492,9 +492,8 @@ def join_record_group(request):
 
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
 def record_group_members(request, record_group_id):
-    """GET: who is on the sheet. POST (owner): add someone directly, by user id."""
+    """GET: who is on the sheet, open to anyone who may view it. POST (owner): add someone by id or nickname."""
     group, err = _get_accessible_group(request, record_group_id, need="manage" if request.method == "POST" else "view")
     if err:
         return err
@@ -506,7 +505,13 @@ def record_group_members(request, record_group_id):
         if uid.isdigit():
             target = User.objects.filter(id=int(uid)).first()
         elif username:
-            target = User.objects.filter(username__iexact=username).first()
+            target = User.objects.filter(username=username).first()
+            if not target:
+                near = list(User.objects.filter(username__iexact=username)[:2])
+                if len(near) > 1:
+                    return Response({"error": "같은 닉네임이 여럿입니다. 대소문자까지 정확히 입력해 주세요."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                target = near[0] if near else None
         else:
             target = None
         if not target:

@@ -104,7 +104,7 @@ export default function SheetMembersPanel({ recordGroupId, memberFilter, onFilte
     <div className="mb-4 max-w-2xl w-full mx-auto bg-white dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3">
       <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between py-1 text-left">
         <span className="font-semibold">
-          공유 시트 · {data.members.length + 1}명
+          그룹 시트 · {data.members.length + 1}명
           {memberFilter !== null && <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">필터 적용 중</span>}
         </span>
         <span className="text-gray-400 text-sm">{open ? "접기 ▲" : "펼치기 ▼"}</span>
@@ -173,7 +173,7 @@ export default function SheetMembersPanel({ recordGroupId, memberFilter, onFilte
                 <input
                   value={invitee}
                   onChange={(e) => setInvitee(e.target.value)}
-                  placeholder="아이디로 초대"
+                  placeholder="닉네임으로 초대"
                   className="flex-1 min-w-[140px] px-3 py-1.5 border rounded-lg bg-white dark:bg-gray-800 text-sm"
                 />
                 <button type="button" onClick={add} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">

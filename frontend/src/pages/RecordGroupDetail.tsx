@@ -783,7 +783,7 @@ const RecordGroupDetailPage = () => {
       {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}
-      {(sheetKind === "shared" || sharePreview) && myRole && myRole !== "public" && (
+      {(sheetKind === "shared" || sharePreview) && (
         <SheetMembersPanel
           recordGroupId={Number(recordGroupId)}
           memberFilter={memberFilter}
