@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList } from "recharts";
-import { getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups } from "@/api/toolApi";
+import { getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups, getSheetContributors, type SheetContributor } from "@/api/toolApi";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
 interface DeckInfo {
@@ -142,6 +142,9 @@ const StatisticsPage = () => {
   const [showWinLoss, setShowWinLoss] = useState(true);
   const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
   const [mySheets, setMySheets] = useState<{ id: number; name: string }[]>([]);
+  const [contributors, setContributors] = useState<SheetContributor[]>([]);
+  const [memberFilter, setMemberFilter] = useState<number | null>(null);
+  const [rankMember, setRankMember] = useState<number | null>(null);
   const isAggregate = !recordGroupId;
 
   useEffect(() => {
@@ -172,11 +175,13 @@ const StatisticsPage = () => {
           return;
         }
         const [statsRes, rankRes] = await Promise.all([
-          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId),
-          getRecordGroupRankHistory(Number(recordGroupId)).catch(() => ({ matches: [] })),
+          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId, memberFilter),
+          getRecordGroupRankHistory(Number(recordGroupId), rankMember).catch(() => ({ matches: [], member: null })),
         ]);
         setStats(statsRes);
         setRankHistory(rankRes.matches || []);
+        // the server decides whose curve to show when nobody is picked; follow it
+        if (rankMember === null && rankRes.member?.id) setRankMember(rankRes.member.id);
         if (deckFilterOptions.length === 0 && statsRes.my_deck_stats) {
           setDeckFilterOptions(statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean));
         }
@@ -186,7 +191,14 @@ const StatisticsPage = () => {
       }
     };
     fetchData();
-  }, [recordGroupId, selectedDeckId, navigate]);
+  }, [recordGroupId, selectedDeckId, memberFilter, rankMember, navigate]);
+
+  useEffect(() => {
+    if (!recordGroupId) { setContributors([]); return; }
+    getSheetContributors(Number(recordGroupId))
+      .then((r) => setContributors(r.contributors.filter((c) => c.user)))
+      .catch(() => setContributors([]));
+  }, [recordGroupId]);
 
   if (!stats) return <div className="p-6">로딩 중...</div>;
 
@@ -277,6 +289,33 @@ const StatisticsPage = () => {
   const tabClass = (tab: string) =>
     `px-4 py-2 font-semibold md:text-lg ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
 
+  const PersonChips = ({ value, onPick, withAll }: { value: number | null; onPick: (id: number | null) => void; withAll: boolean }) => {
+    if (contributors.length < 2) return null;
+    const chip = (on: boolean) =>
+      `px-2.5 py-1 rounded-full text-sm border flex items-center gap-1.5 ${
+        on ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
+      }`;
+    return (
+      <div className="flex flex-wrap gap-2 mb-4">
+        {withAll && (
+          <button type="button" onClick={() => onPick(null)} className={chip(value === null)}>
+            전체
+          </button>
+        )}
+        {contributors.map((c) => (
+          <button key={c.user!.id} type="button" onClick={() => onPick(c.user!.id)} className={chip(value === c.user!.id)}>
+            {c.user!.icon ? (
+              <img src={c.user!.icon} alt="" className="w-5 h-5 rounded-full object-cover" />
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
+            )}
+            {c.user!.username}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const subTabClass = (tab: string) =>
     `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
 
@@ -327,6 +366,10 @@ const StatisticsPage = () => {
             ))}
           </select>
         </div>
+      )}
+
+      {activeTab !== "rankChange" && (
+        <PersonChips value={memberFilter} onPick={setMemberFilter} withAll />
       )}
 
       {activeTab === "basic" && (
@@ -559,6 +602,8 @@ const StatisticsPage = () => {
 
       {activeTab === "rankChange" && (
         <div className="space-y-4">
+          {/* a rank curve is one person's climb; merging several makes a meaningless line */}
+          <PersonChips value={rankMember} onPick={(id) => id !== null && setRankMember(id)} withAll={false} />
           <div className="flex gap-2">
             <button onClick={() => setRankSubTab("rank")} className={subTabClass("rank")}>랭크</button>
             <button onClick={() => setRankSubTab("score")} className={subTabClass("score")}>점수</button>

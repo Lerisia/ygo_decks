@@ -287,9 +287,13 @@ def get_user_statistics_full(request):
         groups = groups.filter(id__in=wanted)
 
     group_list = list(groups.order_by("-created_at").values("id", "name"))
-    group_ids = [g["id"] for g in group_list]
 
-    matches = MatchRecord.objects.filter(record_group_id__in=group_ids, is_deleted=False, recorded_by=request.user)
+    # Counted by author, not by membership: games you recorded stay yours even after
+    # you leave the group sheet you recorded them in.
+    matches = MatchRecord.objects.filter(
+        is_deleted=False, recorded_by=request.user, record_group__is_deleted=False)
+    if raw_ids:
+        matches = matches.filter(record_group_id__in=wanted)
     deck_id = request.GET.get("deck_id")
     if deck_id:
         matches = matches.filter(deck_id=deck_id)
@@ -434,9 +438,20 @@ def get_record_group_rank_history(request, record_group_id):
     if err:
         return err
 
+    # A rank curve only means something for one person: on a group sheet, several
+    # people's climbs interleave into a line that goes nowhere. Default to the caller.
+    asked = request.GET.get("member")
+    if asked and asked.isdigit():
+        whose = int(asked)
+    elif (request.user.is_authenticated
+          and record_group.matches.filter(is_deleted=False, recorded_by=request.user).exists()):
+        whose = request.user.id
+    else:
+        whose = record_group.user_id
+
     matches = (
         record_group.matches
-        .filter(is_deleted=False)
+        .filter(is_deleted=False, recorded_by_id=whose)
         .filter(Q(rank__isnull=False) | Q(score__isnull=False))
         .order_by("id")
         .values("rank", "wins", "score", "result")
@@ -453,7 +468,8 @@ def get_record_group_rank_history(request, record_group_id):
         for i, m in enumerate(matches)
     ]
 
-    return Response({"matches": data}, status=status.HTTP_200_OK)
+    return Response({"matches": data, "member": user_brief(User.objects.filter(id=whose).first())},
+                    status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])

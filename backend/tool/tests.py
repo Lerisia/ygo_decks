@@ -768,6 +768,44 @@ class SharedSheetTest(TestCase):
         self.assertEqual([m["username"] for m in body["members"]], ["mate"])
         self.assertEqual(body["invite_code"], "")
 
+    def test_rank_history_follows_one_person_at_a_time(self):
+        self._join(self.mate)
+        for who, rank in [(self.owner, "gold3"), (self.mate, "master1"), (self.owner, "gold2")]:
+            self._as(who).post(f"/api/record-groups/{self.group.id}/add-match/", {
+                "deck": self.deck.id, "opponent_deck": self.opp.id, "first_or_second": "first",
+                "result": "win", "coin_toss_result": "win", "rank": rank,
+            }, format="json")
+
+        mine = self._as(self.owner).get(f"/api/record-groups/{self.group.id}/rank-history/").json()
+        self.assertEqual([m["rank"] for m in mine["matches"]], ["gold3", "gold2"])
+        self.assertEqual(mine["member"]["username"], "owner")
+
+        theirs = self._as(self.owner).get(
+            f"/api/record-groups/{self.group.id}/rank-history/?member={self.mate.id}").json()
+        self.assertEqual([m["rank"] for m in theirs["matches"]], ["master1"])
+        self.assertEqual(theirs["member"]["username"], "mate")
+
+        as_mate = self._as(self.mate).get(f"/api/record-groups/{self.group.id}/rank-history/").json()
+        self.assertEqual([m["rank"] for m in as_mate["matches"]], ["master1"])
+
+    def test_my_totals_keep_games_i_recorded_after_i_leave(self):
+        self._join(self.mate)
+        self._add_match(self.mate)
+        before = self._as(self.mate).get("/api/record-groups/statistics/full/").json()
+        self.assertEqual(before["basic"]["total_games"], 1)
+
+        self.assertEqual(
+            self._as(self.mate).delete(f"/api/record-groups/{self.group.id}/members/{self.mate.id}/").status_code, 204)
+        after = self._as(self.mate).get("/api/record-groups/statistics/full/").json()
+        self.assertEqual(after["basic"]["total_games"], 1)
+
+    def test_my_totals_ignore_records_other_people_wrote(self):
+        self._join(self.mate)
+        self._add_match(self.mate)
+        self._add_match(self.owner)
+        self.assertEqual(
+            self._as(self.owner).get("/api/record-groups/statistics/full/").json()["basic"]["total_games"], 1)
+
     def test_viewer_may_read_but_not_write(self):
         self._as(self.owner).post(f"/api/record-groups/{self.group.id}/members/",
                                   {"user_id": self.mate.id, "role": "viewer"}, format="json")

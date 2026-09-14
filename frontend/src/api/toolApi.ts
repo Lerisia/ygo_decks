@@ -195,8 +195,9 @@ export const getRecordGroupStatistics = async (recordGroupId: number) => {
   return response.json();
 };
 
-export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number) => {
-  const params = deckId ? `?deck_id=${deckId}` : "";
+export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number, memberId?: number | null) => {
+  const qs = [deckId ? `deck_id=${deckId}` : "", memberId ? `member=${memberId}` : ""].filter(Boolean).join("&");
+  const params = qs ? `?${qs}` : "";
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -278,12 +279,13 @@ export const getUserStatisticsFull = async (deckId?: number) => {
   return response.json();
 };
 
-export const getRecordGroupRankHistory = async (recordGroupId: number) => {
+export const getRecordGroupRankHistory = async (recordGroupId: number, memberId?: number | null) => {
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/`, {
-    headers,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/${memberId ? `?member=${memberId}` : ""}`,
+    { headers },
+  );
 
   if (!response.ok) {
     throw new Error(`API 요청 실패: ${response.status}`);
