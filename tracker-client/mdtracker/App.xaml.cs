@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.3.2";
+    public const string Version = "0.3.3";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private WinForms.NotifyIcon? _tray;
@@ -54,20 +54,40 @@ public partial class App : System.Windows.Application
 
     private void OnMatchCaptured(PendingMatch m)
     {
-        if (!m.IsDemo && (Tracker.Store.Config.Token == null || Tracker.Store.Config.RecordGroupId == null))
+        if (!m.IsDemo && Tracker.Store.Config.Token == null)
         {
-            // Not set up yet: record nothing rather than leaving a half-saved state on the site, and say so plainly.
-            // (The raw capture is still archived for card statistics.)
             ShowMain();
-            _tray?.ShowBalloonTip(6000, "YGO Decks 트래커",
-                Tracker.Store.Config.Token == null
-                    ? "로그인하지 않아 이번 게임은 기록되지 않았습니다."
-                    : "기록할 시트가 없어 이번 게임은 기록되지 않았습니다. 시트를 만들어 주세요.",
-                WinForms.ToolTipIcon.Warning);
+            _tray?.ShowBalloonTip(6000, "YGO Decks 트래커", "로그인하지 않아 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
             return;
         }
+        if (!m.IsDemo && Tracker.Store.Config.RecordGroupId == null)
+        {
+            // No sheet yet: make one in the background rather than dropping the game, then carry on as usual.
+            new Thread(() =>
+            {
+                bool ok = Tracker.EnsureRecordGroup();
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (!ok)
+                    {
+                        ShowMain();
+                        _tray?.ShowBalloonTip(6000, "YGO Decks 트래커", "시트를 만들지 못해 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
+                        return;
+                    }
+                    _tray?.ShowBalloonTip(5000, "YGO Decks 트래커", $"기록할 시트 '{Tracker.Store.Config.RecordGroupName}'을(를) 만들었습니다.", WinForms.ToolTipIcon.Info);
+                    MainWin?.Refresh();
+                    ShowOverlay(m);
+                });
+            }) { IsBackground = true }.Start();
+            return;
+        }
+        ShowOverlay(m);
+    }
+
+    private void ShowOverlay(PendingMatch m)
+    {
         try { new OverlayWindow(Tracker, m).Show(); }
-        catch (Exception ex) { Log.Info("overlay error: " + ex.Message); Tracker.Defer(m); }
+        catch (Exception ex) { Log.Info("overlay error: " + ex.Message); }
     }
 
     internal void ShowMain()

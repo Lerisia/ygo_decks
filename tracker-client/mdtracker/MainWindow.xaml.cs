@@ -49,6 +49,9 @@ public partial class MainWindow : Window
 
     private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); }
 
+    /// Called after the tracker creates a sheet on its own.
+    public void Refresh() => Dispatcher.BeginInvoke(() => { RefreshPanels(); LoadGroups(); });
+
     private void RefreshStatus()
     {
         StatusText.Text = T.Status;

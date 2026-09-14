@@ -101,6 +101,21 @@ public sealed class Tracker
         else m.SuggestedMyDeckId = m.MyCandidates.FirstOrDefault()?.DeckId;
     }
 
+    /// Make sure a record sheet exists: use the newest one, or create a default so a first game is never lost.
+    public bool EnsureRecordGroup()
+    {
+        if (Store.Config.RecordGroupId != null) return true;
+        try
+        {
+            var g = Api.Groups().FirstOrDefault() ?? Api.CreateGroup($"{DateTime.Now:yyyy-MM} 시즌");
+            Store.Config.RecordGroupId = g.Id; Store.Config.RecordGroupName = g.Name; Store.SaveConfig();
+            Log.Info($"record sheet ready: {g.Name}");
+            return true;
+        }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); return false; }
+        catch (Exception ex) { Log.Info("sheet auto-create failed: " + ex.Message); return false; }
+    }
+
     /// Save to the selected record group. Returns null on success, else an error message.
     public string? Save(PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
