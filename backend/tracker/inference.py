@@ -2,7 +2,7 @@
 from collections import Counter, defaultdict
 
 from card.models import Card, CardIdAlias, CardArchetypeOverride
-from deck.models import DeckArchetype
+from deck.models import DeckArchetype, DeckInferencePriority
 
 # 엔진 덱은 다른 덱의 용병으로 섞이는 경우가 많아, 비엔진 덱이 함께 보이면 그쪽을 먼저 제안한다
 # (특이점 2026-09-15). 비엔진 후보 점수가 엔진 후보 점수의 이 비율 이상이면 엔진 후보를 뒤로 보낸다.
@@ -61,11 +61,12 @@ def infer_decks(card_ids, limit=3):
         engines[da.deck_id] = da.deck.is_engine
     total = sum(arch_votes.values())
     best_plain = max((s for d, s in scores.items() if not engines[d]), default=0.0)
+    beaten = {p.loser_id for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores)}
 
     def demoted(deck_id, score):
         return engines[deck_id] and names[deck_id] not in ENGINE_ALWAYS_TOP and best_plain >= ENGINE_DEMOTE_MIN_RATIO * score
 
-    ranked = sorted(scores.items(), key=lambda kv: (demoted(*kv), -kv[1], names[kv[0]]))[:limit]
+    ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, demoted(*kv), -kv[1], names[kv[0]]))[:limit]
     return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d]} for d, s in ranked], unknown
 
 

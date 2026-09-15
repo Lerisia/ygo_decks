@@ -227,3 +227,23 @@ class DeckNote(models.Model):
 
     def __str__(self):
         return f"{self.deck.name}: {self.title}"
+
+
+class DeckInferencePriority(models.Model):
+    """Deck inference only: when both decks are candidates for the same duel, rank `winner` above `loser`.
+
+    For hybrids the site treats as one deck — 십이수와 현람을 섞은 덱은 현람으로 분류한다(특이점 2026-09-15).
+    Scores are untouched, so a deck seen alone is unaffected.
+    """
+
+    winner = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="inference_wins")
+    loser = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="inference_losses")
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["winner", "loser"], name="uniq_deck_inference_priority")]
+        verbose_name = "덱 인식 우선순위"
+        verbose_name_plural = "덱 인식 우선순위"
+
+    def __str__(self):
+        return f"{self.winner.name} > {self.loser.name}"

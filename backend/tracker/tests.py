@@ -472,3 +472,35 @@ class TrackerArchetypeOverrideTest(TestCase):
     def test_pure_endymion_is_unaffected(self):
         cands, _ = infer_decks([8135, 8135])
         self.assertEqual([c["name"] for c in cands], ["엔디미온"])
+
+
+class TrackerDeckPriorityTest(TestCase):
+    """DeckInferencePriority: 혼용 덱은 지정한 쪽으로 (특이점 2026-09-15, 십이수현람 → 현람)."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype, DeckInferencePriority
+        self.zoo = _create_deck("십이수")
+        self.rad = _create_deck("현람")
+        DeckArchetype.objects.create(deck=self.zoo, name="Zoodiac")
+        DeckArchetype.objects.create(deck=self.rad, name="Radiant Typhoon")
+        for kid, arch in [("201", "Zoodiac"), ("202", "Radiant Typhoon")]:
+            Card.objects.create(card_id=f"c{kid}", konami_id=kid, name=f"card{kid}", archetype=arch)
+        DeckInferencePriority.objects.create(winner=self.rad, loser=self.zoo, note="혼용은 현람")
+
+    def test_hybrid_is_classified_as_the_winner(self):
+        cands, _ = infer_decks([201, 201, 201, 201, 202])
+        self.assertEqual([c["name"] for c in cands], ["현람", "십이수"])
+
+    def test_loser_alone_is_unaffected(self):
+        cands, _ = infer_decks([201, 201])
+        self.assertEqual([c["name"] for c in cands], ["십이수"])
+
+    def test_priority_only_applies_to_the_listed_pair(self):
+        from deck.models import DeckArchetype
+        other = _create_deck("령수")
+        DeckArchetype.objects.create(deck=other, name="Spiritual Beast")
+        from card.models import Card
+        Card.objects.create(card_id="c203", konami_id="203", name="card203", archetype="Spiritual Beast")
+        cands, _ = infer_decks([201, 201, 203])
+        self.assertEqual(cands[0]["name"], "십이수")

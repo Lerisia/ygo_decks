@@ -122,3 +122,13 @@ class DeckArchetypeAdmin(admin.ModelAdmin):
     list_editable = ("weight",)
     search_fields = ("deck__name", "name")
     autocomplete_fields = ("deck",)
+
+
+from .models import DeckInferencePriority
+
+
+@admin.register(DeckInferencePriority)
+class DeckInferencePriorityAdmin(admin.ModelAdmin):
+    list_display = ("winner", "loser", "note")
+    autocomplete_fields = ("winner", "loser")
+    search_fields = ("winner__name", "loser__name", "note")
