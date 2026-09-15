@@ -1,7 +1,7 @@
 """Deck inference for the PC tracker: card IDs (Konami cid == Card.konami_id) → site decks."""
 from collections import Counter, defaultdict
 
-from card.models import Card, CardIdAlias
+from card.models import Card, CardIdAlias, CardArchetypeOverride
 from deck.models import DeckArchetype
 
 # 엔진 덱은 다른 덱의 용병으로 섞이는 경우가 많아, 비엔진 덱이 함께 보이면 그쪽을 먼저 제안한다
@@ -42,11 +42,15 @@ def infer_decks(card_ids, limit=3):
         return [], []
     cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype")}
     unknown = sorted(int(k) for k in counts if k not in cards and k.isdigit())
+    overrides = {o.konami_id: o.archetype for o in CardArchetypeOverride.objects.filter(konami_id__in=list(counts))}
     arch_votes = Counter()
     for kid, n in counts.items():
         card = cards.get(kid)
-        if card and card.archetype:
-            arch_votes[card.archetype] += n
+        if not card:
+            continue
+        archetype = overrides.get(kid, card.archetype)
+        if archetype:
+            arch_votes[archetype] += n
     if not arch_votes:
         return [], unknown
     scores = defaultdict(float)

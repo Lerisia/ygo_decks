@@ -305,3 +305,23 @@ class CardIdAlias(models.Model):
 
     def __str__(self):
         return f"{self.md_id} → {self.card.korean_name or self.card.name}"
+
+
+class CardArchetypeOverride(models.Model):
+    """Deck inference only: use this archetype instead of Card.archetype (blank = the card votes for nothing).
+
+    YGOPRODeck archetypes mislabel some cards for our purposes — generic staples that happen to carry a theme
+    name (신성마황후 셀레네 = "Endymion") and crossover parts played as a mercenary engine elsewhere
+    (마기스토스 엔디미온 카드들). Editable in admin so 운영진 can fix inference without a deploy.
+    """
+
+    konami_id = models.CharField(max_length=20, unique=True)
+    archetype = models.CharField(max_length=100, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "카드 아키타입 보정"
+        verbose_name_plural = "카드 아키타입 보정"
+
+    def __str__(self):
+        return f"{self.konami_id} → {self.archetype or '(투표 제외)'}"

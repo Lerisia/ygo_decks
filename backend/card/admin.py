@@ -108,3 +108,13 @@ class CardIdAliasAdmin(admin.ModelAdmin):
     list_display = ("md_id", "card", "note")
     search_fields = ("md_id", "card__name", "card__korean_name")
     autocomplete_fields = ("card",)
+
+
+from .models import CardArchetypeOverride
+
+
+@admin.register(CardArchetypeOverride)
+class CardArchetypeOverrideAdmin(admin.ModelAdmin):
+    list_display = ("konami_id", "archetype", "note")
+    list_editable = ("archetype", "note")
+    search_fields = ("konami_id", "archetype", "note")

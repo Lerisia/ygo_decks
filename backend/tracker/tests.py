@@ -437,3 +437,38 @@ class TrackerEngineDemotionTest(TestCase):
     def test_engine_only_candidates_keep_score_order(self):
         cands, _ = infer_decks([101, 101, 103])
         self.assertEqual([c["name"] for c in cands], ["엘펜노츠", "낙인"])
+
+
+class TrackerArchetypeOverrideTest(TestCase):
+    """CardArchetypeOverride: 범용 카드는 투표 제외, 용병 파츠는 실제로 쓰는 덱으로 (특이점 2026-09-15)."""
+
+    def setUp(self):
+        from card.models import Card, CardArchetypeOverride
+        from deck.models import DeckArchetype
+        self.endymion = _create_deck("엔디미온")
+        self.fairy = _create_deck("페어리테일")
+        DeckArchetype.objects.create(deck=self.endymion, name="Endymion")
+        DeckArchetype.objects.create(deck=self.fairy, name="Fairy Tail")
+        DeckArchetype.objects.create(deck=self.fairy, name="Magistus", weight=0.6)
+        for kid, name, arch in [("8135", "마법 도시 엔디미온", "Endymion"), ("14937", "신성마황후 셀레네", "Endymion"),
+                                ("21220", "크레센트 오브 마기스토스 엔디미온", "Endymion"), ("15614", "마기스토스 베르 산드리용", "Magistus"),
+                                ("22499", "페어리테일－위캣", "Fairy Tail")]:
+            Card.objects.create(card_id=f"c{kid}", konami_id=kid, name=name, archetype=arch)
+        CardArchetypeOverride.objects.create(konami_id="14937", archetype="", note="범용 링크")
+        CardArchetypeOverride.objects.create(konami_id="21220", archetype="Magistus", note="마기스토스 파츠")
+
+    def test_blank_override_removes_the_vote(self):
+        cands, _ = infer_decks([14937])
+        self.assertEqual(cands, [])
+
+    def test_override_moves_the_vote_to_the_deck_that_plays_the_part(self):
+        cands, _ = infer_decks([21220, 15614])
+        self.assertEqual([c["name"] for c in cands], ["페어리테일"])
+
+    def test_theme_cards_still_win_over_the_borrowed_engine(self):
+        cands, _ = infer_decks([21220, 15614, 22499])
+        self.assertEqual(cands[0]["name"], "페어리테일")
+
+    def test_pure_endymion_is_unaffected(self):
+        cands, _ = infer_decks([8135, 8135])
+        self.assertEqual([c["name"] for c in cands], ["엔디미온"])
