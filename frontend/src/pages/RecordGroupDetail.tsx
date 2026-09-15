@@ -398,7 +398,7 @@ const RecordGroupDetailPage = () => {
   }, [isOwner]);
 
   // Tracker capture → register form. A suggested deck not in the owned list is added to the options for this pick.
-  const fillFromPending = (p: TrackerPendingMatch) => {
+  const fillFromPending = (p: TrackerPendingMatch, oppDeckId?: number) => {
     const deckId = p.suggested_deck?.deck_id ?? null;
     if (deckId && !owned_decks.some((d) => d.id === deckId)) {
       const d = decks.find((x) => x.id === deckId);
@@ -409,7 +409,7 @@ const RecordGroupDetailPage = () => {
     setNewMatch((prev) => ({
       ...prev,
       deck: deckId ? String(deckId) : "",
-      opponent_deck: p.suggested_opp_deck ? String(p.suggested_opp_deck.deck_id) : "null",
+      opponent_deck: oppDeckId ? String(oppDeckId) : p.suggested_opp_deck ? String(p.suggested_opp_deck.deck_id) : "null",
       opponent_deck_name: "",
       coin_toss_result: p.coin_win ? "win" : "lose",
       first_or_second: p.first ? "first" : "second",

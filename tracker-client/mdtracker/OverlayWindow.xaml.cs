@@ -55,8 +55,8 @@ public partial class OverlayWindow : Window
         _oppDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedOppDeckId);
         _oppUnknown = _oppDeck == null;
         OppDeckBox.Text = _oppDeck?.Name ?? "모름/기타";
-        var top = _m.OppCandidates.FirstOrDefault();
-        OppHint.Text = top != null ? $"추천 {top.Name} {Math.Round(top.Share * 100)}%" : "판독 근거 없음";
+        var top2 = _m.OppCandidates.Take(2).Select(c => $"{c.Name} {Math.Round(c.Share * 100)}%").ToList();
+        OppHint.Text = top2.Count > 0 ? "추천 " + string.Join(" · 또는 ", top2) : "판독 근거 없음";
         if (_m.Error != null) Msg.Text = _m.Error;
         if (_m.IsDemo) { Headline.Text += "   (미리보기 — 저장되지 않음)"; }
 

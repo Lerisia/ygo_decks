@@ -5,7 +5,7 @@ import { getRankLabel } from "@/utils/rankUtils";
 type Props = {
   items: TrackerPendingMatch[];
   activeId: number | null;
-  onFill: (item: TrackerPendingMatch) => void;
+  onFill: (item: TrackerPendingMatch, oppDeckId?: number) => void;
   onDiscard: (id: number) => void;
 };
 
@@ -50,9 +50,27 @@ export default function TrackerPendingPanel({ items, activeId, onFill, onDiscard
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                 내 덱: <b>{p.suggested_deck?.name ?? "판독 실패"}</b>
-                {" · "}상대 덱: <b>{p.suggested_opp_deck?.name ?? "모름/기타"}</b>
-                {p.opp_candidates.length > 1 && (
-                  <span className="text-gray-500 dark:text-gray-400"> (또는 {p.opp_candidates[1].name})</span>
+                {" · "}상대 덱:{" "}
+                {p.opp_candidates.length > 0 ? (
+                  p.opp_candidates.slice(0, 2).map((c, i) => (
+                    <button
+                      key={c.deck_id}
+                      type="button"
+                      onClick={() => onFill(p, c.deck_id)}
+                      title={`이 후보로 폼에 채우기${c.share != null ? ` (일치도 ${Math.round(c.share * 100)}%)` : ""}`}
+                      className={`mr-1 px-1.5 py-0.5 rounded border text-xs ${
+                        i === 0
+                          ? "border-blue-400 bg-blue-50 dark:bg-blue-900/40 font-semibold"
+                          : "border-gray-300 dark:border-gray-600"
+                      }`}
+                    >
+                      {c.name}
+                      {c.is_engine ? " (엔진)" : ""}
+                      {c.share != null ? ` ${Math.round(c.share * 100)}%` : ""}
+                    </button>
+                  ))
+                ) : (
+                  <b>모름/기타</b>
                 )}
                 {p.opp_card_names.length > 0 && (
                   <button type="button" className="ml-2 underline" onClick={() => setOpenCards(openCards === p.id ? null : p.id)}>
