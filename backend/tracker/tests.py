@@ -3,6 +3,7 @@ from rest_framework.test import APIClient
 
 from deck.models import Deck
 from user.models import User
+from tracker.inference import infer_decks
 
 
 def _create_deck(name="테스트 덱", **kwargs):
@@ -397,3 +398,42 @@ class TrackerStatsTest(TestCase):
         body = self.client.get("/api/tracker/today/").json()
         self.assertEqual(body["games"], 0)
         self.assertIsNone(body["win_rate"])
+
+
+class TrackerEngineDemotionTest(TestCase):
+    """엔진 덱은 비엔진 후보가 함께 보이면 뒤로, 단 낙인은 예외 (특이점 2026-09-15)."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        self.engine = _create_deck("엘펜노츠")
+        self.engine.is_engine = True
+        self.engine.save(update_fields=["is_engine"])
+        self.plain = _create_deck("싱크론")
+        self.branded = _create_deck("낙인")
+        self.branded.is_engine = True
+        self.branded.save(update_fields=["is_engine"])
+        DeckArchetype.objects.create(deck=self.engine, name="Elfnote")
+        DeckArchetype.objects.create(deck=self.plain, name="Synchron")
+        DeckArchetype.objects.create(deck=self.branded, name="Branded")
+        for kid, arch in [("101", "Elfnote"), ("102", "Synchron"), ("103", "Branded")]:
+            Card.objects.create(card_id=f"c{kid}", konami_id=kid, name=f"card{kid}", archetype=arch)
+
+    def test_non_engine_beats_engine_even_with_fewer_cards(self):
+        cands, _ = infer_decks([101, 101, 101, 101, 102])
+        self.assertEqual([c["name"] for c in cands], ["싱크론", "엘펜노츠"])
+        self.assertTrue(cands[1]["is_engine"])
+        self.assertFalse(cands[0]["is_engine"])
+        self.assertEqual(cands[1]["score"], 4.0)
+
+    def test_engine_keeps_top_when_non_engine_is_negligible(self):
+        cands, _ = infer_decks([101] * 10 + [102])
+        self.assertEqual([c["name"] for c in cands], ["엘펜노츠", "싱크론"])
+
+    def test_branded_is_exempt_from_demotion(self):
+        cands, _ = infer_decks([103, 103, 103, 103, 102])
+        self.assertEqual([c["name"] for c in cands], ["낙인", "싱크론"])
+
+    def test_engine_only_candidates_keep_score_order(self):
+        cands, _ = infer_decks([101, 101, 103])
+        self.assertEqual([c["name"] for c in cands], ["엘펜노츠", "낙인"])

@@ -51,6 +51,9 @@ export default function TrackerPendingPanel({ items, activeId, onFill, onDiscard
               <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                 내 덱: <b>{p.suggested_deck?.name ?? "판독 실패"}</b>
                 {" · "}상대 덱: <b>{p.suggested_opp_deck?.name ?? "모름/기타"}</b>
+                {p.opp_candidates.length > 1 && (
+                  <span className="text-gray-500 dark:text-gray-400"> (또는 {p.opp_candidates[1].name})</span>
+                )}
                 {p.opp_card_names.length > 0 && (
                   <button type="button" className="ml-2 underline" onClick={() => setOpenCards(openCards === p.id ? null : p.id)}>
                     상대가 보여준 카드 {p.opp_card_names.length}장

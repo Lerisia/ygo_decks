@@ -1,7 +1,7 @@
 // Games captured by the PC tracker that wait for the user's confirmation on the record page.
 const API_BASE_URL = "/api";
 
-export type DeckCandidate = { deck_id: number; name: string; score?: number; share?: number; source?: "inferred" | "remembered" };
+export type DeckCandidate = { deck_id: number; name: string; score?: number; share?: number; is_engine?: boolean; source?: "inferred" | "remembered" };
 export type CardName = { id: number; name: string; count: number };
 
 export type TrackerPendingMatch = {
