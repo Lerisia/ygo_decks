@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
+import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 
 interface Deck {
   id: number;
@@ -194,6 +195,8 @@ export default function DatabasePage() {
 
   return (
     <div className="h-auto min-h-screen px-0 sm:px-4 text-center p-4">
+      <DatabaseTrackerPromo />
+
       {/* Search decks */}
       <Input
         placeholder="덱 이름 검색..."
