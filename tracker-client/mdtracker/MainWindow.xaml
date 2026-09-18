@@ -35,7 +35,6 @@
         <Border Grid.Row="1" x:Name="LoginPanel" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,0,0,12">
             <StackPanel>
                 <TextBlock Text="로그인" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                <TextBlock Text="ygodecks.com 계정으로 로그인하면 게임이 자동으로 기록됩니다. 비밀번호는 저장하지 않습니다." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -83,16 +82,12 @@
                     <Button Grid.Column="2" Content="새 시트 만들기" Style="{StaticResource Secondary}" Click="CreateGroup_Click"/>
                 </Grid>
                 <TextBlock x:Name="SetupMsg" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
-                <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"
-                           Text="게임이 끝나면 게임 화면 위에 확인 창이 잠깐 뜹니다. 게임은 창모드 또는 테두리 없는 창모드로 두세요(전체화면이면 게임 위에 표시되지 않습니다)."/>
                 <CheckBox x:Name="LivePanelBox" Margin="0,10,0,0" Checked="LivePanel_Changed" Unchecked="LivePanel_Changed"
-                          Content="듀얼 중 사이드 패널 표시 (상대 덱 판독 · 매치업 전적 · 턴 시간 · 공개 카드)"/>
+                          Content="듀얼 중 사이드 패널 표시"/>
                 <CheckBox x:Name="AlertBox" Margin="0,6,0,0" Checked="Alert_Changed" Unchecked="Alert_Changed"
-                          Content="게임을 내려놓은 동안 내 차례(선택지·턴)가 오면 소리로 알림"/>
-                <CheckBox x:Name="AutoUpdateBox" Margin="0,6,0,0" Checked="AutoUpdate_Changed" Unchecked="AutoUpdate_Changed"
-                          Content="새 버전이 나오면 자동으로 업데이트 (듀얼 중이 아닐 때 재시작)"/>
+                          Content="게임을 내려놓은 동안 내 차례가 오면 소리로 알림"/>
                 <CheckBox x:Name="AutoStartBox" Margin="0,6,0,0" Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"
-                          Content="Windows 시작 시 자동 실행 (트레이에서 조용히 대기하다가 게임이 켜지면 바로 기록)"/>
+                          Content="Windows 시작 시 자동 실행"/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="사이트에서 시트 보기" Style="{StaticResource Secondary}" Click="OpenSite_Click"/>
                 </StackPanel>
@@ -114,7 +109,6 @@
         <Border Grid.Row="4" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10" Padding="14">
             <DockPanel>
                 <TextBlock Text="최근 게임" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,6"/>
-                <TextBlock Text="더블클릭하면 기록을 고칠 수 있습니다 (사이트에도 반영). 저장 안 된 게임은 확인 창이 다시 뜹니다." Foreground="{StaticResource Muted}" FontSize="11" DockPanel.Dock="Top" Margin="0,0,0,6"/>
                 <ListView x:Name="RecentList" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MouseDoubleClick="RecentList_MouseDoubleClick">
                     <ListView.View>
                         <GridView>

@@ -5,7 +5,7 @@ client reported an older version (or none at all, which means a build from befor
 reporting existed).
 """
 
-LATEST = "0.5.1"
+LATEST = "0.5.2"
 MIN_SUPPORTED = "0.4.0"
 DOWNLOAD_URL = "https://ygodecks.com/media/tracker/mdtracker.exe"
 

@@ -40,8 +40,6 @@
 
         <TextBlock Text="메모" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,8,0,0"/>
         <TextBox x:Name="MemoBox" Margin="0,2,0,0"/>
-
-        <TextBlock Text="수정해도 포인트는 다시 지급되지 않습니다." Foreground="{StaticResource Muted}" FontSize="11" Margin="0,10,0,0"/>
         <DockPanel Margin="0,10,0,0">
             <TextBlock x:Name="Msg" Foreground="#DC2626" VerticalAlignment="Center" DockPanel.Dock="Left"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

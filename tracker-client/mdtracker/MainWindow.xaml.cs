@@ -46,9 +46,7 @@ public partial class MainWindow : Window
         var info = await Task.Run(() => T.Api.LatestVersion());
         if (info == null || string.IsNullOrEmpty(info.Latest) || !App.Behind(info.Latest)) return;
         if (!string.IsNullOrEmpty(info.Url)) _updateUrl = info.Url;
-        UpdateText.Text = T.Store.Config.AutoUpdate
-            ? $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version}) 곧 자동으로 업데이트됩니다."
-            : $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version})";
+        UpdateText.Text = $"새 버전 {info.Latest}이 있습니다. (현재 {App.Version})";
         UpdateBanner.Visibility = Visibility.Visible;
     }
 
@@ -56,12 +54,6 @@ public partial class MainWindow : Window
     {
         UpdateBtn.IsEnabled = false;
         ((App)System.Windows.Application.Current).UpdateNow();
-    }
-
-    private void AutoUpdate_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_settingAutoStart) return;
-        T.Store.Config.AutoUpdate = AutoUpdateBox.IsChecked == true; T.Store.SaveConfig();
     }
 
     private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); RefreshToday(); }
@@ -90,7 +82,6 @@ public partial class MainWindow : Window
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
         LivePanelBox.IsChecked = T.Store.Config.LivePanel;
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
-        AutoUpdateBox.IsChecked = T.Store.Config.AutoUpdate;
         _settingAutoStart = false;
     }
 

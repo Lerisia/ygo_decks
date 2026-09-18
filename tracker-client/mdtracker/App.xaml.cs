@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.5.1";
+    public const string Version = "0.5.2";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -165,29 +165,35 @@ public partial class App : System.Windows.Application
 
     private void SetUpdateState(string s) { UpdateState = s; UpdateStateChanged?.Invoke(); }
 
-    /// Check on start and every 30 minutes; download in the background; swap in as soon as no duel is running.
+    /// Check on start and every 30 minutes. A newer build is offered once per run — between duels, never mid-game —
+    /// and only installed after the person says yes.
+    private string _offered = "";
     private void AutoUpdateLoop()
     {
         Thread.Sleep(8000);
         while (true)
         {
+            int wait = 30 * 60 * 1000;
             try
             {
-                if (Tracker.Store.Config.AutoUpdate && !_updateStaged)
+                var info = Tracker.Api.LatestVersion();
+                if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url) && _offered != info.Latest)
                 {
-                    var info = Tracker.Api.LatestVersion();
-                    if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url))
+                    if (Tracker.Live != null || _overlay != null) wait = 5000;   // ask after the duel
+                    else
                     {
-                        SetUpdateState($"새 버전 {info.Latest} 내려받는 중…");
-                        var staged = Updater.Download(info.Url, p => SetUpdateState($"새 버전 {info.Latest} 내려받는 중… {p}"));
-                        if (staged != null) { _updateStaged = true; SetUpdateState($"새 버전 {info.Latest} 준비됨 — 듀얼이 끝나면 자동으로 재시작합니다"); }
-                        else SetUpdateState("");
+                        _offered = info.Latest;
+                        Dispatcher.Invoke(() =>
+                        {
+                            SetUpdateState($"새 버전 {info.Latest}이 있습니다. (현재 {Version})");
+                            ShowMain();
+                            if (new UpdateDialog { Owner = MainWin }.ShowDialog() == true) UpdateNow();
+                        });
                     }
                 }
-                if (_updateStaged && Tracker.Live == null && _overlay == null) { Dispatcher.Invoke(RestartForUpdate); return; }
             }
-            catch (Exception ex) { Log.Info("auto-update: " + ex.Message); }
-            Thread.Sleep(_updateStaged ? 5000 : 30 * 60 * 1000);
+            catch (Exception ex) { Log.Info("update check: " + ex.Message); }
+            Thread.Sleep(wait);
         }
     }
 
