@@ -233,6 +233,30 @@ class TrackerGameArchiveTest(TestCase):
     def test_requires_did(self):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 
+    def test_turn_from_old_clients_is_shifted_to_count_from_one(self):
+        from tracker.models import TrackerGame
+        self.client.post("/api/tracker/games/", {**self.capture, "turn": 2}, format="json", HTTP_X_TRACKER_VERSION="0.4.3")
+        self.assertEqual(TrackerGame.objects.get(did=self.capture["did"]).turn, 3)
+        self.client.post("/api/tracker/games/", {**self.capture, "turn": 2}, format="json", HTTP_X_TRACKER_VERSION="0.5.1")
+        self.assertEqual(TrackerGame.objects.get(did=self.capture["did"]).turn, 2)
+
+    def test_second_save_of_the_same_duel_returns_the_existing_record(self):
+        from tool.models import MatchRecord
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        body = {
+            "deck": self.deck.id, "opponent_deck": None, "first_or_second": "first", "result": "win",
+            "coin_toss_result": "win", "rank": "bronze3", "wins": 0, "tracker_did": self.capture["did"],
+        }
+        first = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", body, format="json")
+        again = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", body, format="json")
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.json()["match_id"], first.json()["match_id"])
+        self.assertTrue(again.json()["duplicate"])
+        self.assertEqual(MatchRecord.objects.filter(record_group=self.group).count(), 1)
+        # deleting the record frees the duel to be saved again
+        MatchRecord.objects.filter(id=first.json()["match_id"]).update(is_deleted=True)
+        self.assertEqual(self.client.post(f"/api/record-groups/{self.group.id}/add-match/", body, format="json").status_code, 201)
+
     def test_turn_times_are_kept_and_sanitized(self):
         from tracker.models import TrackerGame
         times = [{"turn": 1, "me": True, "sec": 95}, {"turn": 2, "me": False, "sec": "40"}, "junk", {"turn": 3, "me": True, "sec": -5}]
@@ -399,10 +423,30 @@ class TrackerStatsTest(TestCase):
         body = self.client.get("/api/tracker/today/").json()
         self.assertEqual((body["games"], body["wins"], body["win_rate"]), (2, 1, 50.0))
         self.assertEqual(body["coin_win_rate"], 50.0)
+        self.assertEqual(body["decks"], [])
         self.assertEqual(body["first"], {"games": 1, "wins": 1, "win_rate": 100.0})
         self.assertEqual(body["second"], {"games": 1, "wins": 0, "win_rate": 0.0})
         self.assertEqual(body["avg_turns"], 2.0)
         self.assertEqual(body["rank"], {"from": "master5", "to": "master4"})
+
+    def test_today_can_be_narrowed_to_one_deck(self):
+        from django.utils import timezone
+        from tool.models import MatchRecord, RecordGroup
+        from tracker.models import TrackerDeckMap, TrackerGame
+        now = timezone.now()
+        yami = _create_deck("야미"); tear = _create_deck("티아라멘츠")
+        group = RecordGroup.objects.create(user=self.user, name="s")
+        rec = MatchRecord.objects.create(record_group=group, recorded_by=self.user, deck=yami, first_or_second="first", result="win")
+        TrackerGame.objects.create(user=self.user, did="1", game_mode=3, result="win", turn=1, ended_at=now, match=rec)      # deck via saved record
+        TrackerGame.objects.create(user=self.user, did="2", game_mode=3, result="lose", turn=1, ended_at=now, md_deck_id="77")  # deck via mapping
+        TrackerGame.objects.create(user=self.user, did="3", game_mode=3, result="lose", turn=1, ended_at=now, md_deck_id="99")  # unknown deck
+        TrackerDeckMap.objects.create(user=self.user, md_deck_id="77", deck=tear)
+        body = self.client.get("/api/tracker/today/").json()
+        self.assertEqual(body["games"], 3)
+        self.assertEqual([(d["name"], d["games"], d["wins"]) for d in body["decks"]], [("야미", 1, 1), ("티아라멘츠", 1, 0)])
+        only = self.client.get(f"/api/tracker/today/?deck={tear.id}").json()
+        self.assertEqual((only["games"], only["wins"]), (1, 0))
+        self.assertEqual(len(only["decks"]), 2)   # the deck list stays complete so the picker keeps every option
 
     def test_today_empty(self):
         body = self.client.get("/api/tracker/today/").json()

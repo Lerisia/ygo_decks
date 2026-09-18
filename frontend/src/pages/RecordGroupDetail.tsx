@@ -612,7 +612,10 @@ const RecordGroupDetailPage = () => {
     }
   };
 
-  const deckSource = extraDeck && !owned_decks.some((d) => d.id === extraDeck.id) ? [...owned_decks, extraDeck] : owned_decks;
+  // Any deck can be picked; the ones marked as owned just come first in the list.
+  const ownedIds = new Set(owned_decks.map((d) => d.id));
+  const deckSource = [...decks.filter((d) => ownedIds.has(d.id)), ...decks.filter((d) => !ownedIds.has(d.id))];
+  if (extraDeck && !deckSource.some((d) => d.id === extraDeck.id)) deckSource.push(extraDeck);
   const deckOptions: OptionType[] = deckSource.map((deck) => ({
     value: String(deck.id),
     label: deck.name,
@@ -799,11 +802,6 @@ const RecordGroupDetailPage = () => {
           <span className="text-gray-400 text-sm">{showRegisterForm ? "접기 ▲" : "펼치기 ▼"}</span>
         </button>
         {showRegisterForm && <div className="mt-2 pb-1">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            <a href="/mypage/mydecks" className="underline">보유 덱 관리</a>에서 등록한 덱만 선택 가능
-          </p>
-        </div>
         <div className="flex flex-col gap-2">
           <Select<OptionType>
             options={deckOptions}
@@ -1157,7 +1155,7 @@ const RecordGroupDetailPage = () => {
       {editingMatch && (
         <EditMatchModal
           match={editingMatch}
-          ownedDecks={owned_decks}
+          ownedDecks={deckSource}
           allOptions={allOptions}
           rankOptions={RANK_OPTIONS}
           onClose={() => setEditingMatch(null)}

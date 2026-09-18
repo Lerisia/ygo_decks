@@ -117,10 +117,17 @@ def add_match_to_record_group(request, record_group_id):
 
     data = request.data
 
+    # Two tracker instances (or a retry) saving the same duel: hand back the record that already exists.
+    if data.get("tracker_did"):
+        from tracker.models import TrackerGame
+        dup = TrackerGame.objects.filter(user=user, did=str(data.get("tracker_did")).strip(), match__isnull=False, match__is_deleted=False).first()
+        if dup:
+            return Response({"match_id": dup.match_id, "points_added": 0, "duplicate": True}, status=status.HTTP_200_OK)
+
     opponent_deck = data.get("opponent_deck")
     if opponent_deck == "null" or opponent_deck == "" or opponent_deck is None:
         opponent_deck = None
-        
+
     match = MatchRecord(
         record_group=record_group,
         recorded_by=user,

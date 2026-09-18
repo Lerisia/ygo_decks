@@ -83,8 +83,9 @@ def _turn_times(raw):
     return out or None
 
 
-def upsert_game(user, data):
-    """Archive a captured duel (idempotent per did). Opponent cards may be ints or {id,pos,face} dicts."""
+def upsert_game(user, data, legacy_turn=False):
+    """Archive a captured duel (idempotent per did). Opponent cards may be ints or {id,pos,face} dicts.
+    legacy_turn: clients before 0.5.1 sent the engine's 0-based turn counter; the site counts turns from 1."""
     from .inference import resolve_aliases
     from .models import TrackerGame
     did = str(data.get("did") or "").strip()
@@ -113,7 +114,7 @@ def upsert_game(user, data):
         "wins": data.get("wins"),
         "rating_before": data.get("rating_before"),
         "rating_after": data.get("rating_after"),
-        "turn": int(data.get("turn") or 0),
+        "turn": int(data.get("turn") or 0) + (1 if legacy_turn else 0),
         "md_deck_id": str(data.get("md_deck_id") or "")[:32],
         "my_cards": my_cards,
         "opp_cards": opp_cards,

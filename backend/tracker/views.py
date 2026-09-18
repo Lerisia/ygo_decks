@@ -24,11 +24,14 @@ def tracker_infer(request):
         v = request.data.get(key) or []
         return [int(x) for x in v if str(x).isdigit()]
 
+    from .inference import resolve_aliases
     out = {}
     for key in ("my", "opp"):
         ids = _ids(f"{key}_cards")
         cands, unknown = infer_decks(ids)
-        out[key] = {"candidates": cands, "unknown_ids": unknown, "cards": card_names(ids)}
+        # alt-art ids the client will keep seeing in memory → the base ids the names/decklist use
+        aliases = {str(raw): base for raw, base in zip(ids, resolve_aliases(ids)) if raw != base}
+        out[key] = {"candidates": cands, "unknown_ids": unknown, "cards": card_names(ids), "aliases": aliases}
     return Response(out)
 
 
@@ -93,7 +96,8 @@ def games(request):
     from .services import upsert_game
 
     try:
-        obj, created = upsert_game(request.user, request.data)
+        client_version = (request.headers.get("X-Tracker-Version") or "").strip()
+        obj, created = upsert_game(request.user, request.data, legacy_turn=bool(client_version) and ver.is_outdated(client_version, "0.5.1"))
     except (ValueError, TypeError) as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     return Response({"id": obj.id, "did": obj.did}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
@@ -166,8 +170,30 @@ def today(request):
 
     from .models import TrackerGame
 
+    from .models import TrackerDeckMap
+
     start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
-    games = list(TrackerGame.objects.filter(user=request.user, ended_at__gte=start).order_by("ended_at"))
+    games = list(TrackerGame.objects.filter(user=request.user, ended_at__gte=start).select_related("match__deck").order_by("ended_at"))
+
+    # Which site deck each game was: the saved record's deck, else what the user said that MD deck is.
+    mapped = {m.md_deck_id: m.deck for m in TrackerDeckMap.objects.filter(user=request.user).select_related("deck")}
+    def deck_of(g):
+        if g.match and not g.match.is_deleted and g.match.deck_id:
+            return g.match.deck
+        return mapped.get(g.md_deck_id)
+    per_deck = {}
+    for g in games:
+        d = deck_of(g)
+        if d is None:
+            continue
+        row = per_deck.setdefault(d.id, {"id": d.id, "name": d.name, "games": 0, "wins": 0})
+        row["games"] += 1
+        row["wins"] += g.result == "win"
+    decks = sorted(per_deck.values(), key=lambda r: -r["games"])
+
+    deck_param = request.GET.get("deck")
+    if deck_param and deck_param.isdigit():
+        games = [g for g in games if (deck_of(g).id if deck_of(g) else None) == int(deck_param)]
     n = len(games)
     w = sum(1 for g in games if g.result == "win")
     firsts = [g for g in games if g.first]
@@ -180,6 +206,7 @@ def today(request):
         "second": {"games": len(seconds), "wins": sum(1 for g in seconds if g.result == "win"),
                    "win_rate": _rate(sum(1 for g in seconds if g.result == "win"), len(seconds))},
         "avg_turns": round(sum(g.turn for g in games) / n, 1) if n else None,
+        "decks": decks,
     }
     ranked = [g for g in games if g.game_mode == 3 and g.rank_code]
     if ranked:
