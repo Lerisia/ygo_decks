@@ -77,7 +77,11 @@ def card_names(card_ids):
         if c and c not in counts:
             order.append(c)
         counts[c] += 1
-    cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name", "frame_type")}
+    # duplicate rows exist for some ids; keep the one that knows its frame type
+    cards = {}
+    for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name", "frame_type"):
+        if c.konami_id not in cards or (c.frame_type and not cards[c.konami_id].frame_type):
+            cards[c.konami_id] = c
     out = []
     for c in order:
         card = cards.get(str(c))
