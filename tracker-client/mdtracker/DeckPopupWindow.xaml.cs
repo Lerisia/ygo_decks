@@ -15,6 +15,7 @@ public partial class DeckPopupWindow : Window
     public DeckPopupWindow()
     {
         InitializeComponent();
+        OverlayScale.Apply(this);
         SourceInitialized += (_, _) => WinApi.ClickThrough(new WindowInteropHelper(this).Handle);
     }
 

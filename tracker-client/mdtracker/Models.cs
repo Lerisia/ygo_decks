@@ -25,6 +25,8 @@ public sealed class Config
     public bool ResearchFeed { get; set; }
     /// Fetch a newer build in the background and swap it in between duels.
     public bool AutoUpdate { get; set; } = true;
+    /// Size of everything drawn over the game (1.0 = as designed).
+    public double OverlayScale { get; set; } = 1.0;
     /// Locally tracked ranked win gauge (the game only reports promotions/demotions at low ranks).
     public Gauge? Gauge { get; set; }
 }

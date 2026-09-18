@@ -397,6 +397,18 @@ const RecordGroupDetailPage = () => {
     return () => clearInterval(id);
   }, [isOwner]);
 
+  // Records the tracker saves while this page is open appear on their own. Paused while the tab is hidden
+  // or a record is being edited, so nothing shifts under the person's hands.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible" || editingMatch) return;
+      loadMatches();
+      loadLastMatch();
+    }, 15000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, memberFilter, editingMatch]);
+
   // Tracker capture → register form. A suggested deck not in the owned list is added to the options for this pick.
   const fillFromPending = (p: TrackerPendingMatch, oppDeckId?: number) => {
     const deckId = p.suggested_deck?.deck_id ?? null;

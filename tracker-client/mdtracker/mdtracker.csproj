@@ -19,7 +19,7 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.5.3</Version>
+    <Version>0.5.4</Version>
   </PropertyGroup>
 
   <!-- Compile time, shown in the window title so test builds can be told apart. -->

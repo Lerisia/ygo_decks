@@ -13,6 +13,7 @@ public partial class IdleWindow : Window
     public IdleWindow()
     {
         InitializeComponent();
+        OverlayScale.Apply(this);
         Loaded += (_, _) => Place();
     }
 

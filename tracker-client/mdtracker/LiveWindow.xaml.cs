@@ -18,6 +18,7 @@ public partial class LiveWindow : Window
     public LiveWindow()
     {
         InitializeComponent();
+        OverlayScale.Apply(this);
         Loaded += (_, _) => Place();
     }
 

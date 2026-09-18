@@ -82,7 +82,16 @@ public partial class MainWindow : Window
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
         LivePanelBox.IsChecked = T.Store.Config.LivePanel;
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
+        if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
+        int idx = Array.FindIndex(OverlayScale.Options, o => Math.Abs(o.scale - T.Store.Config.OverlayScale) < 0.01);
+        ScaleBox.SelectedIndex = idx < 0 ? 1 : idx;
         _settingAutoStart = false;
+    }
+
+    private void ScaleBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_settingAutoStart || ScaleBox.SelectedIndex < 0) return;
+        T.Store.Config.OverlayScale = OverlayScale.Options[ScaleBox.SelectedIndex].scale; T.Store.SaveConfig();
     }
 
     private void Alert_Changed(object sender, RoutedEventArgs e)

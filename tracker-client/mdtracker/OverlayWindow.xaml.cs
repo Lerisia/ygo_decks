@@ -24,6 +24,7 @@ public partial class OverlayWindow : Window
     public OverlayWindow(Tracker t, PendingMatch m)
     {
         InitializeComponent();
+        OverlayScale.Apply(this);
         _t = t; _m = m;
         _left = AutoSaveSeconds;
         Fill();
