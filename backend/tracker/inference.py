@@ -77,9 +77,10 @@ def card_names(card_ids):
         if c and c not in counts:
             order.append(c)
         counts[c] += 1
-    cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name")}
+    cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name", "frame_type")}
     out = []
     for c in order:
         card = cards.get(str(c))
-        out.append({"id": c, "name": (card.korean_name or card.name) if card else f"#{c}", "count": counts[c]})
+        out.append({"id": c, "name": (card.korean_name or card.name) if card else f"#{c}", "count": counts[c],
+                    "frame": (card.frame_type or "") if card else ""})
     return out

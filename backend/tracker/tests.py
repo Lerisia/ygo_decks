@@ -45,7 +45,7 @@ class TrackerInferTest(TestCase):
         self.assertAlmostEqual(my[0]["share"], 1.0)
         self.assertEqual(res.data["opp"]["candidates"][0]["name"], "레조네이터")
         self.assertEqual(res.data["opp"]["candidates"][0]["score"], 2.0)
-        self.assertEqual(res.data["my"]["cards"][0], {"id": 4007, "name": "Blue-Eyes White Dragon", "count": 3})
+        self.assertEqual(res.data["my"]["cards"][0], {"id": 4007, "name": "Blue-Eyes White Dragon", "count": 3, "frame": ""})
         self.assertEqual([c["id"] for c in res.data["opp"]["cards"]], [9015, 19014])
 
     def test_unknown_ids_and_empty(self):
@@ -105,7 +105,7 @@ class TrackerAliasTest(TestCase):
         self.assertEqual(cands[0]["name"], "푸른 눈")
         self.assertEqual(cands[0]["score"], 2.0)
         self.assertEqual(unknown, [3891])
-        self.assertEqual(card_names([3892, 4007]), [{"id": 4007, "name": "푸른 눈의 백룡", "count": 2}])
+        self.assertEqual(card_names([3892, 4007]), [{"id": 4007, "name": "푸른 눈의 백룡", "count": 2, "frame": ""}])
 
 
 class TrackerPendingTest(TestCase):
