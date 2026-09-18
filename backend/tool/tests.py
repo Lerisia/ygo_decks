@@ -327,6 +327,23 @@ class GetRecordGroupMatchesTest(TestCase):
         resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
         self.assertEqual(len(resp.json()["matches"]), 1)
 
+    def test_created_at_and_day_totals(self):
+        from django.utils import timezone
+        _create_match(self.group, self.deck, result="win")
+        _create_match(self.group, self.deck, result="win")
+        _create_match(self.group, self.deck, result="lose")
+        deleted = _create_match(self.group, self.deck, result="win")
+        deleted.is_deleted = True
+        deleted.save()
+
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/", {"page_size": 2})
+        data = resp.json()
+        self.assertEqual(len(data["matches"]), 2)
+        self.assertIn("created_at", data["matches"][0])
+        today = timezone.localdate().isoformat()
+        # the whole day is counted, not just the rows on this page
+        self.assertEqual(data["days"], {today: {"count": 3, "wins": 2}})
+
 
 class RecordGroupVisibilityTest(TestCase):
     def setUp(self):

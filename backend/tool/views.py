@@ -314,6 +314,23 @@ def get_user_statistics_full(request):
 
 from django.core.paginator import Paginator
 
+def _day_totals(matches, stamps):
+    """Games and wins per local day, for the days the given timestamps fall on. Counts the whole day
+    over the same filtered queryset, so a day split across two pages still shows its full tally."""
+    if not stamps:
+        return {}
+    days = {timezone.localtime(s).date() for s in stamps}
+    lo = timezone.make_aware(datetime.combine(min(days), datetime.min.time()))
+    hi = timezone.make_aware(datetime.combine(max(days) + timedelta(days=1), datetime.min.time()))
+    out = {d.isoformat(): {"count": 0, "wins": 0} for d in days}
+    for created, result in matches.filter(created_at__gte=lo, created_at__lt=hi).values_list("created_at", "result"):
+        key = timezone.localtime(created).date().isoformat()
+        if key in out:
+            out[key]["count"] += 1
+            out[key]["wins"] += result == "win"
+    return out
+
+
 @api_view(["GET"])
 def get_record_group_matches(request, record_group_id):
     record_group, err = _get_accessible_group(request, record_group_id)
@@ -376,12 +393,14 @@ def get_record_group_matches(request, record_group_id):
             "notes": match.notes,
             "opponent_deck_name": match.opponent_deck_name,
             "recorded_by": user_brief(match.recorded_by),
+            "created_at": match.created_at,
         }
         for match in current_page
     ]
 
     return Response({
         "matches": data,
+        "days": _day_totals(matches, [m.created_at for m in current_page]),
         "total_pages": paginator.num_pages,
         "record_group_name": record_group.name,
         "is_public": record_group.is_public,

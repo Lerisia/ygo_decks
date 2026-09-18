@@ -10,11 +10,31 @@ import SheetMembersPanel from "@/components/SheetMembersPanel";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
-import { getNextRankState, RANK_OPTIONS, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
+import { getNextRankState, RANK_OPTIONS, RANK_ORDER, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
 import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 import { matchesDeckQuery } from "@/utils/hangul";
 
 const isDark = () => document.documentElement.classList.contains("dark");
+
+const TIER_LABEL: Record<string, string> = { rookie: "루키", bronze: "브론즈", silver: "실버", gold: "골드", platinum: "플래티넘", diamond: "다이아", master: "마스터" };
+const tierOf = (rank: string) => rank.replace(/\d+$/, "");
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+// local calendar day, matching the server's day totals
+const localDayKey = (iso: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const dayLabel = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const thisYear = new Date().getFullYear() === y;
+  return `${thisYear ? "" : `${y}년 `}${m}월 ${d}일 (${WEEKDAY[date.getDay()]})`;
+};
+const timeLabel = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 const customSelectStyles = {
   control: (provided: any) => ({
@@ -80,7 +100,10 @@ type MatchRecord = {
   score: number | null;
   score_type: string | null;
   notes: string;
+  created_at: string;
 };
+
+type DayTotals = Record<string, { count: number; wins: number }>;
 
 type OptionType = {
   value: string;
@@ -296,6 +319,7 @@ const RecordGroupDetailPage = () => {
   const { recordGroupId } = useParams();
   const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [days, setDays] = useState<DayTotals>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -450,6 +474,7 @@ const RecordGroupDetailPage = () => {
     try {
       const response = await getRecordGroupMatches(Number(recordGroupId), page, pageSize, memberFilter)
       setMatches(response.matches);
+      setDays(response.days ?? {});
       setTotalPages(response.total_pages);
       setRecordGroupName(response.record_group_name);
       setIsPublic(response.is_public);
@@ -665,34 +690,6 @@ const RecordGroupDetailPage = () => {
     }
   }, [winOptions, newMatch.wins, newMatch.rank, useRankOrScore]);
 
-  const getMobileRankOrScoreDisplay = (
-    rank: string | null,
-    wins: number | null,
-    score: number | null
-  ): string | null => {
-    if (rank) {
-      const match = rank.match(/^([a-z]+)(\d)$/);
-      if (!match) return rank;
-  
-      const tierMap: Record<string, string> = {
-        rookie: "루", bronze: "브", silver: "실",
-        gold: "골", platinum: "플", diamond: "다", master: "마",
-      };
-  
-      const tier = tierMap[match[1]];
-      const level = match[2];
-  
-      const short = tier ? `${tier}${level}` : rank;
-      return wins !== null ? `${short}·${wins}` : short;
-    }
-  
-    if (score !== null) {
-      return `${score}`;
-    }
-  
-    return null;
-  };
-  
   const getRankOrScoreDisplay = (
     rank: string | null,
     wins: number | null,
@@ -700,7 +697,7 @@ const RecordGroupDetailPage = () => {
   ): string | null => {
     if (rank) {
       const label = RANK_OPTIONS.find((r) => r.value === rank)?.label || rank;
-      return wins !== null ? `${label} / ${wins}승` : label;
+      return wins !== null ? `${label} · ${wins}승` : label;
     }
   
     if (score !== null) {
@@ -1031,11 +1028,11 @@ const RecordGroupDetailPage = () => {
         </div>}
       </div>}
 
-      <div className="flex justify-end gap-4 mb-4">
+      <div className="flex justify-end mb-2">
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
-          className="p-2 border rounded bg-white dark:bg-gray-800 text-black dark:text-white"
+          className="px-2 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300"
         >
           <option value="10">10개씩 보기</option>
           <option value="20">20개씩 보기</option>
@@ -1043,109 +1040,128 @@ const RecordGroupDetailPage = () => {
         </select>
       </div>
 
-      <div className="mt-4 space-y-2">
-        {matches.map((match) => {
+      <div className="border-t border-gray-200 dark:border-gray-700 tabular-nums">
+        {matches.map((match, i) => {
           const isWin = match.result === "win";
-          const borderColor = isWin ? "border-l-blue-500" : "border-l-red-400";
-          const resultBg = isWin ? "bg-blue-50 dark:bg-blue-950" : "bg-red-50 dark:bg-red-950";
-          let coinImg = null;
-          if (match.coin_toss_result === "win") {
-            coinImg = "/images/coin_front.png";
-          } else if (match.coin_toss_result === "lose") {
-            coinImg = "/images/coin_back.png";
-          }
+          const dayKey = localDayKey(match.created_at);
+          const older = matches[i + 1];
+          const showDay = i === 0 || localDayKey(matches[i - 1].created_at) !== dayKey;
+          const tally = days[dayKey];
+          // rank climbed since the previous record of the same day → ↑, and a tier change gets its own line
+          const prevRank = older && localDayKey(older.created_at) === dayKey ? older.rank : null;
+          const climbed = isWin && !!match.rank && !!prevRank && RANK_ORDER.indexOf(match.rank) > RANK_ORDER.indexOf(prevRank);
+          const promoted = climbed && tierOf(match.rank!) !== tierOf(prevRank!);
+          const oppName = match.opponent_deck?.name ?? match.opponent_deck_name ?? "모름/기타";
 
           return (
-            <div
-              key={match.id}
-              className={`rounded-lg border border-gray-200 dark:border-gray-700 border-l-4 ${borderColor} ${resultBg} overflow-hidden`}
-            >
-              {sheetKind === "shared" && match.recorded_by && (
-                <div className="flex items-center gap-1.5 px-2 pt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {match.recorded_by.icon ? (
-                    <img
-                      src={match.recorded_by.icon}
-                      alt=""
-                      className={`w-5 h-5 rounded-full object-cover ${match.recorded_by.border ? "ring-2 ring-blue-400" : ""}`}
-                    />
-                  ) : (
-                    <span className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
-                  )}
-                  <span>{match.recorded_by.username}</span>
+            <div key={match.id}>
+              {showDay && (
+                <div className="flex items-baseline gap-2 pt-4 pb-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">{dayLabel(dayKey)}</span>
+                  {tally && <span className="ml-auto">{tally.count}전 {tally.wins}승 {tally.count - tally.wins}패</span>}
                 </div>
               )}
-              <div className="flex items-center justify-between p-2 sm:p-3">
-                <div className="w-12 sm:w-16 flex justify-center flex-shrink-0">
-                  {coinImg && (
-                    <img src={coinImg} alt="코인토스" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
-                  )}
+              <div
+                className={`group relative grid items-center gap-x-2 sm:gap-x-2.5 px-2 pr-1 border-l-[3px] mb-px
+                  grid-cols-[1fr_auto_28px] sm:grid-cols-[1fr_96px_28px_44px_48px] py-2 sm:py-0 sm:min-h-[58px]
+                  ${isWin ? "border-l-blue-500 bg-blue-50/70 dark:bg-blue-950/40" : "border-l-red-400 bg-red-50/80 dark:bg-red-950/30"}`}
+              >
+                <div className="flex items-center gap-2 min-w-0 col-span-2 sm:col-span-1">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {match.deck.cover_image_small ? (
+                      <img src={match.deck.cover_image_small} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded bg-gray-200 dark:bg-gray-700 shrink-0" />
+                    )}
+                    <span className="truncate text-[15px] font-medium">{match.deck.name}</span>
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0">vs</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <img src={match.opponent_deck?.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
+                    <span className="truncate text-[15px]">{oppName}</span>
+                  </div>
                 </div>
 
-                <div className="w-16 sm:w-32 flex flex-col items-center flex-shrink-0">
-                  {match.deck.cover_image_small ? (
-                    <img src={match.deck.cover_image_small} alt={match.deck.name} className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 sm:w-16 sm:h-16 rounded bg-gray-200 dark:bg-gray-700" />
+                <div className="flex sm:flex-col gap-x-2 gap-y-0.5 text-[13px] leading-tight text-gray-500 dark:text-gray-400 row-start-2 sm:row-start-auto">
+                  {sheetKind === "shared" && match.recorded_by && (
+                    <span className="flex items-center gap-1 sm:hidden">
+                      {match.recorded_by.icon ? (
+                        <img src={match.recorded_by.icon} alt="" className={`w-4 h-4 rounded-full object-cover ${match.recorded_by.border ? "ring-2 ring-blue-400" : ""}`} />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600" />
+                      )}
+                      {match.recorded_by.username}
+                    </span>
                   )}
-                  <p className="text-xs sm:text-sm mt-1 text-center break-keep">{match.deck.name}</p>
-                </div>
-
-                <div className="flex-1 px-1 text-center">
-                  <span className={`inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full ${
-                    isWin ? "bg-blue-500 text-white" : "bg-red-400 text-white"
-                  }`}>
-                    {isWin ? "WIN" : "LOSE"}
-                  </span>
-                  <p className="text-sm sm:text-base mt-1">
+                  <span className={match.first_or_second === "first" ? "font-semibold text-gray-900 dark:text-gray-100" : "font-medium"}>
                     {match.first_or_second === "first" ? "선공" : "후공"}
-                  </p>
-                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-                    <span className="hidden sm:inline">
-                      {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
-                    </span>
-                    <span className="inline sm:hidden">
-                      {getMobileRankOrScoreDisplay(match.rank, match.wins, match.score)}
-                    </span>
-                  </p>
+                  </span>
+                  <span>
+                    {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
+                    {climbed && <span className="ml-1 font-semibold text-green-700 dark:text-green-400">↑</span>}
+                  </span>
                 </div>
 
-                <div className="w-16 sm:w-32 flex flex-col items-center flex-shrink-0">
-                  <img
-                    src={match.opponent_deck?.cover_image_small || UNKNOWN_DECK_IMAGE}
-                    alt={match.opponent_deck?.name ?? match.opponent_deck_name ?? "모름/기타"}
-                    className="w-10 h-10 sm:w-16 sm:h-16 rounded object-cover"
-                  />
-                  <p className="text-xs sm:text-sm mt-1 text-center break-keep">
-                    {match.opponent_deck?.name ?? match.opponent_deck_name ?? "모름/기타"}
-                  </p>
+                <div className="flex justify-center row-start-1 col-start-3 sm:row-start-auto sm:col-start-auto">
+                  {match.coin_toss_result && (
+                    <img
+                      src={match.coin_toss_result === "win" ? "/images/coin_front.png" : "/images/coin_back.png"}
+                      alt={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
+                      title={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
+                      className="w-6 h-6 object-contain"
+                    />
+                  )}
                 </div>
 
-                <div className="w-12 sm:w-16 flex flex-col items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => setEditingMatch(match)}
-                    className="px-2 py-1 text-xs sm:text-sm bg-green-500 text-white rounded hover:bg-green-600 w-full"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => { if (confirm("이 기록을 삭제할까요?")) handleDelete(match.id); }}
-                    className="px-2 py-1 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600 w-full"
-                  >
-                    삭제
-                  </button>
+                <div className="text-xs text-gray-400 dark:text-gray-500 text-right row-start-2 col-start-2 sm:row-start-auto sm:col-start-auto">
+                  {timeLabel(match.created_at)}
                 </div>
+
+                <div className="flex justify-end gap-0.5 row-start-2 col-start-3 sm:row-start-auto sm:col-start-auto opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
+                  {canWrite && (
+                    <>
+                      <button onClick={() => setEditingMatch(match)} title="수정" aria-label="수정"
+                        className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white">
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                      </button>
+                      <button onClick={() => { if (confirm("이 기록을 삭제할까요?")) handleDelete(match.id); }} title="삭제" aria-label="삭제"
+                        className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600">
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {sheetKind === "shared" && match.recorded_by && (
+                  <div className="hidden sm:flex absolute right-[132px] top-1 items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 pointer-events-none">
+                    {match.recorded_by.icon ? (
+                      <img src={match.recorded_by.icon} alt="" className={`w-3.5 h-3.5 rounded-full object-cover ${match.recorded_by.border ? "ring-1 ring-blue-400" : ""}`} />
+                    ) : (
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-300 dark:bg-gray-600" />
+                    )}
+                    {match.recorded_by.username}
+                  </div>
+                )}
+
+                {match.notes && (
+                  <div className="col-span-full text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words pb-1.5 sm:pb-2 sm:-mt-2">
+                    {match.notes}
+                  </div>
+                )}
               </div>
-
-              {match.notes && (
-                <div className="px-4 pb-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-                  {match.notes}
+              {promoted && (
+                <div className="flex items-center gap-2 pl-3 py-1 text-[11px] font-medium text-green-700 dark:text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  {TIER_LABEL[tierOf(match.rank!)] ?? match.rank} 승급
                 </div>
               )}
             </div>
           );
         })}
+        {matches.length === 0 && (
+          <p className="py-10 text-center text-sm text-gray-400">아직 기록이 없습니다.</p>
+        )}
       </div>
-
 
       <div className="flex justify-center mt-4 gap-2">
         <button
