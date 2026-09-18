@@ -448,6 +448,20 @@ class TrackerStatsTest(TestCase):
         self.assertEqual((only["games"], only["wins"]), (1, 0))
         self.assertEqual(len(only["decks"]), 2)   # the deck list stays complete so the picker keeps every option
 
+    def test_today_skips_games_captured_while_paused(self):
+        from django.utils import timezone
+        from tracker.models import TrackerGame
+        now = timezone.now()
+        TrackerGame.objects.create(user=self.user, did="1", game_mode=3, result="win", turn=1, ended_at=now)
+        TrackerGame.objects.create(user=self.user, did="2", game_mode=3, result="lose", turn=1, ended_at=now, hidden=True)
+        body = self.client.get("/api/tracker/today/").json()
+        self.assertEqual((body["games"], body["wins"]), (1, 1))
+
+    def test_paused_upload_is_archived_but_hidden(self):
+        from tracker.models import TrackerGame
+        self.client.post("/api/tracker/games/", {"did": "7709189150700000001", "game_mode": 3, "result": "win", "paused": True}, format="json")
+        self.assertTrue(TrackerGame.objects.get(did="7709189150700000001").hidden)
+
     def test_today_empty(self):
         body = self.client.get("/api/tracker/today/").json()
         self.assertEqual(body["games"], 0)

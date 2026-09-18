@@ -2,8 +2,10 @@ from django.urls import path
 from .views import export_cards_csv, get_quiz_card, predict_card_api, classify_deck_image, search_cards_by_name
 from .quiz_views import quiz_next_card, quiz_check_answer, quiz_submit_score, quiz_leaderboard
 from .effect_tag_admin_views import effect_tags_list, effect_tag_update
+from .thumb_views import card_thumb
 
 urlpatterns = [
+    path("card-thumb/<int:konami_id>/", card_thumb, name="card_thumb"),
     path("get_csv/", export_cards_csv, name="export_cards_csv"),
     path("mosaic-quiz/", get_quiz_card, name="get_mosaic-quiz"),
     path("predict-card/", predict_card_api, name="predict_card_api"),

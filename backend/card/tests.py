@@ -340,3 +340,26 @@ class QuizAllTimeBestBackfillTest(TestCase):
         # OneToOne — second insert must fail.
         with self.assertRaises(Exception):
             QuizAllTimeBest.objects.create(user=u, score=10, streak=1, achieved_at=timezone.now())
+
+
+class CardThumbTests(TestCase):
+    """Tracker overlay thumbnails: cut once from the illustration, then served from media."""
+
+    def test_thumb_is_generated_and_redirected(self):
+        from io import BytesIO
+        from PIL import Image
+        from card.models import Card, CardIdAlias
+        with tempfile.TemporaryDirectory() as media:
+            with override_settings(MEDIA_ROOT=media):
+                buf = BytesIO(); Image.new("RGB", (120, 80), (200, 30, 30)).save(buf, "JPEG")
+                card = Card.objects.create(card_id="c1", konami_id="4041", name="Dark Magician",
+                                           card_illust=SimpleUploadedFile("4041.jpg", buf.getvalue(), content_type="image/jpeg"))
+                CardIdAlias.objects.create(md_id=23487, card=card)
+                res = self.client.get("/api/card-thumb/4041/")
+                self.assertEqual(res.status_code, 302)
+                self.assertTrue(res["Location"].endswith("/card_thumbs/4041_48.jpg"))
+                out = os.path.join(media, "card_thumbs", "4041_48.jpg")
+                self.assertEqual(Image.open(out).size, (48, 48))
+                # an alt-art id resolves to the same base card
+                self.assertEqual(self.client.get("/api/card-thumb/23487/")["Location"], res["Location"])
+                self.assertEqual(self.client.get("/api/card-thumb/999999/").status_code, 404)

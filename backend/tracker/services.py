@@ -119,6 +119,7 @@ def upsert_game(user, data, legacy_turn=False):
         "my_cards": my_cards,
         "opp_cards": opp_cards,
         "turn_times": _turn_times(data.get("turn_times")),
+        "hidden": bool(data.get("paused")),
         "started_at": _dt(data.get("started_at")),
         "ended_at": _dt(data.get("ended_at")),
     }

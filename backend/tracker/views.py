@@ -173,7 +173,7 @@ def today(request):
     from .models import TrackerDeckMap
 
     start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
-    games = list(TrackerGame.objects.filter(user=request.user, ended_at__gte=start).select_related("match__deck").order_by("ended_at"))
+    games = list(TrackerGame.objects.filter(user=request.user, ended_at__gte=start, hidden=False).select_related("match__deck").order_by("ended_at"))
 
     # Which site deck each game was: the saved record's deck, else what the user said that MD deck is.
     mapped = {m.md_deck_id: m.deck for m in TrackerDeckMap.objects.filter(user=request.user).select_related("deck")}
