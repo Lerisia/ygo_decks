@@ -154,8 +154,8 @@ public sealed class Tracker
         if (r == null) return null;
         // two lines: the deck overall, then this matchup
         var lines = new List<string>();
-        if (r.Total is { Games: > 0 } t) lines.Add($"{r.Deck} {t.Wins}승 {t.Games - t.Wins}패");
-        if (r.Matchup is { Games: > 0 } m) lines.Add($"vs {r.Opponent} {m.Wins}승 {m.Games - m.Wins}패");
+        if (r.Total is { Games: > 0 } t) lines.Add($"{r.Deck} {t.Games}전 {t.Wins}승 {t.Games - t.Wins}패");
+        if (r.Matchup is { Games: > 0 } m) lines.Add($"vs {r.Opponent} 승률 {Math.Round(m.Wins * 100.0 / m.Games)}%");
         else if (r.Opponent != null && lines.Count > 0) lines.Add($"vs {r.Opponent} 첫 대결");
         return lines.Count == 0 ? null : string.Join("\n", lines);
     }

@@ -18,8 +18,12 @@ public partial class DeckPopupWindow : Window
         SourceInitialized += (_, _) => WinApi.ClickThrough(new WindowInteropHelper(this).Handle);
     }
 
+    private string _placedFor = "";
+
     public void Update(string title, List<(string text, int count, bool header)> rows)
     {
+        // anchor once per zone: the pop-up stays put while the cursor wanders inside the same zone
+        if (title != _placedFor) { _placedFor = title; Dispatcher.BeginInvoke(Place, System.Windows.Threading.DispatcherPriority.Loaded); }
         var key = title + "|" + string.Join("|", rows.Select(r => $"{r.text}:{r.count}"));
         if (key != _key)
         {
@@ -44,7 +48,6 @@ public partial class DeckPopupWindow : Window
             }
             if (rows.Count == 0) Rows.Children.Add(new TextBlock { Text = "아직 알려진 카드 없음", Foreground = Muted });
         }
-        Place();
     }
 
     /// Left of the cursor, vertically centred on it, kept on screen.

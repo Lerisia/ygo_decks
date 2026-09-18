@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.5.2";
+    public const string Version = "0.5.3";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -243,8 +243,11 @@ public partial class App : System.Windows.Application
     {
         try
         {
+            // "in front" counts our own windows so dragging the card does not hide it — but the tracker's main window
+            // being active means the person is looking at the tracker, not the game.
             bool show = Tracker.GameConnected && Tracker.Live == null && _overlay == null
-                        && Tracker.Store.Config.LivePanel && Tracker.Store.Config.Token != null && WinApi.GameInFront();
+                        && Tracker.Store.Config.LivePanel && Tracker.Store.Config.Token != null
+                        && WinApi.GameInFront() && !(MainWin?.IsActive ?? false);
             if (!show) { if (_idle != null) { try { _idle.Close(); } catch { } _idle = null; } return; }
             if (_idle == null) { _idle = new IdleWindow(); _idle.Show(); _idle.Update(_today); }
             if (!_todayBusy && DateTime.Now - _todayAt > TimeSpan.FromSeconds(60))
