@@ -1,0 +1,15 @@
+<Window x:Class="MdTracker.IdleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        FontFamily="Segoe UI, Malgun Gothic" FontSize="12" Foreground="White">
+    <!-- between duels: today's record, top centre of the game window -->
+    <Border Background="#D9111827" CornerRadius="10" Padding="14,6" MouseDown="Panel_MouseDown">
+        <StackPanel>
+            <TextBlock x:Name="Line1" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Line2" Foreground="#CBD5E1" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+            <TextBlock x:Name="Line3" Foreground="#93C5FD" HorizontalAlignment="Center" Margin="0,2,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+    </Border>
+</Window>

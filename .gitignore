@@ -84,3 +84,4 @@ tracker-client/**/bin/
 tracker-client/**/obj/
 tracker-client/**/publish/
 tracker-client/**/publish-linux/
+tracker-client/mdtracker/snapshot.key

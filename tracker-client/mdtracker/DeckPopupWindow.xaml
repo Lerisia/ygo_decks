@@ -1,0 +1,13 @@
+<Window x:Class="MdTracker.DeckPopupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        IsHitTestVisible="False" FontFamily="Segoe UI, Malgun Gothic" FontSize="12" Foreground="White">
+    <Border Background="#E6111827" CornerRadius="10" Padding="12,8" Width="380">
+        <StackPanel>
+            <TextBlock x:Name="Title" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <WrapPanel x:Name="Rows"/>
+        </StackPanel>
+    </Border>
+</Window>

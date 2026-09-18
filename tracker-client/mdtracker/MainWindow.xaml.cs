@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = $"YGO Decks 트래커 {App.Version}";
+        Title = $"YGO Decks 트래커 {App.Version}  ·  빌드 {BuildStamp()}";
         T.StatusChanged += _ => Dispatcher.BeginInvoke(RefreshStatus);
         T.MatchesChanged += () => Dispatcher.BeginInvoke(() => { RefreshRecent(); RefreshToday(); });
         Loaded += (_, _) => { RefreshAll(); if (T.Store.Config.Token != null) LoadGroups(); CheckVersion(); };
@@ -23,28 +23,45 @@ public partial class MainWindow : Window
 
     private string _updateUrl = "https://ygodecks.com/media/tracker/mdtracker.exe";
 
+    /// When this exe was compiled — tells test builds apart at a glance.
+    private static string BuildStamp()
+    {
+        try
+        {
+            return typeof(App).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+                .OfType<System.Reflection.AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == "BuildStamp")?.Value ?? "?";
+        }
+        catch { return "?"; }
+    }
+
     /// Compare this build against the server's current one and show the update banner if behind.
+    /// The actual download/swap is App's job; the banner mirrors its state.
     private async void CheckVersion()
     {
-        var info = await Task.Run(() => T.Api.LatestVersion());
-        if (info == null || string.IsNullOrEmpty(info.Latest)) return;
-        static int[] P(string v) => v.Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
-        var mine = P(App.Version); var theirs = P(info.Latest);
-        bool behind = false;
-        for (int i = 0; i < Math.Max(mine.Length, theirs.Length); i++)
+        var app = (App)System.Windows.Application.Current;
+        app.UpdateStateChanged += () => Dispatcher.BeginInvoke(() =>
         {
-            int a = i < mine.Length ? mine[i] : 0, b = i < theirs.Length ? theirs[i] : 0;
-            if (a != b) { behind = a < b; break; }
-        }
-        if (!behind) return;
+            if (app.UpdateState.Length > 0) { UpdateText.Text = app.UpdateState; UpdateBanner.Visibility = Visibility.Visible; }
+        });
+        var info = await Task.Run(() => T.Api.LatestVersion());
+        if (info == null || string.IsNullOrEmpty(info.Latest) || !App.Behind(info.Latest)) return;
         if (!string.IsNullOrEmpty(info.Url)) _updateUrl = info.Url;
-        UpdateText.Text = $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version}) 받아서 교체해 주세요.";
+        UpdateText.Text = T.Store.Config.AutoUpdate
+            ? $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version}) 곧 자동으로 업데이트됩니다."
+            : $"새 버전 {info.Latest}이 나왔습니다. (현재 {App.Version})";
         UpdateBanner.Visibility = Visibility.Visible;
     }
 
     private void Update_Click(object sender, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true }); } catch { }
+        UpdateBtn.IsEnabled = false;
+        ((App)System.Windows.Application.Current).UpdateNow();
+    }
+
+    private void AutoUpdate_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_settingAutoStart) return;
+        T.Store.Config.AutoUpdate = AutoUpdateBox.IsChecked == true; T.Store.SaveConfig();
     }
 
     private void RefreshAll() { RefreshStatus(); RefreshPanels(); RefreshRecent(); RefreshToday(); }
@@ -72,7 +89,16 @@ public partial class MainWindow : Window
         _settingAutoStart = true;
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
         LivePanelBox.IsChecked = T.Store.Config.LivePanel;
+        AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
+        AutoUpdateBox.IsChecked = T.Store.Config.AutoUpdate;
         _settingAutoStart = false;
+    }
+
+    private void Alert_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_settingAutoStart) return;
+        T.Store.Config.AlertMyTurn = AlertBox.IsChecked == true; T.Store.SaveConfig();
+        if (T.Store.Config.AlertMyTurn) Tracker.Chime();   // preview the sound
     }
 
     private bool _settingAutoStart;
@@ -95,6 +121,7 @@ public partial class MainWindow : Window
     {
         RecentList.ItemsSource = T.Store.Recent().Where(m => m.Status != "discarded").Select(m => new
         {
+            Did = m.Did,
             Time = DateTime.TryParse(m.EndedAt, out var t) ? t.ToString("MM-dd HH:mm") : "",
             Opp = m.OppName,
             Result = m.Result == "win" ? "승" : m.Result == "lose" ? "패" : m.Result,
@@ -108,18 +135,38 @@ public partial class MainWindow : Window
         }).ToList();
     }
 
-    /// Today's record, straight from the server so it follows the account across PCs.
+    private int? _todayDeck;
+    private bool _settingTodayDeck;
+    private static readonly TodayDeck AllDecks = new() { Id = 0, Name = "전체" };
+
+    private void TodayDeckBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_settingTodayDeck || TodayDeckBox.SelectedItem is not TodayDeck d) return;
+        _todayDeck = d.Id == 0 ? null : d.Id;
+        RefreshToday();
+    }
+
+    /// Today's record, straight from the server so it follows the account across PCs. The deck picker lists
+    /// every deck played today (the server keeps that list complete even when one deck is selected).
     private async void RefreshToday()
     {
         if (T.Store.Config.Token == null) { TodayPanel.Visibility = Visibility.Collapsed; return; }
-        var t = await Task.Run(() => { try { return T.Api.Today(); } catch { return null; } });
+        var deck = _todayDeck;
+        var t = await Task.Run(() => { try { return T.Api.Today(deck); } catch { return null; } });
         TodayPanel.Visibility = Visibility.Visible;
         if (t == null) { TodayText.Text = "불러오지 못했습니다."; return; }
+        _settingTodayDeck = true;
+        var options = new List<TodayDeck> { AllDecks };
+        options.AddRange(t.Decks);
+        TodayDeckBox.ItemsSource = options;
+        TodayDeckBox.SelectedItem = options.FirstOrDefault(o => (o.Id == 0 ? null : (int?)o.Id) == deck) ?? AllDecks;
+        TodayDeckBox.Visibility = Visibility.Visible;   // always there, so nobody wonders where the deck filter went
+        _settingTodayDeck = false;
         if (t.Games == 0) { TodayText.Text = "오늘 기록된 게임이 없습니다."; return; }
-        var parts = new List<string> { $"{t.Games}전 {t.Wins}승 {t.Losses}패 ({t.WinRate}%)" };
+        var parts = new List<string> { $"{t.Games}전 {t.Wins}승 {t.Losses}패", $"승률 {t.WinRate}%" };
         if (t.CoinWinRate != null) parts.Add($"코인 {t.CoinWinRate}%");
-        if (t.First is { Games: > 0 } f) parts.Add($"선공 {f.Wins}/{f.Games}");
-        if (t.Second is { Games: > 0 } s) parts.Add($"후공 {s.Wins}/{s.Games}");
+        if (t.First is { Games: > 0 } f) parts.Add($"선공 승률 {Math.Round((double)f.Wins * 100 / f.Games)}%");
+        if (t.Second is { Games: > 0 } s) parts.Add($"후공 승률 {Math.Round((double)s.Wins * 100 / s.Games)}%");
         if (t.AvgTurns != null) parts.Add($"평균 {t.AvgTurns}턴");
         var line = string.Join("   ·   ", parts);
         if (t.Rank?.From != null) line += $"\n랭크 {OverlayWindow.RankLabel(t.Rank.From)} → {OverlayWindow.RankLabel(t.Rank.To)}";
@@ -128,6 +175,17 @@ public partial class MainWindow : Window
     }
 
     private string? DeckName(int? id) => id == null ? null : T.Store.Decks.FirstOrDefault(d => d.Id == id)?.Name;
+
+    /// Saved game → edit dialog (synced to the site); anything else → the confirmation card again.
+    private void RecentList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        var did = RecentList.SelectedItem?.GetType().GetProperty("Did")?.GetValue(RecentList.SelectedItem) as string;
+        if (did == null) return;
+        var m = T.Store.Recent().FirstOrDefault(x => x.Did == did);
+        if (m == null) return;
+        if (m.Status == "saved" && m.MatchId != null) new EditWindow(T, m) { Owner = this }.ShowDialog();
+        else new OverlayWindow(T, m).Show();
+    }
 
     // ---- login ----
     private void PwBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) LoginBtn_Click(sender, e); }

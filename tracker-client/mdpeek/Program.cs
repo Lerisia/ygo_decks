@@ -79,6 +79,30 @@ try
             Watch(g, outdir);
             return 0;
         }
+        case "time":
+        {
+            // Duel clock probe: one line whenever the engine's TimeLeft/TimeTotal/inputGuard, turn, or LP changes.
+            var g = new Game(mem);
+            string last = "";
+            Console.WriteLine("time  step turn which guard timeLeft timeTotal LP | uiInput uiDuel uiTurn");
+            while (true)
+            {
+                try
+                {
+                    var d = g.ReadDuel();
+                    var ui = g.DuelTimerUi();
+                    var hv = g.Hover();
+                    var line = d == null ? "(no duel client)"
+                        : $"{d.Step,4} {d.Turn,4} {d.WhichTurn,5} {(d.InputGuard ? 1 : 0),5} {d.TimeLeft,8} {d.TimeTotal,9} {string.Join("/", d.LP)} | "
+                          + (ui == null ? "(no timer)" : $"{(ui.Value.input ? 1 : 0)} {(int)ui.Value.duel} {(int)ui.Value.turn}")
+                          + (hv == null ? " | hover -" : $" | hover p{hv.Value.player} pos{hv.Value.position} i{hv.Value.index}")
+                          + $" | eff {d.RunningEffect}/{d.CurrentRunEffect}";
+                    if (line != last) { Console.WriteLine($"{DateTime.Now:HH:mm:ss.f} {line}"); last = line; }
+                }
+                catch (Exception ex) { if (mem.Proc.HasExited) { Console.WriteLine("game exited"); return 0; } Console.WriteLine("read error: " + ex.Message); }
+                Thread.Sleep(250);
+            }
+        }
         case "classes":
         {
             var il = new Il2Cpp(mem);

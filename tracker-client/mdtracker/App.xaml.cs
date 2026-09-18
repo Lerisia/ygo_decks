@@ -7,11 +7,29 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.5.0";
+    public const string Version = "0.5.1";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
     private LiveWindow? _live;
+    private DeckPopupWindow? _deckPopup;
+    private IdleWindow? _idle;
+    private readonly System.Windows.Threading.DispatcherTimer _idleTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private TodayResponse? _today; private DateTime _todayAt; private bool _todayBusy;
+    private static Mutex? s_single;
+
+    /// Two copies (even different versions) would each save the same duel; only the first one lives.
+    private static bool AnotherInstanceRunning()
+    {
+        s_single = new Mutex(true, @"Local\YGODecksTracker", out bool first);
+        if (!first) return true;
+        try
+        {
+            int me = Environment.ProcessId;
+            return System.Diagnostics.Process.GetProcessesByName("mdtracker").Any(p => p.Id != me);
+        }
+        catch { return false; }
+    }
     private WinForms.NotifyIcon? _tray;
     private bool _balloonShown;
 
@@ -31,6 +49,14 @@ public partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        Updater.WaitForPredecessor(e.Args);
+        if (AnotherInstanceRunning())
+        {
+            if (!e.Args.Contains(AutoStart.MinimizedArg))
+                System.Windows.MessageBox.Show("트래커가 이미 실행 중입니다. 트레이 아이콘을 확인하세요.\n(두 개를 켜면 같은 게임이 두 번 기록됩니다)", "YGO Decks 트래커", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
         AppDomain.CurrentDomain.UnhandledException += (_, a) => ReportCrash(a.ExceptionObject);
         DispatcherUnhandledException += (_, a) => { ReportCrash(a.Exception); a.Handled = true; };
         TaskScheduler.UnobservedTaskException += (_, a) => { ReportCrash(a.Exception); a.SetObserved(); };
@@ -40,6 +66,9 @@ public partial class App : System.Windows.Application
         Tracker.MatchCaptured += m => Dispatcher.BeginInvoke(() => OnMatchCaptured(m));
         Tracker.LiveUpdated += () => Dispatcher.BeginInvoke(OnLiveUpdated);
         Tracker.LiveEnded += () => Dispatcher.BeginInvoke(CloseLive);
+        Tracker.MatchesChanged += () => _todayAt = default;   // a finished game refreshes the idle card at once
+        _idleTimer.Tick += (_, _) => IdleTick();
+        _idleTimer.Start();
 
         _tray = new WinForms.NotifyIcon { Icon = MakeIcon(), Text = "YGO Decks 트래커", Visible = true };
         var menu = new WinForms.ContextMenuStrip();
@@ -53,6 +82,10 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains(AutoStart.MinimizedArg)) HideToTray();
         else MainWin.Show();
         Tracker.Start();
+        new Thread(Updater.Cleanup) { IsBackground = true }.Start();
+        if (e.Args.Contains(Updater.UpdatedArg)) _tray?.ShowBalloonTip(5000, "YGO Decks 트래커", $"{Version}(으)로 업데이트했습니다.", WinForms.ToolTipIcon.Info);
+        _startArgs = e.Args;
+        new Thread(AutoUpdateLoop) { IsBackground = true, Name = "update" }.Start();
 
         if (e.Args.Contains("--demo"))
             new Thread(() => { Thread.Sleep(2500); Tracker.DemoMatch(); }) { IsBackground = true }.Start();
@@ -104,6 +137,14 @@ public partial class App : System.Windows.Application
                 w.Show();
             }
             _live.Update(s);
+            // pop-up beside the cursor for the zone it rests on (my deck, an opponent's set card, their piles)
+            var hover = WinApi.GameInFront() ? _live.HoverRows(s) : null;
+            if (hover != null)
+            {
+                if (_deckPopup == null) { _deckPopup = new DeckPopupWindow(); _deckPopup.Show(); }
+                _deckPopup.Update(hover.Value.title, hover.Value.rows);
+            }
+            else if (_deckPopup != null) { try { _deckPopup.Close(); } catch { } _deckPopup = null; }
         }
         catch (Exception ex) { Log.Info("live panel: " + ex.Message); }
     }
@@ -112,6 +153,107 @@ public partial class App : System.Windows.Application
     {
         try { _live?.Close(); } catch { }
         _live = null;
+        try { _deckPopup?.Close(); } catch { }
+        _deckPopup = null;
+    }
+
+    // ---- self-update ----
+    private string[] _startArgs = Array.Empty<string>();
+    internal string UpdateState { get; private set; } = "";   // shown in the main window banner
+    internal event Action? UpdateStateChanged;
+    private bool _updateStaged;
+
+    private void SetUpdateState(string s) { UpdateState = s; UpdateStateChanged?.Invoke(); }
+
+    /// Check on start and every 30 minutes; download in the background; swap in as soon as no duel is running.
+    private void AutoUpdateLoop()
+    {
+        Thread.Sleep(8000);
+        while (true)
+        {
+            try
+            {
+                if (Tracker.Store.Config.AutoUpdate && !_updateStaged)
+                {
+                    var info = Tracker.Api.LatestVersion();
+                    if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url))
+                    {
+                        SetUpdateState($"새 버전 {info.Latest} 내려받는 중…");
+                        var staged = Updater.Download(info.Url, p => SetUpdateState($"새 버전 {info.Latest} 내려받는 중… {p}"));
+                        if (staged != null) { _updateStaged = true; SetUpdateState($"새 버전 {info.Latest} 준비됨 — 듀얼이 끝나면 자동으로 재시작합니다"); }
+                        else SetUpdateState("");
+                    }
+                }
+                if (_updateStaged && Tracker.Live == null && _overlay == null) { Dispatcher.Invoke(RestartForUpdate); return; }
+            }
+            catch (Exception ex) { Log.Info("auto-update: " + ex.Message); }
+            Thread.Sleep(_updateStaged ? 5000 : 30 * 60 * 1000);
+        }
+    }
+
+    internal static bool Behind(string latest)
+    {
+        static int[] P(string v) => v.Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
+        var mine = P(Version); var theirs = P(latest);
+        for (int i = 0; i < Math.Max(mine.Length, theirs.Length); i++)
+        {
+            int a = i < mine.Length ? mine[i] : 0, b = i < theirs.Length ? theirs[i] : 0;
+            if (a != b) return a < b;
+        }
+        return false;
+    }
+
+    /// Manual path from the banner button: download now (if not yet), then swap and relaunch right away.
+    internal void UpdateNow()
+    {
+        new Thread(() =>
+        {
+            try
+            {
+                if (!_updateStaged)
+                {
+                    var info = Tracker.Api.LatestVersion();
+                    if (info == null || string.IsNullOrEmpty(info.Url)) { SetUpdateState("버전 정보를 가져오지 못했습니다"); return; }
+                    SetUpdateState($"새 버전 {info.Latest} 내려받는 중…");
+                    if (Updater.Download(info.Url, p => SetUpdateState($"새 버전 {info.Latest} 내려받는 중… {p}")) == null) { SetUpdateState("내려받기에 실패했습니다"); return; }
+                    _updateStaged = true;
+                }
+                Dispatcher.Invoke(RestartForUpdate);
+            }
+            catch (Exception ex) { SetUpdateState("업데이트 실패: " + ex.Message); }
+        }) { IsBackground = true }.Start();
+    }
+
+    private void RestartForUpdate()
+    {
+        SetUpdateState("업데이트 적용 중 — 재시작합니다");
+        try { s_single?.Dispose(); } catch { }
+        if (Updater.ApplyAndRelaunch(_startArgs)) Quit();
+        else { _updateStaged = false; SetUpdateState("업데이트를 적용하지 못했습니다. 새 버전을 직접 받아 주세요."); }
+    }
+
+    /// Between duels: today's record at the top of the game window. Gone the moment a duel or the confirmation card is up.
+    private void IdleTick()
+    {
+        try
+        {
+            bool show = Tracker.GameConnected && Tracker.Live == null && _overlay == null
+                        && Tracker.Store.Config.LivePanel && Tracker.Store.Config.Token != null && WinApi.GameInFront();
+            if (!show) { if (_idle != null) { try { _idle.Close(); } catch { } _idle = null; } return; }
+            if (_idle == null) { _idle = new IdleWindow(); _idle.Show(); _idle.Update(_today); }
+            if (!_todayBusy && DateTime.Now - _todayAt > TimeSpan.FromSeconds(60))
+            {
+                _todayBusy = true;
+                new Thread(() =>
+                {
+                    TodayResponse? t = null;
+                    try { t = Tracker.Api.Today(); } catch { }
+                    Dispatcher.BeginInvoke(() => { _todayBusy = false; _todayAt = DateTime.Now; if (t != null) { _today = t; _idle?.Update(t); } });
+                }) { IsBackground = true }.Start();
+            }
+            _idle.Place();
+        }
+        catch (Exception ex) { Log.Info("idle card: " + ex.Message); }
     }
 
     /// One card at a time: a match left unsaved stays in the site's pending list, so closing it loses nothing.

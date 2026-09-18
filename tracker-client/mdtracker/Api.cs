@@ -16,6 +16,51 @@ public sealed class Api
 
     private string Url(string path) => _store.Config.ServerUrl.TrimEnd('/') + path;
 
+    // ---- research feed ----
+    private static readonly string? SnapshotKey = ReadSnapshotKey();
+    private static string? ReadSnapshotKey()
+    {
+        try
+        {
+            using var st = typeof(Api).Assembly.GetManifestResourceStream("snapshot.key");
+            if (st == null) return null;
+            using var r = new System.IO.StreamReader(st);
+            var k = r.ReadToEnd().Trim();
+            return k.Length > 0 ? k : null;
+        }
+        catch { return null; }
+    }
+
+    /// Clock/turn samples from one duel → the site's snapshot store (keyed, no login), to pin down how the
+    /// engine's TimeLeft maps onto each player before the remaining-time display is built.
+    public void UploadProbe(PendingMatch m)
+    {
+        if (SnapshotKey == null) return;
+        var samples = new JsonArray(m.TimeProbe.Select(s => (JsonNode)new JsonObject
+        {
+            ["t"] = Math.Round(s.T, 1), ["step"] = s.Step, ["turn"] = s.Turn, ["which"] = s.Which, ["guard"] = s.Guard,
+            ["left"] = s.Left, ["total"] = s.Total, ["lp"] = s.Lp,
+            ["ui_input"] = s.UiInput, ["ui_duel"] = s.UiDuel, ["ui_turn"] = s.UiTurn, ["run_eff"] = s.RunEff, ["cur_eff"] = s.CurEff,
+        }).ToArray());
+        var o = new JsonObject
+        {
+            ["tag"] = "timeprobe", ["sender"] = _store.Config.Email ?? "anon", ["version"] = App.Version,
+            ["did"] = m.Did, ["myid"] = m.MyId, ["first"] = m.First, ["turn"] = m.Turn, ["result"] = m.Result, ["finish"] = m.Finish,
+            ["samples"] = samples,
+            ["my_cards"] = new JsonArray(m.MyCards.Select(x => (JsonNode)x).ToArray()),
+            ["my_extra"] = new JsonArray(m.MyExtraCards.Select(x => (JsonNode)x).ToArray()),
+            ["final_cards"] = new JsonArray(m.FinalCards.Select(c => (JsonNode)new JsonObject { ["me"] = c.Me, ["zone"] = c.Zone, ["id"] = c.Id, ["face"] = c.Face, ["uid"] = c.Uid }).ToArray()),
+            ["log_uids"] = new JsonObject(m.FinalLogUids.Select(kv => new KeyValuePair<string, JsonNode?>(kv.Key.ToString(), kv.Value))),
+            ["reveals"] = new JsonArray(m.RevealLog.Select(x => (JsonNode)x).ToArray()),
+            ["table_log"] = new JsonArray(m.TableLog.Select(x => (JsonNode)x).ToArray()),
+            ["table_stats"] = new JsonArray(m.TableStats.Select(x => (JsonNode)x).ToArray()),
+        };
+        var r = Req(HttpMethod.Post, "/api/tracker/snapshot/", o.ToJsonString(), auth: false);
+        r.Headers.Add("X-Tracker-Key", SnapshotKey);
+        var (status, _) = Send(r);
+        if (status is not (200 or 201)) throw new Exception($"snapshot {status}");
+    }
+
     private HttpRequestMessage Req(HttpMethod m, string path, string? json = null, bool auth = true)
     {
         var r = new HttpRequestMessage(m, Url(path));
@@ -64,9 +109,9 @@ public sealed class Api
         return status == 200 ? SafeParse(text, J.Default.MatchupResponse) : null;
     }
 
-    public TodayResponse? Today()
+    public TodayResponse? Today(int? deck = null)
     {
-        var (status, text) = Send(Req(HttpMethod.Get, "/api/tracker/today/"));
+        var (status, text) = Send(Req(HttpMethod.Get, deck == null ? "/api/tracker/today/" : $"/api/tracker/today/?deck={deck}"));
         if (status == 401) throw new UnauthorizedAccessException();
         return status == 200 ? SafeParse(text, J.Default.TodayResponse) : null;
     }
@@ -108,6 +153,19 @@ public sealed class Api
     }
 
     /// Creates the record; returns (match id, points awarded) or throws with the server's message.
+    /// Edit a saved record in place. The site never re-awards points on edits.
+    public void UpdateMatch(int matchId, int deckId, int? oppDeckId, string first, string result, string coin, string? notes)
+    {
+        var o = new JsonObject
+        {
+            ["deck"] = deckId, ["opponent_deck"] = oppDeckId.HasValue ? oppDeckId.Value : null,
+            ["first_or_second"] = first, ["result"] = result, ["coin_toss_result"] = coin, ["notes"] = notes,
+        };
+        var (status, _) = Send(Req(HttpMethod.Patch, $"/api/match-records/{matchId}/update/", o.ToJsonString()));
+        if (status == 401) throw new UnauthorizedAccessException();
+        if (status != 200) throw new Exception($"update {status}");
+    }
+
     public (int id, int points) AddMatch(int groupId, PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
         bool rate = m.GameMode == 19;

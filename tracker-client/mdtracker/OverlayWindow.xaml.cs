@@ -12,6 +12,7 @@ public partial class OverlayWindow : Window
     private readonly Tracker _t;
     private readonly PendingMatch _m;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _vis = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private int _left;
     private bool _paused, _busy;
     private SiteDeck? _myDeck, _oppDeck;
@@ -24,11 +25,13 @@ public partial class OverlayWindow : Window
     {
         InitializeComponent();
         _t = t; _m = m;
-        _left = Math.Max(5, t.Store.Config.OverlaySeconds);
+        _left = AutoSaveSeconds;
         Fill();
         Loaded += (_, _) => Place();
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
+        _vis.Tick += (_, _) => LiveWindow.SyncVisibility(this);
+        _vis.Start();
     }
 
     public static string RankLabel(string? code)
@@ -49,14 +52,6 @@ public partial class OverlayWindow : Window
         else if (_m.RankCode != null) parts.Add($"{RankLabel(_m.RankCode)}{(_m.Wins is int w ? $" · {w}승" : "")}");
         parts.Add($"{_m.Turn}턴");
         SubLine.Text = string.Join(" · ", parts);
-        if (_m.MySec + _m.OppSec > 0)
-        {
-            static string Mmss(int s) => $"{s / 60}:{s % 60:00}";
-            var line = $"소요 시간  내 {Mmss(_m.MySec)} · 상대 {Mmss(_m.OppSec)}";
-            var longest = _m.TurnTimes.OrderByDescending(t => t.Sec).FirstOrDefault();
-            if (longest != null && _m.TurnTimes.Count > 1) line += $"   ·   가장 긴 턴 {(longest.Me ? "내" : "상대")} {longest.Turn}턴 {Mmss(longest.Sec)}";
-            TimeText.Text = line; TimeText.Visibility = Visibility.Visible;
-        }
 
         _myDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedMyDeckId);
         MyDeckBox.Text = _myDeck?.Name ?? "";
@@ -118,17 +113,21 @@ public partial class OverlayWindow : Window
         if (_left <= 0) { _timer.Stop(); _ = SaveAsync(auto: true); }
     }
 
+    /// Auto-save delay. Touching the card restarts it rather than stopping it, so the card never lingers forever;
+    /// it only stops when a person has to act (deck missing, save failed).
+    private const int AutoSaveSeconds = 10;
     private void UpdateCountdown() => Countdown.Text = _paused ? "자동 저장 멈춤 · 저장을 눌러주세요" : $"{_left}초 후 자동 저장";
     private void Pause() { if (!_paused) { _paused = true; UpdateCountdown(); } }
-    private void Input_Focus(object sender, RoutedEventArgs e) => Pause();
-    private void Input_Changed(object sender, TextChangedEventArgs e) => Pause();
+    private void Touch() { if (!_paused) { _left = AutoSaveSeconds; UpdateCountdown(); } }
+    private void Input_Focus(object sender, RoutedEventArgs e) => Touch();
+    private void Input_Changed(object sender, TextChangedEventArgs e) => Touch();
     // Dragging the card is not editing it; keep the countdown running.
     private void Card_MouseDown(object sender, MouseButtonEventArgs e) { if (e.ChangedButton == MouseButton.Left && e.OriginalSource is Border or Panel) try { DragMove(); } catch { } }
 
     // ---- deck search ----
-    // TextChanged also fires when Fill() sets the suggestion, so only the user's typing pauses.
-    private void MyDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (MyDeckBox.IsKeyboardFocusWithin) { Pause(); Search(MyDeckBox, MyDeckList); } }
-    private void OppDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (OppDeckBox.IsKeyboardFocusWithin) { Pause(); _oppUnknown = false; Search(OppDeckBox, OppDeckList); } }
+    // TextChanged also fires when Fill() sets the suggestion, so only the user's typing counts.
+    private void MyDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (MyDeckBox.IsKeyboardFocusWithin) { Touch(); Search(MyDeckBox, MyDeckList); } }
+    private void OppDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (OppDeckBox.IsKeyboardFocusWithin) { Touch(); _oppUnknown = false; Search(OppDeckBox, OppDeckList); } }
 
     private void Search(TextBox box, ListBox list)
     {
@@ -159,7 +158,7 @@ public partial class OverlayWindow : Window
 
     private void Unknown_Click(object sender, RoutedEventArgs e)
     {
-        Pause(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed; LoadMatchup();
+        Touch(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed; LoadMatchup();
     }
 
     // ---- actions ----
@@ -192,5 +191,5 @@ public partial class OverlayWindow : Window
 
     private void Discard_Click(object sender, RoutedEventArgs e) { _timer.Stop(); _t.Discard(_m); Close(); }
 
-    protected override void OnClosed(EventArgs e) { _timer.Stop(); base.OnClosed(e); }
+    protected override void OnClosed(EventArgs e) { _timer.Stop(); _vis.Stop(); base.OnClosed(e); }
 }

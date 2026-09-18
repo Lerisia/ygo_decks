@@ -19,6 +19,12 @@ public sealed class Config
     public bool StartWithWindows { get; set; }
     /// Side panel during the duel (opponent deck read, matchup record, turn clock, revealed cards).
     public bool LivePanel { get; set; } = true;
+    /// Sound when my clock starts running (a choice opens or my turn begins) while the game is not the front window.
+    public bool AlertMyTurn { get; set; }
+    /// Upload per-duel research samples (clock, card table, reveals) to the site. Off by default; set in config.json.
+    public bool ResearchFeed { get; set; }
+    /// Fetch a newer build in the background and swap it in between duels.
+    public bool AutoUpdate { get; set; } = true;
     /// Locally tracked ranked win gauge (the game only reports promotions/demotions at low ranks).
     public Gauge? Gauge { get; set; }
 }
@@ -50,6 +56,8 @@ public sealed class InferSide
     [JsonPropertyName("candidates")] public List<DeckCandidate> Candidates { get; set; } = new();
     [JsonPropertyName("unknown_ids")] public List<int> UnknownIds { get; set; } = new();
     [JsonPropertyName("cards")] public List<CardInfo> Cards { get; set; } = new();
+    /// alt-art id (as read from the game) → base id used by names and the decklist
+    [JsonPropertyName("aliases")] public Dictionary<string, int> Aliases { get; set; } = new();
 }
 
 public sealed class InferResponse
@@ -128,8 +136,18 @@ public sealed class RatingSpan
     [JsonPropertyName("to")] public double? To { get; set; }
 }
 
+public sealed class TodayDeck
+{
+    [JsonPropertyName("id")] public int Id { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("games")] public int Games { get; set; }
+    [JsonPropertyName("wins")] public int Wins { get; set; }
+    public override string ToString() => $"{Name} {Wins}승 {Games - Wins}패";
+}
+
 public sealed class TodayResponse
 {
+    [JsonPropertyName("decks")] public List<TodayDeck> Decks { get; set; } = new();
     [JsonPropertyName("games")] public int Games { get; set; }
     [JsonPropertyName("wins")] public int Wins { get; set; }
     [JsonPropertyName("losses")] public int Losses { get; set; }
@@ -154,29 +172,73 @@ public sealed class OppCard
     public bool Face { get; set; }
 }
 
+/// One card the engine knows about, with its zone (BindingDuelFieldCards.FieldPostion: 0-4 monster, 5-6 extra monster,
+/// 7-11 spell/trap, 12 field, 13 hand, 14 extra deck, 15 deck, 16 graveyard, 17 banished).
+public sealed class LiveCard
+{
+    public bool Me { get; set; }
+    public int Zone { get; set; }
+    public int Id { get; set; }
+    public bool Face { get; set; }
+    public int Uid { get; set; }   // the engine's per-card instance id — stable while the card stays in the duel
+    public int Index { get; set; } // slot within the zone (nPos >> 16)
+    public const int Hand = 13, ExtraDeck = 14, Deck = 15, Grave = 16, Banished = 17;
+}
+
 /// What the poll sees mid-duel (not persisted).
 public sealed class LiveTick
 {
     public int Turn { get; set; }
     public bool TurnMe { get; set; }
-    public int TurnElapsed { get; set; }
-    public List<int> OppCards { get; set; } = new();
+    public List<LiveCard> Cards { get; set; } = new();
+    public bool HoverMe { get; set; }
+    public int HoverZone { get; set; } = -1;   // FieldPostion code under the game cursor, -1 = none
+    public int HoverIndex { get; set; }
+    public int MySecLeft { get; set; }         // engine's own clock (bank)
+    public int OppSecLeft { get; set; }        // estimate: the rules replayed, minus the time the opponent was deciding
+    public Dictionary<int, int> LogUids { get; set; } = new();   // the game log's uid → card id table
 }
 
-/// Mid-duel state for the side panel: the poll fills the clock, background lookups fill the rest.
+/// Mid-duel state for the side panel: the poll fills the clock and zones, background lookups fill names and decks.
 public sealed class LiveDuel
 {
     public string OppName { get; set; } = "";
     public int Turn { get; set; }
     public bool TurnMe { get; set; }
-    public int TurnElapsed { get; set; }
-    public int MySec { get; set; }
-    public int OppSec { get; set; }
-    public List<int> OppCards { get; set; } = new();
+    public bool HoverMe { get; set; }
+    public int HoverZone { get; set; } = -1;
+    public int HoverIndex { get; set; }
+    public int MySecLeft { get; set; }
+    public int OppSecLeft { get; set; }
+    public List<LiveCard> Cards { get; set; } = new();
+    public List<CardInfo> MyDeckList { get; set; } = new();
+    public HashSet<int> MyExtraIds { get; set; } = new();
+    public Dictionary<int, string> Names { get; } = new();
+    public Dictionary<int, int> Aliases { get; } = new();
+    public int Base(int id) => Aliases.TryGetValue(id, out var b) ? b : id;
     public List<DeckCandidate> OppCandidates { get; set; } = new();
-    public List<CardInfo> OppCardNames { get; set; } = new();
     public int? MatchupOppId { get; set; }
     public string? MatchupText { get; set; }
+}
+
+/// One change of the engine's clock/turn state during a duel (research feed for the remaining-time feature).
+public sealed class TimeSample
+{
+    public double T { get; set; }
+    public int Step { get; set; }
+    public int Turn { get; set; }
+    public int Which { get; set; }
+    public bool Guard { get; set; }
+    public uint Left { get; set; }
+    public uint Total { get; set; }
+    public string Lp { get; set; } = "";
+    // the on-screen timer (DuelTimer3D): whose input it is showing and its two remaining values
+    public bool UiInput { get; set; }
+    public int UiDuel { get; set; }
+    public int UiTurn { get; set; }
+    // engine animation state — the opponent's clock only runs while they are prompted and nothing is animating
+    public int RunEff { get; set; }
+    public int CurEff { get; set; }
 }
 
 /// Wall-clock seconds one turn took, as seen by the 0.5s poll.
@@ -215,9 +277,16 @@ public sealed class PendingMatch
     public int Turn { get; set; }
     public string? MyMdDeckId { get; set; }
     public List<int> MyCards { get; set; } = new();
+    public List<int> MyExtraCards { get; set; } = new();   // the extra-deck part of MyCards
     public List<int> OppCards { get; set; } = new();
     public List<OppCard> OppCardDetails { get; set; } = new();
     public List<TurnTime> TurnTimes { get; set; } = new();
+    public List<TimeSample> TimeProbe { get; set; } = new();
+    public List<LiveCard> FinalCards { get; set; } = new();   // both players' card table at duel end (research feed)
+    public Dictionary<int, int> FinalLogUids { get; set; } = new();
+    public List<string> RevealLog { get; set; } = new();   // "t|uid|id|zone|src" whenever a hidden opponent card became known
+    public List<string> TableLog { get; set; } = new();    // every 5s: "t|uid:zone:engineId:shownId:face,..." for the opponent's cards
+    public List<string> TableStats { get; set; } = new();  // every 10s: which engine table the card list came from
     public int MySec { get; set; }
     public int OppSec { get; set; }
     public bool GameUploaded { get; set; }      // raw capture archived on the site (/api/tracker/games/)
@@ -250,7 +319,10 @@ public sealed class PendingMatch
 [JsonSerializable(typeof(VersionResponse))]
 [JsonSerializable(typeof(MatchupResponse))]
 [JsonSerializable(typeof(TodayResponse))]
+[JsonSerializable(typeof(TodayDeck))]
 [JsonSerializable(typeof(PendingMatch))]
 [JsonSerializable(typeof(OppCard))]
 [JsonSerializable(typeof(TurnTime))]
+[JsonSerializable(typeof(TimeSample))]
+[JsonSerializable(typeof(LiveCard))]
 public partial class J : JsonSerializerContext { }

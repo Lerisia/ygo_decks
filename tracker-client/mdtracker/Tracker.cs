@@ -19,6 +19,7 @@ public sealed class Tracker
     private PendingMatch? _liveMatch;
     private string _liveKey = "";
     private bool _liveBusy;
+    private readonly Dictionary<int, int> _knownOpp = new();   // uid → card id, once the engine has shown it
 
     public Tracker(Store store, Api api)
     {
@@ -50,7 +51,7 @@ public sealed class Tracker
                 var g = new Game(mem);
                 SetStatus("마스터듀얼 연결됨 — 랭크/레이팅 게임을 자동으로 기록합니다", true);
                 Log.Info("game connected");
-                var rec = new Recorder(g, OnMatch, did => Store.Has(did)) { OnLive = OnLiveTick, OnLiveEnd = EndLive };
+                var rec = new Recorder(g, OnMatch, did => Store.Has(did)) { OnLive = OnLiveTick, OnLiveEnd = EndLive, OnMyInputOpened = AlertIfAway };
                 rec.Run();
             }
             catch (Exception ex)
@@ -65,14 +66,33 @@ public sealed class Tracker
     // ---- mid-duel panel ----
     private void OnLiveTick(PendingMatch m, LiveTick t)
     {
-        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName }; _liveKey = ""; }
+        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _liveStart = DateTime.Now; }
         var L = Live!;
-        L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.TurnElapsed = t.TurnElapsed; L.MySec = m.MySec; L.OppSec = m.OppSec; L.OppCards = t.OppCards;
-        var key = string.Join(",", t.OppCards.OrderBy(x => x));
-        if (key != _liveKey && !_liveBusy && t.OppCards.Count > 0 && Store.Config.Token != null)
+        // What was shown once stays known: the game log's uid → id table (hand opens, searches, flips) plus anything
+        // the engine has named on a tick. A revealed card that goes back to hand or is set face-down keeps its name.
+        var stamp = (DateTime.Now - _liveStart).TotalSeconds;
+        foreach (var kv in t.LogUids)
+            if (!_knownOpp.ContainsKey(kv.Key)) { _knownOpp[kv.Key] = kv.Value; Reveal(m, stamp, kv.Key, kv.Value, t.Cards, "log"); }
+        var engineIds = new Dictionary<int, int>();
+        foreach (var c in t.Cards)
+        {
+            if (c.Me || c.Uid == 0) continue;
+            engineIds[c.Uid] = c.Id;
+            if (c.Id != 0) { if (!_knownOpp.ContainsKey(c.Uid)) Reveal(m, stamp, c.Uid, c.Id, t.Cards, "engine"); _knownOpp[c.Uid] = c.Id; }
+            else if (_knownOpp.TryGetValue(c.Uid, out var known)) c.Id = known;
+        }
+        // research feed: the opponent's whole table every ~5s, engine id and shown id side by side
+        if (++_tableTick % 10 == 0 && m.TableLog.Count < 400)
+            m.TableLog.Add($"{stamp:0}|" + string.Join(",", t.Cards.Where(c => !c.Me).Select(c => $"{c.Uid}:{c.Zone}:{engineIds.GetValueOrDefault(c.Uid)}:{c.Id}:{(c.Face ? 1 : 0)}")));
+        L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.Cards = t.Cards; L.HoverMe = t.HoverMe; L.HoverZone = t.HoverZone; L.HoverIndex = t.HoverIndex;
+        L.MySecLeft = t.MySecLeft; L.OppSecLeft = t.OppSecLeft;
+        var opp = t.Cards.Where(c => !c.Me).Select(c => c.Id).ToList();
+        var key = string.Join(",", opp.OrderBy(x => x));
+        // First call names my decklist even before the opponent shows anything; later calls follow new opponent cards.
+        if ((key != _liveKey || L.MyDeckList.Count == 0) && !_liveBusy && Store.Config.Token != null)
         {
             _liveKey = key; _liveBusy = true;
-            new Thread(() => LiveLookup(m, L, t.OppCards)) { IsBackground = true }.Start();
+            new Thread(() => LiveLookup(m, L, opp)) { IsBackground = true }.Start();
         }
         LiveUpdated?.Invoke();
     }
@@ -83,7 +103,10 @@ public sealed class Tracker
         try
         {
             var inf = Api.Infer(m.MyCards, opp);
-            L.OppCandidates = inf.Opp.Candidates; L.OppCardNames = inf.Opp.Cards;
+            L.OppCandidates = inf.Opp.Candidates;
+            L.MyDeckList = inf.My.Cards;
+            foreach (var c in inf.My.Cards.Concat(inf.Opp.Cards)) L.Names[c.Id] = c.Name;
+            foreach (var kv in inf.My.Aliases.Concat(inf.Opp.Aliases)) if (int.TryParse(kv.Key, out var raw)) L.Aliases[raw] = kv.Value;
             int? my = m.MyMdDeckId != null && Store.Config.DeckMap.TryGetValue(m.MyMdDeckId, out var mapped) ? mapped : inf.My.Candidates.FirstOrDefault()?.DeckId;
             var oppId = inf.Opp.Candidates.FirstOrDefault()?.DeckId;
             if (my != null && (L.MatchupText == null || oppId != L.MatchupOppId))
@@ -100,18 +123,41 @@ public sealed class Tracker
 
     private void EndLive() { _liveMatch = null; Live = null; LiveEnded?.Invoke(); }
 
+    private DateTime _liveStart;
+    private int _tableTick;
+    /// Research feed: note the moment an opponent card in a hidden zone (hand/deck/extra) first got a name.
+    private static void Reveal(PendingMatch m, double t, int uid, int id, List<LiveCard> cards, string src)
+    {
+        var c = cards.FirstOrDefault(x => x.Uid == uid);
+        if (c == null || c.Me || m.RevealLog.Count >= 500) return;
+        m.RevealLog.Add($"{t:0.0}|{uid}|{id}|{c.Zone}|{(c.Face ? 1 : 0)}|{src}");
+    }
+
+    private DateTime _lastAlert;
+    /// Optional: a sound when my clock starts while the game is minimized or behind another window.
+    private void AlertIfAway()
+    {
+        if (!Store.Config.AlertMyTurn || WinApi.GameIsForeground()) return;
+        if ((DateTime.Now - _lastAlert).TotalSeconds < 5) return;
+        _lastAlert = DateTime.Now;
+        Chime();
+    }
+
+    /// A short two-note chime of our own, so it never reads as a Windows error sound.
+    public static void Chime()
+    {
+        new Thread(() => { try { Console.Beep(880, 120); Console.Beep(1175, 180); } catch { } }) { IsBackground = true }.Start();
+    }
+
     public static string? MatchupLine(MatchupResponse? r)
     {
         if (r == null) return null;
-        if (r.Matchup is { Games: > 0 } m)
-        {
-            var s = $"{r.Deck} vs {r.Opponent}  {m.Games}전 {m.Wins}승 ({m.WinRate}%)";
-            if (r.First is { Games: > 0 } f) s += $"   ·   선공 {f.Wins}/{f.Games}";
-            if (r.Second is { Games: > 0 } s2) s += $"   후공 {s2.Wins}/{s2.Games}";
-            return s;
-        }
-        if (r.Total is { Games: > 0 } t) return $"{r.Deck} 전체 {t.Games}전 {t.Wins}승 ({t.WinRate}%)   ·   이 상대와는 첫 대결";
-        return null;
+        // two lines: the deck overall, then this matchup
+        var lines = new List<string>();
+        if (r.Total is { Games: > 0 } t) lines.Add($"{r.Deck} {t.Wins}승 {t.Games - t.Wins}패");
+        if (r.Matchup is { Games: > 0 } m) lines.Add($"vs {r.Opponent} {m.Wins}승 {m.Games - m.Wins}패");
+        else if (r.Opponent != null && lines.Count > 0) lines.Add($"vs {r.Opponent} 첫 대결");
+        return lines.Count == 0 ? null : string.Join("\n", lines);
     }
 
     private void OnMatch(PendingMatch m)
@@ -122,6 +168,8 @@ public sealed class Tracker
         MatchesChanged?.Invoke();
         MatchCaptured?.Invoke(m);
         if (!m.IsDemo) new Thread(() => ArchiveGame(m)) { IsBackground = true }.Start();
+        if (!m.IsDemo && Store.Config.ResearchFeed && (m.TimeProbe.Count > 0 || m.FinalCards.Count > 0))
+            new Thread(() => { try { Api.UploadProbe(m); } catch (Exception ex) { Log.Info("time probe upload: " + ex.Message); } }) { IsBackground = true }.Start();
     }
 
     /// Raw capture → site archive; failures are retried by RetryLoop.
@@ -208,6 +256,7 @@ public sealed class Tracker
     }
 
     public void Discard(PendingMatch m) { m.Status = "discarded"; if (!m.IsDemo) { Store.Save(m); MatchesChanged?.Invoke(); } }
+    public void NotifyMatchesChanged() => MatchesChanged?.Invoke();
 
     /// Games whose save failed (network hiccup) are parked on the site once a minute so nothing is lost.
     private void RetryLoop()
