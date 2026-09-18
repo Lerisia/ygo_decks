@@ -69,6 +69,26 @@ public partial class MainWindow : Window
         SetupMsg.Text = noSheet ? "시트를 만들면 다음 게임부터 기록됩니다."
                                 : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
+        _settingAutoStart = true;
+        AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
+        LivePanelBox.IsChecked = T.Store.Config.LivePanel;
+        _settingAutoStart = false;
+    }
+
+    private bool _settingAutoStart;
+
+    private void LivePanel_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_settingAutoStart) return;
+        T.Store.Config.LivePanel = LivePanelBox.IsChecked == true; T.Store.SaveConfig();
+    }
+
+    private void AutoStart_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_settingAutoStart) return;
+        bool on = AutoStartBox.IsChecked == true;
+        if (!AutoStart.Apply(on)) { SetupMsg.Text = "시작 프로그램 등록에 실패했습니다."; return; }
+        T.Store.Config.StartWithWindows = on; T.Store.SaveConfig();
     }
 
     private void RefreshRecent()

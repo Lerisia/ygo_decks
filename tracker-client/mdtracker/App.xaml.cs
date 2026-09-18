@@ -7,9 +7,11 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.4.3";
+    public const string Version = "0.5.0";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
+    private OverlayWindow? _overlay;
+    private LiveWindow? _live;
     private WinForms.NotifyIcon? _tray;
     private bool _balloonShown;
 
@@ -36,6 +38,8 @@ public partial class App : System.Windows.Application
         var api = new Api(store);
         Tracker = new Tracker(store, api);
         Tracker.MatchCaptured += m => Dispatcher.BeginInvoke(() => OnMatchCaptured(m));
+        Tracker.LiveUpdated += () => Dispatcher.BeginInvoke(OnLiveUpdated);
+        Tracker.LiveEnded += () => Dispatcher.BeginInvoke(CloseLive);
 
         _tray = new WinForms.NotifyIcon { Icon = MakeIcon(), Text = "YGO Decks 트래커", Visible = true };
         var menu = new WinForms.ContextMenuStrip();
@@ -45,7 +49,9 @@ public partial class App : System.Windows.Application
         _tray.DoubleClick += (_, _) => ShowMain();
 
         MainWin = new MainWindow();
-        MainWin.Show();
+        if (Tracker.Store.Config.StartWithWindows) AutoStart.Apply(true);
+        if (e.Args.Contains(AutoStart.MinimizedArg)) HideToTray();
+        else MainWin.Show();
         Tracker.Start();
 
         if (e.Args.Contains("--demo"))
@@ -84,9 +90,42 @@ public partial class App : System.Windows.Application
         ShowOverlay(m);
     }
 
+    private void OnLiveUpdated()
+    {
+        var s = Tracker.Live;
+        if (s == null || !Tracker.Store.Config.LivePanel) return;
+        try
+        {
+            if (_live == null)
+            {
+                var w = new LiveWindow();
+                w.Closed += (_, _) => { if (ReferenceEquals(_live, w)) _live = null; };
+                _live = w;
+                w.Show();
+            }
+            _live.Update(s);
+        }
+        catch (Exception ex) { Log.Info("live panel: " + ex.Message); }
+    }
+
+    private void CloseLive()
+    {
+        try { _live?.Close(); } catch { }
+        _live = null;
+    }
+
+    /// One card at a time: a match left unsaved stays in the site's pending list, so closing it loses nothing.
     private void ShowOverlay(PendingMatch m)
     {
-        try { new OverlayWindow(Tracker, m).Show(); }
+        try
+        {
+            CloseLive();
+            try { _overlay?.Close(); } catch { }
+            var w = new OverlayWindow(Tracker, m);
+            w.Closed += (_, _) => { if (ReferenceEquals(_overlay, w)) _overlay = null; };
+            _overlay = w;
+            w.Show();
+        }
         catch (Exception ex) { Log.Info("overlay error: " + ex.Message); }
     }
 

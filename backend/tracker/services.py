@@ -68,6 +68,21 @@ def _dt(value):
     return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
 
 
+def _turn_times(raw):
+    """[{turn, me, sec}] from the client, or None when it sent nothing usable (older builds)."""
+    if not isinstance(raw, list):
+        return None
+    out = []
+    for t in raw[:300]:
+        if not isinstance(t, dict):
+            continue
+        try:
+            out.append({"turn": int(t.get("turn")), "me": bool(t.get("me")), "sec": max(0, int(t.get("sec")))})
+        except (TypeError, ValueError):
+            continue
+    return out or None
+
+
 def upsert_game(user, data):
     """Archive a captured duel (idempotent per did). Opponent cards may be ints or {id,pos,face} dicts."""
     from .inference import resolve_aliases
@@ -102,6 +117,7 @@ def upsert_game(user, data):
         "md_deck_id": str(data.get("md_deck_id") or "")[:32],
         "my_cards": my_cards,
         "opp_cards": opp_cards,
+        "turn_times": _turn_times(data.get("turn_times")),
         "started_at": _dt(data.get("started_at")),
         "ended_at": _dt(data.get("ended_at")),
     }
@@ -139,16 +155,21 @@ def link_game(user, did, match):
     return 0
 
 
-def touch_client(user, version):
+def touch_client(user, version, tracker_only=False):
     """Remember which tracker build this user is running.
 
-    Only the tracker app sends X-Tracker-Version; the website calls these same endpoints without it,
-    so a missing header must never clear what we already know.
+    Only the tracker app sends X-Tracker-Version; the website calls some of these endpoints without it,
+    so a missing header must never clear what we already know. On endpoints only the tracker calls
+    (tracker_only), a missing header still counts as activity: builds from before version reporting
+    keep last_seen fresh instead of looking abandoned.
     """
     from .models import TrackerClient
     if not user or not user.is_authenticated:
         return
     v = (version or "").strip()[:20]
-    if not v:
-        return
-    TrackerClient.objects.update_or_create(user=user, defaults={"version": v})
+    if v:
+        TrackerClient.objects.update_or_create(user=user, defaults={"version": v})
+    elif tracker_only:
+        client, created = TrackerClient.objects.get_or_create(user=user)
+        if not created:
+            client.save(update_fields=["last_seen"])

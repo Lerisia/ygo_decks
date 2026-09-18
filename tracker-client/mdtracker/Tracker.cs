@@ -11,8 +11,14 @@ public sealed class Tracker
     public event Action<string>? StatusChanged;
     public event Action<PendingMatch>? MatchCaptured;
     public event Action? MatchesChanged;
+    public event Action? LiveUpdated;
+    public event Action? LiveEnded;
+    public LiveDuel? Live { get; private set; }
     public string Status { get; private set; } = "마스터듀얼 실행을 기다리는 중…";
     public bool GameConnected { get; private set; }
+    private PendingMatch? _liveMatch;
+    private string _liveKey = "";
+    private bool _liveBusy;
 
     public Tracker(Store store, Api api)
     {
@@ -44,7 +50,7 @@ public sealed class Tracker
                 var g = new Game(mem);
                 SetStatus("마스터듀얼 연결됨 — 랭크/레이팅 게임을 자동으로 기록합니다", true);
                 Log.Info("game connected");
-                var rec = new Recorder(g, OnMatch, did => Store.Has(did));
+                var rec = new Recorder(g, OnMatch, did => Store.Has(did)) { OnLive = OnLiveTick, OnLiveEnd = EndLive };
                 rec.Run();
             }
             catch (Exception ex)
@@ -54,6 +60,58 @@ public sealed class Tracker
             finally { mem?.Dispose(); }
             Thread.Sleep(5000);
         }
+    }
+
+    // ---- mid-duel panel ----
+    private void OnLiveTick(PendingMatch m, LiveTick t)
+    {
+        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName }; _liveKey = ""; }
+        var L = Live!;
+        L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.TurnElapsed = t.TurnElapsed; L.MySec = m.MySec; L.OppSec = m.OppSec; L.OppCards = t.OppCards;
+        var key = string.Join(",", t.OppCards.OrderBy(x => x));
+        if (key != _liveKey && !_liveBusy && t.OppCards.Count > 0 && Store.Config.Token != null)
+        {
+            _liveKey = key; _liveBusy = true;
+            new Thread(() => LiveLookup(m, L, t.OppCards)) { IsBackground = true }.Start();
+        }
+        LiveUpdated?.Invoke();
+    }
+
+    /// Opponent deck read + this user's record in that matchup, refreshed whenever new opponent cards appear.
+    private void LiveLookup(PendingMatch m, LiveDuel L, List<int> opp)
+    {
+        try
+        {
+            var inf = Api.Infer(m.MyCards, opp);
+            L.OppCandidates = inf.Opp.Candidates; L.OppCardNames = inf.Opp.Cards;
+            int? my = m.MyMdDeckId != null && Store.Config.DeckMap.TryGetValue(m.MyMdDeckId, out var mapped) ? mapped : inf.My.Candidates.FirstOrDefault()?.DeckId;
+            var oppId = inf.Opp.Candidates.FirstOrDefault()?.DeckId;
+            if (my != null && (L.MatchupText == null || oppId != L.MatchupOppId))
+            {
+                L.MatchupOppId = oppId;
+                L.MatchupText = MatchupLine(Api.Matchup(my.Value, oppId));
+            }
+            LiveUpdated?.Invoke();
+        }
+        catch (UnauthorizedAccessException) { Store.Config.Token = null; Store.SaveConfig(); }
+        catch (Exception ex) { Log.Info("live lookup: " + ex.Message); }
+        finally { _liveBusy = false; }
+    }
+
+    private void EndLive() { _liveMatch = null; Live = null; LiveEnded?.Invoke(); }
+
+    public static string? MatchupLine(MatchupResponse? r)
+    {
+        if (r == null) return null;
+        if (r.Matchup is { Games: > 0 } m)
+        {
+            var s = $"{r.Deck} vs {r.Opponent}  {m.Games}전 {m.Wins}승 ({m.WinRate}%)";
+            if (r.First is { Games: > 0 } f) s += $"   ·   선공 {f.Wins}/{f.Games}";
+            if (r.Second is { Games: > 0 } s2) s += $"   후공 {s2.Wins}/{s2.Games}";
+            return s;
+        }
+        if (r.Total is { Games: > 0 } t) return $"{r.Deck} 전체 {t.Games}전 {t.Wins}승 ({t.WinRate}%)   ·   이 상대와는 첫 대결";
+        return null;
     }
 
     private void OnMatch(PendingMatch m)

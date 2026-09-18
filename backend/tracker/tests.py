@@ -233,6 +233,16 @@ class TrackerGameArchiveTest(TestCase):
     def test_requires_did(self):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 
+    def test_turn_times_are_kept_and_sanitized(self):
+        from tracker.models import TrackerGame
+        times = [{"turn": 1, "me": True, "sec": 95}, {"turn": 2, "me": False, "sec": "40"}, "junk", {"turn": 3, "me": True, "sec": -5}]
+        self.client.post("/api/tracker/games/", {**self.capture, "turn_times": times}, format="json")
+        g = TrackerGame.objects.get(user=self.user, did=self.capture["did"])
+        self.assertEqual(g.turn_times, [{"turn": 1, "me": True, "sec": 95}, {"turn": 2, "me": False, "sec": 40}, {"turn": 3, "me": True, "sec": 0}])
+        # older builds send nothing → stays null rather than an empty list
+        self.client.post("/api/tracker/games/", {**self.capture, "did": "7709189150693852099"}, format="json")
+        self.assertIsNone(TrackerGame.objects.get(user=self.user, did="7709189150693852099").turn_times)
+
 
 class TrackerWinBonusTest(TestCase):
     """5P per tracker-recorded win, paid once, only when the capture itself was a win."""

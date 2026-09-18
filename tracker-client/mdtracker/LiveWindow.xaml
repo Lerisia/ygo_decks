@@ -1,0 +1,29 @@
+<Window x:Class="MdTracker.LiveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        FontFamily="Segoe UI, Malgun Gothic" FontSize="12" Foreground="White">
+    <Grid>
+        <Border x:Name="Body" Background="#D9111827" CornerRadius="10" Padding="12" Width="270" MouseDown="Panel_MouseDown">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,6">
+                    <Button DockPanel.Dock="Right" Content="▸" Style="{StaticResource Ghost}" Padding="8,0" FontSize="12" Click="Collapse_Click" ToolTip="접기"/>
+                    <TextBlock x:Name="Head" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+
+                <TextBlock Text="상대 덱" Foreground="#9CA3AF" FontSize="11"/>
+                <TextBlock x:Name="OppDeck" TextWrapping="Wrap" Margin="0,1,0,6"/>
+                <TextBlock x:Name="Matchup" Foreground="#93C5FD" TextWrapping="Wrap" Margin="0,0,0,6" Visibility="Collapsed"/>
+                <TextBlock x:Name="TurnLine" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,0,0,6"/>
+
+                <TextBlock x:Name="CardsLabel" Text="상대 공개 카드" Foreground="#9CA3AF" FontSize="11"/>
+                <WrapPanel x:Name="Cards" Margin="0,2,0,0"/>
+            </StackPanel>
+        </Border>
+        <Border x:Name="Pill" Visibility="Collapsed" Background="#D9111827" CornerRadius="10" Padding="10,4" Cursor="Hand"
+                MouseDown="Panel_MouseDown" MouseLeftButtonUp="Expand_Click" ToolTip="펼치기">
+            <TextBlock x:Name="PillText" Text="◂"/>
+        </Border>
+    </Grid>
+</Window>

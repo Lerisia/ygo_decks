@@ -14,7 +14,8 @@
                 <TextBlock x:Name="Headline" Margin="8,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 <TextBlock x:Name="Countdown" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#9CA3AF"/>
             </DockPanel>
-            <TextBlock x:Name="SubLine" Foreground="#CBD5E1" Margin="0,0,0,10"/>
+            <TextBlock x:Name="SubLine" Foreground="#CBD5E1" Margin="0,0,0,4"/>
+            <TextBlock x:Name="TimeText" Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
 
             <!-- my deck -->
             <TextBlock Text="내 덱" Foreground="#9CA3AF" FontSize="11"/>

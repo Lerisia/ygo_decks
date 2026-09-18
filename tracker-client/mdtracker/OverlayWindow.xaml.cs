@@ -49,6 +49,14 @@ public partial class OverlayWindow : Window
         else if (_m.RankCode != null) parts.Add($"{RankLabel(_m.RankCode)}{(_m.Wins is int w ? $" · {w}승" : "")}");
         parts.Add($"{_m.Turn}턴");
         SubLine.Text = string.Join(" · ", parts);
+        if (_m.MySec + _m.OppSec > 0)
+        {
+            static string Mmss(int s) => $"{s / 60}:{s % 60:00}";
+            var line = $"소요 시간  내 {Mmss(_m.MySec)} · 상대 {Mmss(_m.OppSec)}";
+            var longest = _m.TurnTimes.OrderByDescending(t => t.Sec).FirstOrDefault();
+            if (longest != null && _m.TurnTimes.Count > 1) line += $"   ·   가장 긴 턴 {(longest.Me ? "내" : "상대")} {longest.Turn}턴 {Mmss(longest.Sec)}";
+            TimeText.Text = line; TimeText.Visibility = Visibility.Visible;
+        }
 
         _myDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedMyDeckId);
         MyDeckBox.Text = _myDeck?.Name ?? "";
@@ -80,17 +88,7 @@ public partial class OverlayWindow : Window
         var opp = _oppUnknown ? null : _oppDeck;
         if (deck == null) { MatchupText.Text = ""; return; }
         var r = await Task.Run(() => { try { return _t.Api.Matchup(deck.Id, opp?.Id); } catch { return null; } });
-        if (r == null) { MatchupText.Text = ""; return; }
-        if (r.Matchup is { Games: > 0 } m)
-        {
-            var parts = $"{r.Deck} vs {r.Opponent}  {m.Games}전 {m.Wins}승 ({m.WinRate}%)";
-            if (r.First is { Games: > 0 } f) parts += $"   ·   선공 {f.Wins}/{f.Games}";
-            if (r.Second is { Games: > 0 } s2) parts += $"   후공 {s2.Wins}/{s2.Games}";
-            MatchupText.Text = parts;
-        }
-        else if (r.Total is { Games: > 0 } t)
-            MatchupText.Text = $"{r.Deck} 전체 {t.Games}전 {t.Wins}승 ({t.WinRate}%)   ·   이 상대와는 첫 대결";
-        else MatchupText.Text = "";
+        MatchupText.Text = Tracker.MatchupLine(r) ?? "";
     }
 
     /// Top-center of the game window; falls back to the primary screen.
@@ -120,15 +118,17 @@ public partial class OverlayWindow : Window
         if (_left <= 0) { _timer.Stop(); _ = SaveAsync(auto: true); }
     }
 
-    private void UpdateCountdown() => Countdown.Text = _paused ? "" : $"{_left}초 후 자동 저장";
+    private void UpdateCountdown() => Countdown.Text = _paused ? "자동 저장 멈춤 · 저장을 눌러주세요" : $"{_left}초 후 자동 저장";
     private void Pause() { if (!_paused) { _paused = true; UpdateCountdown(); } }
     private void Input_Focus(object sender, RoutedEventArgs e) => Pause();
     private void Input_Changed(object sender, TextChangedEventArgs e) => Pause();
-    private void Card_MouseDown(object sender, MouseButtonEventArgs e) { Pause(); if (e.ChangedButton == MouseButton.Left && e.OriginalSource is Border or Panel) try { DragMove(); } catch { } }
+    // Dragging the card is not editing it; keep the countdown running.
+    private void Card_MouseDown(object sender, MouseButtonEventArgs e) { if (e.ChangedButton == MouseButton.Left && e.OriginalSource is Border or Panel) try { DragMove(); } catch { } }
 
     // ---- deck search ----
-    private void MyDeckBox_TextChanged(object sender, TextChangedEventArgs e) { Pause(); if (MyDeckBox.IsKeyboardFocusWithin) Search(MyDeckBox, MyDeckList); }
-    private void OppDeckBox_TextChanged(object sender, TextChangedEventArgs e) { Pause(); if (OppDeckBox.IsKeyboardFocusWithin) { _oppUnknown = false; Search(OppDeckBox, OppDeckList); } }
+    // TextChanged also fires when Fill() sets the suggestion, so only the user's typing pauses.
+    private void MyDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (MyDeckBox.IsKeyboardFocusWithin) { Pause(); Search(MyDeckBox, MyDeckList); } }
+    private void OppDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (OppDeckBox.IsKeyboardFocusWithin) { Pause(); _oppUnknown = false; Search(OppDeckBox, OppDeckList); } }
 
     private void Search(TextBox box, ListBox list)
     {

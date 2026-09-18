@@ -60,6 +60,7 @@ class TrackerGame(models.Model):
     md_deck_id = models.CharField(max_length=32, blank=True, default="")
     my_cards = models.JSONField(default=list, help_text="main+extra card ids as listed by the game")
     opp_cards = models.JSONField(default=list, help_text="[{id, pos, face}] every opponent card the engine revealed")
+    turn_times = models.JSONField(null=True, blank=True, help_text="[{turn, me, sec}] wall-clock seconds per turn")
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
     match = models.ForeignKey("tool.MatchRecord", on_delete=models.SET_NULL, null=True, blank=True, related_name="tracker_games")

@@ -11,6 +11,8 @@ internal sealed class Recorder
     private readonly Action<PendingMatch> _onMatch;
     private readonly Func<string, bool> _alreadyKnown;
     public static readonly HashSet<int> RecordedModes = new() { 3, 19 }; // Rank, Rate
+    public Action<PendingMatch, LiveTick>? OnLive;
+    public Action? OnLiveEnd;
 
     public Recorder(Game g, Action<PendingMatch> onMatch, Func<string, bool> alreadyKnown)
     {
@@ -43,6 +45,9 @@ internal sealed class Recorder
     {
         PendingMatch? cur = null;      // duel in progress
         int lastStep = -999;
+        uint lastTurn = 0; DateTime turnStart = default;
+        bool liveShown = false; int liveTick = 0; List<int> liveCards = new();
+        void EndLive() { if (liveShown) { liveShown = false; OnLiveEnd?.Invoke(); } }
         while (true)
         {
             try
@@ -50,8 +55,8 @@ internal sealed class Recorder
                 var d = _g.ReadDuel();
                 if (d == null)
                 {
-                    if (cur != null) { Log.Info("duel client gone before result — dropped"); cur = null; }
-                    lastStep = -999;
+                    if (cur != null) { Log.Info("duel client gone before result — dropped"); cur = null; EndLive(); }
+                    lastStep = -999; lastTurn = 0;
                 }
                 else
                 {
@@ -60,7 +65,26 @@ internal sealed class Recorder
                         Log.Info($"step {Enums.Step(d.Step)} (mode {Enums.GameMode(d.GameMode)})");
                         lastStep = d.Step;
                     }
-                    if (d.Step == 16 && cur == null) cur = CaptureStart(d);
+                    if (d.Step == 16 && cur == null) { cur = CaptureStart(d); lastTurn = 0; }
+                    // Turn clock: the counter only moves while the duel runs (step 16); leaving that step ends the last turn.
+                    if (cur != null && lastTurn != 0 && (d.Step != 16 || d.Turn != lastTurn)) { CloseTurn(cur, lastTurn, turnStart); lastTurn = 0; }
+                    if (cur != null && d.Step == 16 && d.Turn != 0 && lastTurn == 0) { lastTurn = d.Turn; turnStart = DateTime.Now; }
+                    if (cur != null && d.Step == 16 && OnLive != null && RecordedModes.Contains(cur.GameMode))
+                    {
+                        // Clock every poll; the card table (up to 2k reads) only every 2s.
+                        if (liveTick++ % 4 == 0)
+                        {
+                            liveCards = new List<int>();
+                            foreach (var c in _g.ReadPvpCards()) if ((c.pos & 0xFF) != cur.MyId) liveCards.Add(c.cardId);
+                        }
+                        liveShown = true;
+                        OnLive(cur, new LiveTick
+                        {
+                            Turn = (int)d.Turn, TurnMe = lastTurn != 0 && (lastTurn % 2 == 1) == cur.First,
+                            TurnElapsed = lastTurn == 0 ? 0 : (int)(DateTime.Now - turnStart).TotalSeconds, OppCards = liveCards,
+                        });
+                    }
+                    else if (d.Step != 16) EndLive();
                     if (d.Step >= 19 && cur != null)
                     {
                         CaptureEnd(cur, d);
@@ -75,6 +99,15 @@ internal sealed class Recorder
             }
             Thread.Sleep(500);
         }
+    }
+
+    /// Turns strictly alternate, so odd turns belong to whoever went first — no need for the game's (inverted) turn-owner flag.
+    private static void CloseTurn(PendingMatch m, uint turn, DateTime start)
+    {
+        int sec = (int)Math.Round((DateTime.Now - start).TotalSeconds);
+        bool me = (turn % 2 == 1) == m.First;
+        m.TurnTimes.Add(new TurnTime { Turn = (int)turn, Me = me, Sec = sec });
+        if (me) m.MySec += sec; else m.OppSec += sec;
     }
 
     private PendingMatch? CaptureStart(Game.DuelState d)
@@ -161,7 +194,7 @@ internal sealed class Recorder
         m.RankCode = RankCode(m.RankBefore, m.TierBefore);
         if (m.Did == "0" || _alreadyKnown(m.Did)) { Log.Info($"duel {m.Did} already recorded / no id — skipped"); return; }
         if (!RecordedModes.Contains(m.GameMode)) { Log.Info($"mode {m.GameModeName} not recorded — skipped"); return; }
-        Log.Info($"duel end: {m.Result} ({m.Finish}), turn {m.Turn}, rank {m.RankCode}, rating {m.RatingBefore}→{m.RatingAfter}, {m.OppCards.Count} opp cards");
+        Log.Info($"duel end: {m.Result} ({m.Finish}), turn {m.Turn}, time me {m.MySec}s / opp {m.OppSec}s, rank {m.RankCode}, rating {m.RatingBefore}→{m.RatingAfter}, {m.OppCards.Count} opp cards");
         _onMatch(m);
     }
 

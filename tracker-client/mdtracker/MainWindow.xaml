@@ -85,6 +85,10 @@
                 <TextBlock x:Name="SetupMsg" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
                 <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"
                            Text="게임이 끝나면 게임 화면 위에 확인 창이 잠깐 뜹니다. 게임은 창모드 또는 테두리 없는 창모드로 두세요(전체화면이면 게임 위에 표시되지 않습니다)."/>
+                <CheckBox x:Name="LivePanelBox" Margin="0,10,0,0" Checked="LivePanel_Changed" Unchecked="LivePanel_Changed"
+                          Content="듀얼 중 사이드 패널 표시 (상대 덱 판독 · 매치업 전적 · 턴 시간 · 공개 카드)"/>
+                <CheckBox x:Name="AutoStartBox" Margin="0,6,0,0" Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"
+                          Content="Windows 시작 시 자동 실행 (트레이에서 조용히 대기하다가 게임이 켜지면 바로 기록)"/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="사이트에서 시트 보기" Style="{StaticResource Secondary}" Click="OpenSite_Click"/>
                 </StackPanel>

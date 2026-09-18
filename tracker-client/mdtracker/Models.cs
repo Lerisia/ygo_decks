@@ -15,6 +15,10 @@ public sealed class Config
     /// Seconds the overlay waits before saving with the suggested values.
     public int OverlaySeconds { get; set; } = 20;
     public bool ShowedFullscreenTip { get; set; }
+    /// Registered in HKCU Run so the tracker is already in the tray when the game starts.
+    public bool StartWithWindows { get; set; }
+    /// Side panel during the duel (opponent deck read, matchup record, turn clock, revealed cards).
+    public bool LivePanel { get; set; } = true;
     /// Locally tracked ranked win gauge (the game only reports promotions/demotions at low ranks).
     public Gauge? Gauge { get; set; }
 }
@@ -150,6 +154,39 @@ public sealed class OppCard
     public bool Face { get; set; }
 }
 
+/// What the poll sees mid-duel (not persisted).
+public sealed class LiveTick
+{
+    public int Turn { get; set; }
+    public bool TurnMe { get; set; }
+    public int TurnElapsed { get; set; }
+    public List<int> OppCards { get; set; } = new();
+}
+
+/// Mid-duel state for the side panel: the poll fills the clock, background lookups fill the rest.
+public sealed class LiveDuel
+{
+    public string OppName { get; set; } = "";
+    public int Turn { get; set; }
+    public bool TurnMe { get; set; }
+    public int TurnElapsed { get; set; }
+    public int MySec { get; set; }
+    public int OppSec { get; set; }
+    public List<int> OppCards { get; set; } = new();
+    public List<DeckCandidate> OppCandidates { get; set; } = new();
+    public List<CardInfo> OppCardNames { get; set; } = new();
+    public int? MatchupOppId { get; set; }
+    public string? MatchupText { get; set; }
+}
+
+/// Wall-clock seconds one turn took, as seen by the 0.5s poll.
+public sealed class TurnTime
+{
+    public int Turn { get; set; }
+    public bool Me { get; set; }
+    public int Sec { get; set; }
+}
+
 /// One duel captured from memory.
 public sealed class PendingMatch
 {
@@ -180,6 +217,9 @@ public sealed class PendingMatch
     public List<int> MyCards { get; set; } = new();
     public List<int> OppCards { get; set; } = new();
     public List<OppCard> OppCardDetails { get; set; } = new();
+    public List<TurnTime> TurnTimes { get; set; } = new();
+    public int MySec { get; set; }
+    public int OppSec { get; set; }
     public bool GameUploaded { get; set; }      // raw capture archived on the site (/api/tracker/games/)
     public List<DeckCandidate> MyCandidates { get; set; } = new();
     public List<DeckCandidate> OppCandidates { get; set; } = new();
@@ -212,4 +252,5 @@ public sealed class PendingMatch
 [JsonSerializable(typeof(TodayResponse))]
 [JsonSerializable(typeof(PendingMatch))]
 [JsonSerializable(typeof(OppCard))]
+[JsonSerializable(typeof(TurnTime))]
 public partial class J : JsonSerializerContext { }

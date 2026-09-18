@@ -19,7 +19,7 @@ from . import version as ver
 @permission_classes([IsAuthenticated])
 def tracker_infer(request):
     """PC tracker: card ids (Konami cid) for both players → site deck candidates."""
-    touch_client(request.user, request.headers.get("X-Tracker-Version"))
+    touch_client(request.user, request.headers.get("X-Tracker-Version"), tracker_only=True)
     def _ids(key):
         v = request.data.get(key) or []
         return [int(x) for x in v if str(x).isdigit()]
@@ -89,7 +89,7 @@ def pending_discard(request, pending_id):
 @permission_classes([IsAuthenticated])
 def games(request):
     """Tracker: archive one captured duel (full decklist + revealed opponent cards). Idempotent per did."""
-    touch_client(request.user, request.headers.get("X-Tracker-Version"))
+    touch_client(request.user, request.headers.get("X-Tracker-Version"), tracker_only=True)
     from .services import upsert_game
 
     try:
