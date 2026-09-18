@@ -19,7 +19,7 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.6.0</Version>
+    <Version>0.6.1</Version>
   </PropertyGroup>
 
   <!-- Pretendard (OFL) embedded so every machine renders the same UI font. -->
@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+    <EmbeddedResource Include="chime.wav" LogicalName="chime.wav" />
   </ItemGroup>
 
   <ItemGroup>

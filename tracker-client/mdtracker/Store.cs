@@ -20,6 +20,14 @@ public sealed class Store
         var cfg = Path.Combine(Dir, "config.json");
         if (File.Exists(cfg))
             try { Config = JsonSerializer.Deserialize(File.ReadAllText(cfg), J.Default.Config) ?? new(); } catch { }
+        else Config.OverlayScaleVersion = 2;
+        // 0.6.0 configs: every step moved up by one (0.85→1.0, 1.0→1.2, …) so nobody's overlay gets smaller
+        if (Config.OverlayScaleVersion < 2)
+        {
+            Config.OverlayScale = Config.OverlayScale switch { < 0.9 => 1.0, < 1.1 => 1.2, < 1.3 => 1.4, _ => 1.6 };
+            Config.OverlayScaleVersion = 2;
+            SaveConfig();
+        }
         foreach (var f in Directory.GetFiles(Path.Combine(Dir, "matches"), "*.json").OrderBy(f => f))
             try { var m = JsonSerializer.Deserialize(File.ReadAllText(f), J.Default.PendingMatch); if (m != null) Matches.Add(m); } catch { }
         var decks = Path.Combine(Dir, "decks.json");

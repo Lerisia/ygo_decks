@@ -143,10 +143,20 @@ public sealed class Tracker
         Chime();
     }
 
-    /// A short two-note chime of our own, so it never reads as a Windows error sound.
+    /// A soft two-note chime of our own (chime.wav, embedded), so it never reads as a Windows error sound.
     public static void Chime()
     {
-        new Thread(() => { try { Console.Beep(880, 120); Console.Beep(1175, 180); } catch { } }) { IsBackground = true }.Start();
+        new Thread(() =>
+        {
+            try
+            {
+                using var s = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("chime.wav");
+                if (s == null) { Console.Beep(880, 120); return; }
+                using var p = new System.Media.SoundPlayer(s);
+                p.PlaySync();
+            }
+            catch { }
+        }) { IsBackground = true }.Start();
     }
 
     public static string? MatchupLine(MatchupResponse? r)

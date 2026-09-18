@@ -188,9 +188,9 @@ public partial class LiveWindow : Window
         if (rect is { } g)
         {
             Left = g.tl.X + (cfg.LiveCardX ?? 12);
-            Top = g.tl.Y + (cfg.LiveCardY ?? (g.br.Y - g.tl.Y) * 0.28);
+            Top = g.tl.Y + (cfg.LiveCardY ?? (g.br.Y - g.tl.Y) * 0.08);
         }
-        else { Left = cfg.LiveCardX ?? 12; Top = cfg.LiveCardY ?? SystemParameters.PrimaryScreenHeight * 0.28; }
+        else { Left = cfg.LiveCardX ?? 12; Top = cfg.LiveCardY ?? SystemParameters.PrimaryScreenHeight * 0.08; }
     }
 
     private void Panel_MouseDown(object sender, MouseButtonEventArgs e)

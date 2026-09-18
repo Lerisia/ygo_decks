@@ -30,7 +30,8 @@ public sealed class Config
     /// Fetch a newer build in the background and swap it in between duels.
     public bool AutoUpdate { get; set; } = true;
     /// Size of everything drawn over the game (1.0 = as designed).
-    public double OverlayScale { get; set; } = 1.0;
+    public double OverlayScale { get; set; } = 1.2;
+    public int OverlayScaleVersion { get; set; }   // 2: the 1.0/1.2/1.4/1.6 steps; missing = a 0.6.0 config
     /// Where the person dragged the overlays, as offsets from the game window's top-left (null = default spot).
     public double? LiveCardX { get; set; }
     public double? LiveCardY { get; set; }

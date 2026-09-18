@@ -92,6 +92,7 @@ public partial class MainWindow : Window
     {
         if (_settingAutoStart || ScaleBox.SelectedIndex < 0) return;
         T.Store.Config.OverlayScale = OverlayScale.Options[ScaleBox.SelectedIndex].scale; T.Store.SaveConfig();
+        App.RescaleOverlays();
     }
 
     private void Alert_Changed(object sender, RoutedEventArgs e)

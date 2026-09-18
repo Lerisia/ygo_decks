@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.6.0";
+    public const string Version = "0.6.1";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -223,11 +223,19 @@ public partial class App : System.Windows.Application
             if (hover != null)
             {
                 if (_deckPopup == null) { _deckPopup = new DeckPopupWindow(); _deckPopup.Show(); }
-                _deckPopup.Update(hover.Value.title, hover.Value.rows);
+                _deckPopup.Update(hover.Value.title, hover.Value.rows, toRight: s.HoverMe);
             }
             else if (_deckPopup != null) { try { _deckPopup.Close(); } catch { } _deckPopup = null; }
         }
         catch (Exception ex) { Log.Info("live panel: " + ex.Message); }
+    }
+
+    /// The text-size setting changed: re-apply it to every overlay that is already on screen.
+    public static void RescaleOverlays()
+    {
+        if (Current is not App a) return;
+        foreach (Window? w in new Window?[] { a._live, a._idle, a._overlay, a._deckPopup })
+            if (w != null) try { OverlayScale.Apply(w); } catch { }
     }
 
     private void CloseLive()
