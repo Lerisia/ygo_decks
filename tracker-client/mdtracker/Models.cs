@@ -17,8 +17,12 @@ public sealed class Config
     public bool ShowedFullscreenTip { get; set; }
     /// Registered in HKCU Run so the tracker is already in the tray when the game starts.
     public bool StartWithWindows { get; set; }
-    /// Side panel during the duel (opponent deck read, matchup record, turn clock, revealed cards).
+    /// Side panel during the duel (kept for configs written before OverlayMode existed).
     public bool LivePanel { get; set; } = true;
+    /// What is drawn over the game: 0 nothing, 1 record only (idle card + deck read/record lines), 2 everything
+    /// (card lists by zone, opponent clock estimate, cursor pop-ups). -1 = not set yet → derived from LivePanel.
+    public int OverlayMode { get; set; } = -1;
+    public int EffectiveOverlayMode => OverlayMode >= 0 ? OverlayMode : (LivePanel ? 2 : 0);
     /// Sound when my clock starts running (a choice opens or my turn begins) while the game is not the front window.
     public bool AlertMyTurn { get; set; }
     /// Upload per-duel research samples (clock, card table, reveals) to the site. Off by default; set in config.json.
@@ -27,6 +31,12 @@ public sealed class Config
     public bool AutoUpdate { get; set; } = true;
     /// Size of everything drawn over the game (1.0 = as designed).
     public double OverlayScale { get; set; } = 1.0;
+    /// Where the person dragged the overlays, as offsets from the game window's top-left (null = default spot).
+    public double? LiveCardX { get; set; }
+    public double? LiveCardY { get; set; }
+    public double LiveCardW { get; set; } = 240;
+    public double? IdleCardX { get; set; }
+    public double? IdleCardY { get; set; }
     /// Locally tracked ranked win gauge (the game only reports promotions/demotions at low ranks).
     public Gauge? Gauge { get; set; }
 }
@@ -51,6 +61,7 @@ public sealed class CardInfo
     [JsonPropertyName("id")] public int Id { get; set; }
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("count")] public int Count { get; set; }
+    [JsonPropertyName("frame")] public string Frame { get; set; } = "";   // effect / spell / trap / fusion / xyz / link / …
 }
 
 public sealed class InferSide
@@ -149,6 +160,16 @@ public sealed class TodayDeck
 
 public sealed class TodayResponse
 {
+    /// "랭크 A → B" or "레이팅 X → Y". At Master 1 the rank cannot move, so the rating is the number that matters.
+    public string? ProgressLine()
+    {
+        bool topOfLadder = Rank?.From == "master1" && Rank?.To == "master1";
+        if (Rank?.From != null && !topOfLadder) return $"랭크 {OverlayWindow.RankLabel(Rank.From)} → {OverlayWindow.RankLabel(Rank.To)}";
+        if (Rating?.To != null) return $"레이팅 {Rating.From:0.##} → {Rating.To:0.##}";
+        if (Rank?.From != null) return $"랭크 {OverlayWindow.RankLabel(Rank.From)}";
+        return null;
+    }
+
     [JsonPropertyName("decks")] public List<TodayDeck> Decks { get; set; } = new();
     [JsonPropertyName("games")] public int Games { get; set; }
     [JsonPropertyName("wins")] public int Wins { get; set; }
@@ -173,6 +194,10 @@ public sealed class OppCard
     public int Pos { get; set; }
     public bool Face { get; set; }
 }
+
+/// One line in an overlay card list: thumbnail (by card id), name, count, frame type for the tint.
+/// Count -1 = name only; Header = section title.
+public record struct Row(int Id, string Text, int Count, bool Header = false, string Frame = "");
 
 /// One card the engine knows about, with its zone (BindingDuelFieldCards.FieldPostion: 0-4 monster, 5-6 extra monster,
 /// 7-11 spell/trap, 12 field, 13 hand, 14 extra deck, 15 deck, 16 graveyard, 17 banished).
@@ -216,6 +241,7 @@ public sealed class LiveDuel
     public List<CardInfo> MyDeckList { get; set; } = new();
     public HashSet<int> MyExtraIds { get; set; } = new();
     public Dictionary<int, string> Names { get; } = new();
+    public Dictionary<int, string> Frames { get; } = new();
     public Dictionary<int, int> Aliases { get; } = new();
     public int Base(int id) => Aliases.TryGetValue(id, out var b) ? b : id;
     public List<DeckCandidate> OppCandidates { get; set; } = new();
@@ -306,6 +332,7 @@ public sealed class PendingMatch
     public string? Notes { get; set; }
     public int PointsAdded { get; set; }
     public bool IsDemo { get; set; }   // preview: never saved, never sent
+    public bool Paused { get; set; }   // captured while recording was paused: archived for research, excluded from my record
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true)]

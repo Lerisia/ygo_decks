@@ -80,7 +80,7 @@ public partial class MainWindow : Window
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
         _settingAutoStart = true;
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
-        LivePanelBox.IsChecked = T.Store.Config.LivePanel;
+        OverlayModeBox.SelectedIndex = T.Store.Config.EffectiveOverlayMode;
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
         if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
         int idx = Array.FindIndex(OverlayScale.Options, o => Math.Abs(o.scale - T.Store.Config.OverlayScale) < 0.01);
@@ -103,10 +103,12 @@ public partial class MainWindow : Window
 
     private bool _settingAutoStart;
 
-    private void LivePanel_Changed(object sender, RoutedEventArgs e)
+    private void OverlayModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_settingAutoStart) return;
-        T.Store.Config.LivePanel = LivePanelBox.IsChecked == true; T.Store.SaveConfig();
+        if (_settingAutoStart || OverlayModeBox.SelectedIndex < 0) return;
+        T.Store.Config.OverlayMode = OverlayModeBox.SelectedIndex;
+        T.Store.Config.LivePanel = OverlayModeBox.SelectedIndex > 0;
+        T.Store.SaveConfig();
     }
 
     private void AutoStart_Changed(object sender, RoutedEventArgs e)
@@ -169,8 +171,7 @@ public partial class MainWindow : Window
         if (t.Second is { Games: > 0 } s) parts.Add($"후공 승률 {Math.Round((double)s.Wins * 100 / s.Games)}%");
         if (t.AvgTurns != null) parts.Add($"평균 {t.AvgTurns}턴");
         var line = string.Join("   ·   ", parts);
-        if (t.Rank?.From != null) line += $"\n랭크 {OverlayWindow.RankLabel(t.Rank.From)} → {OverlayWindow.RankLabel(t.Rank.To)}";
-        else if (t.Rating?.To != null) line += $"\n레이팅 {t.Rating.From:0.##} → {t.Rating.To:0.##}";
+        if (t.ProgressLine() is string progress) line += "\n" + progress;
         TodayText.Text = line;
     }
 

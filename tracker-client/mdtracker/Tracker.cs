@@ -105,7 +105,7 @@ public sealed class Tracker
             var inf = Api.Infer(m.MyCards, opp);
             L.OppCandidates = inf.Opp.Candidates;
             L.MyDeckList = inf.My.Cards;
-            foreach (var c in inf.My.Cards.Concat(inf.Opp.Cards)) L.Names[c.Id] = c.Name;
+            foreach (var c in inf.My.Cards.Concat(inf.Opp.Cards)) { L.Names[c.Id] = c.Name; L.Frames[c.Id] = c.Frame; }
             foreach (var kv in inf.My.Aliases.Concat(inf.Opp.Aliases)) if (int.TryParse(kv.Key, out var raw)) L.Aliases[raw] = kv.Value;
             int? my = m.MyMdDeckId != null && Store.Config.DeckMap.TryGetValue(m.MyMdDeckId, out var mapped) ? mapped : inf.My.Candidates.FirstOrDefault()?.DeckId;
             var oppId = inf.Opp.Candidates.FirstOrDefault()?.DeckId;
@@ -162,6 +162,15 @@ public sealed class Tracker
 
     private void OnMatch(PendingMatch m)
     {
+        // Paused from the tray: the raw duel is still archived (flagged so it stays out of this person's record),
+        // but it is not offered for saving.
+        if (App.RecordingPaused && !m.IsDemo)
+        {
+            m.Status = "discarded"; m.Paused = true;
+            Store.Save(m); MatchesChanged?.Invoke(); MatchCaptured?.Invoke(m);
+            new Thread(() => ArchiveGame(m)) { IsBackground = true }.Start();
+            return;
+        }
         if (m.GameMode == 3 && !m.IsDemo) ApplyGauge(m);
         Enrich(m);
         if (!m.IsDemo) Store.Save(m);
@@ -266,7 +275,7 @@ public sealed class Tracker
             Thread.Sleep(60_000);
             if (Store.Config.Token == null) continue;
             foreach (var m in Store.Matches.Where(x => x.Status == "failed").ToList()) Defer(m);
-            foreach (var m in Store.Matches.Where(x => !x.GameUploaded && !x.IsDemo && x.Status != "discarded").ToList()) ArchiveGame(m);
+            foreach (var m in Store.Matches.Where(x => !x.GameUploaded && !x.IsDemo && (x.Status != "discarded" || x.Paused)).ToList()) ArchiveGame(m);
         }
     }
 

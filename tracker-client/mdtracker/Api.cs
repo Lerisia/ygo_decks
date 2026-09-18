@@ -208,6 +208,7 @@ public sealed class Api
             ["opp_cards"] = opp,
             ["started_at"] = m.StartedAt, ["ended_at"] = m.EndedAt,
             ["turn_times"] = new JsonArray(m.TurnTimes.Select(t => (JsonNode)new JsonObject { ["turn"] = t.Turn, ["me"] = t.Me, ["sec"] = t.Sec }).ToArray()),
+            ["paused"] = m.Paused,
         };
         var (status, text) = Send(Req(HttpMethod.Post, "/api/tracker/games/", o.ToJsonString()));
         if (status == 401) throw new UnauthorizedAccessException();

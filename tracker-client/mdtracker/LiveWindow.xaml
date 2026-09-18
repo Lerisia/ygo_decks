@@ -3,13 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
         ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
-        FontFamily="Segoe UI, Malgun Gothic" FontSize="12" Foreground="White">
+        FontFamily="pack://application:,,,/Fonts/#Pretendard" FontSize="12" Foreground="White">
     <Grid>
-        <!-- one card, always: who / turn & clocks / deck read / record / everything the opponent has shown, by zone -->
-        <Border Background="#D9111827" CornerRadius="10" Padding="12,8" Width="300" MouseDown="Panel_MouseDown">
+        <!-- one card: who / turn & clocks / deck read / record / everything the opponent has shown, by zone -->
+        <Border x:Name="Full" Background="#D9111827" CornerRadius="10" Padding="12,8" Width="240" MouseDown="Panel_MouseDown">
             <StackPanel>
-                <TextBlock x:Name="StripHead" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                <TextBlock x:Name="StripTurn" Foreground="#CBD5E1" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                <DockPanel>
+                    <Button x:Name="MinBtn" DockPanel.Dock="Right" Content="−" Style="{StaticResource Ghost}" Padding="8,0" FontSize="12" Click="Minimize_Click" ToolTip="카드 목록 접기/펼치기"/>
+                    <TextBlock x:Name="StripHead" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+                <TextBlock x:Name="StripTurn" Foreground="#CBD5E1" Margin="0,2,0,0" TextWrapping="Wrap"/>
                 <TextBlock x:Name="StripDeck" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
                 <TextBlock x:Name="StripMatchup" Foreground="#93C5FD" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                 <!-- no visible scrollbar: it sat on top of the count column; the wheel still scrolls -->
@@ -18,5 +21,14 @@
                 </ScrollViewer>
             </StackPanel>
         </Border>
+        <!-- drag the corner to change the card's width -->
+        <Thumb x:Name="Grip" Width="16" Height="16" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,3,3"
+               Cursor="SizeWE" DragDelta="Grip_DragDelta" DragCompleted="Grip_DragCompleted" ToolTip="끌어서 폭 조절">
+            <Thumb.Template>
+                <ControlTemplate TargetType="Thumb">
+                    <Path Data="M14,2 L14,14 L2,14 Z" Fill="#66FFFFFF"/>
+                </ControlTemplate>
+            </Thumb.Template>
+        </Thumb>
     </Grid>
 </Window>

@@ -51,7 +51,7 @@ internal sealed class Recorder
         string lastProbe = ""; DateTime probeStart = default;
         // Opponent clock estimate. The client never receives the opponent's timer, but their clock only runs while
         // they are deciding: no prompt open on my side and nothing animating. Verified against my own clock (2% off).
-        double oppBank = 300; int bankTurn = -1; DateTime lastTick = default;
+        double oppBank = 300; int bankTurn = -1; DateTime lastTick = default; double idlePending = 0; bool idleLong = false;
         bool lastMyInput = false;
         void EndLive() { if (liveShown) { liveShown = false; OnLiveEnd?.Invoke(); } }
         while (true)
@@ -71,7 +71,7 @@ internal sealed class Recorder
                         Log.Info($"step {Enums.Step(d.Step)} (mode {Enums.GameMode(d.GameMode)})");
                         lastStep = d.Step;
                     }
-                    if (d.Step == 16 && cur == null) { cur = CaptureStart(d); clockTurn = -1; lastProbe = ""; probeStart = DateTime.Now; oppBank = 300; bankTurn = -1; lastTick = default; }
+                    if (d.Step == 16 && cur == null) { cur = CaptureStart(d); clockTurn = -1; lastProbe = ""; probeStart = DateTime.Now; oppBank = 300; bankTurn = -1; lastTick = default; idlePending = 0; idleLong = false; }
                     var ui = cur == null ? null : _g.DuelTimerUi();
                     if (cur != null && d.Step == 16)
                     {
@@ -82,8 +82,18 @@ internal sealed class Recorder
                             if (bankTurn >= 0) oppBank = Math.Min(300, oppBank + (IsMyTurn(cur, (int)d.Turn) ? 30 : 60));
                             bankTurn = (int)d.Turn;
                         }
-                        bool myInput = ui?.input ?? false, noEffect = d.RunningEffect == -1 && d.CurrentRunEffect == -1;
-                        if (lastTick != default && !myInput && noEffect) oppBank = Math.Max(0, oppBank - (now - lastTick).TotalSeconds);
+                        // ViewType.Null (0) and "none" (-1) both mean nothing is animating
+                        bool myInput = ui?.input ?? false, noEffect = d.RunningEffect <= 0 && d.CurrentRunEffect <= 0;
+                        if (lastTick != default && !myInput && noEffect)
+                        {
+                            // Only stretches longer than a server round-trip count as the opponent deciding: the sub-second
+                            // idle after every action is network time, and the server stops the clock for it.
+                            double dt = (now - lastTick).TotalSeconds;
+                            idlePending += dt;
+                            if (idlePending >= 1.5) { oppBank = Math.Max(0, oppBank - idlePending); idlePending = 0; idleLong = true; }
+                            else if (idleLong) { oppBank = Math.Max(0, oppBank - dt); idlePending = 0; }
+                        }
+                        else { idlePending = 0; idleLong = false; }
                         lastTick = now;
                         if (myInput && !lastMyInput && RecordedModes.Contains(cur.GameMode)) OnMyInputOpened?.Invoke();
                         lastMyInput = myInput;

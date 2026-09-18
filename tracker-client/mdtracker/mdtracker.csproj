@@ -19,8 +19,14 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.5.4</Version>
+    <Version>0.6.0</Version>
   </PropertyGroup>
+
+  <!-- Pretendard (OFL) embedded so every machine renders the same UI font. -->
+  <ItemGroup>
+    <Resource Include="Fonts\Pretendard-Regular.ttf" />
+    <Resource Include="Fonts\Pretendard-SemiBold.ttf" />
+  </ItemGroup>
 
   <!-- Compile time, shown in the window title so test builds can be told apart. -->
   <ItemGroup>

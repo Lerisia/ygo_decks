@@ -27,29 +27,23 @@ public partial class IdleWindow : Window
         if (t.Second is { Games: > 0 } s) parts.Add($"후공 승률 {Math.Round((double)s.Wins * 100 / s.Games)}%");
         if (t.CoinWinRate != null) parts.Add($"코인 {t.CoinWinRate}%");
         Line2.Text = string.Join(" · ", parts);
-        string? line3 = null;
-        if (t.Rank?.From != null) line3 = $"랭크 {OverlayWindow.RankLabel(t.Rank.From)} → {OverlayWindow.RankLabel(t.Rank.To)}";
-        else if (t.Rating?.To != null) line3 = $"레이팅 {t.Rating.From:0.##} → {t.Rating.To:0.##}";
+        var line3 = t.ProgressLine();
         Line3.Text = line3 ?? ""; Line3.Visibility = line3 == null ? Visibility.Collapsed : Visibility.Visible;
         Place();
     }
 
-    /// Top centre of the game window unless the user dragged it elsewhere.
+    /// Where the person last dragged it (saved relative to the game window), else the top centre of the game window.
     public void Place()
     {
         if (_dragged || !IsLoaded) return;
-        var src = PresentationSource.FromVisual(this);
-        var fromDevice = src?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
-        double left, top, width;
-        if (WinApi.GameWindowRect() is WinApi.RECT r)
+        var cfg = App.Tracker.Store.Config;
+        var rect = OverlayScale.GameRect(this);
+        if (rect is { } g)
         {
-            var tl = fromDevice.Transform(new Point(r.Left, r.Top));
-            var br = fromDevice.Transform(new Point(r.Right, r.Bottom));
-            left = tl.X; top = tl.Y + 8; width = br.X - tl.X;
+            Left = cfg.IdleCardX is double x ? g.tl.X + x : g.tl.X + ((g.br.X - g.tl.X) - ActualWidth) / 2;
+            Top = g.tl.Y + (cfg.IdleCardY ?? 8);
         }
-        else { left = 0; top = 8; width = SystemParameters.PrimaryScreenWidth; }
-        Left = left + (width - ActualWidth) / 2;
-        Top = top;
+        else { Left = cfg.IdleCardX ?? (SystemParameters.PrimaryScreenWidth - ActualWidth) / 2; Top = cfg.IdleCardY ?? 8; }
     }
 
     private void Panel_MouseDown(object sender, MouseButtonEventArgs e)
@@ -57,6 +51,13 @@ public partial class IdleWindow : Window
         if (e.ChangedButton != MouseButton.Left || e.OriginalSource is not (Border or Panel or TextBlock)) return;
         var before = new Point(Left, Top);
         try { DragMove(); } catch { }
-        if (Math.Abs(Left - before.X) > 2 || Math.Abs(Top - before.Y) > 2) _dragged = true;
+        if (Math.Abs(Left - before.X) > 2 || Math.Abs(Top - before.Y) > 2)
+        {
+            _dragged = true;
+            var cfg = App.Tracker.Store.Config;
+            var origin = OverlayScale.GameRect(this)?.tl ?? new Point(0, 0);
+            cfg.IdleCardX = Left - origin.X; cfg.IdleCardY = Top - origin.Y;
+            App.Tracker.Store.SaveConfig();
+        }
     }
 }

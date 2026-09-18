@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
         ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
-        FontFamily="Segoe UI, Malgun Gothic" FontSize="12" Foreground="White">
+        FontFamily="pack://application:,,,/Fonts/#Pretendard" FontSize="12" Foreground="White">
     <!-- between duels: today's record, top centre of the game window -->
     <Border Background="#D9111827" CornerRadius="10" Padding="14,6" MouseDown="Panel_MouseDown">
         <StackPanel>

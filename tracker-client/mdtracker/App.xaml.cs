@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.5.4";
+    public const string Version = "0.6.0";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -72,8 +72,8 @@ public partial class App : System.Windows.Application
 
         _tray = new WinForms.NotifyIcon { Icon = MakeIcon(), Text = "YGO Decks 트래커", Visible = true };
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("열기", null, (_, _) => ShowMain());
-        menu.Items.Add("종료", null, (_, _) => Quit());
+        menu.Opening += (_, _) => BuildTrayMenu(menu);
+        BuildTrayMenu(menu);
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (_, _) => ShowMain();
 
@@ -91,8 +91,88 @@ public partial class App : System.Windows.Application
             new Thread(() => { Thread.Sleep(2500); Tracker.DemoMatch(); }) { IsBackground = true }.Start();
     }
 
+    // ---- tray menu ----
+    private List<RecordGroup> _trayGroups = new();
+    private DateTime _trayGroupsAt;
+    internal static bool RecordingPaused;   // session-only: finished duels are not offered for saving
+
+    /// Rebuilt every time the menu opens: today's record, the last game, sheet switcher, pause toggle.
+    private void BuildTrayMenu(WinForms.ContextMenuStrip menu)
+    {
+        menu.Items.Clear();
+        bool loggedIn = Tracker.Store.Config.Token != null;
+
+        var today = _today;
+        var todayItem = new WinForms.ToolStripMenuItem(today == null ? "오늘의 전적" : today.Games == 0 ? "오늘 기록된 게임 없음"
+            : $"오늘 {today.Games}전 {today.Wins}승 {today.Losses}패 · 승률 {today.WinRate}%") { Font = new Font(menu.Font, System.Drawing.FontStyle.Bold) };
+        todayItem.Click += (_, _) => ShowMain();
+        menu.Items.Add(todayItem);
+        if (loggedIn && !_todayBusy && DateTime.Now - _todayAt > TimeSpan.FromSeconds(60)) RefreshToday();
+
+        var last = Tracker.Store.Recent().FirstOrDefault(x => x.Status != "discarded");
+        if (last != null)
+        {
+            var when = DateTime.TryParse(last.EndedAt, out var t) ? t.ToString("HH:mm") : "";
+            var opp = last.SavedOppDeckName ?? Tracker.Store.Decks.FirstOrDefault(d => d.Id == last.SuggestedOppDeckId)?.Name ?? last.OppName;
+            var lastItem = new WinForms.ToolStripMenuItem($"마지막 게임: {(last.Result == "win" ? "승" : "패")} · vs {opp} · {when}{(last.Status == "saved" ? "" : " (미저장)")}");
+            lastItem.Click += (_, _) => Dispatcher.BeginInvoke(() =>
+            {
+                if (last.Status == "saved" && last.MatchId != null) { ShowMain(); new EditWindow(Tracker, last) { Owner = MainWin }.ShowDialog(); }
+                else new OverlayWindow(Tracker, last).Show();
+            });
+            menu.Items.Add(lastItem);
+        }
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+
+        if (loggedIn)
+        {
+            var sheets = new WinForms.ToolStripMenuItem("기록할 시트");
+            if (_trayGroups.Count == 0) sheets.DropDownItems.Add(new WinForms.ToolStripMenuItem("불러오는 중…") { Enabled = false });
+            foreach (var g in _trayGroups)
+            {
+                var it = new WinForms.ToolStripMenuItem(g.Name) { Checked = g.Id == Tracker.Store.Config.RecordGroupId };
+                it.Click += (_, _) => { Tracker.Store.Config.RecordGroupId = g.Id; Tracker.Store.Config.RecordGroupName = g.Name; Tracker.Store.SaveConfig(); MainWin?.Refresh(); };
+                sheets.DropDownItems.Add(it);
+            }
+            menu.Items.Add(sheets);
+            if (DateTime.Now - _trayGroupsAt > TimeSpan.FromSeconds(60))
+                new Thread(() => { try { _trayGroups = Tracker.Api.Groups(); _trayGroupsAt = DateTime.Now; } catch { } }) { IsBackground = true }.Start();
+
+            menu.Items.Add("사이트에서 시트 열기", null, (_, _) =>
+            {
+                var gid = Tracker.Store.Config.RecordGroupId;
+                var url = gid == null ? $"{Tracker.Store.Config.ServerUrl}/record-groups" : $"{Tracker.Store.Config.ServerUrl}/record-groups/{gid}";
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+            });
+            menu.Items.Add(new WinForms.ToolStripSeparator());
+        }
+
+        var pause = new WinForms.ToolStripMenuItem("기록 일시 정지") { Checked = RecordingPaused, CheckOnClick = true };
+        pause.CheckedChanged += (_, _) => { RecordingPaused = pause.Checked; _tray!.Text = RecordingPaused ? "YGO Decks 트래커 — 기록 일시 정지" : "YGO Decks 트래커"; };
+        menu.Items.Add(pause);
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+        menu.Items.Add("열기", null, (_, _) => ShowMain());
+        menu.Items.Add("종료", null, (_, _) => Quit());
+    }
+
+    private void RefreshToday()
+    {
+        _todayBusy = true;
+        new Thread(() =>
+        {
+            TodayResponse? t = null;
+            try { t = Tracker.Api.Today(); } catch { }
+            Dispatcher.BeginInvoke(() => { _todayBusy = false; _todayAt = DateTime.Now; if (t != null) { _today = t; _idle?.Update(t); } });
+        }) { IsBackground = true }.Start();
+    }
+
     private void OnMatchCaptured(PendingMatch m)
     {
+        if (RecordingPaused && !m.IsDemo)
+        {
+            _tray?.ShowBalloonTip(4000, "YGO Decks 트래커", "기록 일시 정지 중이라 이번 게임은 기록하지 않았습니다.", WinForms.ToolTipIcon.Info);
+            return;
+        }
         if (!m.IsDemo && Tracker.Store.Config.Token == null)
         {
             ShowMain();
@@ -126,7 +206,8 @@ public partial class App : System.Windows.Application
     private void OnLiveUpdated()
     {
         var s = Tracker.Live;
-        if (s == null || !Tracker.Store.Config.LivePanel) return;
+        int mode = Tracker.Store.Config.EffectiveOverlayMode;
+        if (s == null || mode == 0) return;
         try
         {
             if (_live == null)
@@ -136,9 +217,9 @@ public partial class App : System.Windows.Application
                 _live = w;
                 w.Show();
             }
-            _live.Update(s);
+            _live.Update(s, full: mode >= 2);
             // pop-up beside the cursor for the zone it rests on (my deck, an opponent's set card, their piles)
-            var hover = WinApi.GameInFront() ? _live.HoverRows(s) : null;
+            var hover = mode >= 2 && WinApi.GameInFront() ? _live.HoverRows(s) : null;
             if (hover != null)
             {
                 if (_deckPopup == null) { _deckPopup = new DeckPopupWindow(); _deckPopup.Show(); }
@@ -246,20 +327,11 @@ public partial class App : System.Windows.Application
             // "in front" counts our own windows so dragging the card does not hide it — but the tracker's main window
             // being active means the person is looking at the tracker, not the game.
             bool show = Tracker.GameConnected && Tracker.Live == null && _overlay == null
-                        && Tracker.Store.Config.LivePanel && Tracker.Store.Config.Token != null
+                        && Tracker.Store.Config.EffectiveOverlayMode >= 1 && Tracker.Store.Config.Token != null
                         && WinApi.GameInFront() && !(MainWin?.IsActive ?? false);
             if (!show) { if (_idle != null) { try { _idle.Close(); } catch { } _idle = null; } return; }
             if (_idle == null) { _idle = new IdleWindow(); _idle.Show(); _idle.Update(_today); }
-            if (!_todayBusy && DateTime.Now - _todayAt > TimeSpan.FromSeconds(60))
-            {
-                _todayBusy = true;
-                new Thread(() =>
-                {
-                    TodayResponse? t = null;
-                    try { t = Tracker.Api.Today(); } catch { }
-                    Dispatcher.BeginInvoke(() => { _todayBusy = false; _todayAt = DateTime.Now; if (t != null) { _today = t; _idle?.Update(t); } });
-                }) { IsBackground = true }.Start();
-            }
+            if (!_todayBusy && DateTime.Now - _todayAt > TimeSpan.FromSeconds(60)) RefreshToday();
             _idle.Place();
         }
         catch (Exception ex) { Log.Info("idle card: " + ex.Message); }

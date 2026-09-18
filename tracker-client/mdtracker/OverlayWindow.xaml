@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
         ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
-        FontFamily="Segoe UI, Malgun Gothic" FontSize="13" Foreground="White">
+        FontFamily="pack://application:,,,/Fonts/#Pretendard" FontSize="13" Foreground="White">
     <Border Background="#E6111827" CornerRadius="12" Padding="16" Width="440" MouseDown="Card_MouseDown">
         <StackPanel>
             <!-- headline -->
