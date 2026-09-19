@@ -100,7 +100,21 @@ def games(request):
         obj, created = upsert_game(request.user, request.data, legacy_turn=bool(client_version) and ver.is_outdated(client_version, "0.5.1"))
     except (ValueError, TypeError) as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    _keep_list_log(request.user, obj, request.data.get("list_log"))
     return Response({"id": obj.id, "did": obj.did}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+def _keep_list_log(user, game, list_log):
+    """0.6.2+: what the game's card-list window showed (reveals, confirms) — research data for reading those windows,
+    written beside the snapshot files rather than into the database."""
+    if not isinstance(list_log, list) or not list_log:
+        return
+    out_dir = os.path.join(settings.BASE_DIR, "data", "tracker_snapshots")
+    os.makedirs(out_dir, exist_ok=True)
+    name = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_u{user.id}_listlog_{game.did}.json"
+    body = {"user": user.id, "did": game.did, "opp_cards": game.opp_cards, "list_log": [str(x)[:2000] for x in list_log[:200]]}
+    with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=1)
 
 
 @api_view(["GET"])

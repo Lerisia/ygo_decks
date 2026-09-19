@@ -224,6 +224,7 @@ public sealed class LiveTick
     public int HoverIndex { get; set; }
     public int MySecLeft { get; set; }         // engine's own clock (bank)
     public int OppSecLeft { get; set; }        // estimate: the rules replayed, minus the time the opponent was deciding
+    public Dictionary<int, int> ListUids { get; set; } = new();   // uid → card id from the open card-list window (reveals, confirms)
     public Dictionary<int, int> LogUids { get; set; } = new();   // the game log's uid → card id table
 }
 
@@ -315,6 +316,7 @@ public sealed class PendingMatch
     public Dictionary<int, int> FinalLogUids { get; set; } = new();
     public List<string> RevealLog { get; set; } = new();   // "t|uid|id|zone|src" whenever a hidden opponent card became known
     public List<string> TableLog { get; set; } = new();    // every 5s: "t|uid:zone:engineId:shownId:face,..." for the opponent's cards
+    public List<string> ListLog { get; set; } = new();     // each time the card-list window opens: "t|type|n|id:uid:bits,..." 
     public List<string> TableStats { get; set; } = new();  // every 10s: which engine table the card list came from
     public int MySec { get; set; }
     public int OppSec { get; set; }

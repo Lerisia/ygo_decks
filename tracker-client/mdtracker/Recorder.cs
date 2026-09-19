@@ -47,7 +47,7 @@ internal sealed class Recorder
         PendingMatch? cur = null;      // duel in progress
         int lastStep = -999;
         int clockTurn = -1; DateTime turnStart = default;   // raw nTurnNum being timed (0-based in the engine)
-        bool liveShown = false; int liveTick = 0; List<LiveCard> liveCards = new(); Dictionary<int, int> logUids = new();
+        bool liveShown = false; int liveTick = 0; List<LiveCard> liveCards = new(); Dictionary<int, int> logUids = new(), listUids = new(); bool listOpen = false;
         string lastProbe = ""; DateTime probeStart = default;
         // Opponent clock estimate. The client never receives the opponent's timer, but their clock only runs while
         // they are deciding: no prompt open on my side and nothing animating. Verified against my own clock (2% off).
@@ -128,6 +128,19 @@ internal sealed class Recorder
                             foreach (var c in _g.ReadPvpCards(includeUnknown: true))
                                 liveCards.Add(new LiveCard { Me = (c.pos & 0xFF) == cur.MyId, Zone = (c.pos >> 8) & 0xFF, Index = (c.pos >> 16) & 0xFF, Id = c.cardId, Face = c.face, Uid = c.uid });
                             try { logUids = _g.LogUidTable(); } catch (Exception ex) { Log.Info("log uid table: " + ex.Message); }
+                            // the card-list window: a revealed hand, a looked-at deck or extra deck lists cards the table itself never names
+                            try
+                            {
+                                listUids = new Dictionary<int, int>();
+                                var sl = _g.SelectionList();
+                                bool openNow = sl is { open: true, cards.Count: > 0 };
+                                if (openNow)
+                                    foreach (var c in sl!.Value.cards) if (c.Uid > 0 && c.Id > 0) listUids[c.Uid] = c.Id;
+                                if (openNow && !listOpen && cur.ListLog.Count < 100)
+                                    cur.ListLog.Add($"{(DateTime.Now - probeStart).TotalSeconds:0}|{sl!.Value.type}|{sl.Value.cards.Count}|" + string.Join(",", sl.Value.cards.Take(40).Select(c => $"{c.Id}:{c.Uid}:{c.Bits}")));
+                                listOpen = openNow;
+                            }
+                            catch (Exception ex) { Log.Info("card list: " + ex.Message); }
                             if (liveTick == 1 || liveTick % 120 == 0) Log.Info("card table " + _g.LastTableStats);
                             if (cur.TableStats.Count < 60 && liveTick % 20 == 0) cur.TableStats.Add($"{(DateTime.Now - probeStart).TotalSeconds:0}s {_g.LastTableStats}");
                         }
@@ -137,7 +150,7 @@ internal sealed class Recorder
                         {
                             Turn = (int)d.Turn + 1, TurnMe = IsMyTurn(cur, (int)d.Turn), Cards = liveCards,
                             HoverMe = hover != null && hover.Value.player == cur.MyId, HoverZone = hover?.position ?? -1, HoverIndex = hover?.index ?? 0,
-                            MySecLeft = (int)d.TimeTotal, OppSecLeft = (int)Math.Round(oppBank), LogUids = logUids,
+                            MySecLeft = (int)d.TimeTotal, OppSecLeft = (int)Math.Round(oppBank), LogUids = logUids, ListUids = listUids,
                         });
                     }
                     else if (d.Step != 16) { EndLive(); lastMyInput = false; }

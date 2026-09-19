@@ -28,6 +28,10 @@ internal static class Off
     // DuelClient.duelHUD → DuelHUD.duellog → DuelLogController.m_UidCardidTable (Dictionary<int,int>: card uid → card id,
     // filled by every reveal the log shows — hand opens, searches, flips)
     public const int DC_duelHUD = 0xC8, HUD_duellog = 0x170, DLC_uidCardidTable = 0xB8;
+    // DuelHUD.cardSelectionList → CardSelectionList: the card-list window (reveals, confirms, selections);
+    // m_GroupedDataList is a List<ListCardData> { cardid @0x18, listIndexForEngine @0x20, targetUid @0x2C, cardstatus.bitVec @0x44 }
+    public const int HUD_cardSelectionList = 0x1A0, CSL_groupedDataList = 0xE8, CSL_open = 0x223, CSL_listType = 0x248;
+    public const int LCD_cardid = 0x18, LCD_listIndex = 0x20, LCD_targetUid = 0x2C, LCD_statusBits = 0x44;
 
     // DuelEndOperation
     public const int DEO_resultType = 0x28, DEO_finishType = 0x2C;
@@ -117,6 +121,34 @@ internal sealed class Game
             if (next >= -1 && val != 0) map[key] = val;
         }
         return map;
+    }
+
+    public sealed record ListCard(int Id, int Uid, int Bits, int Index);
+
+    /// The card-list window: what kind of list it is (CardSelectionList.ListType: 14 opponent hand, 16 opponent deck top,
+    /// 17 check card, 11-13 grave/extra/deck …), whether it is open, and the cards it lists. Null when there is no HUD.
+    public (int type, bool open, List<ListCard> cards)? SelectionList()
+    {
+        ulong dc = DuelClientInstance; if (dc == 0) return null;
+        ulong hud = M.Ptr(dc + Off.DC_duelHUD); if (hud == 0) return null;
+        ulong csl = M.Ptr(hud + Off.HUD_cardSelectionList); if (csl == 0) return null;
+        int type = M.I32(csl + Off.CSL_listType); bool open = M.U8(csl + Off.CSL_open) != 0;
+        var cards = new List<ListCard>();
+        ulong list = M.Ptr(csl + Off.CSL_groupedDataList);
+        if (list != 0)
+        {
+            ulong items = M.Ptr(list + Rt.ListItems); int size = M.I32(list + Rt.ListSize);
+            if (items != 0 && size > 0 && size <= 512)
+            {
+                var raw = M.Read(items + Rt.ArrItems, size * 8);
+                for (int i = 0; i < size; i++)
+                {
+                    ulong e = BitConverter.ToUInt64(raw, i * 8); if (e == 0) continue;
+                    cards.Add(new ListCard(M.I32(e + Off.LCD_cardid), M.I32(e + Off.LCD_targetUid), M.I32(e + Off.LCD_statusBits), M.I32(e + Off.LCD_listIndex)));
+                }
+            }
+        }
+        return (type, open, cards);
     }
 
     /// Zone the player's cursor is on (player index, FieldPostion code, slot index), or null when nothing is pointed at.

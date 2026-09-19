@@ -233,6 +233,17 @@ class TrackerGameArchiveTest(TestCase):
     def test_requires_did(self):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 
+    def test_list_log_is_kept_as_a_research_file(self):
+        import glob, os, json
+        from django.conf import settings
+        cap = {**self.capture, "did": "7709189150704783635", "list_log": ["3|14|2|4007:88:1234,8933:89:1235"]}
+        self.assertEqual(self.client.post("/api/tracker/games/", cap, format="json").status_code, 201)
+        files = glob.glob(os.path.join(settings.BASE_DIR, "data", "tracker_snapshots", f"*_listlog_{cap['did']}.json"))
+        self.assertEqual(len(files), 1)
+        body = json.load(open(files[0], encoding="utf-8"))
+        self.assertEqual(body["list_log"], cap["list_log"])
+        os.remove(files[0])
+
     def test_timestamps_keep_the_clients_utc_offset(self):
         # 0.6.2+ sends the PC's local time with its offset: 17:05 on the US west coast is 09:05 the next day in Korea
         from django.utils import timezone

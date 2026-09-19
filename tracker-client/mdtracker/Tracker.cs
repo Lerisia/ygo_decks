@@ -73,6 +73,7 @@ public sealed class Tracker
         var stamp = (DateTime.Now - _liveStart).TotalSeconds;
         foreach (var kv in t.LogUids)
             if (!_knownOpp.ContainsKey(kv.Key)) { _knownOpp[kv.Key] = kv.Value; Reveal(m, stamp, kv.Key, kv.Value, t.Cards, "log"); }
+        // t.ListUids (the card-list window) is only logged for now; it joins the memory above once the uid mapping is verified
         var engineIds = new Dictionary<int, int>();
         foreach (var c in t.Cards)
         {

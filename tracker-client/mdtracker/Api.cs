@@ -53,6 +53,7 @@ public sealed class Api
             ["log_uids"] = new JsonObject(m.FinalLogUids.Select(kv => new KeyValuePair<string, JsonNode?>(kv.Key.ToString(), kv.Value))),
             ["reveals"] = new JsonArray(m.RevealLog.Select(x => (JsonNode)x).ToArray()),
             ["table_log"] = new JsonArray(m.TableLog.Select(x => (JsonNode)x).ToArray()),
+            ["list_log"] = new JsonArray(m.ListLog.Select(x => (JsonNode)x).ToArray()),
             ["table_stats"] = new JsonArray(m.TableStats.Select(x => (JsonNode)x).ToArray()),
         };
         var r = Req(HttpMethod.Post, "/api/tracker/snapshot/", o.ToJsonString(), auth: false);
@@ -209,6 +210,7 @@ public sealed class Api
             ["started_at"] = m.StartedAt, ["ended_at"] = m.EndedAt,
             ["turn_times"] = new JsonArray(m.TurnTimes.Select(t => (JsonNode)new JsonObject { ["turn"] = t.Turn, ["me"] = t.Me, ["sec"] = t.Sec }).ToArray()),
             ["paused"] = m.Paused,
+            ["list_log"] = new JsonArray(m.ListLog.Select(x => (JsonNode)x).ToArray()),
         };
         var (status, text) = Send(Req(HttpMethod.Post, "/api/tracker/games/", o.ToJsonString()));
         if (status == 401) throw new UnauthorizedAccessException();
