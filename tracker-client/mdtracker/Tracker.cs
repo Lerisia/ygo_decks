@@ -314,7 +314,7 @@ public sealed class Tracker
     {
         var m = new PendingMatch
         {
-            IsDemo = true, Did = "demo-" + DateTime.Now.Ticks, StartedAt = DateTime.Now.AddMinutes(-9).ToString("s"), EndedAt = DateTime.Now.ToString("s"),
+            IsDemo = true, Did = "demo-" + DateTime.Now.Ticks, StartedAt = DateTime.Now.AddMinutes(-9).ToString("yyyy-MM-dd'T'HH:mm:sszzz"), EndedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:sszzz"),
             GameMode = 3, GameModeName = "Rank", Result = "win", Finish = "Normal", CoinWin = true, First = true, MyId = 0,
             MyName = "Elyss", OppName = "ヤヤトゥーレ", RankBefore = 2, TierBefore = 3, RankAfter = 2, TierAfter = 2, RankCode = "bronze3", Turn = 2,
             MyMdDeckId = "28860507",

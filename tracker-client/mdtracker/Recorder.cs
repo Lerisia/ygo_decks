@@ -178,7 +178,7 @@ internal sealed class Recorder
         int mode = GetInt(r, "GameMode") ?? d.GameMode;
         var m = new PendingMatch
         {
-            StartedAt = DateTime.Now.ToString("s"),
+            StartedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:sszzz"),
             GameMode = mode, GameModeName = Enums.GameMode(mode), MyId = myid,
             CoinWin = (GetInt(r, "Choice") ?? GetInt(r, "choice") ?? -1) == myid,
             First = (GetInt(r, "FirstPlayer") ?? GetInt(r, "first") ?? -1) == myid,
@@ -227,7 +227,7 @@ internal sealed class Recorder
     private void CaptureEnd(PendingMatch m, Game.DuelState d)
     {
         m.Did = d.Did.ToString();
-        m.EndedAt = DateTime.Now.ToString("s");
+        m.EndedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:sszzz");   // with the UTC offset: the site must not read a PC in another time zone as Korean time
         m.Result = d.Result switch { 1 => "win", 2 => "lose", 3 => "draw", _ => d.WinMe ? "win" : d.WinRival ? "lose" : "" };
         m.Finish = Enums.Finish(d.Finish);
         m.Turn = (int)d.Turn + 1;   // engine counts from 0; the site counts turns the way players do

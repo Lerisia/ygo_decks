@@ -233,6 +233,15 @@ class TrackerGameArchiveTest(TestCase):
     def test_requires_did(self):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 
+    def test_timestamps_keep_the_clients_utc_offset(self):
+        # 0.6.2+ sends the PC's local time with its offset: 17:05 on the US west coast is 09:05 the next day in Korea
+        from django.utils import timezone
+        from tracker.models import TrackerGame
+        cap = {**self.capture, "did": "7709189150704783634", "started_at": "2026-09-18T16:57:10-07:00", "ended_at": "2026-09-18T17:05:25-07:00"}
+        self.assertEqual(self.client.post("/api/tracker/games/", cap, format="json").status_code, 201)
+        g = TrackerGame.objects.get(user=self.user, did=cap["did"])
+        self.assertEqual(timezone.localtime(g.ended_at).strftime("%Y-%m-%dT%H:%M"), "2026-09-19T09:05")
+
     def test_turn_from_old_clients_is_shifted_to_count_from_one(self):
         from tracker.models import TrackerGame
         self.client.post("/api/tracker/games/", {**self.capture, "turn": 2}, format="json", HTTP_X_TRACKER_VERSION="0.4.3")
