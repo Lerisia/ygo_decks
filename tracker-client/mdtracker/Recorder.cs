@@ -47,7 +47,7 @@ internal sealed class Recorder
         PendingMatch? cur = null;      // duel in progress
         int lastStep = -999;
         int clockTurn = -1; DateTime turnStart = default;   // raw nTurnNum being timed (0-based in the engine)
-        bool liveShown = false; int liveTick = 0; List<LiveCard> liveCards = new(); Dictionary<int, int> logUids = new(), listUids = new(); bool listOpen = false;
+        bool liveShown = false; int liveTick = 0; List<LiveCard> liveCards = new(); Dictionary<int, int> logUids = new(); List<LiveCard> listCards = new(); bool listOpen = false;
         string lastProbe = ""; DateTime probeStart = default;
         // Opponent clock estimate. The client never receives the opponent's timer, but their clock only runs while
         // they are deciding: no prompt open on my side and nothing animating. Verified against my own clock (2% off).
@@ -131,11 +131,13 @@ internal sealed class Recorder
                             // the card-list window: a revealed hand, a looked-at deck or extra deck lists cards the table itself never names
                             try
                             {
-                                listUids = new Dictionary<int, int>();
+                                listCards = new List<LiveCard>();
                                 var sl = _g.SelectionList();
                                 bool openNow = sl is { open: true, cards.Count: > 0 };
+                                // items carry no uid; their status bits pack player | position << 1 | slot << 6 (verified on hand reveals)
                                 if (openNow)
-                                    foreach (var c in sl!.Value.cards) if (c.Uid > 0 && c.Id > 0) listUids[c.Uid] = c.Id;
+                                    foreach (var c in sl!.Value.cards)
+                                        if (c.Id > 0) listCards.Add(new LiveCard { Me = (c.Bits & 1) == cur.MyId, Zone = (c.Bits >> 1) & 0x1F, Index = (c.Bits >> 6) & 0x3F, Id = c.Id });
                                 if (openNow && !listOpen && cur.ListLog.Count < 100)
                                     cur.ListLog.Add($"{(DateTime.Now - probeStart).TotalSeconds:0}|{sl!.Value.type}|{sl.Value.cards.Count}|" + string.Join(",", sl.Value.cards.Take(40).Select(c => $"{c.Id}:{c.Uid}:{c.Bits}")));
                                 listOpen = openNow;
@@ -150,7 +152,7 @@ internal sealed class Recorder
                         {
                             Turn = (int)d.Turn + 1, TurnMe = IsMyTurn(cur, (int)d.Turn), Cards = liveCards,
                             HoverMe = hover != null && hover.Value.player == cur.MyId, HoverZone = hover?.position ?? -1, HoverIndex = hover?.index ?? 0,
-                            MySecLeft = (int)d.TimeTotal, OppSecLeft = (int)Math.Round(oppBank), LogUids = logUids, ListUids = listUids,
+                            MySecLeft = (int)d.TimeTotal, OppSecLeft = (int)Math.Round(oppBank), LogUids = logUids, ListCards = listCards,
                         });
                     }
                     else if (d.Step != 16) { EndLive(); lastMyInput = false; }

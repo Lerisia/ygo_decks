@@ -224,7 +224,7 @@ public sealed class LiveTick
     public int HoverIndex { get; set; }
     public int MySecLeft { get; set; }         // engine's own clock (bank)
     public int OppSecLeft { get; set; }        // estimate: the rules replayed, minus the time the opponent was deciding
-    public Dictionary<int, int> ListUids { get; set; } = new();   // uid → card id from the open card-list window (reveals, confirms)
+    public List<LiveCard> ListCards { get; set; } = new();   // the open card-list window (reveals, confirms): id + owner/zone/slot, no uid
     public Dictionary<int, int> LogUids { get; set; } = new();   // the game log's uid → card id table
 }
 
