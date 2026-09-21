@@ -90,6 +90,8 @@
                         <ComboBoxItem Content="전체"/>
                     </ComboBox>
                 </StackPanel>
+                <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"
+                           Text="상대 남은 시간은 서버가 알려주는 값이 아닙니다. 게임의 시간 규칙(시작 300초, 내 턴 +60초, 상대 턴 +30초, 최대 300초)으로 트래커가 계산한 추정치라 실제와 몇 초 다를 수 있습니다."/>
                 <CheckBox x:Name="AlertBox" Margin="0,6,0,0" Checked="Alert_Changed" Unchecked="Alert_Changed"
                           Content="게임을 내려놓은 동안 내 차례가 오면 소리로 알림"/>
                 <CheckBox x:Name="AutoStartBox" Margin="0,6,0,0" Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"

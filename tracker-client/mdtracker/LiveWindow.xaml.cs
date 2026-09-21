@@ -52,7 +52,7 @@ public partial class LiveWindow : Window
         if (_full != full || (StripRows.Visibility == Visibility.Visible) != (full && !s_minimized)) { _full = full; ApplyMinimized(); }
         StripHead.Text = $"vs {s.OppName}";
         StripTurn.Text = s.Turn == 0 ? "듀얼 시작" : $"{s.Turn}턴 · {(s.TurnMe ? "내 턴" : "상대 턴")}";
-        if (full && s.Turn > 0 && s.MySecLeft > 0) StripTurn.Text += $" · 상대 남은 시간 {s.OppSecLeft}초";   // my own clock is on screen already
+        if (full && s.Turn > 0 && s.MySecLeft > 0) StripTurn.Text += $" · 상대 남은 시간(추정) {s.OppSecLeft}초";   // my own clock is on screen already; the opponent's is never sent, so this is our replay of the clock rules
         var top2 = s.OppCandidates.Take(2).Select(c => $"{c.Name} {Math.Round(c.Share * 100)}%").ToList();
         bool anyOpp = s.Cards.Any(c => !c.Me);
         StripDeck.Text = top2.Count > 0 ? string.Join(" · 또는 ", top2) : anyOpp ? "판독 중…" : "아직 공개된 카드 없음";
