@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
          updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility } from "@/api/toolApi";
@@ -570,8 +570,16 @@ const RecordGroupDetailPage = () => {
 
   
   
+ // The next-match defaults are applied once per saved record. The 15s poll hands back a new object for the
+ // same record, and re-applying it used to wipe an opponent deck / memo the person was still typing.
+ const appliedLastMatchId = useRef<number | null>(null);
  useEffect(() => {
   if (!lastMatch || owned_decks.length === 0) return;
+  if (appliedLastMatchId.current === lastMatch.id) return;
+  appliedLastMatchId.current = lastMatch.id;
+  const formTouched =
+    !!newMatch.opponent_deck || !!newMatch.opponent_deck_name.trim() || !!newMatch.notes.trim();
+  if (formTouched) return;
 
   const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
 
@@ -618,6 +626,8 @@ const RecordGroupDetailPage = () => {
       wins: null,
     }));
   }
+  // newMatch is read for the touched check only; adding it here would re-run this on every keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [lastMatch, owned_decks]);
 
   const handleRegisterMatch = async () => {
@@ -642,6 +652,9 @@ const RecordGroupDetailPage = () => {
         setPending((list) => list.filter((p) => p.id !== activePendingId));
         setActivePendingId(null);
       }
+      // Clear what the person typed here, not from the poll: the next-match defaults below only apply to
+      // an untouched form, so leaving these set would carry the saved opponent deck into the next record.
+      setNewMatch((prev) => ({ ...prev, opponent_deck: "", opponent_deck_name: "", notes: "" }));
       await loadMatches();
       await loadLastMatch();
     } catch (error) {
