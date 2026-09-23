@@ -60,7 +60,8 @@ def _is_unknown(row):
 
 def compute_full_statistics(matches):
     """`matches` is a MatchRecord queryset (already filtered for is_deleted / deck_id)."""
-    rows = list(matches.order_by("id").values(*ROW_FIELDS))
+    # My deck '기타' (deck = null) is a deck the 도감 doesn't list — kept in the record list, left out of statistics.
+    rows = list(matches.filter(deck__isnull=False).order_by("id").values(*ROW_FIELDS))
 
     total = _acc()
     by_deck = {}          # deck_id -> acc (insertion order = first appearance)

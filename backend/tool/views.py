@@ -232,7 +232,7 @@ def get_record_group_statistics(request, record_group_id):
     if err:
         return err
 
-    matches = record_group.matches.filter(is_deleted=False)
+    matches = record_group.matches.filter(is_deleted=False, deck__isnull=False)  # my deck '기타' is not counted
     _member = request.GET.get("member")
     if _member and _member.isdigit():
         matches = matches.filter(recorded_by_id=int(_member))
@@ -432,6 +432,7 @@ def recent_meta_deck_stats(request):
         ~Q(opponent_deck__name=""),
         opponent_deck__isnull=False,
         opponent_deck__name__isnull=False,
+        deck__isnull=False,  # my deck '기타' is not counted
         created_at__gte=time_threshold,
         is_deleted=False,
     ).filter(

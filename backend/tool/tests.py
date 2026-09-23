@@ -931,16 +931,39 @@ class OtherMyDeckTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIsNone(resp.json()["matches"][0]["deck"])
 
-    def test_statistics_group_other_deck_separately(self):
+    def test_full_statistics_exclude_other_deck(self):
         _create_match(self.group, None, self.opp, result="win")
         _create_match(self.group, None, self.opp, result="lose")
         _create_match(self.group, self.deck, self.opp, result="win")
         resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/")
         self.assertEqual(resp.status_code, 200)
-        mine = {(s["deck"] or {}).get("name"): s for s in resp.json()["my_deck_stats"]}
-        self.assertEqual(mine[None]["count"], 2)
-        self.assertEqual(mine[None]["win_rate"], 50.0)
-        self.assertEqual(mine["내덱"]["count"], 1)
+        data = resp.json()
+        self.assertEqual(data["basic"]["total_games"], 1)
+        self.assertEqual([s["deck"]["name"] for s in data["my_deck_stats"]], ["내덱"])
+        self.assertEqual(sum(s["count"] for s in data["opponent_deck_stats"]), 1)
+
+    def test_user_statistics_exclude_other_deck(self):
+        _create_match(self.group, None, self.opp)
+        _create_match(self.group, self.deck, self.opp)
+        resp = self.client.get("/api/record-groups/statistics/full/")
+        self.assertEqual(resp.json()["basic"]["total_games"], 1)
+
+    def test_basic_statistics_exclude_other_deck(self):
+        _create_match(self.group, None, self.opp)
+        _create_match(self.group, self.deck, self.opp)
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/")
+        self.assertEqual(resp.json()["total_games"], 1)
+
+    def test_meta_statistics_exclude_other_deck(self):
+        _create_match(self.group, None, self.opp, rank="diamond3")
+        _create_match(self.group, self.deck, self.opp, rank="diamond3")
+        resp = self.client.get("/api/recent-meta-deck-stats/")
+        self.assertEqual(resp.json()["total_matches"], 1)
+
+    def test_other_deck_still_listed_in_records(self):
+        _create_match(self.group, None, self.opp)
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
+        self.assertEqual(len(resp.json()["matches"]), 1)
 
     def test_update_match_to_other_deck(self):
         match = _create_match(self.group, self.deck, self.opp)
