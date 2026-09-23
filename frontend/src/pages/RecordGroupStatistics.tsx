@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList } from "recharts";
 import { getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups, getSheetContributors, type SheetContributor } from "@/api/toolApi";
-import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
+import { OTHER_DECK_IMAGE, UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 
 interface DeckInfo {
   id: number;
@@ -205,7 +205,10 @@ const StatisticsPage = () => {
   const totalWins = Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100);
   const totalLosses = stats.basic.total_games - totalWins;
 
-  const myDecks = [...stats.my_deck_stats].sort((a, b) => b.count - a.count);
+  // My deck '기타' comes back as deck = null; give it a stand-in so the chart and tables can key/label it.
+  const myDecks = [...stats.my_deck_stats]
+    .map((s) => (s.deck ? s : { ...s, deck: { id: -1, name: "기타", cover_image_small: OTHER_DECK_IMAGE } as DeckInfo }))
+    .sort((a, b) => b.count - a.count);
   const oppDecks = [...stats.opponent_deck_stats]
     .map((entry) => ({
       ...entry,

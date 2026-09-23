@@ -82,7 +82,8 @@ class MatchRecord(models.Model):
     record_group = models.ForeignKey("RecordGroup", on_delete=models.CASCADE, related_name="matches")
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="recorded_matches",
                                     help_text="이 기록을 넣은 사람 (공유 시트에서 기여자 구분)")
-    deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="player_matches",)
+    deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="player_matches", null=True, blank=True,
+                             help_text="비어 있으면 '기타' — 도감에 없는 덱")
     opponent_deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="opponent_matches", blank=True, null=True)
     opponent_deck_name = models.CharField(max_length=100, blank=True, null=True)
     is_deleted = models.BooleanField(default=False)

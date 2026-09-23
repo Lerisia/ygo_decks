@@ -900,3 +900,51 @@ class SharedSheetTest(TestCase):
         self._join(self.mate)
         self.assertEqual(self._as(self.owner).delete(f"/api/record-groups/{self.group.id}/members/{self.mate.id}/").status_code, 204)
         self.assertEqual(self._as(self.stranger).delete(f"/api/record-groups/{self.group.id}/members/{self.owner.id}/").status_code, 403)
+
+
+class OtherMyDeckTest(TestCase):
+    """내 덱 '기타': 도감에 없는 덱으로 기록 (deck=None), 특이점 2026-09-23."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="o@test.com", username="other1", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck(name="내덱")
+        self.opp = _create_deck(name="상대덱")
+        self.group = RecordGroup.objects.create(user=self.user, name="시즌1")
+
+    def _post(self, deck):
+        return self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": deck, "opponent_deck": self.opp.id,
+            "first_or_second": "first", "result": "win", "coin_toss_result": "win",
+        }, format="json")
+
+    def test_add_match_with_other_deck(self):
+        for value in ("null", None):
+            resp = self._post(value)
+            self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(MatchRecord.objects.filter(deck__isnull=True).count(), 2)
+
+    def test_match_list_serializes_other_deck_as_null(self):
+        _create_match(self.group, None, self.opp)
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()["matches"][0]["deck"])
+
+    def test_statistics_group_other_deck_separately(self):
+        _create_match(self.group, None, self.opp, result="win")
+        _create_match(self.group, None, self.opp, result="lose")
+        _create_match(self.group, self.deck, self.opp, result="win")
+        resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/")
+        self.assertEqual(resp.status_code, 200)
+        mine = {(s["deck"] or {}).get("name"): s for s in resp.json()["my_deck_stats"]}
+        self.assertEqual(mine[None]["count"], 2)
+        self.assertEqual(mine[None]["win_rate"], 50.0)
+        self.assertEqual(mine["내덱"]["count"], 1)
+
+    def test_update_match_to_other_deck(self):
+        match = _create_match(self.group, self.deck, self.opp)
+        resp = self.client.patch(f"/api/match-records/{match.id}/update/", {"deck": "null"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        match.refresh_from_db()
+        self.assertIsNone(match.deck_id)

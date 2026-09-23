@@ -127,11 +127,14 @@ def add_match_to_record_group(request, record_group_id):
     opponent_deck = data.get("opponent_deck")
     if opponent_deck == "null" or opponent_deck == "" or opponent_deck is None:
         opponent_deck = None
+    deck = data.get("deck")
+    if deck in ("null", "", None):
+        deck = None  # '기타'
 
     match = MatchRecord(
         record_group=record_group,
         recorded_by=user,
-        deck_id=data.get("deck"),
+        deck_id=deck,
         opponent_deck_id=opponent_deck,
         opponent_deck_name=data.get("opponent_deck_name") or None,
         first_or_second=data.get("first_or_second"),
@@ -362,15 +365,18 @@ def get_record_group_matches(request, record_group_id):
     data = [
         {
             "id": match.id,
-            "deck": {
-                "id": match.deck.id,
-                "name": match.deck.name,
-                "cover_image_small": (
-                    match.deck.cover_image_small.url 
-                    if match.deck.cover_image_small 
-                    else None
-                ),
-            },
+            "deck": (
+                {
+                    "id": match.deck.id,
+                    "name": match.deck.name,
+                    "cover_image_small": (
+                        match.deck.cover_image_small.url
+                        if match.deck.cover_image_small
+                        else None
+                    ),
+                }
+                if match.deck else None
+            ),
             "opponent_deck": (
                 {
                     "id": match.opponent_deck.id,

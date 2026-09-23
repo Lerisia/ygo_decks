@@ -11,7 +11,7 @@ import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
 import Select from "react-select";
 import { getNextRankState, RANK_OPTIONS, RANK_ORDER, getValidWinOptions as getValidWinOpts } from "@/utils/rankUtils";
-import { UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
+import { OTHER_DECK_IMAGE, UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
 import { matchesDeckQuery } from "@/utils/hangul";
 
 const isDark = () => document.documentElement.classList.contains("dark");
@@ -89,7 +89,7 @@ type Contributor = { id: number; username: string; icon: string | null; border: 
 type MatchRecord = {
   id: number;
   recorded_by?: Contributor | null;
-  deck: DeckShortData;
+  deck: DeckShortData | null;
   opponent_deck: DeckShortData | null;
   opponent_deck_name: string | null;
   first_or_second: "first" | "second";
@@ -584,7 +584,7 @@ const RecordGroupDetailPage = () => {
   const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
 
   const base: Partial<MatchForm> = {
-    deck: matchedDeck ? String(matchedDeck.id) : "",
+    deck: !lastMatch.deck ? "null" : matchedDeck ? String(matchedDeck.id) : "",
     opponent_deck: "",
     opponent_deck_name: "",
     first_or_second: "first",
@@ -635,7 +635,7 @@ const RecordGroupDetailPage = () => {
     const oppDeck = newMatch.opponent_deck || "null";
     try {
       await addMatchToRecordGroup(Number(recordGroupId), {
-        deck: Number(newMatch.deck),
+        deck: newMatch.deck === "null" ? null : Number(newMatch.deck),
         opponent_deck: oppDeck === "null" ? null : Number(oppDeck),
         opponent_deck_name: newMatch.opponent_deck_name || null,
         coin_toss_result: newMatch.coin_toss_result as "win" | "lose",
@@ -666,11 +666,15 @@ const RecordGroupDetailPage = () => {
   const ownedIds = new Set(owned_decks.map((d) => d.id));
   const deckSource = [...decks.filter((d) => ownedIds.has(d.id)), ...decks.filter((d) => !ownedIds.has(d.id))];
   if (extraDeck && !deckSource.some((d) => d.id === extraDeck.id)) deckSource.push(extraDeck);
-  const deckOptions: OptionType[] = deckSource.map((deck) => ({
-    value: String(deck.id),
-    label: deck.name,
-    aliases: decks.find((d) => d.id === deck.id)?.aliases || [],
-  }));
+  const deckOptions: OptionType[] = [
+    ...deckSource.map((deck) => ({
+      value: String(deck.id),
+      label: deck.name,
+      aliases: decks.find((d) => d.id === deck.id)?.aliases || [],
+    })),
+    // For decks the 도감 doesn't list; saved as deck = null.
+    { value: "null", label: "기타 (도감에 없는 덱)", aliases: ["기타", "ㄱㅌ"] },
+  ];
 
   // Shared search for both deck selects: name/alias substring, or initials
   // (with compound jamo expanded) when the query is all consonants.
@@ -1081,12 +1085,14 @@ const RecordGroupDetailPage = () => {
               >
                 <div className="flex items-center gap-2 min-w-0 col-span-2 sm:col-span-1">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {match.deck.cover_image_small ? (
+                    {!match.deck ? (
+                      <img src={OTHER_DECK_IMAGE} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
+                    ) : match.deck.cover_image_small ? (
                       <img src={match.deck.cover_image_small} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
                     ) : (
                       <div className="w-9 h-9 rounded bg-gray-200 dark:bg-gray-700 shrink-0" />
                     )}
-                    <span className="truncate text-[15px] font-medium">{match.deck.name}</span>
+                    <span className="truncate text-[15px] font-medium">{match.deck?.name ?? "기타"}</span>
                   </div>
                   <span className="text-xs text-gray-400 shrink-0">vs</span>
                   <div className="flex items-center gap-2 min-w-0 flex-1">

@@ -77,7 +77,7 @@ def compute_full_statistics(matches):
             _add(by_opp.setdefault(row["opponent_deck_id"], _acc()), row)
         _add(by_pair.setdefault((row["deck_id"], row["opponent_deck_id"]), _acc()), row)
 
-    deck_ids = set(by_deck) | {d for d in by_opp if d is not None}
+    deck_ids = {d for d in by_deck if d is not None} | {d for d in by_opp if d is not None}
     decks = Deck.objects.in_bulk(deck_ids) if deck_ids else {}
     serialized = {d.id: DeckShortSerializer(d).data for d in decks.values()}
 

@@ -59,7 +59,7 @@ export const updateRecordGroupName = async (recordGroupId: number, name: string)
 export const updateMatchRecord = async (
   matchId: number,
   data: {
-    deck?: number;
+    deck?: number | null;
     opponent_deck?: number | null;
     opponent_deck_name?: string | null;
     first_or_second?: "first" | "second";
@@ -127,7 +127,7 @@ export const deleteRecordGroup = async (recordGroupId: number) => {
 };
 
 type NewMatchPayload = {
-  deck: number;
+  deck: number | null;
   opponent_deck: number | null;
   opponent_deck_name?: string | null;
   first_or_second: "first" | "second";
