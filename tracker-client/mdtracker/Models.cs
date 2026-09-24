@@ -5,6 +5,7 @@ namespace MdTracker;
 
 public sealed class Config
 {
+    public string? TestKey { get; set; }   // test build only: the password the server last accepted
     public string ServerUrl { get; set; } = "https://ygodecks.com";
     public string? Token { get; set; }
     public string? Email { get; set; }

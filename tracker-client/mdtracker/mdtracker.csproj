@@ -22,6 +22,11 @@
     <Version>0.6.5</Version>
   </PropertyGroup>
 
+  <!-- dotnet publish -p:TestBuild=true: the password-locked test build (leak kept visible, whole captures sent, no updates) -->
+  <PropertyGroup Condition="'$(TestBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
+  </PropertyGroup>
+
   <!-- Pretendard (OFL) embedded so every machine renders the same UI font. -->
   <ItemGroup>
     <Resource Include="Fonts\Pretendard-Regular.ttf" />

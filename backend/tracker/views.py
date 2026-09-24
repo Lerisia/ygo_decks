@@ -117,6 +117,47 @@ def _keep_list_log(user, game, list_log):
         json.dump(body, f, ensure_ascii=False, indent=1)
 
 
+TEST_KEY_FILE = os.path.join(settings.BASE_DIR, "data", "tracker_test_key.txt")
+
+
+def _test_key():
+    """The test build's password; edit the file on the server to change it (no file = test builds locked)."""
+    try:
+        with open(TEST_KEY_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def _test_key_ok(given):
+    from django.utils.crypto import constant_time_compare
+    key = _test_key()
+    return bool(key) and constant_time_compare(str(given or ""), key)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def test_unlock(request):
+    """Test build start-up: the build runs only while this accepts its password."""
+    ok = _test_key_ok(request.data.get("password"))
+    return Response({"ok": ok}, status=status.HTTP_200_OK if ok else status.HTTP_403_FORBIDDEN)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def test_log(request):
+    """Test build: the whole capture of every duel (any mode), kept as a research file beside the snapshots."""
+    if request.user.id not in ver.GATE_EXEMPT_USER_IDS or not _test_key_ok(request.headers.get("X-Tracker-Test-Key")):
+        return Response({"error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+    safe = lambda v: re.sub(r"[^0-9A-Za-z_-]", "", str(v or ""))[:40] or "x"
+    out_dir = os.path.join(settings.BASE_DIR, "data", "tracker_snapshots")
+    os.makedirs(out_dir, exist_ok=True)
+    name = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_u{request.user.id}_test_{safe(request.data.get('gameModeName'))}_{safe(request.data.get('did'))}.json"
+    with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
+        json.dump(request.data, f, ensure_ascii=False)
+    return Response({"ok": True}, status=status.HTTP_201_CREATED)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def version_info(request):

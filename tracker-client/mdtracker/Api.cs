@@ -83,6 +83,26 @@ public sealed class Api
         try { return JsonSerializer.Deserialize(text, ti); } catch { return null; }
     }
 
+    /// Test build: does the server still accept this password? null when the server can't be reached.
+    public bool? TestUnlock(string password)
+    {
+        try
+        {
+            var (status, _) = Send(Req(HttpMethod.Post, "/api/tracker/test/unlock/", new JsonObject { ["password"] = password }.ToJsonString(), auth: false));
+            return status == 200 ? true : status == 403 ? false : null;
+        }
+        catch { return null; }
+    }
+
+    /// Test build: the whole capture of a duel (any mode) for research.
+    public void UploadTestLog(PendingMatch m)
+    {
+        var r = Req(HttpMethod.Post, "/api/tracker/test/log/", JsonSerializer.Serialize(m, J.Default.PendingMatch));
+        r.Headers.Add("X-Tracker-Test-Key", _store.Config.TestKey ?? "");
+        var (status, _) = Send(r);
+        if (status is not (200 or 201)) throw new Exception($"test log {status}");
+    }
+
     /// Returns null on success, else an error message.
     public string? Login(string email, string password)
     {

@@ -43,6 +43,9 @@ public partial class MainWindow : Window
         {
             if (app.UpdateState.Length > 0) { UpdateText.Text = app.UpdateState; UpdateBanner.Visibility = Visibility.Visible; }
         });
+#if TEST_BUILD
+        await Task.CompletedTask; return;   // the test build never offers the public release
+#endif
         var info = await Task.Run(() => T.Api.LatestVersion());
         if (info == null || string.IsNullOrEmpty(info.Latest) || !App.Behind(info.Latest)) return;
         if (!string.IsNullOrEmpty(info.Url)) _updateUrl = info.Url;

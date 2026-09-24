@@ -53,6 +53,9 @@ public sealed class Tracker
                 SetStatus("마스터듀얼 연결됨 — 랭크/레이팅 게임을 자동으로 기록합니다", true);
                 Log.Info("game connected");
                 var rec = new Recorder(g, OnMatch, did => Store.Has(did)) { OnLive = OnLiveTick, OnLiveEnd = EndLive, OnMyInputOpened = AlertIfAway };
+#if TEST_BUILD
+                rec.OnResearch = m => new Thread(() => { try { Api.UploadTestLog(m); } catch (Exception ex) { Log.Info("test log: " + ex.Message); } }) { IsBackground = true }.Start();
+#endif
                 rec.Run();
             }
             catch (Exception ex)
@@ -76,19 +79,25 @@ public sealed class Tracker
         // A card in the deck is hidden again: the deck gets shuffled, and a random pick (악마양 릴리스, 에니아크래프트: 3 shown,
         // 1 picked face-down) leaves the deck under the same uid. Whatever was known up to then is forgotten; what is shown
         // after it leaves the deck (a flip, a searched card, a looked-at hand) counts again.
+#if !TEST_BUILD   // the test build keeps the 0.6.3 memory on purpose: it is how the leak is reproduced
         foreach (var c in t.Cards)
             if (!c.Me && c.Uid != 0 && c.Zone == LiveCard.Deck)
             {
                 _knownOpp.Remove(c.Uid);
                 if (t.LogUids.TryGetValue(c.Uid, out var logged)) _staleLog[c.Uid] = logged;
             }
+#endif
         foreach (var kv in t.LogUids)
             if (!(_staleLog.TryGetValue(kv.Key, out var stale) && stale == kv.Value) && !_knownOpp.ContainsKey(kv.Key)) { _knownOpp[kv.Key] = kv.Value; Reveal(m, stamp, kv.Key, kv.Value, t.Cards, "log"); }
         // the card-list window (a revealed hand, a looked-at deck or extra deck): its items name the opponent's card at a
         // zone + slot; the card table at that spot gives the uid, so the name stays once the window closes
         foreach (var lc in t.ListCards)
         {
+#if TEST_BUILD
+            if (lc.Me || lc.Zone > 17) continue;
+#else
             if (lc.Me || lc.Zone > 17 || lc.Zone == LiveCard.Deck) continue;
+#endif
             var at = t.Cards.FirstOrDefault(c => !c.Me && c.Zone == lc.Zone && c.Index == lc.Index && c.Uid != 0);
             if (at != null && !_knownOpp.ContainsKey(at.Uid)) { _knownOpp[at.Uid] = lc.Id; Reveal(m, stamp, at.Uid, lc.Id, t.Cards, "list"); }
         }
@@ -97,7 +106,9 @@ public sealed class Tracker
         {
             if (c.Me || c.Uid == 0) continue;
             engineIds[c.Uid] = c.Id;
+#if !TEST_BUILD
             if (c.Zone == LiveCard.Deck) continue;
+#endif
             if (c.Id != 0) { if (!_knownOpp.ContainsKey(c.Uid)) Reveal(m, stamp, c.Uid, c.Id, t.Cards, "engine"); _knownOpp[c.Uid] = c.Id; }
             else if (_knownOpp.TryGetValue(c.Uid, out var known)) c.Id = known;
         }

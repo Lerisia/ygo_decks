@@ -7,7 +7,11 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
+#if TEST_BUILD
+    public const string Version = "0.6.5-test";
+#else
     public const string Version = "0.6.5";
+#endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -62,6 +66,9 @@ public partial class App : System.Windows.Application
         TaskScheduler.UnobservedTaskException += (_, a) => { ReportCrash(a.Exception); a.SetObserved(); };
         var store = new Store();
         var api = new Api(store);
+#if TEST_BUILD
+        if (!TestGate.Unlock(store, api)) { Shutdown(); return; }
+#endif
         Tracker = new Tracker(store, api);
         Tracker.MatchCaptured += m => Dispatcher.BeginInvoke(() => OnMatchCaptured(m));
         Tracker.LiveUpdated += () => Dispatcher.BeginInvoke(OnLiveUpdated);
@@ -78,6 +85,10 @@ public partial class App : System.Windows.Application
         _tray.DoubleClick += (_, _) => ShowMain();
 
         MainWin = new MainWindow();
+#if TEST_BUILD
+        MainWin.Title += " — 테스트 빌드";
+        _tray.Text = "YGO Decks 트래커 (테스트 빌드)";
+#endif
         if (Tracker.Store.Config.StartWithWindows) AutoStart.Apply(true);
         if (e.Args.Contains(AutoStart.MinimizedArg)) HideToTray();
         else MainWin.Show();
@@ -85,7 +96,9 @@ public partial class App : System.Windows.Application
         new Thread(Updater.Cleanup) { IsBackground = true }.Start();
         if (e.Args.Contains(Updater.UpdatedArg)) _tray?.ShowBalloonTip(5000, "YGO Decks 트래커", $"{Version}(으)로 업데이트했습니다.", WinForms.ToolTipIcon.Info);
         _startArgs = e.Args;
+#if !TEST_BUILD
         new Thread(AutoUpdateLoop) { IsBackground = true, Name = "update" }.Start();
+#endif
 
         if (e.Args.Contains("--demo"))
             new Thread(() => { Thread.Sleep(2500); Tracker.DemoMatch(); }) { IsBackground = true }.Start();

@@ -426,6 +426,50 @@ class TrackerVersionGateTest(TestCase):
         self.assertEqual(self.client.get("/api/tracker/pending/").status_code, 200)   # the website sends no version
 
 
+class TrackerTestBuildTest(TestCase):
+    """The test build unlocks with a server-side password and sends whole captures from test accounts only."""
+
+    def setUp(self):
+        import tempfile
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="t@test.com", username="testbuild", password="pass1234")
+        self.key = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+        self.key.write("260924\n"); self.key.close()
+        self.p_key = patch("tracker.views.TEST_KEY_FILE", self.key.name); self.p_key.start()
+
+    def tearDown(self):
+        import glob, os
+        self.p_key.stop()
+        os.remove(self.key.name)
+        for f in glob.glob(os.path.join("data", "tracker_snapshots", f"*_u{self.user.id}_test_*")):
+            os.remove(f)
+
+    def test_unlock_checks_the_password_even_for_a_test_version(self):
+        ok = self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json", HTTP_X_TRACKER_VERSION="0.6.5-test")
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(self.client.post("/api/tracker/test/unlock/", {"password": "0000"}, format="json").status_code, 403)
+
+    def test_no_password_file_locks_everything(self):
+        with patch("tracker.views.TEST_KEY_FILE", "/nonexistent/key.txt"):
+            self.assertEqual(self.client.post("/api/tracker/test/unlock/", {"password": ""}, format="json").status_code, 403)
+
+    def test_capture_is_kept_for_a_test_account_with_the_password(self):
+        import glob, os
+        self.client.force_authenticate(user=self.user)
+        body = {"did": "77091", "gameModeName": "Room", "revealLog": ["1|2|3|15|1|engine"]}
+        with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
+            res = self.client.post("/api/tracker/test/log/", body, format="json", HTTP_X_TRACKER_TEST_KEY="260924")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(len(glob.glob(os.path.join("data", "tracker_snapshots", f"*_u{self.user.id}_test_Room_77091.json"))), 1)
+
+    def test_capture_is_refused_without_the_account_or_the_password(self):
+        self.client.force_authenticate(user=self.user)
+        with patch("tracker.version.GATE_EXEMPT_USER_IDS", set()):
+            self.assertEqual(self.client.post("/api/tracker/test/log/", {"did": "1"}, format="json", HTTP_X_TRACKER_TEST_KEY="260924").status_code, 403)
+        with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
+            self.assertEqual(self.client.post("/api/tracker/test/log/", {"did": "1"}, format="json", HTTP_X_TRACKER_TEST_KEY="bad").status_code, 403)
+
+
 class TrackerStatsTest(TestCase):
     """Matchup record and today's summary shown in the tracker."""
 

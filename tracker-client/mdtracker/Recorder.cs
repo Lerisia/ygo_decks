@@ -13,6 +13,7 @@ internal sealed class Recorder
     public static readonly HashSet<int> RecordedModes = new() { 3, 19 }; // Rank, Rate
     public Action<PendingMatch, LiveTick>? OnLive;
     public Action? OnLiveEnd;
+    public Action<PendingMatch>? OnResearch;   // test build: every finished duel, any mode
     public Action? OnMyInputOpened;   // my clock just started running: a prompt opened or my turn began
 
     public Recorder(Game g, Action<PendingMatch> onMatch, Func<string, bool> alreadyKnown)
@@ -275,6 +276,7 @@ internal sealed class Recorder
             }
         }
         m.RankCode = RankCode(m.RankBefore, m.TierBefore);
+        OnResearch?.Invoke(m);
         if (m.Did == "0" || _alreadyKnown(m.Did)) { Log.Info($"duel {m.Did} already recorded / no id — skipped"); return; }
         if (!RecordedModes.Contains(m.GameMode)) { Log.Info($"mode {m.GameModeName} not recorded — skipped"); return; }
         Log.Info($"duel end: {m.Result} ({m.Finish}), turn {m.Turn}, time me {m.MySec}s / opp {m.OppSec}s, rank {m.RankCode}, rating {m.RatingBefore}→{m.RatingAfter}, {m.OppCards.Count} opp cards");

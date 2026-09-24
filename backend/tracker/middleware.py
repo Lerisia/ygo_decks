@@ -2,7 +2,7 @@ from django.http import JsonResponse
 
 from . import version as ver
 
-OPEN_PATHS = ("/api/tracker/version/", "/api/token/")
+OPEN_PATHS = ("/api/tracker/version/", "/api/token/", "/api/tracker/test/unlock/")
 
 
 class TrackerVersionGate:
