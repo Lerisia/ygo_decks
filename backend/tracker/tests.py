@@ -392,7 +392,6 @@ class TrackerVersionTest(TestCase):
         self.assertTrue(body["outdated"])
 
 
-@patch("tracker.version.MIN_SUPPORTED", "0.6.4")
 class TrackerVersionGateTest(TestCase):
     """Builds below MIN_SUPPORTED are refused everywhere except the version check and login."""
 
@@ -411,6 +410,14 @@ class TrackerVersionGateTest(TestCase):
         self.assertEqual(self.client.get("/api/tracker/version/", HTTP_X_TRACKER_VERSION="0.6.3").status_code, 200)
         res = self.client.post("/api/token/", {"email": "g@test.com", "password": "wrong"}, format="json", HTTP_X_TRACKER_VERSION="0.6.3")
         self.assertNotEqual(res.status_code, 426)
+
+    def test_exempt_account_keeps_its_old_build(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
+            c = APIClient()
+            c.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(self.user).access_token}")
+            res = c.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION="0.6.3")
+            self.assertEqual(res.status_code, 200)
 
     def test_current_build_and_the_website_pass(self):
         from tracker import version as ver

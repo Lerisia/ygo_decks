@@ -17,7 +17,16 @@ class TrackerVersionGate:
     def __call__(self, request):
         v = request.headers.get("X-Tracker-Version")
         if (v is not None and request.path.startswith("/api/") and not request.path.startswith(OPEN_PATHS)
-                and ver.is_outdated(v, ver.MIN_SUPPORTED)):
+                and ver.is_outdated(v, ver.MIN_SUPPORTED) and _user_id(request) not in ver.GATE_EXEMPT_USER_IDS):
             return JsonResponse({"error": "트래커를 최신 버전으로 업데이트해 주세요.", "min_supported": ver.MIN_SUPPORTED,
                                  "url": ver.DOWNLOAD_URL}, status=426)
         return self.get_response(request)
+
+
+def _user_id(request):
+    try:
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+        found = JWTAuthentication().authenticate(request)
+        return found[0].id if found else None
+    except Exception:
+        return None
