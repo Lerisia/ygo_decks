@@ -7,7 +7,7 @@ namespace MdTracker;
 
 public partial class App : System.Windows.Application
 {
-    public const string Version = "0.6.3";
+    public const string Version = "0.6.4";
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
     private OverlayWindow? _overlay;
@@ -266,7 +266,8 @@ public partial class App : System.Windows.Application
             try
             {
                 var info = Tracker.Api.LatestVersion();
-                if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url) && _offered != info.Latest)
+                bool must = info != null && !string.IsNullOrEmpty(info.MinSupported) && Behind(info.MinSupported);
+                if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url) && (_offered != info.Latest || must))
                 {
                     if (Tracker.Live != null || _overlay != null) wait = 5000;   // ask after the duel
                     else
@@ -274,7 +275,8 @@ public partial class App : System.Windows.Application
                         _offered = info.Latest;
                         Dispatcher.Invoke(() =>
                         {
-                            SetUpdateState($"새 버전 {info.Latest}이 있습니다. (현재 {Version})");
+                            SetUpdateState(must ? $"업데이트가 필요합니다. 새 버전 {info.Latest}을 받아야 기록이 저장됩니다. (현재 {Version})"
+                                                : $"새 버전 {info.Latest}이 있습니다. (현재 {Version})");
                             ShowMain();
                             if (new UpdateDialog { Owner = MainWin }.ShowDialog() == true) UpdateNow();
                         });

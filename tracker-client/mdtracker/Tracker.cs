@@ -20,6 +20,7 @@ public sealed class Tracker
     private string _liveKey = "";
     private bool _liveBusy;
     private readonly Dictionary<int, int> _knownOpp = new();   // uid → card id, once the engine has shown it
+    private readonly HashSet<int> _viaDeck = new();              // opponent uids seen in the deck: earlier knowledge no longer counts
 
     public Tracker(Store store, Api api)
     {
@@ -66,26 +67,33 @@ public sealed class Tracker
     // ---- mid-duel panel ----
     private void OnLiveTick(PendingMatch m, LiveTick t)
     {
-        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _liveStart = DateTime.Now; }
+        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _viaDeck.Clear(); _liveStart = DateTime.Now; }
         var L = Live!;
         // What was shown once stays known: the game log's uid → id table (hand opens, searches, flips) plus anything
-        // the engine has named on a tick. A revealed card that goes back to hand or is set face-down keeps its name.
+        // the engine has named on a tick. A revealed card that goes back to hand or is set face-down keeps its name —
+        // unless it passes through the deck (below).
         var stamp = (DateTime.Now - _liveStart).TotalSeconds;
+        // A card that enters the deck is hidden again: the deck gets shuffled, and a random pick (악마양 릴리스: 3 shown,
+        // the player picks 1 face-down) leaves the deck under the same uid. The game hides it, so must we — only what the
+        // engine shows after it leaves the deck counts.
+        foreach (var c in t.Cards)
+            if (!c.Me && c.Uid != 0 && c.Zone == LiveCard.Deck) { _knownOpp.Remove(c.Uid); _viaDeck.Add(c.Uid); }
         foreach (var kv in t.LogUids)
-            if (!_knownOpp.ContainsKey(kv.Key)) { _knownOpp[kv.Key] = kv.Value; Reveal(m, stamp, kv.Key, kv.Value, t.Cards, "log"); }
+            if (!_viaDeck.Contains(kv.Key) && !_knownOpp.ContainsKey(kv.Key)) { _knownOpp[kv.Key] = kv.Value; Reveal(m, stamp, kv.Key, kv.Value, t.Cards, "log"); }
         // the card-list window (a revealed hand, a looked-at deck or extra deck): its items name the opponent's card at a
         // zone + slot; the card table at that spot gives the uid, so the name stays once the window closes
         foreach (var lc in t.ListCards)
         {
             if (lc.Me || lc.Zone > 17) continue;
             var at = t.Cards.FirstOrDefault(c => !c.Me && c.Zone == lc.Zone && c.Index == lc.Index && c.Uid != 0);
-            if (at != null && !_knownOpp.ContainsKey(at.Uid)) { _knownOpp[at.Uid] = lc.Id; Reveal(m, stamp, at.Uid, lc.Id, t.Cards, "list"); }
+            if (at != null && !_viaDeck.Contains(at.Uid) && !_knownOpp.ContainsKey(at.Uid)) { _knownOpp[at.Uid] = lc.Id; Reveal(m, stamp, at.Uid, lc.Id, t.Cards, "list"); }
         }
         var engineIds = new Dictionary<int, int>();
         foreach (var c in t.Cards)
         {
             if (c.Me || c.Uid == 0) continue;
             engineIds[c.Uid] = c.Id;
+            if (c.Zone == LiveCard.Deck) continue;
             if (c.Id != 0) { if (!_knownOpp.ContainsKey(c.Uid)) Reveal(m, stamp, c.Uid, c.Id, t.Cards, "engine"); _knownOpp[c.Uid] = c.Id; }
             else if (_knownOpp.TryGetValue(c.Uid, out var known)) c.Id = known;
         }

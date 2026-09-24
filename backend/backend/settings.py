@@ -82,6 +82,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "allauth.account.middleware.AccountMiddleware",
+    "tracker.middleware.TrackerVersionGate",
 ]
 
 DJ_REST_AUTH = {

@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -253,6 +254,7 @@ class TrackerGameArchiveTest(TestCase):
         g = TrackerGame.objects.get(user=self.user, did=cap["did"])
         self.assertEqual(timezone.localtime(g.ended_at).strftime("%Y-%m-%dT%H:%M"), "2026-09-19T09:05")
 
+    @patch("tracker.version.MIN_SUPPORTED", "0.4.0")
     def test_turn_from_old_clients_is_shifted_to_count_from_one(self):
         from tracker.models import TrackerGame
         self.client.post("/api/tracker/games/", {**self.capture, "turn": 2}, format="json", HTTP_X_TRACKER_VERSION="0.4.3")
@@ -359,6 +361,7 @@ class TrackerVersionTest(TestCase):
         self.assertFalse(body["used_tracker"])
         self.assertFalse(body["outdated"])
 
+    @patch("tracker.version.MIN_SUPPORTED", "0.0.1")
     def test_header_version_is_remembered_and_compared(self):
         from tracker import version as ver
         self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
@@ -387,6 +390,33 @@ class TrackerVersionTest(TestCase):
         self.assertIsNone(body["version"])
         self.assertTrue(body["used_tracker"])
         self.assertTrue(body["outdated"])
+
+
+@patch("tracker.version.MIN_SUPPORTED", "0.6.4")
+class TrackerVersionGateTest(TestCase):
+    """Builds below MIN_SUPPORTED are refused everywhere except the version check and login."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="g@test.com", username="gateuser", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+
+    def test_old_build_is_refused_with_an_update_hint(self):
+        res = self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION="0.6.3")
+        self.assertEqual(res.status_code, 426)
+        self.assertTrue(res.json()["url"].endswith("mdtracker.exe"))
+        self.assertEqual(self.client.get("/api/record-groups/", HTTP_X_TRACKER_VERSION="0.6.3").status_code, 426)
+
+    def test_old_build_can_still_check_the_version_and_log_in(self):
+        self.assertEqual(self.client.get("/api/tracker/version/", HTTP_X_TRACKER_VERSION="0.6.3").status_code, 200)
+        res = self.client.post("/api/token/", {"email": "g@test.com", "password": "wrong"}, format="json", HTTP_X_TRACKER_VERSION="0.6.3")
+        self.assertNotEqual(res.status_code, 426)
+
+    def test_current_build_and_the_website_pass(self):
+        from tracker import version as ver
+        res = self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION=ver.MIN_SUPPORTED)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self.client.get("/api/tracker/pending/").status_code, 200)   # the website sends no version
 
 
 class TrackerStatsTest(TestCase):
