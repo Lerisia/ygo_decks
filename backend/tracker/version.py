@@ -5,7 +5,7 @@ client reported an older version (or none at all, which means a build from befor
 reporting existed).
 """
 
-LATEST = "0.6.4"
+LATEST = "0.6.5"
 MIN_SUPPORTED = "0.6.4"  # builds below this are refused by TrackerVersionGate
 GATE_EXEMPT_USER_IDS = {1}  # 엘리스 may keep running old builds
 DOWNLOAD_URL = "https://ygodecks.com/media/tracker/mdtracker.exe"
