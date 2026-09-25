@@ -169,3 +169,23 @@ def group_qualifiers(group_rankings, advance):
         tier = [ranking[place] for ranking in group_rankings if place < len(ranking)]
         order.extend(pid for pid, _ in sorted(tier, key=lambda r: -r[1]))
     return order
+
+
+def losers_round(survivors, pending_losers):
+    """Double elimination, one losers-bracket round. `survivors` won their last
+    losers-bracket match; `pending_losers` fell out of the winners bracket and
+    have not been seated yet. Returns (pairs, losers_still_waiting).
+
+    More survivors than droppers -> survivors play each other and the droppers
+    wait a round (the classic alternating major/minor rhythm). Otherwise each
+    survivor meets a dropper in reverse order (keeps early rematches apart) and
+    leftover droppers pair among themselves; an odd one out gets a bye."""
+    survivors, pending = list(survivors), list(pending_losers)
+    if not survivors:
+        return pair_adjacent(pending) if pending else [], []
+    if len(survivors) > len(pending):  # lone survivor with nobody pending = losers-bracket champion
+        return (pair_adjacent(survivors) if len(survivors) > 1 else []), pending
+    n_left = len(pending) - len(survivors)
+    pairs = list(zip(survivors, reversed(pending[n_left:])))
+    pairs.extend(pair_adjacent(pending[:n_left]))
+    return pairs, []

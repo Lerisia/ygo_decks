@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "@/components/Avatar";
-import BracketTree from "@/components/tournament/BracketTree";
+import BracketTree, { ColumnBracket } from "@/components/tournament/BracketTree";
 import DeckTab from "@/components/tournament/DeckTab";
 import AnnouncementsTab from "@/components/tournament/AnnouncementsTab";
 import ChatTab from "@/components/tournament/ChatTab";
@@ -15,8 +15,9 @@ import {
 
 const FORMAT_LABELS: Record<string, string> = {
   single_elim: "싱글 엘리미네이션", swiss: "스위스", round_robin: "라운드 로빈", swiss_cut: "스위스+결선",
-  group_knockout: "조별+결선",
+  group_knockout: "조별+결선", double_elim: "더블 엘리미네이션",
 };
+const BRACKET_LABELS: Record<string, string> = { winners: "승자조", losers: "패자조", final: "최종전" };
 const STATUS_LABELS: Record<string, string> = {
   recruiting: "모집 중", ongoing: "진행 중", completed: "종료",
 };
@@ -109,6 +110,7 @@ function TournamentDetailPage() {
     const canReport = role && !confirmed && (m.report_status === "pending" || m.reported_by === myUserId || m.report_status === "disputed");
     return (
       <div key={m.id} className="border dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
+        {m.bracket && <div className="text-[11px] font-semibold text-gray-400 mb-1">{BRACKET_LABELS[m.bracket]}</div>}
         <div className="flex items-center justify-between gap-2">
           <EntrantChip e={m.entrant1} size={36} />
           <span className="text-xs text-gray-400 shrink-0">VS</span>
@@ -367,7 +369,38 @@ function TournamentDetailPage() {
           : [];
         return (
           <section>
-            {knockoutRounds.length > 0 && (
+            {knockoutRounds.length > 0 && t.format === "double_elim" && (() => {
+              const wb = knockoutRounds
+                .map((r) => ({ ...r, matches: r.matches.filter((m) => m.bracket === "winners") }))
+                .filter((r) => r.matches.length > 0);
+              const lb = knockoutRounds
+                .map((r, i) => ({ title: `패자조 ${i}R`, matches: r.matches.filter((m) => m.bracket === "losers") }))
+                .filter((c) => c.matches.length > 0)
+                .map((c, i) => ({ ...c, title: `패자조 ${i + 1}R` }));
+              const finals = knockoutRounds
+                .map((r) => r.matches.filter((m) => m.bracket === "final"))
+                .filter((ms) => ms.length > 0)
+                .map((ms, i) => ({ title: i === 0 ? "최종전" : "최종전 (리셋)", matches: ms }));
+              return (
+                <div className="mb-5 space-y-4">
+                  <div>
+                    <h3 className="font-semibold mb-2">승자조</h3>
+                    <BracketTree rounds={wb} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">패자조</h3>
+                    {lb.length > 0 ? <ColumnBracket columns={lb} /> : <p className="text-sm text-gray-500 dark:text-gray-400">승자조 1라운드가 끝나면 시작됩니다.</p>}
+                  </div>
+                  {finals.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2">최종전</h3>
+                      <ColumnBracket columns={finals} />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {knockoutRounds.length > 0 && t.format !== "double_elim" && (
               <div className="mb-5">
                 {listRounds.length > 0 && (
                   <h3 className="font-semibold mb-2">결선 토너먼트</h3>

@@ -21,7 +21,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-export type TournamentFormat = "single_elim" | "swiss" | "round_robin" | "swiss_cut" | "group_knockout";
+export type TournamentFormat = "single_elim" | "swiss" | "round_robin" | "swiss_cut" | "group_knockout" | "double_elim";
 export type TournamentStatus = "recruiting" | "ongoing" | "completed" | "cancelled";
 
 export type Entrant = {
@@ -39,6 +39,7 @@ export type MatchItem = {
   id: number;
   bracket_pos: number;
   group: number | null;
+  bracket: "" | "winners" | "losers" | "final";
   entrant1: Entrant;
   entrant2: Entrant | null;
   result: "p1" | "p2" | "draw" | "bye" | null;

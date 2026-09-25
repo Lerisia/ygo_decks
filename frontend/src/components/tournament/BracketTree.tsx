@@ -26,7 +26,7 @@ function entrantRow(e: Entrant | null, won: boolean, decided: boolean, isBye = f
   );
 }
 
-function MatchNode({ match }: Slot) {
+export function MatchNode({ match }: Slot) {
   const decided = !!match && (match.report_status === "confirmed" || match.result === "bye");
   const p1won = decided && (match!.result === "p1" || match!.result === "bye");
   const p2won = decided && match!.result === "p2";
@@ -85,6 +85,29 @@ export default function BracketTree({ rounds }: { rounds: RoundItem[] }) {
                     </>
                   )}
                 </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+/** Plain columns of match nodes (no halving assumption) — losers bracket and
+ *  grand final of a double elimination, where column sizes follow their own rhythm. */
+export function ColumnBracket({ columns }: { columns: { title: string; matches: MatchItem[] }[] }) {
+  if (columns.length === 0) return null;
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="flex gap-4" style={{ minWidth: columns.length * 176 }}>
+        {columns.map((col, k) => (
+          <div key={k} className="flex flex-col w-40 shrink-0">
+            <div className="text-xs text-gray-400 mb-1 text-center">{col.title}</div>
+            <div className="flex flex-col flex-1 justify-around gap-3">
+              {[...col.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => (
+                <MatchNode key={m.id} match={m} />
               ))}
             </div>
           </div>

@@ -8,11 +8,11 @@
 
 | 메서드/경로 | 권한 | 설명 |
 |---|---|---|
-| `POST create/` | 회원 | 대회 개설. body: `name`\*, `event_date`\*(ISO), `format`\*(`single_elim`·`swiss`·`round_robin`·`swiss_cut`·`group_knockout`), `capacity`(2~128, 기본 8), `description`, `format_config`(스위스 `{"swiss_rounds": 4}`, 스위스컷 `{"cut": 4}`, 조별 `{"groups": 2|4|8, "advance": 1~4}`) → 201 + 상세 |
+| `POST create/` | 회원 | 대회 개설. body: `name`\*, `event_date`\*(ISO), `format`\*(`single_elim`·`swiss`·`round_robin`·`swiss_cut`·`group_knockout`·`double_elim`), `capacity`(2~128, 기본 8), `description`, `format_config`(스위스 `{"swiss_rounds": 4}`, 스위스컷 `{"cut": 4}`, 조별 `{"groups": 2|4|8, "advance": 1~4}`) → 201 + 상세 |
 | `GET ` | 공개 | 대회 목록 (취소 제외, 최신순). `?status=recruiting|ongoing|completed` 필터. 각 항목에 `entrant_count`, `host_name` |
 | `GET <id>/` | 공개 | 상세: 대회 정보 + `entrants[]`(아바타 아이콘·테두리 포함) + `rounds[].matches[]` + 주최자 아바타. `md_uid`는 주최자·참가자에게만 값, 그 외 null |
 | `POST <id>/start/` | 주최자 | 모집 마감·1라운드 대진 생성 (체크인 참가자만 착석, 2명 이상 필요). 라운드 시드 저장 |
-| `POST <id>/next-round/` | 주최자 | 현재 라운드 전 경기 확정 시 다음 라운드 생성. 형식별 규칙(엘림=승자 진출, 스위스=승점 그룹·재대결 방지·bye, 라운드로빈=사전 일정, 스위스컷=라운드 소진 후 상위 컷 시드, 조별=조 일정 소진 후 각 조 상위 N명을 1위끼리→2위끼리 순으로 시드해 결선). 경기의 `group`은 조 index(0=A조), 조별 형식 외에는 null. 남은 라운드 없으면 400 |
+| `POST <id>/next-round/` | 주최자 | 현재 라운드 전 경기 확정 시 다음 라운드 생성. 형식별 규칙(엘림=승자 진출, 스위스=승점 그룹·재대결 방지·bye, 라운드로빈=사전 일정, 스위스컷=라운드 소진 후 상위 컷 시드, 조별=조 일정 소진 후 각 조 상위 N명을 1위끼리→2위끼리 순으로 시드해 결선). 더블 엘림=승자조 승자 진출 + 패자조(생존자>대기 탈락자면 생존자끼리, 아니면 역순 매칭) + 최종전(패자조 우승자가 이기면 리셋 1회)). 경기의 `group`은 조 index(0=A조), `bracket`은 더블 엘림에서 `winners`/`losers`/`final`, 그 외 빈 문자열. 남은 라운드 없으면 400 |
 | `POST <id>/complete/` | 주최자 | 전 경기 확정 시 대회 종료 |
 
 ## 모집·참가
@@ -63,4 +63,4 @@
 | `POST <id>/chat/` | 참가자·주최자 | 메시지 전송. body: `content` (추방자 불가, 길이 제한) |
 
 ## 미구현 (2차)
-더블 엘림, 팀전(Entrant 추상화로 대비됨), 디스코드 알림. 우승 보상은 사이트가 지급하지 않음(주최자 몫).
+팀전(Entrant 추상화로 대비됨), 디스코드 알림. 우승 보상은 사이트가 지급하지 않음(주최자 몫).

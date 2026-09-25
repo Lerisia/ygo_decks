@@ -179,3 +179,38 @@ class GroupStageTest(SimpleTestCase):
     def test_qualifiers_skip_short_groups(self):
         from .engine import group_qualifiers
         self.assertEqual(group_qualifiers([[(1, 3), (2, 0)], [(3, 3)]], 2), [1, 3, 2])
+
+
+class DoubleElimLosersRoundTest(SimpleTestCase):
+    def test_first_drop_pairs_losers_among_themselves(self):
+        from .engine import losers_round
+        pairs, waiting = losers_round([], [1, 2, 3, 4])
+        self.assertEqual(pairs, [(1, 2), (3, 4)])
+        self.assertEqual(waiting, [])
+
+    def test_odd_losers_get_a_bye(self):
+        from .engine import losers_round
+        pairs, waiting = losers_round([], [1])
+        self.assertEqual(pairs, [(1, None)])
+
+    def test_more_survivors_than_droppers_is_a_major_round(self):
+        from .engine import losers_round
+        pairs, waiting = losers_round([10, 20], [5])
+        self.assertEqual(pairs, [(10, 20)])
+        self.assertEqual(waiting, [5])           # the WB loser waits one round
+
+    def test_equal_counts_zip_reversed(self):
+        from .engine import losers_round
+        pairs, waiting = losers_round([10, 20], [5, 6])
+        self.assertEqual(pairs, [(10, 6), (20, 5)])
+        self.assertEqual(waiting, [])
+
+    def test_more_droppers_than_survivors_pairs_the_rest(self):
+        from .engine import losers_round
+        pairs, waiting = losers_round([10], [5, 6, 7])
+        self.assertEqual(pairs, [(10, 7), (5, 6)])
+        self.assertEqual(waiting, [])
+
+    def test_single_survivor_no_droppers_is_the_losers_champion(self):
+        from .engine import losers_round
+        self.assertEqual(losers_round([10], []), ([], []))

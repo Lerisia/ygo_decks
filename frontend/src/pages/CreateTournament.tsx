@@ -74,6 +74,7 @@ function CreateTournament() {
               <option value="round_robin">라운드 로빈</option>
               <option value="swiss_cut">스위스 + 결선 토너먼트</option>
               <option value="group_knockout">조별 리그 + 결선 토너먼트</option>
+              <option value="double_elim">더블 엘리미네이션</option>
             </select>
           </div>
           <div>
@@ -113,6 +114,11 @@ function CreateTournament() {
               참가자를 무작위로 {groups}개 조에 나눠 조별 라운드 로빈을 치른 뒤, 각 조 상위 {advance}명({groups * advance}명)이 결선 토너먼트로 갑니다. 조당 2명 이상이어야 시작할 수 있습니다.
             </p>
           </div>
+        )}
+        {format === "double_elim" && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            승자조에서 지면 패자조로 내려가고, 두 번 지면 탈락합니다. 최종전은 승자조 우승자 대 패자조 우승자이며, 패자조 우승자가 이기면 한 번 더 겨룹니다.
+          </p>
         )}
         <div>
           <label className="block text-sm font-semibold mb-1">대회 배너 (선택)</label>

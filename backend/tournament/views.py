@@ -58,15 +58,63 @@ def _records(tournament):
     return stats
 
 
-def _create_matches(rnd, pairs, groups=None):
-    """`groups`: optional group index per pair (group stage)."""
+def _create_matches(rnd, pairs, groups=None, brackets=None):
+    """`groups`: optional group index per pair (group stage); `brackets`: optional
+    winners/losers/final tag per pair (double elimination)."""
     for pos, (a, b) in enumerate(pairs):
         Match.objects.create(
             round=rnd, entrant1_id=a, entrant2_id=b, bracket_pos=pos,
             group=groups[pos] if groups else None,
+            bracket=brackets[pos] if brackets else "",
             result="bye" if b is None else None,
             report_status="confirmed" if b is None else "pending",
         )
+
+
+def _winner(m):
+    return m.entrant1_id if m.result in ("p1", "bye") else m.entrant2_id
+
+
+def _loser(m):
+    return None if m.result == "bye" else (m.entrant2_id if m.result == "p1" else m.entrant1_id)
+
+
+def _double_elim_next(tournament, current):
+    """Next round of a double elimination as (pairs, brackets), or None when the
+    tournament is decided. Everything is derived from confirmed matches, so a
+    stored state can never drift from the bracket."""
+    all_matches = list(_tournament_matches(tournament).select_related("round").order_by("round__number", "bracket_pos"))
+    cur = [m for m in all_matches if m.round_id == current.id]
+    finals = [m for m in all_matches if m.bracket == "final"]
+    if finals:
+        last = finals[-1]
+        if _winner(last) == last.entrant1_id or len(finals) >= 2:
+            return None                                   # WB champion held, or the reset settled it
+        return [(last.entrant1_id, last.entrant2_id)], ["final"]
+
+    cur_wb = [m for m in cur if m.bracket == "winners"]
+    if cur_wb:
+        wb_alive = [_winner(m) for m in cur_wb]
+    else:  # WB already finished: its champion won the last one-match WB round
+        wb_alive = [_winner(m) for m in all_matches if m.bracket == "winners"][-1:]
+    seated_in_lb = {eid for m in all_matches if m.bracket == "losers" for eid in (m.entrant1_id, m.entrant2_id) if eid}
+    pending = [l for l in (_loser(m) for m in all_matches if m.bracket == "winners") if l and l not in seated_in_lb]
+    survivors = [_winner(m) for m in cur if m.bracket == "losers"]
+
+    pairs, brackets = [], []
+    if len(wb_alive) >= 2:
+        for p in engine.pair_adjacent(wb_alive):
+            pairs.append(p); brackets.append("winners")
+    lb_pairs, waiting = engine.losers_round(survivors, pending)
+    if not survivors and len(pending) == 1 and not waiting:
+        lb_pairs, lb_champion = [], pending[0]          # a lone first dropper needs no bye round
+    else:
+        lb_champion = survivors[0] if (len(survivors) == 1 and not pending and not lb_pairs) else None
+    for p in lb_pairs:
+        pairs.append(p); brackets.append("losers")
+    if not pairs and len(wb_alive) == 1 and lb_champion:
+        return [(wb_alive[0], lb_champion)], ["final"]
+    return (pairs, brackets) if pairs else None
 
 
 def _ranked_entrant_ids(stats):
@@ -307,7 +355,7 @@ def start_tournament(request, tournament_id):
     rng = engine.make_rng(seed)
     ids = [e.id for e in entrants]
 
-    groups = None
+    groups, brackets = None, None
     if t.format == "round_robin":
         schedule = engine.round_robin_schedule(ids, rng)
         t.format_config = {**t.format_config, "rr_schedule": [[list(p) for p in rnd] for rnd in schedule]}
@@ -327,12 +375,16 @@ def start_tournament(request, tournament_id):
     elif t.format == "single_elim":
         pairs = engine.single_elim_round1(ids, rng)
         stage = "knockout"
+    elif t.format == "double_elim":
+        pairs = engine.single_elim_round1(ids, rng)
+        brackets = ["winners"] * len(pairs)
+        stage = "knockout"
     else:  # swiss / swiss_cut both open with a swiss round
         pairs = engine.swiss_pairs([(i, 0) for i in ids], history=set(), prior_byes=set(), rng=rng)
         stage = "swiss"
 
     rnd = Round.objects.create(tournament=t, number=1, random_seed=seed, stage=stage)
-    _create_matches(rnd, pairs, groups)
+    _create_matches(rnd, pairs, groups, brackets)
     t.status = "ongoing"
     t.current_round = 1
     t.save(update_fields=["status", "current_round", "format_config"])
@@ -377,11 +429,17 @@ def next_round(request, tournament_id):
         records = [(eid, st["points"]) for eid, st in stats.items()]
         return engine.swiss_pairs(records, history=history, prior_byes=prior_byes, rng=rng)
 
-    groups = None
+    groups, brackets = None, None
     if t.format == "single_elim":
         pairs = knockout_advance()
         if pairs is None:
             return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+        stage = "knockout"
+    elif t.format == "double_elim":
+        nxt = _double_elim_next(t, current)
+        if nxt is None:
+            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+        pairs, brackets = nxt
         stage = "knockout"
     elif t.format == "group_knockout":
         schedule = t.format_config.get("group_schedule") or []
@@ -435,7 +493,7 @@ def next_round(request, tournament_id):
     current.status = "completed"
     current.save(update_fields=["status"])
     rnd = Round.objects.create(tournament=t, number=t.current_round + 1, random_seed=seed, stage=stage)
-    _create_matches(rnd, pairs, groups)
+    _create_matches(rnd, pairs, groups, brackets)
     t.current_round += 1
     t.save(update_fields=["current_round"])
     return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)

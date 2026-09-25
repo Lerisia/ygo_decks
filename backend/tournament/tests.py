@@ -74,7 +74,7 @@ class CreateAndRecruitTest(TournamentApiTestBase):
         self.assertEqual(data["host_name"], "member")
 
     def test_invalid_format_rejected(self):
-        self.assertEqual(self.create(format="double_elim").status_code, 400)
+        self.assertEqual(self.create(format="ladder").status_code, 400)
 
     def test_list_and_detail_include_entrant_avatars(self):
         t = Tournament.objects.get(id=self.create().json()["id"])
@@ -802,3 +802,118 @@ class GroupKnockoutTest(TournamentApiTestBase):
         self.assertEqual(ko.stage, "knockout")
         seated = {m.entrant1_id for m in ko.matches.all()} | {m.entrant2_id for m in ko.matches.all() if m.entrant2_id}
         self.assertEqual(len(seated), 4)                            # 2명 조도 2명 모두 진출
+
+
+class DoubleElimTest(TournamentApiTestBase):
+    """승자조·패자조 더블 엘리미네이션, 최종전은 패자조 우승자가 이기면 한 번 더."""
+
+    def _make(self, n_players):
+        resp = self.create(name="더블", format="double_elim", capacity=16)
+        assert resp.status_code == 201, resp.content
+        t = Tournament.objects.get(id=resp.json()["id"])
+        players = self.make_players(t, n_players)
+        self.start(t)
+        return t, players
+
+    def _round(self, t):
+        return Round.objects.get(tournament=t, number=t.current_round)
+
+    def _confirm_all(self, t, players, result="win"):
+        for m in self._round(t).matches.exclude(report_status="confirmed"):
+            self.confirm_match(m, players, result=result)
+
+    def _next(self, t):
+        resp = self.client.post(f"/api/tournaments/{t.id}/next-round/")
+        t.refresh_from_db()
+        return resp
+
+    def _brackets(self, t):
+        return sorted(self._round(t).matches.values_list("bracket", flat=True))
+
+    def test_four_players_standard_shape(self):
+        t, players = self._make(4)
+        self.assertEqual(self._brackets(t), ["winners", "winners"])
+        self.assertEqual(self._round(t).stage, "knockout")
+        self._confirm_all(t, players)                                  # entrant1s win W1
+        assert self._next(t).status_code == 200
+        self.assertEqual(self._brackets(t), ["losers", "winners"])     # W2 final + L1
+        self._confirm_all(t, players)
+        assert self._next(t).status_code == 200
+        self.assertEqual(self._brackets(t), ["losers"])                # L2: L1 winner vs W2 loser
+        l2 = self._round(t).matches.get()
+        w2 = Match.objects.get(round__tournament=t, round__number=2, bracket="winners")
+        self.assertEqual(l2.entrant2_id, w2.entrant2_id)               # W2 loser dropped in
+        self._confirm_all(t, players)
+        assert self._next(t).status_code == 200
+        self.assertEqual(self._brackets(t), ["final"])
+        gf = self._round(t).matches.get()
+        self.assertEqual(gf.entrant1_id, w2.entrant1_id)               # WB champion is P1
+        self.assertEqual(gf.entrant2_id, l2.entrant1_id)
+        self.confirm_match(gf, players, result="win")                  # WB champion wins -> over
+        resp = self._next(t)
+        self.assertEqual(resp.status_code, 400)
+        assert self.client.post(f"/api/tournaments/{t.id}/complete/").status_code == 200
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(rows[0]["entrant_id"], gf.entrant1_id)
+        self.assertEqual(rows[1]["entrant_id"], gf.entrant2_id)
+
+    def test_losers_champion_forces_reset(self):
+        t, players = self._make(4)
+        for _ in range(3):
+            self._confirm_all(t, players)
+            assert self._next(t).status_code == 200
+        gf = self._round(t).matches.get()
+        self.confirm_match(gf, players, result="lose")                 # LB champion wins
+        resp = self._next(t)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        reset = self._round(t).matches.get()
+        self.assertEqual(reset.bracket, "final")
+        self.assertEqual({reset.entrant1_id, reset.entrant2_id}, {gf.entrant1_id, gf.entrant2_id})
+        self.confirm_match(reset, players, result="lose")
+        self.assertEqual(self._next(t).status_code, 400)
+        assert self.client.post(f"/api/tournaments/{t.id}/complete/").status_code == 200
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(rows[0]["entrant_id"], reset.entrant2_id)
+
+    def test_eight_players_round_count(self):
+        t, players = self._make(8)
+        shapes = [self._brackets(t)]
+        while True:
+            self._confirm_all(t, players)
+            resp = self._next(t)
+            if resp.status_code != 200:
+                break
+            shapes.append(self._brackets(t))
+        self.assertEqual(shapes, [
+            ["winners"] * 4,
+            ["losers", "losers", "winners", "winners"],
+            ["losers", "losers", "winners"],
+            ["losers"],
+            ["losers"],
+            ["final"],
+        ])
+
+    def test_five_players_with_byes_reaches_a_final(self):
+        t, players = self._make(5)
+        seen_final = False
+        for _ in range(12):
+            self._confirm_all(t, players)
+            resp = self._next(t)
+            if resp.status_code != 200:
+                break
+            if self._brackets(t) == ["final"]:
+                seen_final = True
+        self.assertTrue(seen_final)
+        seated = set()
+        for m in Match.objects.filter(round__tournament=t):
+            seated.update({m.entrant1_id, m.entrant2_id} - {None})
+        self.assertEqual(len(seated), 5)
+
+    def test_bracket_serialized_and_draw_rejected(self):
+        t, players = self._make(4)
+        detail = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(detail["rounds"][0]["matches"][0]["bracket"], "winners")
+        m = self._round(t).matches.first()
+        by_user = {u.id: c for u, c in players}
+        resp = by_user[m.entrant1.user_id].post(f"/api/tournaments/matches/{m.id}/report/", {"result": "draw"}, format="json")
+        self.assertEqual(resp.status_code, 400)

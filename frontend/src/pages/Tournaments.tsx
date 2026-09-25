@@ -8,6 +8,7 @@ const FORMAT_LABELS: Record<string, string> = {
   round_robin: "라운드 로빈",
   swiss_cut: "스위스+결선",
   group_knockout: "조별+결선",
+  double_elim: "더블 엘리미네이션",
 };
 
 const STATUS_BADGES: Record<string, { label: string; cls: string }> = {
