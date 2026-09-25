@@ -10,7 +10,9 @@ from rest_framework import status
 from . import engine
 import re
 
-from .models import Announcement, ChatMessage, Entrant, Match, Round, Tournament
+from django.db.models import Q
+
+from .models import Announcement, Board, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
 from .serializers import (AnnouncementSerializer, ChatMessageSerializer,
                           EntrantSerializer, TournamentDetailSerializer,
                           TournamentListSerializer, user_avatar)
@@ -65,15 +67,41 @@ def _records(tournament):
 
 def _create_matches(rnd, pairs, groups=None, brackets=None):
     """`groups`: optional group index per pair (group stage); `brackets`: optional
-    winners/losers/final tag per pair (double elimination)."""
+    winners/losers/final tag per pair (double elimination). Team matches get one
+    board per lineup slot, seated from each team's default order."""
+    team_size = rnd.tournament.team_size
     for pos, (a, b) in enumerate(pairs):
-        Match.objects.create(
+        m = Match.objects.create(
             round=rnd, entrant1_id=a, entrant2_id=b, bracket_pos=pos,
             group=groups[pos] if groups else None,
             bracket=brackets[pos] if brackets else "",
             result="bye" if b is None else None,
             report_status="confirmed" if b is None else "pending",
         )
+        if team_size > 1 and b is not None:
+            side1 = list(TeamMember.objects.filter(entrant_id=a).order_by("order", "id"))
+            side2 = list(TeamMember.objects.filter(entrant_id=b).order_by("order", "id"))
+            Board.objects.bulk_create([
+                Board(match=m, order=i,
+                      member1=side1[i] if i < len(side1) else None,
+                      member2=side2[i] if i < len(side2) else None)
+                for i in range(team_size)
+            ])
+
+
+def _settle_team_match(match):
+    """All boards confirmed -> the team result. A split is a draw outside the
+    knockout stage; in a knockout it stays open for the host to decide."""
+    boards = list(match.boards.all())
+    if not boards or any(b.report_status != "confirmed" for b in boards):
+        return
+    w1 = sum(1 for b in boards if b.result == "p1")
+    w2 = sum(1 for b in boards if b.result == "p2")
+    if w1 == w2 and match.round.stage == "knockout":
+        return
+    match.result = "p1" if w1 > w2 else "p2" if w2 > w1 else "draw"
+    match.report_status = "confirmed"
+    match.save(update_fields=["result", "report_status"])
 
 
 def _winner(m):
@@ -172,6 +200,137 @@ def _forfeit_open_matches(tournament, entrant, actor):
 
 GROUP_COUNTS = (2, 4, 8)
 MAX_ADVANCE = 4
+MAX_TEAM_SIZE = 5
+
+
+def _ctx(request, t, show_uid=None):
+    """Serializer context: who is looking (join codes, UIDs)."""
+    user = request.user if request.user.is_authenticated else None
+    is_host = bool(user) and t.host_id == user.id
+    if show_uid is None:
+        show_uid = bool(user) and (is_host or _own_entrant(t, user) is not None)
+    return {"show_uid": show_uid, "viewer_id": user.id if user else None, "is_host": is_host}
+
+
+def _own_entrant(t, user):
+    """The entrant this user belongs to: themselves, or the team they are in."""
+    return t.entrants.filter(Q(user=user) | Q(members__user=user)).distinct().first()
+
+
+def _uid_or_err(request):
+    md_uid = str(request.data.get("md_uid") or "").strip() or request.user.md_uid
+    if not re.fullmatch(r"\d{9}", md_uid or ""):
+        return None, _err("마스터 듀얼 UID(숫자 9자리)를 입력해 주세요.")
+    if md_uid != request.user.md_uid:
+        request.user.md_uid = md_uid
+        request.user.save(update_fields=["md_uid"])
+    return md_uid, None
+
+
+def _register_team(request, t):
+    """Captain opens a team: an entrant with no user, plus the captain as first member."""
+    if _membership(t, request.user):
+        return _err("이미 이 대회의 팀에 속해 있습니다.")
+    name = str(request.data.get("team_name") or "").strip()
+    if not name:
+        return _err("팀 이름을 입력해 주세요.")
+    if t.entrants.exclude(status__in=["withdrawn", "kicked"]).filter(name=name).exists():
+        return _err("같은 이름의 팀이 있습니다.")
+    if t.entrants.exclude(status__in=["withdrawn", "kicked"]).count() >= t.capacity:
+        return _err("정원이 가득 찼습니다.")
+    md_uid, err = _uid_or_err(request)
+    if err:
+        return err
+    entrant = Entrant.objects.create(tournament=t, user=None, name=name[:100], join_code=_new_join_code(t))
+    TeamMember.objects.create(entrant=entrant, user=request.user, md_uid=md_uid, is_captain=True, order=0)
+    return Response(EntrantSerializer(entrant, context=_ctx(request, t, True)).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def team_join(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if t.status != "recruiting":
+        return _err("모집 중인 대회가 아닙니다.")
+    if t.team_size < 2:
+        return _err("팀전 대회가 아닙니다.")
+    if _membership(t, request.user):
+        return _err("이미 이 대회의 팀에 속해 있습니다.")
+    code = str(request.data.get("code") or "").strip().upper()
+    entrant = t.entrants.filter(join_code=code).exclude(status__in=["withdrawn", "kicked"]).first() if code else None
+    if not entrant:
+        return _err("팀 코드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    if entrant.status == "checked_in":
+        return _err("이미 체크인한 팀입니다.")
+    if entrant.members.count() >= t.team_size:
+        return _err("팀 인원이 가득 찼습니다.")
+    md_uid, err = _uid_or_err(request)
+    if err:
+        return err
+    TeamMember.objects.create(entrant=entrant, user=request.user, md_uid=md_uid, order=entrant.members.count())
+    return Response(EntrantSerializer(entrant, context=_ctx(request, t, True)).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def team_leave(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if t.status != "recruiting":
+        return _err("모집 중에만 팀을 나갈 수 있습니다. 진행 중에는 팀장이 기권해 주세요.")
+    m = _membership(t, request.user)
+    if not m:
+        return _err("팀에 속해 있지 않습니다.")
+    entrant = m.entrant
+    m.delete()
+    rest = list(entrant.members.order_by("order", "id"))
+    if not rest:
+        entrant.status = "withdrawn"
+        entrant.save(update_fields=["status"])
+    else:
+        for i, x in enumerate(rest):
+            x.order, x.is_captain = i, (i == 0)
+            x.save(update_fields=["order", "is_captain"])
+        if entrant.status == "checked_in":  # roster no longer full
+            entrant.status = "registered"
+            entrant.save(update_fields=["status"])
+    return Response({"ok": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def team_order(request, tournament_id):
+    """Captain sets the default board order (member ids, first = board 1)."""
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    m = _membership(t, request.user)
+    if not m or not m.is_captain:
+        return _err("팀장만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    ids = [int(x) for x in (request.data.get("members") or []) if str(x).isdigit()]
+    members = {x.id: x for x in m.entrant.members.all()}
+    if sorted(ids) != sorted(members):
+        return _err("팀원 목록이 맞지 않습니다.")
+    for i, mid in enumerate(ids):
+        members[mid].order = i
+        members[mid].save(update_fields=["order"])
+    return Response(EntrantSerializer(m.entrant, context=_ctx(request, t, True)).data)
+
+
+def _membership(t, user):
+    return TeamMember.objects.filter(entrant__tournament=t, user=user).exclude(entrant__status__in=["withdrawn", "kicked"]).select_related("entrant").first()
+
+
+def _new_join_code(t):
+    import string
+    alphabet = string.ascii_uppercase + string.digits
+    while True:
+        code = "".join(secrets.choice(alphabet) for _ in range(6))
+        if not t.entrants.filter(join_code=code).exists():
+            return code
 
 
 def _group_options(format_config):
@@ -243,6 +402,12 @@ def create_tournament(request):
         return _err("capacity가 올바르지 않습니다.")
     if not (2 <= capacity <= 128):
         return _err("정원은 2~128명이어야 합니다.")
+    try:
+        team_size = int(data.get("team_size", 1) or 1)
+    except (TypeError, ValueError):
+        return _err("team_size가 올바르지 않습니다.")
+    if not (1 <= team_size <= MAX_TEAM_SIZE):
+        return _err(f"팀 인원은 1(개인전)~{MAX_TEAM_SIZE}명이어야 합니다.")
     cover = request.FILES.get("cover_image")
     if cover:
         cover_err = _cover_error(cover)
@@ -267,10 +432,11 @@ def create_tournament(request):
         format=fmt,
         format_config=format_config,
         capacity=capacity,
+        team_size=team_size,
         event_date=data["event_date"],
         cover_image=request.FILES.get("cover_image"),
     )
-    return Response(TournamentDetailSerializer(t).data, status=status.HTTP_201_CREATED)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t)).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])
@@ -290,10 +456,7 @@ def tournament_detail(request, tournament_id):
         return _err("대회를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     if request.method == "PATCH":
         return _edit_tournament(request, t)
-    show_uid = request.user.is_authenticated and (
-        t.host_id == request.user.id or t.entrants.filter(user=request.user).exists()
-    )
-    return Response(TournamentDetailSerializer(t, context={"show_uid": show_uid}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t)).data)
 
 
 def _edit_tournament(request, t):
@@ -353,7 +516,7 @@ def _edit_tournament(request, t):
             changed.append("format_config")
     if changed:
         t.save(update_fields=changed)
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
 
 
 @api_view(["POST"])
@@ -368,7 +531,7 @@ def cancel_tournament(request, tournament_id):
         return _err("취소할 수 없는 상태입니다.")
     t.status = "cancelled"
     t.save(update_fields=["status"])
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
 
 
 def _get_tournament(tournament_id):
@@ -386,6 +549,8 @@ def register(request, tournament_id):
         return err
     if t.status != "recruiting":
         return _err("모집 중인 대회가 아닙니다.")
+    if t.team_size > 1:
+        return _register_team(request, t)
     active = t.entrants.exclude(status__in=["withdrawn", "kicked"])
     existing = t.entrants.filter(user=request.user).first()
     if existing and existing.status not in ("withdrawn",):
@@ -402,13 +567,9 @@ def register(request, tournament_id):
         existing.status = "registered"
         existing.md_uid = md_uid
         existing.save(update_fields=["status", "md_uid"])
-        return Response(EntrantSerializer(existing, context={"show_uid": True}).data)
+        return Response(EntrantSerializer(existing, context=_ctx(request, t, True)).data)
     entrant = Entrant.objects.create(tournament=t, user=request.user, name=request.user.username, md_uid=md_uid)
-    return Response(EntrantSerializer(entrant, context={"show_uid": True}).data)
-
-
-def _own_entrant(t, user):
-    return t.entrants.filter(user=user).first()
+    return Response(EntrantSerializer(entrant, context=_ctx(request, t, True)).data)
 
 
 @api_view(["POST"])
@@ -422,6 +583,10 @@ def withdraw(request, tournament_id):
     entrant = _own_entrant(t, request.user)
     if not entrant or entrant.status in ("withdrawn", "kicked"):
         return _err("참가 중이 아닙니다.")
+    if entrant.is_team:
+        m = _membership(t, request.user)
+        if not m or not m.is_captain:
+            return _err("팀장만 기권할 수 있습니다.", status.HTTP_403_FORBIDDEN)
     entrant.status = "withdrawn"
     entrant.save(update_fields=["status"])
     _forfeit_open_matches(t, entrant, request.user)
@@ -439,6 +604,12 @@ def check_in(request, tournament_id):
     entrant = _own_entrant(t, request.user)
     if not entrant or entrant.status != "registered":
         return _err("신청 상태에서만 체크인할 수 있습니다.")
+    if entrant.is_team:
+        m = _membership(t, request.user)
+        if not m or not m.is_captain:
+            return _err("팀장만 체크인할 수 있습니다.", status.HTTP_403_FORBIDDEN)
+        if entrant.members.count() < t.team_size:
+            return _err(f"팀원이 {t.team_size}명 모여야 체크인할 수 있습니다.")
     entrant.status = "checked_in"
     entrant.save(update_fields=["status"])
     return Response({"ok": True})
@@ -513,7 +684,7 @@ def start_tournament(request, tournament_id):
     t.status = "ongoing"
     t.current_round = 1
     t.save(update_fields=["status", "current_round", "format_config"])
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
 
 
 @api_view(["POST"])
@@ -626,7 +797,7 @@ def next_round(request, tournament_id):
     _create_matches(rnd, pairs, groups, brackets)
     t.current_round += 1
     t.save(update_fields=["current_round"])
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
 
 
 @api_view(["POST"])
@@ -644,7 +815,7 @@ def complete_tournament(request, tournament_id):
     Round.objects.filter(tournament=t, number=t.current_round).update(status="completed")
     t.status = "completed"
     t.save(update_fields=["status"])
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
 
 
 @api_view(["GET"])
@@ -663,10 +834,16 @@ def standings(request, tournament_id):
     rows = []
     for eid, s in stats.items():
         icon, border = user_avatar(s["entrant"].user)
+        members = []
+        if s["entrant"].user_id is None:
+            for mem in s["entrant"].members.select_related("user__avatar_icon", "user__equipped_border"):
+                mi, mb = user_avatar(mem.user)
+                members.append({"id": mem.id, "name": mem.user.username, "is_captain": mem.is_captain, "avatar_icon": mi, "border": mb})
         rows.append({
             "entrant_id": eid,
             "name": s["entrant"].name,
             "user": s["entrant"].user_id,
+            "members": members,
             "wins": s["wins"], "draws": s["draws"], "losses": s["losses"],
             "points": s["points"],
             "buchholz": buchholz.get(eid, 0),
@@ -691,10 +868,11 @@ def standings(request, tournament_id):
 
 
 def _match_role(match, user):
-    if match.entrant1.user_id == user.id:
-        return "p1"
-    if match.entrant2 and match.entrant2.user_id == user.id:
-        return "p2"
+    for side, entrant in (("p1", match.entrant1), ("p2", match.entrant2)):
+        if entrant is None:
+            continue
+        if entrant.user_id == user.id or (entrant.user_id is None and entrant.members.filter(user=user).exists()):
+            return side
     return None
 
 
@@ -709,6 +887,8 @@ def report_match(request, match_id):
         return _err("이 경기의 참가자가 아닙니다.", status.HTTP_403_FORBIDDEN)
     if match.report_status == "confirmed":
         return _err("이미 확정된 경기입니다.")
+    if match.round.tournament.team_size > 1:
+        return _err("팀전은 보드별로 결과를 보고합니다.")
     reported = request.data.get("result")
     if reported not in ("win", "lose", "draw"):
         return _err("result는 win/lose/draw 중 하나여야 합니다.")
@@ -775,6 +955,114 @@ def override_match(request, match_id):
     return Response({"ok": True, "result": match.result})
 
 
+def _board_role(board, user):
+    if board.member1 and board.member1.user_id == user.id:
+        return "p1"
+    if board.member2 and board.member2.user_id == user.id:
+        return "p2"
+    return None
+
+
+def _get_board(board_id):
+    try:
+        return Board.objects.select_related("match__round__tournament", "member1", "member2").get(id=board_id), None
+    except Board.DoesNotExist:
+        return None, _err("보드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def report_board(request, board_id):
+    board, err = _get_board(board_id)
+    if err:
+        return err
+    role = _board_role(board, request.user)
+    if role is None:
+        return _err("이 보드의 선수가 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if board.report_status == "confirmed" or board.match.report_status == "confirmed":
+        return _err("이미 확정된 경기입니다.")
+    reported = request.data.get("result")
+    if reported not in ("win", "lose"):
+        return _err("result는 win/lose 중 하나여야 합니다.")
+    won = reported == "win"
+    board.result = "p1" if (role == "p1") == won else "p2"
+    board.report_status = "reported"
+    board.reported_by = request.user
+    board.save()
+    return Response({"ok": True, "result": board.result})
+
+
+def _respond_to_board(request, board_id, new_status):
+    board, err = _get_board(board_id)
+    if err:
+        return err
+    if _board_role(board, request.user) is None:
+        return _err("이 보드의 선수가 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if board.report_status != "reported":
+        return _err("보고된 경기가 아닙니다.")
+    if board.reported_by_id == request.user.id:
+        return _err("자신의 보고는 상대가 확인해야 합니다.", status.HTTP_403_FORBIDDEN)
+    board.report_status = new_status
+    board.save(update_fields=["report_status"])
+    if new_status == "confirmed":
+        _settle_team_match(board.match)
+    return Response({"ok": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def confirm_board(request, board_id):
+    return _respond_to_board(request, board_id, "confirmed")
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def dispute_board(request, board_id):
+    return _respond_to_board(request, board_id, "disputed")
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def override_board(request, board_id):
+    board, err = _get_board(board_id)
+    if err:
+        return err
+    if board.match.round.tournament.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    result = request.data.get("result")
+    if result not in ("p1", "p2"):
+        return _err("result는 p1/p2 중 하나여야 합니다.")
+    board.result, board.report_status, board.reported_by = result, "confirmed", request.user
+    board.save()
+    _settle_team_match(board.match)
+    return Response({"ok": True, "result": board.result})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def set_lineup(request, match_id):
+    """Captain reorders their side's boards for this match, until any board is reported."""
+    try:
+        match = Match.objects.select_related("round__tournament", "entrant1", "entrant2").get(id=match_id)
+    except Match.DoesNotExist:
+        return _err("경기를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    t = match.round.tournament
+    m = _membership(t, request.user)
+    if not m or not m.is_captain or m.entrant_id not in (match.entrant1_id, match.entrant2_id):
+        return _err("이 경기 팀의 팀장만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    if match.report_status == "confirmed" or match.boards.exclude(report_status="pending").exists():
+        return _err("결과 보고가 시작된 경기는 출전 순서를 바꿀 수 없습니다.")
+    ids = [int(x) for x in (request.data.get("members") or []) if str(x).isdigit()]
+    members = {x.id: x for x in m.entrant.members.all()}
+    if sorted(ids) != sorted(members):
+        return _err("팀원 목록이 맞지 않습니다.")
+    side = "member1" if m.entrant_id == match.entrant1_id else "member2"
+    for board in match.boards.order_by("order"):
+        setattr(board, side, members[ids[board.order]] if board.order < len(ids) else None)
+        board.save(update_fields=[side])
+    return Response({"ok": True})
+
+
 @api_view(["GET", "POST"])
 def announcements(request, tournament_id):
     t, err = _get_tournament(tournament_id)
@@ -814,8 +1102,17 @@ def chat(request, tournament_id):
     t, err = _get_tournament(tournament_id)
     if err:
         return err
+    want_team = str(request.GET.get("team") or request.data.get("team") or "").lower() in ("1", "true")
+    team = None
+    if want_team:
+        if not request.user.is_authenticated:
+            return _err("로그인이 필요합니다.", status.HTTP_401_UNAUTHORIZED)
+        m = _membership(t, request.user)
+        if not m:
+            return _err("팀에 속해 있지 않습니다.", status.HTTP_403_FORBIDDEN)
+        team = m.entrant
     if request.method == "GET":
-        qs = t.chat_messages.select_related("user__avatar_icon", "user__equipped_border")
+        qs = t.chat_messages.select_related("user__avatar_icon", "user__equipped_border").filter(team=team)
         after = request.GET.get("after")
         if after and str(after).isdigit():
             qs = qs.filter(id__gt=int(after))
@@ -823,13 +1120,15 @@ def chat(request, tournament_id):
     if not request.user.is_authenticated:
         return _err("로그인이 필요합니다.", status.HTTP_401_UNAUTHORIZED)
     is_host = t.host_id == request.user.id
-    entrant = t.entrants.filter(user=request.user).exclude(status="kicked").first()
+    entrant = _own_entrant(t, request.user)
+    if entrant is not None and entrant.status == "kicked":
+        entrant = None
     if not is_host and entrant is None:
         return _err("참가자만 채팅할 수 있습니다.", status.HTTP_403_FORBIDDEN)
     content = str(request.data.get("content") or "").strip()
     if not content or len(content) > 500:
         return _err("내용은 1~500자여야 합니다.")
-    msg = ChatMessage.objects.create(tournament=t, user=request.user, content=content)
+    msg = ChatMessage.objects.create(tournament=t, user=request.user, content=content, team=team)
     return Response(ChatMessageSerializer(msg).data, status=status.HTTP_201_CREATED)
 
 
@@ -852,7 +1151,35 @@ def _deck_response(submission):
 
 
 def _own_active_entrant(t, user):
-    return t.entrants.filter(user=user).exclude(status__in=["withdrawn", "kicked"]).first()
+    return t.entrants.filter(Q(user=user) | Q(members__user=user)).exclude(status__in=["withdrawn", "kicked"]).distinct().first()
+
+
+def _deck_target(t, request):
+    """(entrant, member, error) whose deck is being read: ?entrant_id / ?member_id for
+    hosts and captains, otherwise the caller's own."""
+    member_id = request.GET.get("member_id")
+    entrant_id = request.GET.get("entrant_id")
+    if member_id:
+        member = TeamMember.objects.filter(id=member_id, entrant__tournament=t).select_related("entrant").first()
+        if not member:
+            return None, None, _err("팀원을 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+        mine = _membership(t, request.user)
+        allowed = member.user_id == request.user.id or t.host_id == request.user.id or (
+            mine and mine.is_captain and mine.entrant_id == member.entrant_id)
+        if not allowed:
+            return None, None, _err("열람 권한이 없습니다.", status.HTTP_403_FORBIDDEN)
+        return member.entrant, member, None
+    if entrant_id:
+        entrant = t.entrants.filter(id=entrant_id).first()
+        if not entrant:
+            return None, None, _err("참가자를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+        if not (entrant.user_id == request.user.id or t.host_id == request.user.id):
+            return None, None, _err("열람 권한이 없습니다.", status.HTTP_403_FORBIDDEN)
+        return entrant, None, None
+    entrant = _own_active_entrant(t, request.user)
+    if not entrant:
+        return None, None, _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+    return entrant, (_membership(t, request.user) if entrant.is_team else None), None
 
 
 @api_view(["GET", "POST"])
@@ -863,19 +1190,10 @@ def deck_submission(request, tournament_id):
         return err
 
     if request.method == "GET":
-        entrant_id = request.GET.get("entrant_id")
-        if entrant_id:
-            entrant = t.entrants.filter(id=entrant_id).first()
-            if not entrant:
-                return _err("참가자를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
-            is_owner = entrant.user_id == request.user.id
-            if not (is_owner or t.host_id == request.user.id):
-                return _err("열람 권한이 없습니다.", status.HTTP_403_FORBIDDEN)
-        else:
-            entrant = _own_active_entrant(t, request.user)
-            if not entrant:
-                return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
-        submission = DeckSubmission.objects.filter(entrant=entrant).first()
+        entrant, member, err = _deck_target(t, request)
+        if err:
+            return err
+        submission = DeckSubmission.objects.filter(entrant=entrant, member=member).first()
         if not submission:
             return _err("제출된 덱이 없습니다.", status.HTTP_404_NOT_FOUND)
         return _deck_response(submission)
@@ -890,7 +1208,8 @@ def deck_submission(request, tournament_id):
     if not image:
         return _err("image 파일이 필요합니다.")
 
-    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant)
+    member = _membership(t, request.user) if entrant.is_team else None
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member)
     submission.image = image
     submission.save()
 
@@ -947,7 +1266,8 @@ def deck_card_add(request, tournament_id):
     card = Card.objects.filter(id=request.data.get("card_id")).first()
     if not card:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
-    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant)
+    member = _membership(t, request.user) if entrant.is_team else None
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member)
     DeckSubmissionCard.objects.update_or_create(
         submission=submission, card=card,
         defaults={"quantity": quantity, "confidence": None, "source": "manual"},
@@ -966,7 +1286,8 @@ def deck_card_remove(request, tournament_id, row_id):
         return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
     if t.status != "recruiting":
         return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
-    row = DeckSubmissionCard.objects.filter(id=row_id, submission__entrant=entrant).first()
+    member = _membership(t, request.user) if entrant.is_team else None
+    row = DeckSubmissionCard.objects.filter(id=row_id, submission__entrant=entrant, submission__member=member).first()
     if not row:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     row.delete()
@@ -990,4 +1311,4 @@ def update_cover(request, tournament_id):
     else:
         t.cover_image = None
     t.save(update_fields=["cover_image"])
-    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+    return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)

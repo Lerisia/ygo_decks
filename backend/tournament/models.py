@@ -27,6 +27,7 @@ class Tournament(models.Model):
     # round-robin schedule materialised at start time.
     format_config = models.JSONField(default=dict, blank=True)
     capacity = models.PositiveIntegerField(default=8)
+    team_size = models.PositiveSmallIntegerField(default=1)  # 1 = individual; 2+ = every entrant is a team of this many
     event_date = models.DateTimeField()
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="recruiting")
     current_round = models.PositiveIntegerField(default=0)
@@ -52,6 +53,7 @@ class Entrant(models.Model):
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="registered")
     md_uid = models.CharField(max_length=9, blank=True, default="")  # Master Duel 9-digit UID
     seed = models.IntegerField(null=True, blank=True)
+    join_code = models.CharField(max_length=6, blank=True, default="")  # team entrants: what teammates type to join
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -61,6 +63,29 @@ class Entrant(models.Model):
 
     def __str__(self):
         return f"{self.name} @ {self.tournament.name}"
+
+    @property
+    def is_team(self):
+        return self.user_id is None
+
+
+class TeamMember(models.Model):
+    """One person inside a team entrant. `order` is the default board order the captain set."""
+    entrant = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tournament_team_memberships")
+    md_uid = models.CharField(max_length=9, blank=True, default="")
+    is_captain = models.BooleanField(default=False)
+    order = models.PositiveSmallIntegerField(default=0)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["entrant", "user"], name="unique_team_member"),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} in {self.entrant.name}"
 
 
 class Round(models.Model):
@@ -109,6 +134,25 @@ class Match(models.Model):
         return f"{self.round} {self.entrant1.name} vs {rival}"
 
 
+class Board(models.Model):
+    """One duel inside a team match: member of entrant1 vs member of entrant2, same board order."""
+    RESULT_CHOICES = [("p1", "P1 승"), ("p2", "P2 승")]
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="boards")
+    order = models.PositiveSmallIntegerField()
+    member1 = models.ForeignKey(TeamMember, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    member2 = models.ForeignKey(TeamMember, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    result = models.CharField(max_length=6, choices=RESULT_CHOICES, null=True, blank=True)
+    report_status = models.CharField(max_length=10, choices=Match.REPORT_STATUS_CHOICES, default="pending")
+    reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.match} board {self.order + 1}"
+
+
 class Announcement(models.Model):
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="announcements")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
@@ -126,6 +170,7 @@ class Announcement(models.Model):
 class ChatMessage(models.Model):
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="chat_messages")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    team = models.ForeignKey(Entrant, null=True, blank=True, on_delete=models.CASCADE, related_name="+")  # set = visible to that team only
     content = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -137,15 +182,21 @@ class ChatMessage(models.Model):
 
 
 class DeckSubmission(models.Model):
-    """One deck per entrant: screenshot in, scanned card list out, manual fixes on top."""
-    entrant = models.OneToOneField(Entrant, on_delete=models.CASCADE, related_name="deck_submission")
+    """One deck per entrant (per member in team play): screenshot in, scanned card list out, manual fixes on top."""
+    entrant = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="deck_submissions")
+    member = models.ForeignKey(TeamMember, null=True, blank=True, on_delete=models.CASCADE, related_name="deck_submissions")
     image = models.ImageField(upload_to="tournament_decks/", null=True, blank=True)
     unmatched_count = models.PositiveIntegerField(default=0)  # scanner crops with no DB match
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["entrant", "member"], name="unique_deck_per_member"),
+        ]
+
     def __str__(self):
-        return f"Deck of {self.entrant}"
+        return f"Deck of {self.member or self.entrant}"
 
 
 class DeckSubmissionCard(models.Model):

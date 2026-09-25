@@ -1,6 +1,7 @@
 from django.urls import path
 
-from .views import (update_cover, cancel_tournament,
+from .views import (update_cover, cancel_tournament, team_join, team_leave, team_order,
+                    report_board, confirm_board, dispute_board, override_board, set_lineup,
                     deck_card_add, deck_card_remove, deck_submission,
                     announcements, chat, check_in, complete_tournament, confirm_match,
                     delete_announcement,
@@ -16,6 +17,9 @@ urlpatterns = [
     path("<int:tournament_id>/withdraw/", withdraw),
     path("<int:tournament_id>/check-in/", check_in),
     path("<int:tournament_id>/kick/", kick),
+    path("<int:tournament_id>/team/join/", team_join),
+    path("<int:tournament_id>/team/leave/", team_leave),
+    path("<int:tournament_id>/team/order/", team_order),
     path("<int:tournament_id>/cover/", update_cover),
     path("<int:tournament_id>/start/", start_tournament),
     path("<int:tournament_id>/next-round/", next_round),
@@ -32,4 +36,9 @@ urlpatterns = [
     path("matches/<int:match_id>/confirm/", confirm_match),
     path("matches/<int:match_id>/dispute/", dispute_match),
     path("matches/<int:match_id>/override/", override_match),
+    path("matches/<int:match_id>/lineup/", set_lineup),
+    path("boards/<int:board_id>/report/", report_board),
+    path("boards/<int:board_id>/confirm/", confirm_board),
+    path("boards/<int:board_id>/dispute/", dispute_board),
+    path("boards/<int:board_id>/override/", override_board),
 ]

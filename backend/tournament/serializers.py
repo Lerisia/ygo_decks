@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from avatar.serializers import BorderSerializer, CardIconSerializer
 from avatar.views import _resolve_default_border, _resolve_default_icon
-from .models import DeckSubmission, DeckSubmissionCard, Announcement, ChatMessage, Entrant, Match, Round, Tournament
+from .models import Board, DeckSubmission, DeckSubmissionCard, Announcement, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
 
 
 def user_avatar(user):
@@ -18,14 +18,36 @@ def user_avatar(user):
     )
 
 
+class TeamMemberSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="user.username", read_only=True)
+    md_uid = serializers.SerializerMethodField()
+    avatar_icon = serializers.SerializerMethodField()
+    border = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamMember
+        fields = ["id", "user", "name", "md_uid", "is_captain", "order", "avatar_icon", "border"]
+
+    def get_md_uid(self, obj):
+        return obj.md_uid if self.context.get("show_uid") else None
+
+    def get_avatar_icon(self, obj):
+        return user_avatar(obj.user)[0]
+
+    def get_border(self, obj):
+        return user_avatar(obj.user)[1]
+
+
 class EntrantSerializer(serializers.ModelSerializer):
     avatar_icon = serializers.SerializerMethodField()
     border = serializers.SerializerMethodField()
     md_uid = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
+    join_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Entrant
-        fields = ["id", "user", "name", "status", "md_uid", "seed", "avatar_icon", "border"]
+        fields = ["id", "user", "name", "status", "md_uid", "seed", "avatar_icon", "border", "members", "join_code"]
 
     def get_md_uid(self, obj):
         # In-game friend code — shown to the host and fellow participants only.
@@ -37,15 +59,40 @@ class EntrantSerializer(serializers.ModelSerializer):
     def get_border(self, obj):
         return user_avatar(obj.user)[1]
 
+    def get_members(self, obj):
+        if obj.user_id is not None:
+            return []
+        qs = obj.members.select_related("user__avatar_icon", "user__equipped_border")
+        return TeamMemberSerializer(qs, many=True, context=self.context).data
+
+    def get_join_code(self, obj):
+        # only the team itself (and the host) needs the code
+        viewer = self.context.get("viewer_id")
+        if obj.user_id is not None or viewer is None:
+            return None
+        if self.context.get("is_host") or obj.members.filter(user_id=viewer).exists():
+            return obj.join_code
+        return None
+
+
+class BoardSerializer(serializers.ModelSerializer):
+    member1 = TeamMemberSerializer(read_only=True)
+    member2 = TeamMemberSerializer(read_only=True)
+
+    class Meta:
+        model = Board
+        fields = ["id", "order", "member1", "member2", "result", "report_status", "reported_by"]
+
 
 class MatchSerializer(serializers.ModelSerializer):
     entrant1 = EntrantSerializer(read_only=True)
     entrant2 = EntrantSerializer(read_only=True)
+    boards = BoardSerializer(many=True, read_only=True)
 
     class Meta:
         model = Match
         fields = ["id", "bracket_pos", "group", "bracket", "entrant1", "entrant2",
-                  "result", "report_status", "reported_by"]
+                  "result", "report_status", "reported_by", "boards"]
 
 
 class RoundSerializer(serializers.ModelSerializer):
@@ -62,7 +109,7 @@ class TournamentListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tournament
-        fields = ["id", "name", "format", "status", "capacity", "event_date",
+        fields = ["id", "name", "format", "status", "capacity", "team_size", "event_date",
                   "current_round", "host_name", "entrant_count", "cover_image", "created_at"]
 
     def get_entrant_count(self, obj):
@@ -104,7 +151,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatMessage
-        fields = ["id", "user", "username", "content", "created_at", "avatar_icon", "border"]
+        fields = ["id", "user", "username", "team", "content", "created_at", "avatar_icon", "border"]
 
     def get_avatar_icon(self, obj):
         return user_avatar(obj.user)[0]
@@ -136,7 +183,7 @@ class DeckSubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeckSubmission
-        fields = ["id", "entrant_id", "image", "unmatched_count", "cards", "locked", "updated_at"]
+        fields = ["id", "entrant_id", "member", "image", "unmatched_count", "cards", "locked", "updated_at"]
 
     def get_cards(self, obj):
         qs = obj.cards.select_related("card").order_by("card__korean_name", "card__name")

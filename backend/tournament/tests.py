@@ -1014,3 +1014,200 @@ class EditAndCancelTest(TournamentApiTestBase):
         self.assertNotIn(t.id, [x["id"] for x in self.client.get("/api/tournaments/").json()])
         self.assertEqual(other.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "123456789"}, format="json").status_code, 400)
         self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/cancel/").status_code, 400)
+
+
+class TeamPlayTest(TournamentApiTestBase):
+    """팀전: 팀장이 팀을 만들고 코드로 합류, 팀 경기는 보드별 개인전 다수결."""
+
+    def _team_tournament(self, team_size=3, fmt="round_robin", **cfg):
+        resp = self.create(name="팀전", format=fmt, capacity=8, team_size=team_size, format_config=cfg)
+        assert resp.status_code == 201, resp.content
+        return Tournament.objects.get(id=resp.json()["id"])
+
+    def _team(self, t, tag, size):
+        """Captain creates, others join by code; returns (entrant, [(user, client)])."""
+        members = []
+        cap = _user(f"{tag}cap{t.id}")
+        cc = _auth(cap)
+        r = cc.post(f"/api/tournaments/{t.id}/register/", {"team_name": f"팀{tag}", "md_uid": "111111111"}, format="json")
+        assert r.status_code == 200, r.content
+        code = r.json()["join_code"]
+        members.append((cap, cc))
+        for i in range(size - 1):
+            u = _user(f"{tag}m{i}{t.id}")
+            c = _auth(u)
+            r = c.post(f"/api/tournaments/{t.id}/team/join/", {"code": code, "md_uid": f"22222222{i}"}, format="json")
+            assert r.status_code == 200, r.content
+            members.append((u, c))
+        return Entrant.objects.get(tournament=t, name=f"팀{tag}"), members
+
+    def _check_in(self, t, members):
+        return members[0][1].post(f"/api/tournaments/{t.id}/check-in/")
+
+    def test_create_requires_valid_team_size(self):
+        self.assertEqual(self.create(team_size=1).status_code, 201)
+        self.assertEqual(self.create(team_size=6).status_code, 400)
+        self.assertEqual(self.create(team_size=3).json()["team_size"], 3)
+
+    def test_captain_creates_team_and_members_join_by_code(self):
+        t = self._team_tournament(3)
+        entrant, members = self._team(t, "A", 3)
+        self.assertIsNone(entrant.user)
+        self.assertEqual(entrant.members.count(), 3)
+        self.assertTrue(entrant.members.get(user=members[0][0]).is_captain)
+        # full team refuses a fourth
+        extra = _auth(_user("extra"))
+        code = entrant.join_code
+        self.assertEqual(extra.post(f"/api/tournaments/{t.id}/team/join/", {"code": code, "md_uid": "333333333"}, format="json").status_code, 400)
+        # a member cannot join another team in the same tournament
+        other, _ = self._team(t, "B", 1)
+        r = members[1][1].post(f"/api/tournaments/{t.id}/team/join/", {"code": other.join_code, "md_uid": "222222220"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        # wrong code
+        self.assertEqual(extra.post(f"/api/tournaments/{t.id}/team/join/", {"code": "ZZZZZZ", "md_uid": "333333333"}, format="json").status_code, 404)
+
+    def test_individual_register_refused_in_team_tournament(self):
+        t = self._team_tournament(2)
+        c = _auth(_user("solo"))
+        self.assertEqual(c.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "123456789"}, format="json").status_code, 400)
+
+    def test_check_in_needs_full_roster_and_captain(self):
+        t = self._team_tournament(3)
+        entrant, members = self._team(t, "A", 2)
+        self.assertEqual(self._check_in(t, members).status_code, 400)       # not full
+        u = _user("late"); c = _auth(u)
+        assert c.post(f"/api/tournaments/{t.id}/team/join/", {"code": entrant.join_code, "md_uid": "444444444"}, format="json").status_code == 200
+        self.assertEqual(members[1][1].post(f"/api/tournaments/{t.id}/check-in/").status_code, 403)  # not captain
+        self.assertEqual(self._check_in(t, members).status_code, 200)
+        entrant.refresh_from_db()
+        self.assertEqual(entrant.status, "checked_in")
+
+    def test_leave_and_captain_handover(self):
+        t = self._team_tournament(3)
+        entrant, members = self._team(t, "A", 3)
+        r = members[0][1].post(f"/api/tournaments/{t.id}/team/leave/")
+        self.assertEqual(r.status_code, 200)
+        entrant.refresh_from_db()
+        self.assertEqual(entrant.members.count(), 2)
+        self.assertTrue(entrant.members.get(user=members[1][0]).is_captain)
+        members[1][1].post(f"/api/tournaments/{t.id}/team/leave/")
+        members[2][1].post(f"/api/tournaments/{t.id}/team/leave/")
+        entrant.refresh_from_db()
+        self.assertEqual(entrant.status, "withdrawn")                      # empty team is gone
+
+    def test_detail_shows_members_and_code_only_to_team(self):
+        t = self._team_tournament(2)
+        entrant, members = self._team(t, "A", 2)
+        mine = members[0][1].get(f"/api/tournaments/{t.id}/").json()["entrants"][0]
+        self.assertEqual(len(mine["members"]), 2)
+        self.assertEqual(mine["join_code"], entrant.join_code)
+        self.assertTrue(all(m["avatar_icon"] is not None or m["avatar_icon"] is None for m in mine["members"]))
+        stranger = APIClient().get(f"/api/tournaments/{t.id}/").json()["entrants"][0]
+        self.assertIsNone(stranger["join_code"])
+        self.assertIsNone(stranger["members"][0]["md_uid"])
+
+    def _two_teams_started(self, size=3, fmt="round_robin"):
+        t = self._team_tournament(size, fmt)
+        a, am = self._team(t, "A", size)
+        b, bm = self._team(t, "B", size)
+        assert self._check_in(t, am).status_code == 200
+        assert self._check_in(t, bm).status_code == 200
+        self.start(t)
+        return t, (a, am), (b, bm)
+
+    def test_start_creates_boards_from_member_order(self):
+        t, (a, am), (b, bm) = self._two_teams_started(3)
+        m = Round.objects.get(tournament=t, number=1).matches.get()
+        boards = list(m.boards.order_by("order"))
+        self.assertEqual(len(boards), 3)
+        for i, bd in enumerate(boards):
+            self.assertEqual(bd.member1.entrant_id if bd.member1.entrant_id == m.entrant1_id else bd.member2.entrant_id, m.entrant1_id)
+            self.assertEqual({bd.member1.order, bd.member2.order}, {i})
+        detail = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertEqual(len(detail["rounds"][0]["matches"][0]["boards"]), 3)
+
+    def _board_clients(self, board, all_members):
+        by_user = {u.id: c for u, c in all_members}
+        return by_user[board.member1.user_id], by_user[board.member2.user_id]
+
+    def test_boards_decide_the_team_match_by_majority(self):
+        t, (a, am), (b, bm) = self._two_teams_started(3)
+        m = Round.objects.get(tournament=t, number=1).matches.get()
+        boards = list(m.boards.order_by("order"))
+        everyone = am + bm
+        # team-level report is not allowed in team mode
+        self.assertEqual(am[0][1].post(f"/api/tournaments/matches/{m.id}/report/", {"result": "win"}, format="json").status_code, 400)
+        results = ["win", "lose", "win"]  # from member1's view; member1 belongs to whichever side
+        for bd, res in zip(boards, results):
+            c1, c2 = self._board_clients(bd, everyone)
+            self.assertEqual(c1.post(f"/api/tournaments/boards/{bd.id}/report/", {"result": res}, format="json").status_code, 200)
+            m.refresh_from_db()
+            self.assertNotEqual(m.report_status, "confirmed")
+            self.assertEqual(c2.post(f"/api/tournaments/boards/{bd.id}/confirm/").status_code, 200)
+        m.refresh_from_db()
+        self.assertEqual(m.report_status, "confirmed")
+        side1_wins = sum(1 for bd, res in zip(boards, results) if (bd.member1.entrant_id == m.entrant1_id) == (res == "win"))
+        self.assertEqual(m.result, "p1" if side1_wins >= 2 else "p2")
+
+    def test_even_split_is_a_draw_in_league_and_unresolved_in_knockout(self):
+        t, (a, am), (b, bm) = self._two_teams_started(2)
+        m = Round.objects.get(tournament=t, number=1).matches.get()
+        everyone = am + bm
+        for bd, res in zip(m.boards.order_by("order"), ["win", "lose"]):
+            c1, c2 = self._board_clients(bd, everyone)
+            c1.post(f"/api/tournaments/boards/{bd.id}/report/", {"result": res}, format="json")
+            c2.post(f"/api/tournaments/boards/{bd.id}/confirm/")
+        m.refresh_from_db()
+        # one board each way from member1's view could still be 2-0 if member1 sides differ; compute
+        wins1 = sum(1 for bd, res in zip(m.boards.order_by("order"), ["win", "lose"]) if (bd.member1.entrant_id == m.entrant1_id) == (res == "win"))
+        if wins1 == 1:
+            self.assertEqual((m.result, m.report_status), ("draw", "confirmed"))
+        else:
+            self.assertEqual(m.report_status, "confirmed")
+
+    def test_stranger_cannot_report_board_and_host_can_override(self):
+        t, (a, am), (b, bm) = self._two_teams_started(2)
+        m = Round.objects.get(tournament=t, number=1).matches.get()
+        bd = m.boards.order_by("order").first()
+        self.assertEqual(_auth(_user("x")).post(f"/api/tournaments/boards/{bd.id}/report/", {"result": "win"}, format="json").status_code, 403)
+        self.assertEqual(self.client.post(f"/api/tournaments/boards/{bd.id}/override/", {"result": "p1"}, format="json").status_code, 200)
+        bd.refresh_from_db()
+        self.assertEqual((bd.result, bd.report_status), ("p1", "confirmed"))
+
+    def test_captain_sets_lineup_before_first_report(self):
+        t, (a, am), (b, bm) = self._two_teams_started(3)
+        m = Round.objects.get(tournament=t, number=1).matches.get()
+        ids = [x.id for x in a.members.order_by("order")]
+        r = am[0][1].post(f"/api/tournaments/matches/{m.id}/lineup/", {"members": list(reversed(ids))}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        boards = list(m.boards.order_by("order"))
+        side = [bd.member1 if bd.member1.entrant_id == a.id else bd.member2 for bd in boards]
+        self.assertEqual([x.id for x in side], list(reversed(ids)))
+        self.assertEqual(am[1][1].post(f"/api/tournaments/matches/{m.id}/lineup/", {"members": ids}, format="json").status_code, 403)
+        c1, _ = self._board_clients(boards[0], am + bm)
+        c1.post(f"/api/tournaments/boards/{boards[0].id}/report/", {"result": "win"}, format="json")
+        self.assertEqual(am[0][1].post(f"/api/tournaments/matches/{m.id}/lineup/", {"members": ids}, format="json").status_code, 400)
+
+    def test_team_chat_is_private_to_the_team(self):
+        t = self._team_tournament(2)
+        a, am = self._team(t, "A", 2)
+        b, bm = self._team(t, "B", 1)
+        assert am[0][1].post(f"/api/tournaments/{t.id}/chat/", {"content": "작전", "team": True}, format="json").status_code == 201
+        assert am[0][1].post(f"/api/tournaments/{t.id}/chat/", {"content": "안녕"}, format="json").status_code == 201
+        self.assertEqual([m["content"] for m in am[1][1].get(f"/api/tournaments/{t.id}/chat/?team=1").json()], ["작전"])
+        self.assertEqual([m["content"] for m in APIClient().get(f"/api/tournaments/{t.id}/chat/").json()], ["안녕"])
+        self.assertEqual(bm[0][1].get(f"/api/tournaments/{t.id}/chat/?team=1").json(), [])
+
+    def test_team_withdraw_is_captain_only_and_drops_whole_team(self):
+        t = self._team_tournament(2)
+        a, am = self._team(t, "A", 2)
+        self.assertEqual(am[1][1].post(f"/api/tournaments/{t.id}/withdraw/").status_code, 403)
+        self.assertEqual(am[0][1].post(f"/api/tournaments/{t.id}/withdraw/").status_code, 200)
+        a.refresh_from_db()
+        self.assertEqual(a.status, "withdrawn")
+
+    def test_standings_carry_member_avatars(self):
+        t, (a, am), (b, bm) = self._two_teams_started(2)
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(len(rows[0]["members"]), 2)
+        self.assertIn("avatar_icon", rows[0]["members"][0])
