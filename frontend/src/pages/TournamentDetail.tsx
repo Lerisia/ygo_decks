@@ -7,9 +7,9 @@ import AnnouncementsTab from "@/components/tournament/AnnouncementsTab";
 import ChatTab from "@/components/tournament/ChatTab";
 import { getUserInfo } from "@/api/accountApi";
 import {
-  checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
+  cancelTournament, checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
   getTournament, kickEntrant, nextRound, overrideMatch, registerTournament,
-  reportMatch, startTournament, updateCover, withdrawTournament,
+  reportMatch, startTournament, updateCover, updateTournament, withdrawTournament,
   GROUP_LABEL, type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
 } from "@/api/tournamentApi";
 
@@ -19,8 +19,15 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 const BRACKET_LABELS: Record<string, string> = { winners: "승자조", losers: "패자조", final: "최종전" };
 const STATUS_LABELS: Record<string, string> = {
-  recruiting: "모집 중", ongoing: "진행 중", completed: "종료",
+  recruiting: "모집 중", ongoing: "진행 중", completed: "종료", cancelled: "취소됨",
 };
+const inputCls = "w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 const btn = "px-3 py-1.5 text-sm rounded-lg font-semibold transition disabled:opacity-50";
 const blueBtn = `${btn} bg-blue-600 text-white hover:bg-blue-700`;
 const grayBtn = `${btn} bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600`;
@@ -50,6 +57,8 @@ function TournamentDetailPage() {
   const [tab, setTab] = useState<"players" | "bracket" | "deck" | "notice" | "chat" | null>(null);
   const [uidInput, setUidInput] = useState("");
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState({ name: "", description: "", event_date: "", capacity: "" });
 
   const refresh = useCallback(() => {
     if (!tournamentId) return;
@@ -188,6 +197,7 @@ function TournamentDetailPage() {
         <span className={`shrink-0 text-sm font-semibold px-2 py-1 rounded-full ${
           t.status === "ongoing" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
           : t.status === "completed" ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          : t.status === "cancelled" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
           : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"}`}>
           {STATUS_LABELS[t.status] || t.status}
         </span>
@@ -218,8 +228,14 @@ function TournamentDetailPage() {
         {t.status === "recruiting" && myEntrant?.status === "registered" && (
           <button className={blueBtn} onClick={() => act(() => checkInTournament(t.id))}>체크인</button>
         )}
-        {t.status === "recruiting" && myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (
-          <button className={grayBtn} onClick={() => act(() => withdrawTournament(t.id))}>기권</button>
+        {(t.status === "recruiting" || t.status === "ongoing") && myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (
+          <button
+            className={grayBtn}
+            onClick={() => {
+              if (t.status === "ongoing" && !window.confirm("진행 중인 대회에서 기권하면 남은 경기는 상대 승으로 처리되고 되돌릴 수 없습니다. 기권할까요?")) return;
+              act(() => withdrawTournament(t.id));
+            }}
+          >기권</button>
         )}
         {isHost && t.status === "recruiting" && (
           <button className={blueBtn} onClick={() => act(() => startTournament(t.id))}>대회 시작</button>
@@ -230,7 +246,50 @@ function TournamentDetailPage() {
             <button className={grayBtn} onClick={() => act(() => completeTournament(t.id))}>대회 종료</button>
           </>
         )}
+        {isHost && (t.status === "recruiting" || t.status === "ongoing") && (
+          <>
+            <button
+              className={grayBtn}
+              onClick={() => {
+                setEdit({ name: t.name, description: t.description, event_date: toLocalInput(t.event_date), capacity: String(t.capacity) });
+                setEditing((v) => !v);
+              }}
+            >{editing ? "수정 닫기" : "대회 수정"}</button>
+            <button
+              className={redBtn}
+              onClick={() => {
+                if (!window.confirm("대회를 취소하면 목록에서 사라지고 되돌릴 수 없습니다. 취소할까요?")) return;
+                act(() => cancelTournament(t.id));
+              }}
+            >대회 취소</button>
+          </>
+        )}
       </div>
+
+      {editing && isHost && (
+        <div className="mb-6 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col gap-2">
+          <input className={inputCls} value={edit.name} maxLength={100} onChange={(e) => setEdit({ ...edit, name: e.target.value })} placeholder="대회 이름" />
+          <textarea className={inputCls} rows={3} value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} placeholder="설명" />
+          <div className="grid grid-cols-2 gap-2">
+            <input type="datetime-local" className={inputCls} value={edit.event_date} onChange={(e) => setEdit({ ...edit, event_date: e.target.value })} />
+            <input type="number" min={2} max={128} className={inputCls} value={edit.capacity} disabled={t.status !== "recruiting"} title={t.status !== "recruiting" ? "시작 후에는 정원을 바꿀 수 없습니다" : ""} onChange={(e) => setEdit({ ...edit, capacity: e.target.value })} placeholder="정원" />
+          </div>
+          <div className="flex justify-end">
+            <button
+              className={blueBtn}
+              onClick={() => act(async () => {
+                const payload: Parameters<typeof updateTournament>[1] = {
+                  name: edit.name.trim(), description: edit.description.trim(),
+                  event_date: new Date(edit.event_date).toISOString(),
+                };
+                if (t.status === "recruiting") payload.capacity = Number(edit.capacity);
+                await updateTournament(t.id, payload);
+                setEditing(false);
+              })}
+            >저장</button>
+          </div>
+        </div>
+      )}
 
       {/* 탭: 참가자(=순위) / 대진표 */}
       <div className="flex justify-start sm:justify-center gap-1 sm:gap-3 mb-4 border-b dark:border-gray-700 pb-2 overflow-x-auto">
@@ -302,15 +361,16 @@ function TournamentDetailPage() {
               </thead>
               <tbody>
                 {rows.map((row, i) => (
-                  <tr key={row.entrant_id} className={`border-b dark:border-gray-700/60 ${grouped && row.qualified && !medals ? "bg-blue-50/60 dark:bg-blue-900/20" : ""}`}>
-                    <td className="px-2 py-1.5">{i < 3 && medals && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
+                  <tr key={row.entrant_id} className={`border-b dark:border-gray-700/60 ${row.dropped ? "opacity-50" : grouped && row.qualified && !medals ? "bg-blue-50/60 dark:bg-blue-900/20" : ""}`}>
+                    <td className="px-2 py-1.5">{row.dropped ? "–" : i < 3 && medals && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <Avatar icon={row.avatar_icon} border={row.border} size={28} />
                         <div className="min-w-0">
                           <div className="truncate">
                             {row.name}
-                            {grouped && row.qualified && !medals && <span className="ml-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400">결선</span>}
+                            {row.dropped && <span className="ml-1 text-[10px] font-semibold text-red-500">기권</span>}
+                            {grouped && row.qualified && !medals && !row.dropped && <span className="ml-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400">결선</span>}
                           </div>
                           {uidByEntrant.get(row.entrant_id) && (
                             <div className="text-[11px] text-gray-400 font-mono">{uidByEntrant.get(row.entrant_id)}</div>

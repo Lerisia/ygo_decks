@@ -11,6 +11,8 @@
 | `POST create/` | 회원 | 대회 개설. body: `name`\*, `event_date`\*(ISO), `format`\*(`single_elim`·`swiss`·`round_robin`·`swiss_cut`·`group_knockout`·`double_elim`), `capacity`(2~128, 기본 8), `description`, `format_config`(스위스 `{"swiss_rounds": 4}`, 스위스컷 `{"cut": 4}`, 조별 `{"groups": 2|4|8, "advance": 1~4}`) → 201 + 상세 |
 | `GET ` | 공개 | 대회 목록 (취소 제외, 최신순). `?status=recruiting|ongoing|completed` 필터. 각 항목에 `entrant_count`, `host_name` |
 | `GET <id>/` | 공개 | 상세: 대회 정보 + `entrants[]`(아바타 아이콘·테두리 포함) + `rounds[].matches[]` + 주최자 아바타. `md_uid`는 주최자·참가자에게만 값, 그 외 null |
+| `PATCH <id>/` | 주최자 | 수정. `name`·`description`·`event_date`는 종료 전 언제나, `capacity`(현재 인원 이상)·`format`·`format_config`는 모집 중에만 |
+| `POST <id>/cancel/` | 주최자 | 모집 중·진행 중 대회 취소 → `cancelled` (목록에서 숨김, 신청 불가) |
 | `POST <id>/start/` | 주최자 | 모집 마감·1라운드 대진 생성 (체크인 참가자만 착석, 2명 이상 필요). 라운드 시드 저장 |
 | `POST <id>/next-round/` | 주최자 | 현재 라운드 전 경기 확정 시 다음 라운드 생성. 형식별 규칙(엘림=승자 진출, 스위스=승점 그룹·재대결 방지·bye, 라운드로빈=사전 일정, 스위스컷=라운드 소진 후 상위 컷 시드, 조별=조 일정 소진 후 각 조 상위 N명을 1위끼리→2위끼리 순으로 시드해 결선). 더블 엘림=승자조 승자 진출 + 패자조(생존자>대기 탈락자면 생존자끼리, 아니면 역순 매칭) + 최종전(패자조 우승자가 이기면 리셋 1회)). 경기의 `group`은 조 index(0=A조), `bracket`은 더블 엘림에서 `winners`/`losers`/`final`, 그 외 빈 문자열. 남은 라운드 없으면 400 |
 | `POST <id>/complete/` | 주최자 | 전 경기 확정 시 대회 종료 |
@@ -20,9 +22,9 @@
 | 메서드/경로 | 권한 | 설명 |
 |---|---|---|
 | `POST <id>/register/` | 회원 | 참가 신청. body: `md_uid`(9자리 숫자) — 프로필에 저장돼 다음 대회부턴 생략 가능. 중복/정원 초과/모집 종료 시 400. 기권자는 같은 자리로 재신청 |
-| `POST <id>/withdraw/` | 참가자 | 기권 |
+| `POST <id>/withdraw/` | 참가자 | 기권. 진행 중이면 현재 라운드 미확정 경기는 상대 승으로 확정되고 이후 라운드에서 짝이 될 사람은 부전승 |
 | `POST <id>/check-in/` | 참가자 | 체크인 (신청 상태에서만, 모집 중에만) |
-| `POST <id>/kick/` | 주최자 | 참가자 추방. body: `entrant_id` |
+| `POST <id>/kick/` | 주최자 | 참가자 추방. body: `entrant_id`. 진행 중이면 기권과 같이 처리 |
 
 ## 경기 결과 (셀프 보고 + 상대 확인)
 
@@ -39,7 +41,7 @@
 
 | 메서드/경로 | 권한 | 설명 |
 |---|---|---|
-| `GET <id>/standings/` | 공개 | 순위표: `entrant_id, name, wins/draws/losses, points`(승3·무1), `buchholz`, `group`(조 index, 조별 형식 외 null), `qualified`(결선 착석 여부), 아바타. 결선 성적→승점→부흐홀츠→이름순 정렬 |
+| `GET <id>/standings/` | 공개 | 순위표: `entrant_id, name, wins/draws/losses, points`(승3·무1), `buchholz`, `group`(조 index, 조별 형식 외 null), `qualified`(결선 착석 여부), `dropped`(착석 후 기권·추방, 맨 아래로), 아바타. 기권 여부→결선 성적→승점→부흐홀츠→이름순 정렬 |
 
 ## 덱 제출 (스캐너 + 수동 보정)
 

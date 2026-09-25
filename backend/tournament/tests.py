@@ -917,3 +917,100 @@ class DoubleElimTest(TournamentApiTestBase):
         by_user = {u.id: c for u, c in players}
         resp = by_user[m.entrant1.user_id].post(f"/api/tournaments/matches/{m.id}/report/", {"result": "draw"}, format="json")
         self.assertEqual(resp.status_code, 400)
+
+
+class DropoutTest(TournamentApiTestBase):
+    """진행 중 기권·추방: 남은 경기는 상대 승, 이후 짝은 부전승, 순위표엔 기권으로 남는다."""
+
+    def _rr(self, n=4):
+        resp = self.create(name="RR", format="round_robin")
+        t = Tournament.objects.get(id=resp.json()["id"])
+        players = self.make_players(t, n)
+        self.start(t)
+        return t, players
+
+    def test_withdraw_during_round_forfeits_and_future_opponents_get_byes(self):
+        t, players = self._rr(4)
+        by_user = {u.id: c for u, c in players}
+        m = Round.objects.get(tournament=t, number=1).matches.first()
+        quitter = m.entrant1
+        resp = by_user[quitter.user_id].post(f"/api/tournaments/{t.id}/withdraw/")
+        self.assertEqual(resp.status_code, 200)
+        m.refresh_from_db()
+        self.assertEqual((m.result, m.report_status), ("p2", "confirmed"))
+        for other in Round.objects.get(tournament=t, number=1).matches.exclude(id=m.id):
+            self.confirm_match(other, players)
+        assert self.client.post(f"/api/tournaments/{t.id}/next-round/").status_code == 200
+        r2 = Round.objects.get(tournament=t, number=2)
+        self.assertFalse(r2.matches.filter(entrant1=quitter).exists() or r2.matches.filter(entrant2=quitter).exists())
+        self.assertEqual(r2.matches.filter(entrant2__isnull=True, result="bye").count(), 1)
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(rows[-1]["entrant_id"], quitter.id)
+        self.assertTrue(rows[-1]["dropped"])
+        self.assertTrue(all(not r["dropped"] for r in rows[:-1]))
+
+    def test_kick_during_ongoing_forfeits_too(self):
+        t, players = self._rr(4)
+        m = Round.objects.get(tournament=t, number=1).matches.first()
+        resp = self.client.post(f"/api/tournaments/{t.id}/kick/", {"entrant_id": m.entrant2_id}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        m.refresh_from_db()
+        self.assertEqual((m.result, m.report_status), ("p1", "confirmed"))
+
+    def test_knockout_winner_who_withdraws_hands_a_bye_forward(self):
+        resp = self.create(name="엘림", format="single_elim")
+        t = Tournament.objects.get(id=resp.json()["id"])
+        players = self.make_players(t, 4)
+        self.start(t)
+        by_user = {u.id: c for u, c in players}
+        r1 = list(Round.objects.get(tournament=t, number=1).matches.order_by("bracket_pos"))
+        for m in r1:
+            self.confirm_match(m, players)
+        by_user[r1[0].entrant1.user_id].post(f"/api/tournaments/{t.id}/withdraw/")
+        assert self.client.post(f"/api/tournaments/{t.id}/next-round/").status_code == 200
+        final = Round.objects.get(tournament=t, number=2).matches.get()
+        self.assertEqual((final.entrant1_id, final.entrant2_id, final.result), (r1[1].entrant1_id, None, "bye"))
+
+    def test_withdraw_after_completion_is_refused(self):
+        t, players = self._rr(2)
+        self.confirm_match(Round.objects.get(tournament=t, number=1).matches.get(), players)
+        assert self.client.post(f"/api/tournaments/{t.id}/complete/").status_code == 200
+        by_user = {u.id: c for u, c in players}
+        self.assertEqual(by_user[players[0][0].id].post(f"/api/tournaments/{t.id}/withdraw/").status_code, 400)
+
+
+class EditAndCancelTest(TournamentApiTestBase):
+    def test_host_edits_fields_while_recruiting(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        self.make_players(t, 3, check_in=False)
+        resp = self.client.patch(f"/api/tournaments/{t.id}/", {"name": "새 이름", "capacity": 3, "description": "d"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()["name"], "새 이름")
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t.id}/", {"capacity": 2}, format="json").status_code, 400)
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t.id}/", {"format": "swiss"}, format="json").status_code, 200)
+        t.refresh_from_db()
+        self.assertEqual(t.format, "swiss")
+
+    def test_edit_is_host_only(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        other = _auth(_user("someone"))
+        self.assertEqual(other.patch(f"/api/tournaments/{t.id}/", {"name": "x"}, format="json").status_code, 403)
+
+    def test_after_start_only_text_and_date_change(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        self.make_players(t, 2)
+        self.start(t)
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t.id}/", {"name": "진행중 수정"}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t.id}/", {"capacity": 16}, format="json").status_code, 400)
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t.id}/", {"format": "swiss"}, format="json").status_code, 400)
+
+    def test_cancel_hides_from_list_and_blocks_registration(self):
+        t = Tournament.objects.get(id=self.create().json()["id"])
+        other = _auth(_user("late"))
+        self.assertEqual(other.post(f"/api/tournaments/{t.id}/cancel/").status_code, 403)
+        self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/cancel/").status_code, 200)
+        t.refresh_from_db()
+        self.assertEqual(t.status, "cancelled")
+        self.assertNotIn(t.id, [x["id"] for x in self.client.get("/api/tournaments/").json()])
+        self.assertEqual(other.post(f"/api/tournaments/{t.id}/register/", {"md_uid": "123456789"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/cancel/").status_code, 400)

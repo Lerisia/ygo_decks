@@ -31,9 +31,14 @@ def _tournament_matches(tournament):
 
 
 def _records(tournament):
-    """Per-entrant W/D/L + points from confirmed matches (byes count as wins)."""
-    stats = {e.id: {"entrant": e, "wins": 0, "draws": 0, "losses": 0, "opponents": []}
-             for e in _active_entrants(tournament)}
+    """Per-entrant W/D/L + points from confirmed matches (byes count as wins).
+    Entrants who dropped out after being seated stay in (active=False) so the
+    table still shows them; pairing only ever uses the active ones."""
+    seated = {eid for m in _tournament_matches(tournament) for eid in (m.entrant1_id, m.entrant2_id) if eid}
+    stats = {}
+    for e in tournament.entrants.filter(status__in=["checked_in", "withdrawn", "kicked"]):
+        if e.status == "checked_in" or e.id in seated:
+            stats[e.id] = {"entrant": e, "active": e.status == "checked_in", "wins": 0, "draws": 0, "losses": 0, "opponents": []}
     for m in _tournament_matches(tournament).filter(report_status="confirmed"):
         s1 = stats.get(m.entrant1_id)
         s2 = stats.get(m.entrant2_id) if m.entrant2_id else None
@@ -117,13 +122,52 @@ def _double_elim_next(tournament, current):
     return (pairs, brackets) if pairs else None
 
 
+def _active_stats(stats):
+    return {eid: st for eid, st in stats.items() if st["active"]}
+
+
 def _ranked_entrant_ids(stats):
-    """Standings order: points desc, buchholz desc, name."""
+    """Standings order among still-active entrants: points desc, buchholz desc, name."""
     points = {eid: st["points"] for eid, st in stats.items()}
     opponents = {eid: st["opponents"] for eid, st in stats.items()}
     buch = engine.buchholz_scores(points, opponents)
     return [eid for eid, _ in sorted(
-        stats.items(), key=lambda kv: (-kv[1]["points"], -buch.get(kv[0], 0), kv[1]["entrant"].name))]
+        _active_stats(stats).items(), key=lambda kv: (-kv[1]["points"], -buch.get(kv[0], 0), kv[1]["entrant"].name))]
+
+
+def _seat(tournament, pairs):
+    """Drop-outs never get seated: their would-be opponent takes a bye, and a
+    pair of two drop-outs disappears."""
+    active = set(_active_entrants(tournament).values_list("id", flat=True))
+    out = []
+    for a, b in pairs:
+        a_ok, b_ok = a in active, b in active
+        if a_ok and (b is None or b_ok):
+            out.append((a, b))
+        elif a_ok:
+            out.append((a, None))
+        elif b_ok:
+            out.append((b, None))
+    return out
+
+
+def _forfeit_open_matches(tournament, entrant, actor):
+    """Someone leaves mid-tournament: every unsettled match of theirs in the current
+    round goes to the opponent (a bye of theirs is left alone)."""
+    if tournament.status != "ongoing":
+        return
+    current = Round.objects.filter(tournament=tournament, number=tournament.current_round).first()
+    if not current:
+        return
+    for m in current.matches.exclude(report_status="confirmed"):
+        if m.entrant1_id == entrant.id and m.entrant2_id:
+            m.result = "p2"
+        elif m.entrant2_id == entrant.id:
+            m.result = "p1"
+        else:
+            continue
+        m.report_status, m.reported_by = "confirmed", actor
+        m.save(update_fields=["result", "report_status", "reported_by"])
 
 
 GROUP_COUNTS = (2, 4, 8)
@@ -238,16 +282,93 @@ def list_tournaments(request):
     return Response(TournamentListSerializer(qs, many=True).data)
 
 
-@api_view(["GET"])
+@api_view(["GET", "PATCH"])
 def tournament_detail(request, tournament_id):
     try:
         t = Tournament.objects.get(id=tournament_id)
     except Tournament.DoesNotExist:
         return _err("대회를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
+    if request.method == "PATCH":
+        return _edit_tournament(request, t)
     show_uid = request.user.is_authenticated and (
         t.host_id == request.user.id or t.entrants.filter(user=request.user).exists()
     )
     return Response(TournamentDetailSerializer(t, context={"show_uid": show_uid}).data)
+
+
+def _edit_tournament(request, t):
+    """Host edits. Text and date any time before the end; capacity, format and
+    format options only while still recruiting."""
+    if not request.user.is_authenticated:
+        return _err("로그인이 필요합니다.", status.HTTP_401_UNAUTHORIZED)
+    if t.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    if t.status in ("completed", "cancelled"):
+        return _err("끝난 대회는 수정할 수 없습니다.")
+    data = request.data
+    changed = []
+    if "name" in data:
+        if not str(data["name"]).strip():
+            return _err("대회 이름을 입력해 주세요.")
+        t.name = str(data["name"]).strip()[:100]; changed.append("name")
+    if "description" in data:
+        t.description = str(data["description"] or ""); changed.append("description")
+    if "event_date" in data:
+        if not data["event_date"]:
+            return _err("일시를 입력해 주세요.")
+        t.event_date = data["event_date"]; changed.append("event_date")
+    locked = [k for k in ("capacity", "format", "format_config") if k in data]
+    if locked and t.status != "recruiting":
+        return _err("대회 시작 후에는 정원·형식을 바꿀 수 없습니다.")
+    if "capacity" in data:
+        try:
+            capacity = int(data["capacity"])
+        except (TypeError, ValueError):
+            return _err("capacity가 올바르지 않습니다.")
+        if not (2 <= capacity <= 128):
+            return _err("정원은 2~128명이어야 합니다.")
+        current = t.entrants.exclude(status__in=["withdrawn", "kicked"]).count()
+        if capacity < current:
+            return _err(f"현재 참가자({current}명)보다 적게 줄일 수 없습니다.")
+        t.capacity = capacity; changed.append("capacity")
+    if "format" in data:
+        if data["format"] not in VALID_FORMATS:
+            return _err("지원하지 않는 대회 형식입니다.")
+        t.format = data["format"]; changed.append("format")
+    if "format_config" in data:
+        cfg = data["format_config"] or {}
+        if isinstance(cfg, str):
+            import json
+            try:
+                cfg = json.loads(cfg) if cfg else {}
+            except ValueError:
+                return _err("format_config가 올바르지 않습니다.")
+        t.format_config = cfg; changed.append("format_config")
+    if t.format == "group_knockout" and ("format" in data or "format_config" in data):
+        opts, opt_err = _group_options(t.format_config)
+        if opt_err:
+            return _err(opt_err)
+        t.format_config = {**t.format_config, "groups": opts[0], "advance": opts[1]}
+        if "format_config" not in changed:
+            changed.append("format_config")
+    if changed:
+        t.save(update_fields=changed)
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cancel_tournament(request, tournament_id):
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if t.host_id != request.user.id:
+        return _err("주최자만 가능합니다.", status.HTTP_403_FORBIDDEN)
+    if t.status not in ("recruiting", "ongoing"):
+        return _err("취소할 수 없는 상태입니다.")
+    t.status = "cancelled"
+    t.save(update_fields=["status"])
+    return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
 
 
 def _get_tournament(tournament_id):
@@ -296,11 +417,14 @@ def withdraw(request, tournament_id):
     t, err = _get_tournament(tournament_id)
     if err:
         return err
+    if t.status not in ("recruiting", "ongoing"):
+        return _err("이미 끝난 대회입니다.")
     entrant = _own_entrant(t, request.user)
     if not entrant or entrant.status in ("withdrawn", "kicked"):
         return _err("참가 중이 아닙니다.")
     entrant.status = "withdrawn"
     entrant.save(update_fields=["status"])
+    _forfeit_open_matches(t, entrant, request.user)
     return Response({"ok": True})
 
 
@@ -333,6 +457,7 @@ def kick(request, tournament_id):
         return _err("참가자를 찾을 수 없습니다.")
     entrant.status = "kicked"
     entrant.save(update_fields=["status"])
+    _forfeit_open_matches(t, entrant, request.user)
     return Response({"ok": True})
 
 
@@ -416,7 +541,7 @@ def next_round(request, tournament_id):
             winners.append(m.entrant1_id if m.result in ("p1", "bye") else m.entrant2_id)
         if len(winners) < 2:
             return None
-        return engine.pair_adjacent(winners)
+        return _seat(t, engine.pair_adjacent(winners))
 
     def swiss_pairs_next():
         history = set()
@@ -426,7 +551,7 @@ def next_round(request, tournament_id):
                 history.add(frozenset((m.entrant1_id, m.entrant2_id)))
             else:
                 prior_byes.add(m.entrant1_id)
-        records = [(eid, st["points"]) for eid, st in stats.items()]
+        records = [(eid, st["points"]) for eid, st in _active_stats(stats).items()]
         return engine.swiss_pairs(records, history=history, prior_byes=prior_byes, rng=rng)
 
     groups, brackets = None, None
@@ -440,6 +565,10 @@ def next_round(request, tournament_id):
         if nxt is None:
             return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
         pairs, brackets = nxt
+        seated = [(p2, b) for p, b in zip(pairs, brackets) for p2 in _seat(t, [p])]
+        pairs, brackets = [p for p, _ in seated], [b for _, b in seated]
+        if not pairs:
+            return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
         stage = "knockout"
     elif t.format == "group_knockout":
         schedule = t.format_config.get("group_schedule") or []
@@ -449,8 +578,9 @@ def next_round(request, tournament_id):
                 return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
             stage = "knockout"
         elif t.current_round < len(schedule):
-            groups = [gi for gi, _ in schedule[t.current_round]]
-            pairs = [tuple(p) for _, p in schedule[t.current_round]]
+            seated = [(gi, sp) for gi, p in schedule[t.current_round] for sp in _seat(t, [tuple(p)])]
+            groups = [gi for gi, _ in seated]
+            pairs = [p for _, p in seated]
             stage = "league"
         else:  # group stage done -> cross-seeded knockout
             (_, advance), _ = _group_options(t.format_config)
@@ -463,7 +593,7 @@ def next_round(request, tournament_id):
         schedule = t.format_config.get("rr_schedule") or []
         if t.current_round >= len(schedule):
             return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
-        pairs = [tuple(p) for p in schedule[t.current_round]]
+        pairs = _seat(t, [tuple(p) for p in schedule[t.current_round]])
         stage = "league"
     elif t.format == "swiss_cut":
         if current.stage == "knockout":
@@ -471,7 +601,7 @@ def next_round(request, tournament_id):
             if pairs is None:
                 return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
             stage = "knockout"
-        elif t.current_round < _swiss_round_limit(t, len(stats)):
+        elif t.current_round < _swiss_round_limit(t, len(_active_stats(stats))):
             pairs = swiss_pairs_next()
             stage = "swiss"
         else:  # swiss stage done -> seed the cut
@@ -485,7 +615,7 @@ def next_round(request, tournament_id):
             pairs = engine.seeded_bracket(ranked)
             stage = "knockout"
     else:  # swiss
-        if t.current_round >= _swiss_round_limit(t, len(stats)):
+        if t.current_round >= _swiss_round_limit(t, len(_active_stats(stats))):
             return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
         pairs = swiss_pairs_next()
         stage = "swiss"
@@ -542,6 +672,7 @@ def standings(request, tournament_id):
             "buchholz": buchholz.get(eid, 0),
             "group": group_of.get(eid),
             "qualified": eid in qualified,
+            "dropped": not s["active"],
             "avatar_icon": icon, "border": border,
         })
     if knockout_rounds:
@@ -555,7 +686,7 @@ def standings(request, tournament_id):
         if final and final.report_status == "confirmed" and final.result in ("p1", "p2", "bye"):
             champion = final.entrant1_id if final.result in ("p1", "bye") else final.entrant2_id
             tier[champion] = 0
-    rows.sort(key=lambda r: (tier.get(r["entrant_id"], 10 ** 6), -r["points"], -r["buchholz"], r["name"]))
+    rows.sort(key=lambda r: (r["dropped"], tier.get(r["entrant_id"], 10 ** 6), -r["points"], -r["buchholz"], r["name"]))
     return Response(rows)
 
 

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import (update_cover,
+from .views import (update_cover, cancel_tournament,
                     deck_card_add, deck_card_remove, deck_submission,
                     announcements, chat, check_in, complete_tournament, confirm_match,
                     delete_announcement,
@@ -20,6 +20,7 @@ urlpatterns = [
     path("<int:tournament_id>/start/", start_tournament),
     path("<int:tournament_id>/next-round/", next_round),
     path("<int:tournament_id>/complete/", complete_tournament),
+    path("<int:tournament_id>/cancel/", cancel_tournament),
     path("<int:tournament_id>/standings/", standings),
     path("<int:tournament_id>/deck/", deck_submission),
     path("<int:tournament_id>/deck/cards/", deck_card_add),

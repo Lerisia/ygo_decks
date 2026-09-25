@@ -84,6 +84,7 @@ export type StandingRow = {
   buchholz: number;
   group: number | null;
   qualified: boolean;
+  dropped: boolean;
   avatar_icon: AvatarIcon | null;
   border: Border | null;
 };
@@ -109,6 +110,12 @@ export const createTournament = (payload: {
   form.append("cover_image", coverFile);
   return req<TournamentDetail>("/create/", { method: "POST", body: form });
 };
+
+export const updateTournament = (id: number, payload: {
+  name?: string; description?: string; event_date?: string; capacity?: number;
+  format?: TournamentFormat; format_config?: Record<string, unknown>;
+}) => req<TournamentDetail>(`/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+export const cancelTournament = (id: number) => req<TournamentDetail>(`/${id}/cancel/`, { method: "POST", body: "{}" });
 
 export const updateCover = (id: number, coverFile: File | null) => {
   const form = new FormData();
