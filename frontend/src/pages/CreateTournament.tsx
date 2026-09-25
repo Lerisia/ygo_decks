@@ -13,6 +13,8 @@ function CreateTournament() {
   const [eventDate, setEventDate] = useState("");
   const [swissRounds, setSwissRounds] = useState("");
   const [cut, setCut] = useState(4);
+  const [groups, setGroups] = useState(2);
+  const [advance, setAdvance] = useState(2);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,7 @@ function CreateTournament() {
       const config: Record<string, unknown> = {};
       if ((format === "swiss" || format === "swiss_cut") && swissRounds.trim()) config.swiss_rounds = Number(swissRounds);
       if (format === "swiss_cut") config.cut = cut;
+      if (format === "group_knockout") { config.groups = groups; config.advance = advance; }
       const t = await createTournament({
         name: name.trim(),
         description: description.trim(),
@@ -70,6 +73,7 @@ function CreateTournament() {
               <option value="single_elim">싱글 엘리미네이션</option>
               <option value="round_robin">라운드 로빈</option>
               <option value="swiss_cut">스위스 + 결선 토너먼트</option>
+              <option value="group_knockout">조별 리그 + 결선 토너먼트</option>
             </select>
           </div>
           <div>
@@ -89,6 +93,25 @@ function CreateTournament() {
             <select className={inputCls} value={cut} onChange={(e) => setCut(Number(e.target.value))}>
               {[2, 4, 8, 16].map((n) => <option key={n} value={n}>{n}명</option>)}
             </select>
+          </div>
+        )}
+        {format === "group_knockout" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold mb-1">조 수</label>
+              <select className={inputCls} value={groups} onChange={(e) => setGroups(Number(e.target.value))}>
+                {[2, 4, 8].map((n) => <option key={n} value={n}>{n}개 조</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">조당 결선 진출</label>
+              <select className={inputCls} value={advance} onChange={(e) => setAdvance(Number(e.target.value))}>
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}명</option>)}
+              </select>
+            </div>
+            <p className="col-span-2 text-xs text-gray-500 dark:text-gray-400">
+              참가자를 무작위로 {groups}개 조에 나눠 조별 라운드 로빈을 치른 뒤, 각 조 상위 {advance}명({groups * advance}명)이 결선 토너먼트로 갑니다. 조당 2명 이상이어야 시작할 수 있습니다.
+            </p>
           </div>
         )}
         <div>

@@ -58,10 +58,12 @@ def _records(tournament):
     return stats
 
 
-def _create_matches(rnd, pairs):
+def _create_matches(rnd, pairs, groups=None):
+    """`groups`: optional group index per pair (group stage)."""
     for pos, (a, b) in enumerate(pairs):
         Match.objects.create(
             round=rnd, entrant1_id=a, entrant2_id=b, bracket_pos=pos,
+            group=groups[pos] if groups else None,
             result="bye" if b is None else None,
             report_status="confirmed" if b is None else "pending",
         )
@@ -74,6 +76,41 @@ def _ranked_entrant_ids(stats):
     buch = engine.buchholz_scores(points, opponents)
     return [eid for eid, _ in sorted(
         stats.items(), key=lambda kv: (-kv[1]["points"], -buch.get(kv[0], 0), kv[1]["entrant"].name))]
+
+
+GROUP_COUNTS = (2, 4, 8)
+MAX_ADVANCE = 4
+
+
+def _group_options(format_config):
+    """(groups, advance) from format_config, or an error message."""
+    try:
+        groups = int(format_config.get("groups", 2))
+        advance = int(format_config.get("advance", 1))
+    except (TypeError, ValueError):
+        return None, "조 설정이 올바르지 않습니다."
+    if groups not in GROUP_COUNTS:
+        return None, "조 수는 2, 4, 8 중 하나여야 합니다."
+    if not (1 <= advance <= MAX_ADVANCE):
+        return None, f"조당 진출 인원은 1~{MAX_ADVANCE}명이어야 합니다."
+    return (groups, advance), None
+
+
+def _group_of(tournament):
+    """entrant_id -> group index, from the table stored at start."""
+    return {eid: gi for gi, ids in enumerate(tournament.format_config.get("group_table") or []) for eid in ids}
+
+
+def _group_rankings(tournament, stats):
+    """Per group, (entrant_id, points) best first — same order as the standings table."""
+    group_of = _group_of(tournament)
+    ranked = _ranked_entrant_ids(stats)
+    rankings = [[] for _ in tournament.format_config.get("group_table") or []]
+    for eid in ranked:
+        gi = group_of.get(eid)
+        if gi is not None:
+            rankings[gi].append((eid, stats[eid]["points"]))
+    return rankings
 
 
 def _swiss_round_limit(tournament, entrant_count):
@@ -126,6 +163,11 @@ def create_tournament(request):
             format_config = json.loads(format_config) if format_config else {}
         except ValueError:
             return _err("format_config가 올바르지 않습니다.")
+    if fmt == "group_knockout":
+        opts, opt_err = _group_options(format_config)
+        if opt_err:
+            return _err(opt_err)
+        format_config = {**format_config, "groups": opts[0], "advance": opts[1]}
     t = Tournament.objects.create(
         name=data["name"],
         description=data.get("description", ""),
@@ -265,10 +307,22 @@ def start_tournament(request, tournament_id):
     rng = engine.make_rng(seed)
     ids = [e.id for e in entrants]
 
+    groups = None
     if t.format == "round_robin":
         schedule = engine.round_robin_schedule(ids, rng)
         t.format_config = {**t.format_config, "rr_schedule": [[list(p) for p in rnd] for rnd in schedule]}
         pairs = [(a, b) for a, b in schedule[0]]
+        stage = "league"
+    elif t.format == "group_knockout":
+        (n_groups, _), _ = _group_options(t.format_config)
+        if len(ids) < 2 * n_groups:
+            return _err(f"조당 2명 이상이 필요합니다 (체크인 {len(ids)}명, {n_groups}개 조).")
+        table = engine.group_split(ids, n_groups, rng)
+        schedule = engine.group_schedule(table, rng)
+        t.format_config = {**t.format_config, "group_table": table,
+                           "group_schedule": [[[gi, list(p)] for gi, p in rnd] for rnd in schedule]}
+        groups = [gi for gi, _ in schedule[0]]
+        pairs = [p for _, p in schedule[0]]
         stage = "league"
     elif t.format == "single_elim":
         pairs = engine.single_elim_round1(ids, rng)
@@ -278,7 +332,7 @@ def start_tournament(request, tournament_id):
         stage = "swiss"
 
     rnd = Round.objects.create(tournament=t, number=1, random_seed=seed, stage=stage)
-    _create_matches(rnd, pairs)
+    _create_matches(rnd, pairs, groups)
     t.status = "ongoing"
     t.current_round = 1
     t.save(update_fields=["status", "current_round", "format_config"])
@@ -323,11 +377,30 @@ def next_round(request, tournament_id):
         records = [(eid, st["points"]) for eid, st in stats.items()]
         return engine.swiss_pairs(records, history=history, prior_byes=prior_byes, rng=rng)
 
+    groups = None
     if t.format == "single_elim":
         pairs = knockout_advance()
         if pairs is None:
             return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
         stage = "knockout"
+    elif t.format == "group_knockout":
+        schedule = t.format_config.get("group_schedule") or []
+        if current.stage == "knockout":
+            pairs = knockout_advance()
+            if pairs is None:
+                return _err("모든 라운드가 끝났습니다. 대회를 종료해 주세요.")
+            stage = "knockout"
+        elif t.current_round < len(schedule):
+            groups = [gi for gi, _ in schedule[t.current_round]]
+            pairs = [tuple(p) for _, p in schedule[t.current_round]]
+            stage = "league"
+        else:  # group stage done -> cross-seeded knockout
+            (_, advance), _ = _group_options(t.format_config)
+            ordered = engine.group_qualifiers(_group_rankings(t, stats), advance)
+            if len(ordered) < 2:
+                return _err("결선을 진행할 참가자가 부족합니다.")
+            pairs = engine.seeded_bracket(ordered)
+            stage = "knockout"
     elif t.format == "round_robin":
         schedule = t.format_config.get("rr_schedule") or []
         if t.current_round >= len(schedule):
@@ -362,7 +435,7 @@ def next_round(request, tournament_id):
     current.status = "completed"
     current.save(update_fields=["status"])
     rnd = Round.objects.create(tournament=t, number=t.current_round + 1, random_seed=seed, stage=stage)
-    _create_matches(rnd, pairs)
+    _create_matches(rnd, pairs, groups)
     t.current_round += 1
     t.save(update_fields=["current_round"])
     return Response(TournamentDetailSerializer(t, context={"show_uid": True}).data)
@@ -395,6 +468,10 @@ def standings(request, tournament_id):
     points = {eid: s["points"] for eid, s in stats.items()}
     opponents = {eid: s["opponents"] for eid, s in stats.items()}
     buchholz = engine.buchholz_scores(points, opponents)
+    group_of = _group_of(t)
+    tier = {}
+    knockout_rounds = list(Round.objects.filter(tournament=t, stage="knockout").order_by("number").prefetch_related("matches"))
+    qualified = {eid for r in knockout_rounds for m in r.matches.all() for eid in (m.entrant1_id, m.entrant2_id) if eid}
     rows = []
     for eid, s in stats.items():
         icon, border = user_avatar(s["entrant"].user)
@@ -405,10 +482,10 @@ def standings(request, tournament_id):
             "wins": s["wins"], "draws": s["draws"], "losses": s["losses"],
             "points": s["points"],
             "buchholz": buchholz.get(eid, 0),
+            "group": group_of.get(eid),
+            "qualified": eid in qualified,
             "avatar_icon": icon, "border": border,
         })
-    tier = {}
-    knockout_rounds = list(Round.objects.filter(tournament=t, stage="knockout").order_by("number").prefetch_related("matches"))
     if knockout_rounds:
         last_number = knockout_rounds[-1].number
         for r in knockout_rounds:

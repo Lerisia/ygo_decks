@@ -8,6 +8,7 @@ class Tournament(models.Model):
         ("swiss", "스위스"),
         ("round_robin", "라운드 로빈"),
         ("swiss_cut", "스위스 + 결선 토너먼트"),
+        ("group_knockout", "조별 리그 + 결선 토너먼트"),
     ]
     STATUS_CHOICES = [
         ("recruiting", "모집 중"),
@@ -94,6 +95,7 @@ class Match(models.Model):
     entrant1 = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="matches_as_p1")
     entrant2 = models.ForeignKey(Entrant, null=True, blank=True, on_delete=models.CASCADE, related_name="matches_as_p2")  # None = bye
     bracket_pos = models.PositiveIntegerField(default=0)  # single-elim advancement order
+    group = models.PositiveSmallIntegerField(null=True, blank=True)  # group-stage index (0 = A조); None elsewhere
     result = models.CharField(max_length=6, choices=RESULT_CHOICES, null=True, blank=True)
     report_status = models.CharField(max_length=10, choices=REPORT_STATUS_CHOICES, default="pending")
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")

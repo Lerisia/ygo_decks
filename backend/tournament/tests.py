@@ -698,3 +698,107 @@ class SwissCutTest(TournamentApiTestBase):
         self.make_players(t, 2)
         self.start(t)
         self.assertEqual(Round.objects.get(tournament=t, number=1).stage, "knockout")
+
+
+class GroupKnockoutTest(TournamentApiTestBase):
+    """조별 리그 후 각 조 상위 N명이 결선 토너먼트로."""
+
+    def _make(self, n_players, groups=2, advance=2):
+        resp = self.create(name="조별", format="group_knockout", capacity=16,
+                           format_config={"groups": groups, "advance": advance})
+        assert resp.status_code == 201, resp.content
+        t = Tournament.objects.get(id=resp.json()["id"])
+        players = self.make_players(t, n_players)
+        self.start(t)
+        return t, players
+
+    def _confirm_all(self, t, players, result="win"):
+        rnd = Round.objects.get(tournament=t, number=t.current_round)
+        for m in rnd.matches.exclude(report_status="confirmed"):
+            self.confirm_match(m, players, result=result)
+
+    def _next(self, t):
+        resp = self.client.post(f"/api/tournaments/{t.id}/next-round/")
+        t.refresh_from_db()
+        return resp
+
+    def test_create_validates_group_options(self):
+        self.assertEqual(self.create(format="group_knockout", format_config={"groups": 3}).status_code, 400)
+        self.assertEqual(self.create(format="group_knockout", format_config={"groups": 2, "advance": 9}).status_code, 400)
+        self.assertEqual(self.create(format="group_knockout", format_config={"groups": 4, "advance": 1}).status_code, 201)
+
+    def test_start_needs_two_per_group(self):
+        resp = self.create(name="작은조", format="group_knockout", format_config={"groups": 4, "advance": 1})
+        t = Tournament.objects.get(id=resp.json()["id"])
+        self.make_players(t, 5)
+        self.assertEqual(self.client.post(f"/api/tournaments/{t.id}/start/").status_code, 400)
+
+    def test_start_deals_groups_and_stores_schedule(self):
+        t, players = self._make(8, groups=2, advance=2)
+        r1 = Round.objects.get(tournament=t, number=1)
+        self.assertEqual(r1.stage, "league")
+        by_group = {}
+        for m in r1.matches.all():
+            by_group.setdefault(m.group, set()).update({m.entrant1_id, m.entrant2_id})
+        self.assertEqual(sorted(by_group), [0, 1])
+        self.assertEqual([len(s) for s in by_group.values()], [4, 4])
+        self.assertEqual(len(t.format_config["group_table"]), 2)
+        self.assertEqual(len(t.format_config["group_schedule"]), 3)   # 4명 조 → 3라운드
+
+    def test_group_stage_allows_draw_and_serializes_group(self):
+        t, players = self._make(4, groups=2, advance=1)
+        m = Round.objects.get(tournament=t, number=1).matches.first()
+        by_user = {u.id: c for u, c in players}
+        resp = by_user[m.entrant1.user_id].post(f"/api/tournaments/matches/{m.id}/report/", {"result": "draw"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        detail = self.client.get(f"/api/tournaments/{t.id}/").json()
+        self.assertIn(detail["rounds"][0]["matches"][0]["group"], (0, 1))
+
+    def test_standings_grouped_during_league(self):
+        t, players = self._make(6, groups=2, advance=1)
+        self._confirm_all(t, players)
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(sorted(r["group"] for r in rows), [0, 0, 0, 1, 1, 1])
+        self.assertTrue(all(r["qualified"] is False for r in rows))
+
+    def test_full_run_two_groups_top_two_cross_seeded(self):
+        t, players = self._make(8, groups=2, advance=2)
+        for _ in range(3):                       # 3 league rounds, entrant1 always wins
+            self._confirm_all(t, players)
+            if t.current_round < 3:
+                assert self._next(t).status_code == 200
+        resp = self._next(t)                     # league done -> knockout
+        self.assertEqual(resp.status_code, 200, resp.content)
+        r4 = Round.objects.get(tournament=t, number=4)
+        self.assertEqual(r4.stage, "knockout")
+        semis = list(r4.matches.order_by("bracket_pos"))
+        self.assertEqual(len(semis), 2)
+        group_of = {eid: gi for gi, ids in enumerate(t.format_config["group_table"]) for eid in ids}
+        for m in semis:                          # 1위 vs 다른 조 2위
+            self.assertNotEqual(group_of[m.entrant1_id], group_of[m.entrant2_id])
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(sum(1 for r in rows if r["qualified"]), 4)
+        self._confirm_all(t, players)
+        assert self._next(t).status_code == 200
+        final = Round.objects.get(tournament=t, number=5).matches.get()
+        self.confirm_match(final, players, result="win")
+        self.assertEqual(self._next(t).status_code, 400)          # nothing left
+        assert self.client.post(f"/api/tournaments/{t.id}/complete/").status_code == 200
+        rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
+        self.assertEqual(rows[0]["entrant_id"], final.entrant1_id)
+        self.assertEqual(rows[1]["entrant_id"], final.entrant2_id)
+        self.assertTrue(all(r["qualified"] for r in rows[:4]))
+
+    def test_odd_group_gets_bye_and_short_group_capped(self):
+        t, players = self._make(5, groups=2, advance=2)             # 조 3명 + 2명
+        r1 = Round.objects.get(tournament=t, number=1)
+        self.assertEqual(r1.matches.filter(entrant2__isnull=True).count(), 1)
+        rounds_total = len(t.format_config["group_schedule"])
+        for k in range(rounds_total):
+            self._confirm_all(t, players)
+            resp = self._next(t)
+            self.assertEqual(resp.status_code, 200, resp.content)
+        ko = Round.objects.get(tournament=t, number=rounds_total + 1)
+        self.assertEqual(ko.stage, "knockout")
+        seated = {m.entrant1_id for m in ko.matches.all()} | {m.entrant2_id for m in ko.matches.all() if m.entrant2_id}
+        self.assertEqual(len(seated), 4)                            # 2명 조도 2명 모두 진출

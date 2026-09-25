@@ -10,11 +10,12 @@ import {
   checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
   getTournament, kickEntrant, nextRound, overrideMatch, registerTournament,
   reportMatch, startTournament, updateCover, withdrawTournament,
-  type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
+  GROUP_LABEL, type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
 } from "@/api/tournamentApi";
 
 const FORMAT_LABELS: Record<string, string> = {
   single_elim: "싱글 엘리미네이션", swiss: "스위스", round_robin: "라운드 로빈", swiss_cut: "스위스+결선",
+  group_knockout: "조별+결선",
 };
 const STATUS_LABELS: Record<string, string> = {
   recruiting: "모집 중", ongoing: "진행 중", completed: "종료",
@@ -282,11 +283,11 @@ function TournamentDetailPage() {
         </section>
       )}
 
-      {tab === "players" && t.status !== "recruiting" && (
-        <section>
-          {standings.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">순위 정보가 없습니다.</p>
-          ) : (
+      {tab === "players" && t.status !== "recruiting" && (() => {
+        const grouped = t.format === "group_knockout";
+        const groupIds = grouped ? [...new Set(standings.map((r) => r.group).filter((g): g is number => g !== null))].sort((a, b) => a - b) : [];
+        const knockoutStarted = t.rounds.some((r) => r.stage === "knockout");
+        const renderTable = (rows: StandingRow[], medals: boolean) => (
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -298,14 +299,17 @@ function TournamentDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {standings.map((row, i) => (
-                  <tr key={row.entrant_id} className="border-b dark:border-gray-700/60">
-                    <td className="px-2 py-1.5">{i < 3 && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
+                {rows.map((row, i) => (
+                  <tr key={row.entrant_id} className={`border-b dark:border-gray-700/60 ${grouped && row.qualified && !medals ? "bg-blue-50/60 dark:bg-blue-900/20" : ""}`}>
+                    <td className="px-2 py-1.5">{i < 3 && medals && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <Avatar icon={row.avatar_icon} border={row.border} size={28} />
                         <div className="min-w-0">
-                          <div className="truncate">{row.name}</div>
+                          <div className="truncate">
+                            {row.name}
+                            {grouped && row.qualified && !medals && <span className="ml-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400">결선</span>}
+                          </div>
                           {uidByEntrant.get(row.entrant_id) && (
                             <div className="text-[11px] text-gray-400 font-mono">{uidByEntrant.get(row.entrant_id)}</div>
                           )}
@@ -321,9 +325,31 @@ function TournamentDetailPage() {
                 ))}
               </tbody>
             </table>
-          )}
-        </section>
-      )}
+        );
+        if (standings.length === 0) {
+          return <section><p className="text-sm text-gray-500 dark:text-gray-400">순위 정보가 없습니다.</p></section>;
+        }
+        if (!grouped) return <section>{renderTable(standings, true)}</section>;
+        return (
+          <section className="space-y-5">
+            {knockoutStarted && (
+              <div>
+                <h3 className="font-semibold mb-2">최종 순위</h3>
+                {renderTable(standings.filter((r) => r.qualified), true)}
+              </div>
+            )}
+            {groupIds.map((g) => (
+              <div key={g}>
+                <h3 className="font-semibold mb-2">{GROUP_LABEL(g)}</h3>
+                {renderTable(
+                  [...standings.filter((r) => r.group === g)].sort((a, b) => b.points - a.points || b.buchholz - a.buchholz || a.name.localeCompare(b.name)),
+                  false,
+                )}
+              </div>
+            ))}
+          </section>
+        );
+      })()}
 
       {tab === "bracket" && (() => {
         if (t.rounds.length === 0) {
@@ -362,12 +388,25 @@ function TournamentDetailPage() {
                 {[...listRounds].sort((a, b) => b.number - a.number).map((r) => (
                   <div key={r.number}>
                     <h3 className="font-semibold mb-2">
-                      {knockoutRounds.length > 0 ? "스위스 " : ""}{r.number}라운드{" "}
+                      {t.format === "group_knockout" ? "조별 " : knockoutRounds.length > 0 ? "스위스 " : ""}{r.number}라운드{" "}
                       {r.status === "completed" ? <span className="text-xs text-gray-400">(완료)</span> : null}
                     </h3>
-                    <div className="space-y-2">
-                      {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => renderMatch(m, r.stage !== "knockout"))}
-                    </div>
+                    {t.format === "group_knockout" ? (
+                      <div className="space-y-3">
+                        {[...new Set(r.matches.map((m) => m.group ?? 0))].sort((a, b) => a - b).map((g) => (
+                          <div key={g}>
+                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{GROUP_LABEL(g)}</div>
+                            <div className="space-y-2">
+                              {r.matches.filter((m) => (m.group ?? 0) === g).sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => renderMatch(m, true))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...r.matches].sort((a, b) => a.bracket_pos - b.bracket_pos).map((m) => renderMatch(m, r.stage !== "knockout"))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

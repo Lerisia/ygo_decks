@@ -133,3 +133,39 @@ def seeded_bracket(ordered_ids):
             a, b = b, None
         pairs.append((a, b))
     return pairs
+
+
+def group_split(ids, n_groups, rng):
+    """Random deal into `n_groups` groups whose sizes differ by at most one."""
+    ids = list(ids)
+    rng.shuffle(ids)
+    groups = [[] for _ in range(n_groups)]
+    for i, pid in enumerate(ids):
+        groups[i % n_groups].append(pid)
+    return groups
+
+
+def group_schedule(groups, rng):
+    """Round-robin inside every group, merged round by round:
+    rounds[k] = [(group_index, (a, b)), ...]. A smaller group simply has no
+    matches in the rounds it does not need."""
+    per_group = [round_robin_schedule(g, rng) if len(g) > 1 else [] for g in groups]
+    rounds = []
+    for k in range(max((len(s) for s in per_group), default=0)):
+        rnd = []
+        for gi, schedule in enumerate(per_group):
+            if k < len(schedule):
+                rnd.extend((gi, pair) for pair in schedule[k])
+        rounds.append(rnd)
+    return rounds
+
+
+def group_qualifiers(group_rankings, advance):
+    """`group_rankings`: per group, (entrant_id, points) best first. Returns the
+    knockout seed order: every group winner (by points) before every runner-up,
+    so `seeded_bracket` keeps groupmates apart until late."""
+    order = []
+    for place in range(advance):
+        tier = [ranking[place] for ranking in group_rankings if place < len(ranking)]
+        order.extend(pid for pid, _ in sorted(tier, key=lambda r: -r[1]))
+    return order

@@ -139,3 +139,43 @@ class SeededBracketTest(SimpleTestCase):
     def test_two_seeds_is_the_final(self):
         from .engine import seeded_bracket
         self.assertEqual(seeded_bracket([7, 9]), [(7, 9)])
+
+
+class GroupStageTest(SimpleTestCase):
+    def test_split_deals_evenly_and_reproducibly(self):
+        from .engine import group_split
+        groups = group_split(list(range(1, 11)), 4, make_rng("g"))
+        self.assertEqual(sorted(len(g) for g in groups), [2, 2, 3, 3])
+        self.assertEqual(sorted(x for g in groups for x in g), list(range(1, 11)))
+        self.assertEqual(groups, group_split(list(range(1, 11)), 4, make_rng("g")))
+
+    def test_schedule_everyone_meets_groupmates_once(self):
+        from .engine import group_schedule
+        groups = [[1, 2, 3, 4], [5, 6, 7]]
+        rounds = group_schedule(groups, make_rng("g"))
+        self.assertEqual(len(rounds), 3)                    # max(4-1, 3 with bye)
+        seen = set()
+        for rnd in rounds:
+            for gi, (a, b) in rnd:
+                self.assertIn(a, groups[gi])
+                if b is not None:
+                    self.assertIn(b, groups[gi])
+                    seen.add(frozenset((a, b)))
+        self.assertEqual(len(seen), 6 + 3)                  # C(4,2) + C(3,2)
+
+    def test_schedule_uses_bye_in_odd_group_only(self):
+        from .engine import group_schedule
+        rounds = group_schedule([[1, 2, 3, 4], [5, 6, 7]], make_rng("g"))
+        byes = [(gi, a) for rnd in rounds for gi, (a, b) in rnd if b is None]
+        self.assertEqual(sorted(g for g, _ in byes), [1, 1, 1])
+        self.assertEqual(sorted(a for _, a in byes), [5, 6, 7])
+
+    def test_qualifiers_tiered_by_place_then_points(self):
+        from .engine import group_qualifiers
+        rankings = [[(1, 9), (2, 6), (3, 0)], [(4, 6), (5, 6), (6, 3)]]
+        self.assertEqual(group_qualifiers(rankings, 2), [1, 4, 2, 5])   # winners first, then runners-up
+        self.assertEqual(group_qualifiers(rankings, 1), [1, 4])
+
+    def test_qualifiers_skip_short_groups(self):
+        from .engine import group_qualifiers
+        self.assertEqual(group_qualifiers([[(1, 3), (2, 0)], [(3, 3)]], 2), [1, 3, 2])
