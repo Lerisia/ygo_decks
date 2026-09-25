@@ -1,4 +1,5 @@
 import Avatar from "@/components/Avatar";
+import TeamAvatars from "@/components/tournament/TeamAvatars";
 import type { Entrant, MatchItem, RoundItem } from "@/api/tournamentApi";
 
 /** Knockout bracket drawn as columns of match nodes with elbow connectors.
@@ -18,7 +19,7 @@ function entrantRow(e: Entrant | null, won: boolean, decided: boolean, isBye = f
   }
   return (
     <div className={`flex items-center gap-1.5 px-2 py-1 min-w-0 ${decided && !won ? "opacity-40" : ""}`}>
-      <Avatar icon={e.avatar_icon} border={e.border} size={20} />
+      {e.user === null ? <TeamAvatars members={e.members} size={18} max={3} /> : <Avatar icon={e.avatar_icon} border={e.border} size={20} />}
       <span className={`truncate text-xs ${won ? "font-bold text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>
         {e.name}
       </span>

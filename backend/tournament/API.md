@@ -8,7 +8,7 @@
 
 | 메서드/경로 | 권한 | 설명 |
 |---|---|---|
-| `POST create/` | 회원 | 대회 개설. body: `name`\*, `event_date`\*(ISO), `format`\*(`single_elim`·`swiss`·`round_robin`·`swiss_cut`·`group_knockout`·`double_elim`), `capacity`(2~128, 기본 8), `description`, `format_config`(스위스 `{"swiss_rounds": 4}`, 스위스컷 `{"cut": 4}`, 조별 `{"groups": 2|4|8, "advance": 1~4}`) → 201 + 상세 |
+| `POST create/` | 회원 | 대회 개설. body: `name`\*, `event_date`\*(ISO), `format`\*(`single_elim`·`swiss`·`round_robin`·`swiss_cut`·`group_knockout`·`double_elim`), `capacity`(2~128, 기본 8; 팀전이면 팀 수), `team_size`(1=개인전, 2~5=팀 인원), `description`, `format_config`(스위스 `{"swiss_rounds": 4}`, 스위스컷 `{"cut": 4}`, 조별 `{"groups": 2|4|8, "advance": 1~4}`) → 201 + 상세 |
 | `GET ` | 공개 | 대회 목록 (취소 제외, 최신순). `?status=recruiting|ongoing|completed` 필터. 각 항목에 `entrant_count`, `host_name` |
 | `GET <id>/` | 공개 | 상세: 대회 정보 + `entrants[]`(아바타 아이콘·테두리 포함) + `rounds[].matches[]` + 주최자 아바타. `md_uid`는 주최자·참가자에게만 값, 그 외 null |
 | `PATCH <id>/` | 주최자 | 수정. `name`·`description`·`event_date`는 종료 전 언제나, `capacity`(현재 인원 이상)·`format`·`format_config`는 모집 중에만 |
@@ -25,6 +25,23 @@
 | `POST <id>/withdraw/` | 참가자 | 기권. 진행 중이면 현재 라운드 미확정 경기는 상대 승으로 확정되고 이후 라운드에서 짝이 될 사람은 부전승 |
 | `POST <id>/check-in/` | 참가자 | 체크인 (신청 상태에서만, 모집 중에만) |
 | `POST <id>/kick/` | 주최자 | 참가자 추방. body: `entrant_id`. 진행 중이면 기권과 같이 처리 |
+
+## 팀전 (`team_size` ≥ 2)
+
+| 메서드/경로 | 권한 | 설명 |
+|---|---|---|
+| `POST <id>/register/` | 회원 | body: `team_name`\*, `md_uid` → 팀 생성(팀장). 응답에 `join_code`(6자리) |
+| `POST <id>/team/join/` | 회원 | body: `code`\*, `md_uid` → 팀 합류. 한 대회에 한 팀만, 정원·체크인 팀은 불가 |
+| `POST <id>/team/leave/` | 팀원 | 모집 중에만. 팀장이 나가면 다음 순서가 팀장, 마지막 사람이 나가면 팀 기권 처리 |
+| `POST <id>/team/order/` | 팀장 | body: `members`(팀원 id 순서) → 기본 출전 순서 |
+| `POST <id>/check-in/` | 팀장 | 팀원이 `team_size`명 모여야 가능 |
+| `POST <id>/withdraw/` | 팀장 | 팀 전체 기권 |
+| `POST matches/<id>/lineup/` | 팀장 | body: `members` → 이 경기 내 쪽 보드 순서. 보드 보고가 하나라도 시작되면 불가 |
+| `POST boards/<id>/report/` | 보드 선수 | body: `result`(win/lose). 보드는 무승부 없음 |
+| `POST boards/<id>/confirm/` · `dispute/` | 상대 선수 | 보고 확인 / 이의 |
+| `POST boards/<id>/override/` | 주최자 | body: `result`(p1/p2) |
+
+팀 경기(`Match`)는 보드가 모두 확정되면 자동 확정: 보드 다수결. 동률은 리그·스위스에서 무승부, 결선에서는 미확정으로 남아 주최자가 `matches/<id>/override/`로 판정. 팀전에서 `matches/<id>/report/`는 400. 상세의 `entrants[].members[]`(아바타·팀장·순서, UID는 주최자·참가자에게만), `entrants[].join_code`는 본인 팀·주최자에게만. `rounds[].matches[].boards[]`에 보드 정보. 채팅은 `?team=1`/body `team: true`로 팀 전용 채널(팀원만). 덱 제출은 팀원 단위(`GET deck/?member_id=`: 본인·팀장·주최자).
 
 ## 경기 결과 (셀프 보고 + 상대 확인)
 
@@ -65,4 +82,4 @@
 | `POST <id>/chat/` | 참가자·주최자 | 메시지 전송. body: `content` (추방자 불가, 길이 제한) |
 
 ## 미구현 (2차)
-팀전(Entrant 추상화로 대비됨), 디스코드 알림. 우승 보상은 사이트가 지급하지 않음(주최자 몫).
+디스코드 알림. 팀전 결선 동률의 에이스전(현재는 주최자 판정). 우승 보상은 사이트가 지급하지 않음(주최자 몫).

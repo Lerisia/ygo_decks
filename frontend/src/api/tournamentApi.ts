@@ -24,6 +24,17 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type TournamentFormat = "single_elim" | "swiss" | "round_robin" | "swiss_cut" | "group_knockout" | "double_elim";
 export type TournamentStatus = "recruiting" | "ongoing" | "completed" | "cancelled";
 
+export type TeamMember = {
+  id: number;
+  user: number;
+  name: string;
+  md_uid: string | null;
+  is_captain: boolean;
+  order: number;
+  avatar_icon: AvatarIcon | null;
+  border: Border | null;
+};
+
 export type Entrant = {
   id: number;
   user: number | null;
@@ -33,6 +44,18 @@ export type Entrant = {
   md_uid: string | null;
   avatar_icon: AvatarIcon | null;
   border: Border | null;
+  members: TeamMember[];
+  join_code: string | null;
+};
+
+export type Board = {
+  id: number;
+  order: number;
+  member1: TeamMember | null;
+  member2: TeamMember | null;
+  result: "p1" | "p2" | null;
+  report_status: "pending" | "reported" | "confirmed" | "disputed";
+  reported_by: number | null;
 };
 
 export type MatchItem = {
@@ -45,6 +68,7 @@ export type MatchItem = {
   result: "p1" | "p2" | "draw" | "bye" | null;
   report_status: "pending" | "reported" | "confirmed" | "disputed";
   reported_by: number | null;
+  boards: Board[];
 };
 
 export type RoundItem = { number: number; status: "ongoing" | "completed"; stage: "swiss" | "knockout" | "league" | "main"; matches: MatchItem[] };
@@ -55,6 +79,7 @@ export type TournamentListItem = {
   format: TournamentFormat;
   status: TournamentStatus;
   capacity: number;
+  team_size: number;
   event_date: string;
   current_round: number;
   host_name: string;
@@ -77,6 +102,7 @@ export type StandingRow = {
   entrant_id: number;
   name: string;
   user: number | null;
+  members: { id: number; name: string; is_captain: boolean; avatar_icon: AvatarIcon | null; border: Border | null }[];
   wins: number;
   draws: number;
   losses: number;
@@ -95,7 +121,7 @@ export const listTournaments = () => req<TournamentListItem[]>("/");
 export const getTournament = (id: number) => req<TournamentDetail>(`/${id}/`);
 export const createTournament = (payload: {
   name: string; description?: string; format: TournamentFormat;
-  capacity: number; event_date: string; format_config?: Record<string, unknown>;
+  capacity: number; team_size?: number; event_date: string; format_config?: Record<string, unknown>;
 }, coverFile?: File | null) => {
   if (!coverFile) {
     return req<TournamentDetail>("/create/", { method: "POST", body: JSON.stringify(payload) });
@@ -105,6 +131,7 @@ export const createTournament = (payload: {
   if (payload.description) form.append("description", payload.description);
   form.append("format", payload.format);
   form.append("capacity", String(payload.capacity));
+  if (payload.team_size) form.append("team_size", String(payload.team_size));
   form.append("event_date", payload.event_date);
   if (payload.format_config) form.append("format_config", JSON.stringify(payload.format_config));
   form.append("cover_image", coverFile);
@@ -123,8 +150,21 @@ export const updateCover = (id: number, coverFile: File | null) => {
   return req<TournamentDetail>(`/${id}/cover/`, { method: "POST", body: form });
 };
 
-export const registerTournament = (id: number, mdUid?: string) =>
-  req<Entrant>(`/${id}/register/`, { method: "POST", body: JSON.stringify(mdUid ? { md_uid: mdUid } : {}) });
+export const registerTournament = (id: number, mdUid?: string, teamName?: string) =>
+  req<Entrant>(`/${id}/register/`, { method: "POST", body: JSON.stringify({ ...(mdUid ? { md_uid: mdUid } : {}), ...(teamName ? { team_name: teamName } : {}) }) });
+export const joinTeam = (id: number, code: string, mdUid?: string) =>
+  req<Entrant>(`/${id}/team/join/`, { method: "POST", body: JSON.stringify({ code, ...(mdUid ? { md_uid: mdUid } : {}) }) });
+export const leaveTeam = (id: number) => req<{ ok: boolean }>(`/${id}/team/leave/`, { method: "POST", body: "{}" });
+export const setTeamOrder = (id: number, memberIds: number[]) =>
+  req<Entrant>(`/${id}/team/order/`, { method: "POST", body: JSON.stringify({ members: memberIds }) });
+export const setLineup = (matchId: number, memberIds: number[]) =>
+  req<{ ok: boolean }>(`/matches/${matchId}/lineup/`, { method: "POST", body: JSON.stringify({ members: memberIds }) });
+export const reportBoard = (boardId: number, result: "win" | "lose") =>
+  req<{ ok: boolean }>(`/boards/${boardId}/report/`, { method: "POST", body: JSON.stringify({ result }) });
+export const confirmBoard = (boardId: number) => req<{ ok: boolean }>(`/boards/${boardId}/confirm/`, { method: "POST", body: "{}" });
+export const disputeBoard = (boardId: number) => req<{ ok: boolean }>(`/boards/${boardId}/dispute/`, { method: "POST", body: "{}" });
+export const overrideBoard = (boardId: number, result: "p1" | "p2") =>
+  req<{ ok: boolean }>(`/boards/${boardId}/override/`, { method: "POST", body: JSON.stringify({ result }) });
 export const withdrawTournament = (id: number) => req<{ ok: boolean }>(`/${id}/withdraw/`, { method: "POST", body: "{}" });
 export const checkInTournament = (id: number) => req<{ ok: boolean }>(`/${id}/check-in/`, { method: "POST", body: "{}" });
 export const kickEntrant = (id: number, entrantId: number) =>
@@ -155,6 +195,7 @@ export type DeckCard = {
 export type DeckSubmission = {
   id: number;
   entrant_id: number;
+  member: number | null;
   image: string | null;
   unmatched_count: number;
   cards: DeckCard[];
@@ -163,12 +204,12 @@ export type DeckSubmission = {
 };
 export type Announcement = { id: number; content: string; pinned: boolean; created_at: string };
 export type ChatMessage = {
-  id: number; user: number; username: string; content: string; created_at: string;
+  id: number; user: number; username: string; team: number | null; content: string; created_at: string;
   avatar_icon: AvatarIcon | null; border: Border | null;
 };
 
-export const getDeck = (id: number, entrantId?: number) =>
-  req<DeckSubmission>(`/${id}/deck/${entrantId ? `?entrant_id=${entrantId}` : ""}`);
+export const getDeck = (id: number, entrantId?: number, memberId?: number) =>
+  req<DeckSubmission>(`/${id}/deck/${memberId ? `?member_id=${memberId}` : entrantId ? `?entrant_id=${entrantId}` : ""}`);
 export const uploadDeck = (id: number, file: File) => {
   const form = new FormData();
   form.append("image", file);
@@ -185,7 +226,9 @@ export const postAnnouncement = (id: number, content: string, pinned: boolean) =
 export const deleteAnnouncement = (announcementId: number) =>
   req<{ ok: boolean }>(`/announcements/${announcementId}/`, { method: "DELETE" });
 
-export const getChat = (id: number, after?: number) =>
-  req<ChatMessage[]>(`/${id}/chat/${after ? `?after=${after}` : ""}`);
-export const postChat = (id: number, content: string) =>
-  req<ChatMessage>(`/${id}/chat/`, { method: "POST", body: JSON.stringify({ content }) });
+export const getChat = (id: number, after?: number, team = false) => {
+  const q = [after ? `after=${after}` : "", team ? "team=1" : ""].filter(Boolean).join("&");
+  return req<ChatMessage[]>(`/${id}/chat/${q ? `?${q}` : ""}`);
+};
+export const postChat = (id: number, content: string, team = false) =>
+  req<ChatMessage>(`/${id}/chat/`, { method: "POST", body: JSON.stringify({ content, ...(team ? { team: true } : {}) }) });

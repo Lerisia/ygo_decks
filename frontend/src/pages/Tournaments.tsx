@@ -89,7 +89,7 @@ function Tournaments() {
                   )}
                   <h2 className="text-lg font-semibold pr-16">{t.name}</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {FORMAT_LABELS[t.format]} · {t.entrant_count}/{t.capacity}명 · 주최 {t.host_name}
+                    {FORMAT_LABELS[t.format]}{t.team_size > 1 ? ` · ${t.team_size}인 팀전` : ""} · {t.entrant_count}/{t.capacity}{t.team_size > 1 ? "팀" : "명"} · 주최 {t.host_name}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     일시: {new Date(t.event_date).toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}

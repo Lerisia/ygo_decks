@@ -15,6 +15,7 @@ function CreateTournament() {
   const [cut, setCut] = useState(4);
   const [groups, setGroups] = useState(2);
   const [advance, setAdvance] = useState(2);
+  const [teamSize, setTeamSize] = useState(1);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,6 +42,7 @@ function CreateTournament() {
         description: description.trim(),
         format,
         capacity: cap,
+        team_size: teamSize,
         event_date: new Date(eventDate).toISOString(),
         format_config: config,
       }, coverFile);
@@ -78,9 +80,22 @@ function CreateTournament() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-1">정원 *</label>
+            <label className="block text-sm font-semibold mb-1">정원 * {teamSize > 1 && <span className="font-normal text-gray-500">(팀 수)</span>}</label>
             <input type="number" min={2} max={128} className={inputCls} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
           </div>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1">참가 단위</label>
+          <select className={inputCls} value={teamSize} onChange={(e) => setTeamSize(Number(e.target.value))}>
+            <option value={1}>개인전</option>
+            {[2, 3, 4, 5].map((n) => <option key={n} value={n}>팀전 · {n}인 1팀</option>)}
+          </select>
+          {teamSize > 1 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              팀장이 팀을 만들고 팀 코드를 공유하면 팀원이 합류합니다. 팀 경기는 {teamSize}개 개인전으로 치러지고 더 많이 이긴 팀이 승리합니다.
+              {teamSize % 2 === 0 && " 인원이 짝수라 동률이 날 수 있습니다. 동률은 리그·스위스에서는 무승부, 결선에서는 주최자가 판정합니다."}
+            </p>
+          )}
         </div>
         {(format === "swiss" || format === "swiss_cut") && (
           <div>

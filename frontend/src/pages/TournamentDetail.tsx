@@ -2,15 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import BracketTree, { ColumnBracket } from "@/components/tournament/BracketTree";
+import TeamAvatars from "@/components/tournament/TeamAvatars";
 import DeckTab from "@/components/tournament/DeckTab";
 import AnnouncementsTab from "@/components/tournament/AnnouncementsTab";
 import ChatTab from "@/components/tournament/ChatTab";
 import { getUserInfo } from "@/api/accountApi";
 import {
-  cancelTournament, checkInTournament, completeTournament, confirmMatch, disputeMatch, getStandings,
-  getTournament, kickEntrant, nextRound, overrideMatch, registerTournament,
-  reportMatch, startTournament, updateCover, updateTournament, withdrawTournament,
-  GROUP_LABEL, type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
+  cancelTournament, checkInTournament, completeTournament, confirmBoard, confirmMatch, disputeBoard, disputeMatch, getStandings,
+  getTournament, joinTeam, kickEntrant, leaveTeam, nextRound, overrideBoard, overrideMatch, registerTournament,
+  reportBoard, reportMatch, setLineup, setTeamOrder, startTournament, updateCover, updateTournament, withdrawTournament,
+  GROUP_LABEL, type Board, type Entrant, type MatchItem, type StandingRow, type TournamentDetail as TDetail,
 } from "@/api/tournamentApi";
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -35,15 +36,26 @@ const redBtn = `${btn} bg-red-500 text-white hover:bg-red-600`;
 
 function EntrantChip({ e, size = 40 }: { e: Entrant; size?: number }) {
   const dimmed = e.status === "withdrawn" || e.status === "kicked";
+  const isTeam = e.user === null;
   return (
     <div className={`flex items-center gap-2 min-w-0 ${dimmed ? "opacity-40" : ""}`}>
       <div className="relative shrink-0">
-        <Avatar icon={e.avatar_icon} border={e.border} size={size} />
+        {isTeam ? <TeamAvatars members={e.members} size={Math.round(size * 0.7)} max={3} /> : <Avatar icon={e.avatar_icon} border={e.border} size={size} />}
         {e.status === "checked_in" && (
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900" />
         )}
       </div>
       <span className={`truncate text-sm font-medium ${dimmed ? "line-through" : ""}`}>{e.name}</span>
+    </div>
+  );
+}
+
+function MemberChip({ m, size = 28 }: { m: { name: string; avatar_icon: Entrant["avatar_icon"]; border: Entrant["border"]; is_captain?: boolean } | null; size?: number }) {
+  if (!m) return <span className="text-xs text-gray-400">미배정</span>;
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <Avatar icon={m.avatar_icon} border={m.border} size={size} />
+      <span className="truncate text-sm">{m.name}{m.is_captain && <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">팀장</span>}</span>
     </div>
   );
 }
@@ -56,6 +68,8 @@ function TournamentDetailPage() {
   const [me, setMe] = useState<string | null>(null);
   const [tab, setTab] = useState<"players" | "bracket" | "deck" | "notice" | "chat" | null>(null);
   const [uidInput, setUidInput] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [teamCode, setTeamCode] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState({ name: "", description: "", event_date: "", capacity: "" });
@@ -88,8 +102,14 @@ function TournamentDetailPage() {
   if (!t) return <div className="p-6">{error ? `오류: ${error}` : "로딩 중..."}</div>;
 
   const isHost = me !== null && t.host_name === me;
-  const myEntrant = me !== null ? t.entrants.find((e) => e.name === me) : undefined;
-  const myUserId = myEntrant?.user ?? null;
+  const teamMode = t.team_size > 1;
+  const myEntrant = me !== null
+    ? t.entrants.find((e) => (e.user !== null ? e.name === me : e.members.some((m) => m.name === me)))
+    : undefined;
+  const myMember = myEntrant?.members.find((m) => m.name === me);
+  const myUserId = myEntrant?.user ?? myMember?.user ?? null;
+  const isCaptain = !!myMember?.is_captain;
+  const entrantLabel = teamMode ? "팀" : "명";
   const activeEntrants = t.entrants.filter((e) => e.status === "registered" || e.status === "checked_in");
   const uidByEntrant = new Map(t.entrants.map((e) => [e.id, e.md_uid]));
   const tabClass = (k: "players" | "bracket" | "deck" | "notice" | "chat") =>
@@ -101,8 +121,10 @@ function TournamentDetailPage() {
     catch (e) { setError(e instanceof Error ? e.message : "요청에 실패했습니다."); }
   };
 
+  const sideOf = (e: Entrant | null): boolean =>
+    !!e && myUserId !== null && (e.user === myUserId || e.members.some((mm) => mm.user === myUserId));
   const myRole = (m: MatchItem): "p1" | "p2" | null =>
-    myUserId === null ? null : m.entrant1.user === myUserId ? "p1" : m.entrant2?.user === myUserId ? "p2" : null;
+    sideOf(m.entrant1) ? "p1" : sideOf(m.entrant2) ? "p2" : null;
 
   const resultText = (m: MatchItem) => {
     if (m.result === "bye") return "부전승";
@@ -112,19 +134,101 @@ function TournamentDetailPage() {
     return `${winner?.name} 승`;
   };
 
+  const renderBoard = (m: MatchItem, b: Board) => {
+    const mine = b.member1?.user === myUserId ? "p1" : b.member2?.user === myUserId ? "p2" : null;
+    const decided = b.report_status === "confirmed";
+    const canReport = mine && !decided && m.report_status !== "confirmed" && (b.report_status === "pending" || b.reported_by === myUserId || b.report_status === "disputed");
+    const canRespond = mine && b.report_status === "reported" && b.reported_by !== myUserId;
+    const text = !b.result ? "대기 중" : `${(b.result === "p1" ? b.member1 : b.member2)?.name ?? "?"} 승`;
+    return (
+      <div key={b.id} className="flex items-center justify-between gap-2 flex-wrap rounded-md bg-gray-50 dark:bg-gray-900/40 px-2 py-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[11px] text-gray-400 w-6 shrink-0">{b.order + 1}번</span>
+          <div className={b.result && b.result !== "p1" && decided ? "opacity-40" : ""}><MemberChip m={b.member1} size={24} /></div>
+          <span className="text-[10px] text-gray-400">vs</span>
+          <div className={b.result && b.result !== "p2" && decided ? "opacity-40" : ""}><MemberChip m={b.member2} size={24} /></div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`text-xs font-semibold ${decided ? "text-green-600 dark:text-green-400" : b.report_status === "disputed" ? "text-red-500" : "text-gray-500 dark:text-gray-400"}`}>
+            {text}{b.report_status === "reported" && " (확인 대기)"}{b.report_status === "disputed" && " (이의)"}
+          </span>
+          {canReport && (
+            <>
+              <button className={`${blueBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => reportBoard(b.id, "win"))}>승리</button>
+              <button className={`${grayBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => reportBoard(b.id, "lose"))}>패배</button>
+            </>
+          )}
+          {canRespond && (
+            <>
+              <button className={`${blueBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => confirmBoard(b.id))}>확인</button>
+              <button className={`${redBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => disputeBoard(b.id))}>이의</button>
+            </>
+          )}
+          {isHost && !decided && b.member1 && b.member2 && (
+            <>
+              <button className={`${grayBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => overrideBoard(b.id, "p1"))}>{b.member1.name} 승</button>
+              <button className={`${grayBtn} !px-2 !py-1 !text-xs`} onClick={() => act(() => overrideBoard(b.id, "p2"))}>{b.member2.name} 승</button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderLineup = (m: MatchItem) => {
+    // captain reorders their own side until any board is reported
+    const side = myEntrant && m.entrant1.id === myEntrant.id ? "member1" : myEntrant && m.entrant2?.id === myEntrant.id ? "member2" : null;
+    if (!side || !isCaptain || m.report_status === "confirmed" || m.boards.some((b) => b.report_status !== "pending")) return null;
+    const ids = [...m.boards].sort((a, b) => a.order - b.order).map((b) => b[side]?.id).filter((x): x is number => x !== undefined);
+    const move = (i: number, d: -1 | 1) => {
+      const next = [...ids];
+      const j = i + d;
+      if (j < 0 || j >= next.length) return;
+      [next[i], next[j]] = [next[j], next[i]];
+      act(() => setLineup(m.id, next));
+    };
+    return (
+      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+        <span>출전 순서(팀장):</span>
+        {ids.map((id, i) => {
+          const mem = myEntrant!.members.find((x) => x.id === id);
+          return (
+            <span key={id} className="inline-flex items-center gap-0.5 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">
+              {i + 1}. {mem?.name}
+              <button className="px-0.5 disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} aria-label="위로">▲</button>
+              <button className="px-0.5 disabled:opacity-30" disabled={i === ids.length - 1} onClick={() => move(i, 1)} aria-label="아래로">▼</button>
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderMatch = (m: MatchItem, allowDraw: boolean) => {
     const role = myRole(m);
     const confirmed = m.report_status === "confirmed";
-    const canRespond = role && m.report_status === "reported" && m.reported_by !== myUserId;
-    const canReport = role && !confirmed && (m.report_status === "pending" || m.reported_by === myUserId || m.report_status === "disputed");
+    const canRespond = !teamMode && role && m.report_status === "reported" && m.reported_by !== myUserId;
+    const canReport = !teamMode && role && !confirmed && (m.report_status === "pending" || m.reported_by === myUserId || m.report_status === "disputed");
+    const boardScore = teamMode && m.boards.length > 0
+      ? `${m.boards.filter((b) => b.report_status === "confirmed" && b.result === "p1").length} : ${m.boards.filter((b) => b.report_status === "confirmed" && b.result === "p2").length}`
+      : null;
     return (
       <div key={m.id} className="border dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
         {m.bracket && <div className="text-[11px] font-semibold text-gray-400 mb-1">{BRACKET_LABELS[m.bracket]}</div>}
         <div className="flex items-center justify-between gap-2">
           <EntrantChip e={m.entrant1} size={36} />
-          <span className="text-xs text-gray-400 shrink-0">VS</span>
+          <span className="text-xs text-gray-400 shrink-0">{boardScore ?? "VS"}</span>
           {m.entrant2 ? <EntrantChip e={m.entrant2} size={36} /> : <span className="text-sm text-gray-400">부전승</span>}
         </div>
+        {teamMode && m.boards.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {[...m.boards].sort((a, b) => a.order - b.order).map((b) => renderBoard(m, b))}
+            {renderLineup(m)}
+            {teamMode && !confirmed && m.boards.every((b) => b.report_status === "confirmed") && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">동률입니다. 주최자가 승패를 판정해 주세요.</p>
+            )}
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
           <span className={`text-sm font-semibold ${confirmed ? "text-green-600 dark:text-green-400" : m.report_status === "disputed" ? "text-red-500" : "text-gray-500 dark:text-gray-400"}`}>
             {resultText(m)}
@@ -213,7 +317,7 @@ function TournamentDetailPage() {
 
       {/* 참가/운영 액션 */}
       <div className="flex gap-2 flex-wrap mb-6">
-        {t.status === "recruiting" && me && !myEntrant && (
+        {t.status === "recruiting" && me && !myEntrant && !teamMode && (
           <div className="flex gap-2 items-center">
             <input
               className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-56"
@@ -225,17 +329,44 @@ function TournamentDetailPage() {
             <button className={blueBtn} onClick={() => act(() => registerTournament(t.id, uidInput || undefined))}>참가 신청</button>
           </div>
         )}
-        {t.status === "recruiting" && myEntrant?.status === "registered" && (
-          <button className={blueBtn} onClick={() => act(() => checkInTournament(t.id))}>체크인</button>
+        {t.status === "recruiting" && me && !myEntrant && teamMode && (
+          <div className="w-full flex flex-col sm:flex-row gap-2">
+            <input
+              className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white sm:w-52"
+              placeholder="MD UID 9자리 (저장돼 있으면 생략)"
+              value={uidInput}
+              maxLength={9}
+              onChange={(e) => setUidInput(e.target.value.replace(/\D/g, ""))}
+            />
+            <div className="flex gap-2">
+              <input className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-36" placeholder="팀 이름" maxLength={100} value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+              <button className={blueBtn} disabled={!teamName.trim()} onClick={() => act(() => registerTournament(t.id, uidInput || undefined, teamName.trim()))}>팀 만들기</button>
+            </div>
+            <div className="flex gap-2">
+              <input className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-28 font-mono uppercase" placeholder="팀 코드" maxLength={6} value={teamCode} onChange={(e) => setTeamCode(e.target.value.toUpperCase())} />
+              <button className={grayBtn} disabled={teamCode.length !== 6} onClick={() => act(() => joinTeam(t.id, teamCode, uidInput || undefined))}>팀 합류</button>
+            </div>
+          </div>
         )}
-        {(t.status === "recruiting" || t.status === "ongoing") && myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (
+        {t.status === "recruiting" && myEntrant?.status === "registered" && (!teamMode || isCaptain) && (
+          <button
+            className={blueBtn}
+            disabled={teamMode && myEntrant.members.length < t.team_size}
+            title={teamMode && myEntrant.members.length < t.team_size ? `팀원 ${t.team_size}명이 모여야 체크인할 수 있습니다` : ""}
+            onClick={() => act(() => checkInTournament(t.id))}
+          >체크인</button>
+        )}
+        {t.status === "recruiting" && teamMode && myEntrant && !isCaptain && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (
+          <button className={grayBtn} onClick={() => act(() => leaveTeam(t.id))}>팀 나가기</button>
+        )}
+        {(t.status === "recruiting" || t.status === "ongoing") && myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (!teamMode || isCaptain) && (
           <button
             className={grayBtn}
             onClick={() => {
-              if (t.status === "ongoing" && !window.confirm("진행 중인 대회에서 기권하면 남은 경기는 상대 승으로 처리되고 되돌릴 수 없습니다. 기권할까요?")) return;
+              if (t.status === "ongoing" && !window.confirm(`진행 중인 대회에서 기권하면 남은 경기는 상대 승으로 처리되고 되돌릴 수 없습니다. ${teamMode ? "팀 전체가 " : ""}기권할까요?`)) return;
               act(() => withdrawTournament(t.id));
             }}
-          >기권</button>
+          >{teamMode ? "팀 기권" : "기권"}</button>
         )}
         {isHost && t.status === "recruiting" && (
           <button className={blueBtn} onClick={() => act(() => startTournament(t.id))}>대회 시작</button>
@@ -291,10 +422,43 @@ function TournamentDetailPage() {
         </div>
       )}
 
+      {teamMode && myEntrant && myEntrant.user === null && (myEntrant.status === "registered" || myEntrant.status === "checked_in") && (
+        <div className="mb-6 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <span className="font-semibold">내 팀 · {myEntrant.name} <span className="text-sm font-normal text-gray-500">({myEntrant.members.length}/{t.team_size})</span></span>
+            {myEntrant.join_code && t.status === "recruiting" && (
+              <button
+                className="text-xs font-mono px-2 py-1 rounded bg-white dark:bg-gray-900 border dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="팀 코드 복사"
+                onClick={() => { navigator.clipboard?.writeText(myEntrant.join_code!).catch(() => {}); }}
+              >팀 코드 {myEntrant.join_code} 📋</button>
+            )}
+          </div>
+          <div className="space-y-1">
+            {[...myEntrant.members].sort((a, b) => a.order - b.order).map((m, i, arr) => (
+              <div key={m.id} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs text-gray-400 w-5">{i + 1}</span>
+                  <MemberChip m={m} />
+                  {m.md_uid && <span className="text-[11px] text-gray-400 font-mono">{m.md_uid}</span>}
+                </div>
+                {isCaptain && t.status === "recruiting" && (
+                  <div className="flex gap-1 text-xs">
+                    <button className="px-1.5 disabled:opacity-30" disabled={i === 0} onClick={() => { const ids = arr.map((x) => x.id); [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; act(() => setTeamOrder(t.id, ids)); }}>▲</button>
+                    <button className="px-1.5 disabled:opacity-30" disabled={i === arr.length - 1} onClick={() => { const ids = arr.map((x) => x.id); [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; act(() => setTeamOrder(t.id, ids)); }}>▼</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {isCaptain && t.status === "recruiting" && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">순서는 기본 출전 순서(1번 선수부터)입니다. 경기마다 결과 보고 전까지 바꿀 수 있습니다.</p>}
+        </div>
+      )}
+
       {/* 탭: 참가자(=순위) / 대진표 */}
       <div className="flex justify-start sm:justify-center gap-1 sm:gap-3 mb-4 border-b dark:border-gray-700 pb-2 overflow-x-auto">
         <button onClick={() => setTab("players")} className={tabClass("players")}>
-          참가자 {activeEntrants.length}/{t.capacity}
+          참가자 {activeEntrants.length}/{t.capacity}{entrantLabel}
         </button>
         <button onClick={() => setTab("bracket")} className={tabClass("bracket")}>대진표</button>
         <button onClick={() => setTab("deck")} className={tabClass("deck")}>덱</button>
@@ -307,6 +471,7 @@ function TournamentDetailPage() {
           <DeckTab
             tournamentId={t.id}
             myEntrant={myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") ? myEntrant : undefined}
+            myUserId={myUserId}
             isHost={isHost}
             entrants={t.entrants}
             recruiting={t.status === "recruiting"}
@@ -318,7 +483,11 @@ function TournamentDetailPage() {
       )}
       {tab === "chat" && (
         <section>
-          <ChatTab tournamentId={t.id} canWrite={isHost || !!(myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in"))} />
+          <ChatTab
+            tournamentId={t.id}
+            canWrite={isHost || !!(myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in"))}
+            hasTeam={teamMode && !!myEntrant && myEntrant.user === null && myEntrant.status !== "withdrawn" && myEntrant.status !== "kicked"}
+          />
         </section>
       )}
 
@@ -329,14 +498,27 @@ function TournamentDetailPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {t.entrants.map((e) => (
-                <div key={e.id} className="flex items-center justify-between border dark:border-gray-700 rounded-lg px-2.5 py-2 bg-white dark:bg-gray-800">
-                  <EntrantChip e={e} />
-                  <div className="flex flex-col items-end gap-0.5 shrink-0">
-                    {e.md_uid && <span className="text-[11px] text-gray-400 font-mono">{e.md_uid}</span>}
-                    {isHost && e.status !== "kicked" && e.status !== "withdrawn" && (
-                      <button className="text-xs text-red-500 hover:underline" onClick={() => act(() => kickEntrant(t.id, e.id))}>추방</button>
-                    )}
+                <div key={e.id} className="border dark:border-gray-700 rounded-lg px-2.5 py-2 bg-white dark:bg-gray-800">
+                  <div className="flex items-center justify-between">
+                    <EntrantChip e={e} />
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      {e.md_uid && <span className="text-[11px] text-gray-400 font-mono">{e.md_uid}</span>}
+                      {e.user === null && <span className="text-[11px] text-gray-400">{e.members.length}/{t.team_size}</span>}
+                      {isHost && e.status !== "kicked" && e.status !== "withdrawn" && (
+                        <button className="text-xs text-red-500 hover:underline" onClick={() => act(() => kickEntrant(t.id, e.id))}>추방</button>
+                      )}
+                    </div>
                   </div>
+                  {e.user === null && e.members.length > 0 && (
+                    <div className="mt-1.5 pl-1 space-y-0.5">
+                      {e.members.map((m) => (
+                        <div key={m.id} className="flex items-center justify-between gap-2">
+                          <MemberChip m={m} size={20} />
+                          {m.md_uid && <span className="text-[10px] text-gray-400 font-mono">{m.md_uid}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -365,7 +547,7 @@ function TournamentDetailPage() {
                     <td className="px-2 py-1.5">{row.dropped ? "–" : i < 3 && medals && t.status === "completed" ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Avatar icon={row.avatar_icon} border={row.border} size={28} />
+                        {row.user === null ? <TeamAvatars members={row.members} size={22} max={3} /> : <Avatar icon={row.avatar_icon} border={row.border} size={28} />}
                         <div className="min-w-0">
                           <div className="truncate">
                             {row.name}

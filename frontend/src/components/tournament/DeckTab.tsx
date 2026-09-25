@@ -12,27 +12,33 @@ const grayBtn = `${btn} bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gra
 type Props = {
   tournamentId: number;
   myEntrant: Entrant | undefined;
+  myUserId: number | null;
   isHost: boolean;
   entrants: Entrant[];
   recruiting: boolean;
 };
 
-export default function DeckTab({ tournamentId, myEntrant, isHost, entrants, recruiting }: Props) {
-  const [viewEntrantId, setViewEntrantId] = useState<number | null>(myEntrant?.id ?? null);
+export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, entrants, recruiting }: Props) {
+  const teamMode = !!myEntrant && myEntrant.user === null || entrants.some((e) => e.user === null);
+  const myMember = myEntrant?.members.find((m) => m.user === myUserId);
+  const isCaptain = !!myMember?.is_captain;
+  // team mode views are keyed by member id; individual mode by entrant id
+  const [viewEntrantId, setViewEntrantId] = useState<number | null>(teamMode ? (myMember?.id ?? null) : (myEntrant?.id ?? null));
   const [deck, setDeck] = useState<DeckSubmission | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const isOwnView = viewEntrantId !== null && viewEntrantId === myEntrant?.id;
+  const isOwnView = viewEntrantId !== null && viewEntrantId === (teamMode ? myMember?.id : myEntrant?.id);
   const canEdit = isOwnView && recruiting && !!myEntrant;
 
   const load = async (entrantId: number | null) => {
     setError(""); setNotFound(false);
     if (entrantId === null) { setDeck(null); return; }
     try {
-      setDeck(await getDeck(tournamentId, entrantId === myEntrant?.id ? undefined : entrantId));
+      if (teamMode) setDeck(await getDeck(tournamentId, undefined, entrantId));
+      else setDeck(await getDeck(tournamentId, entrantId === myEntrant?.id ? undefined : entrantId));
     } catch (e) {
       setDeck(null);
       if (e instanceof Error && e.message.includes("제출된 덱이 없습니다")) setNotFound(true);
@@ -57,10 +63,14 @@ export default function DeckTab({ tournamentId, myEntrant, isHost, entrants, rec
   }
 
   const viewable = entrants.filter((e) => e.status === "registered" || e.status === "checked_in");
+  // host sees everyone; a captain sees their own teammates
+  const memberOptions = teamMode
+    ? (isHost ? viewable : myEntrant ? [myEntrant] : []).flatMap((e) => e.members.map((m) => ({ id: m.id, label: `${e.name} · ${m.name}${m.id === myMember?.id ? " (나)" : ""}` })))
+    : [];
 
   return (
     <div>
-      {isHost && (
+      {(isHost || (teamMode && isCaptain)) && (
         <div className="flex items-center gap-2 mb-3">
           <label className="text-sm text-gray-500 dark:text-gray-400">열람 대상</label>
           <select
@@ -69,9 +79,9 @@ export default function DeckTab({ tournamentId, myEntrant, isHost, entrants, rec
             onChange={(e) => setViewEntrantId(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">선택</option>
-            {viewable.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}{e.id === myEntrant?.id ? " (나)" : ""}</option>
-            ))}
+            {teamMode
+              ? memberOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)
+              : viewable.map((e) => <option key={e.id} value={e.id}>{e.name}{e.id === myEntrant?.id ? " (나)" : ""}</option>)}
           </select>
         </div>
       )}
