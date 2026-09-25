@@ -673,3 +673,88 @@ class TrackerDeckPriorityTest(TestCase):
         Card.objects.create(card_id="c203", konami_id="203", name="card203", archetype="Spiritual Beast")
         cands, _ = infer_decks([201, 201, 203])
         self.assertEqual(cands[0]["name"], "십이수")
+
+
+class TrackerLearnedFallbackTest(TestCase):
+    """테마 표시가 없는 카드만 보여 추측이 비면, 이용자가 기록한 상대 덱으로 배운 카드별 통계로 채운다."""
+
+    def setUp(self):
+        from card.models import Card
+        from tool.models import RecordGroup
+        self.user = User.objects.create_user(email="l@test.com", username="learner", password="pass1234")
+        self.group = RecordGroup.objects.create(user=self.user, name="테스트")
+        self.rescue = _create_deck("리시드")
+        self.crown = _create_deck("크라운 클랜")
+        Card.objects.create(card_id="c301", konami_id="301", name="레스큐 에이스 에어 리프터", archetype=None)
+        Card.objects.create(card_id="c302", konami_id="302", name="Clown Crew Cappello", archetype=None)
+        Card.objects.create(card_id="c303", konami_id="303", name="하루 우라라", archetype=None)
+        self.n = 0
+
+    def _game(self, opp_cards, opp_deck, deleted=False):
+        from tool.models import MatchRecord
+        from tracker.models import TrackerGame
+        self.n += 1
+        m = MatchRecord.objects.create(record_group=self.group, opponent_deck=opp_deck, first_or_second="first",
+                                       result="win", coin_toss_result="win", is_deleted=deleted)
+        TrackerGame.objects.create(user=self.user, did=str(self.n), game_mode=3, opp_cards=opp_cards, match=m)
+
+    def _learn(self):
+        from tracker.learned import rebuild_card_deck_stats
+        rebuild_card_deck_stats()
+
+    def test_no_stats_means_no_guess(self):
+        cands, _ = infer_decks([301])
+        self.assertEqual(cands, [])
+
+    def test_fills_the_guess_from_recorded_opponent_decks(self):
+        for _ in range(3):
+            self._game([301, 303], self.rescue)
+            self._game([302, 303], self.crown)
+        self._learn()
+        cands, _ = infer_decks([301, 303])
+        self.assertEqual(cands[0]["name"], "리시드")
+        self.assertTrue(cands[0]["learned"])
+        self.assertEqual(infer_decks([302])[0][0]["name"], "크라운 클랜")
+
+    def test_rarely_seen_cards_are_not_evidence(self):
+        self._game([301], self.rescue)
+        self._learn()
+        self.assertEqual(infer_decks([301])[0], [])
+
+    def test_unlabeled_and_deleted_records_are_ignored(self):
+        for _ in range(3):
+            self._game([301], None)
+            self._game([301], self.crown, deleted=True)
+        self._learn()
+        self.assertEqual(infer_decks([301])[0], [])
+
+    def test_theme_votes_still_come_first(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        blue = _create_deck("푸른 눈")
+        DeckArchetype.objects.create(deck=blue, name="Blue-Eyes")
+        Card.objects.create(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon", archetype="Blue-Eyes")
+        for _ in range(3):
+            self._game([301], self.rescue)
+        self._learn()
+        cands, _ = infer_decks([301, 4007])
+        self.assertEqual([c["name"] for c in cands], ["푸른 눈"])
+        self.assertNotIn("learned", cands[0])
+
+    def test_rebuild_replaces_old_stats(self):
+        from tracker.models import TrackerGame
+        for _ in range(3):
+            self._game([301], self.rescue)
+        self._learn()
+        TrackerGame.objects.all().delete()
+        for _ in range(3):
+            self._game([301], self.crown)
+        self._learn()
+        self.assertEqual(infer_decks([301])[0][0]["name"], "크라운 클랜")
+
+    def test_no_guess_when_the_card_is_split_between_decks(self):
+        for _ in range(3):
+            self._game([303], self.rescue)
+            self._game([303], self.crown)
+        self._learn()
+        self.assertEqual(infer_decks([303])[0], [])

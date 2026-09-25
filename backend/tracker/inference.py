@@ -3,6 +3,7 @@ from collections import Counter, defaultdict
 
 from card.models import Card, CardIdAlias, CardArchetypeOverride
 from deck.models import DeckArchetype, DeckInferencePriority
+from .learned import learned_decks
 
 # 엔진 덱은 다른 덱의 용병으로 섞이는 경우가 많아, 비엔진 덱이 함께 보이면 그쪽을 먼저 제안한다
 # (특이점 2026-09-15). 비엔진 후보 점수가 엔진 후보 점수의 이 비율 이상이면 엔진 후보를 뒤로 보낸다.
@@ -37,7 +38,8 @@ def infer_decks(card_ids, limit=3):
     score, share = score / total votes (0..1). Cards without an archetype contribute nothing. Engine decks drop
     below a non-engine candidate that reaches ENGINE_DEMOTE_MIN_RATIO of their score, but stay in the list.
     """
-    counts = Counter(str(c) for c in resolve_aliases(card_ids) if c)
+    resolved = resolve_aliases(card_ids)
+    counts = Counter(str(c) for c in resolved if c)
     if not counts:
         return [], []
     cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype")}
@@ -52,7 +54,7 @@ def infer_decks(card_ids, limit=3):
         if archetype:
             arch_votes[archetype] += n
     if not arch_votes:
-        return [], unknown
+        return learned_decks(resolved, limit), unknown
     scores = defaultdict(float)
     names, engines = {}, {}
     for da in DeckArchetype.objects.filter(name__in=list(arch_votes)).select_related("deck"):
@@ -67,6 +69,8 @@ def infer_decks(card_ids, limit=3):
         return engines[deck_id] and names[deck_id] not in ENGINE_ALWAYS_TOP and best_plain >= ENGINE_DEMOTE_MIN_RATIO * score
 
     ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, demoted(*kv), -kv[1], names[kv[0]]))[:limit]
+    if not ranked:
+        return learned_decks(resolved, limit), unknown
     return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d]} for d, s in ranked], unknown
 
 

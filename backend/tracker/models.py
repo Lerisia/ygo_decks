@@ -90,3 +90,16 @@ class TrackerClient(models.Model):
 
     def __str__(self):
         return f"{self.user.username} {self.version or '(구버전)'}"
+
+
+class TrackerCardDeckStat(models.Model):
+    """How many user-labeled duels showed this opponent card, per opponent deck (konami_id 0 = all labeled duels
+    of that deck). Rebuilt nightly by `rebuild_card_deck_stats`; used only when theme votes give no guess."""
+    konami_id = models.IntegerField(db_index=True)
+    deck = models.ForeignKey("deck.Deck", on_delete=models.CASCADE, related_name="+")
+    games = models.IntegerField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["konami_id", "deck"], name="uniq_tracker_card_deck_stat")]
+        verbose_name = "카드별 상대 덱 통계"
+        verbose_name_plural = "카드별 상대 덱 통계"
