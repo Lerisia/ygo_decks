@@ -303,6 +303,7 @@ public sealed class PendingMatch
     public int? Wins { get; set; }              // post-game gauge (site convention)
     public bool WinsEstimated { get; set; }
     public string? RawDuelResult { get; set; }  // $.DuelResult as captured (kept locally for schema research)
+    public Dictionary<string, string>? Research { get; set; }  // test build: extra game paths dumped at duel end (ranked win gauge hunt)
     public double? RatingBefore { get; set; }
     public double? RatingAfter { get; set; }
     public int Turn { get; set; }

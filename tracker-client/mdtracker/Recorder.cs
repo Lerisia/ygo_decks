@@ -30,6 +30,45 @@ internal sealed class Recorder
         return JsonDocument.Parse(ms.ToArray());
     }
 
+#if TEST_BUILD
+    /// Where does the game keep the ranked win gauge? Dump the top-level key list plus every
+    /// top-level object whose name smells like rank/season/match, and $.User in full, so the
+    /// server-side logs can be searched without anyone at the keyboard.
+    private Dictionary<string, string> DumpResearchPaths()
+    {
+        var outp = new Dictionary<string, string>();
+        try
+        {
+            var root = _g.ClientWorkData;
+            if (root == 0) return outp;
+            var keys = _g.IL.DictKeys(root).ToList();
+            outp["$.keys"] = string.Join(",", keys);
+            foreach (var k in keys)
+            {
+                var kl = k.ToLowerInvariant();
+                if (k == "User" || kl.Contains("rank") || kl.Contains("season") || kl.Contains("match") || kl.Contains("duelmenu") || kl.Contains("solo") == false && kl.Contains("standard"))
+                    outp["$." + k] = JsonText("$." + k, 40000);
+            }
+        }
+        catch (Exception ex) { outp["error"] = ex.Message; }
+        return outp;
+    }
+
+    private string JsonText(string path, int max)
+    {
+        try
+        {
+            var p = _g.Path(path);
+            if (p == 0) return "(missing)";
+            var ms = new MemoryStream();
+            using (var w = new Utf8JsonWriter(ms)) _g.IL.WriteObject(w, p);
+            var s = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+            return s.Length > max ? s[..max] + "…" : s;
+        }
+        catch (Exception ex) { return "(error: " + ex.Message + ")"; }
+    }
+#endif
+
     private static int? GetInt(JsonElement e, string key) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
     private static double? GetDouble(JsonElement e, string key)
@@ -276,6 +315,9 @@ internal sealed class Recorder
             }
         }
         m.RankCode = RankCode(m.RankBefore, m.TierBefore);
+#if TEST_BUILD
+        m.Research = DumpResearchPaths();
+#endif
         OnResearch?.Invoke(m);
         if (m.Did == "0" || _alreadyKnown(m.Did)) { Log.Info($"duel {m.Did} already recorded / no id — skipped"); return; }
         if (!RecordedModes.Contains(m.GameMode)) { Log.Info($"mode {m.GameModeName} not recorded — skipped"); return; }

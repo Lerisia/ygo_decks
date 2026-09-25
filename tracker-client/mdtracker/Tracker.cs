@@ -331,6 +331,15 @@ public sealed class Tracker
         var next = RankRules.NextState(m.RankCode, g.Wins, m.Result);
         var gameAfter = m.RankAfter is int ra && m.TierAfter is int ta ? Recorder.RankCode(ra, ta) : null;
         if (gameAfter != null && gameAfter != next.rank) { Log.Info($"ladder resync: rules said {next.rank}, game says {gameAfter}"); next = (gameAfter, 0); }
+        else if (gameAfter == null && next.rank != m.RankCode)
+        {
+            // The game reported no promotion/demotion, so the observed rank stands whatever the win
+            // count says (games played without the tracker, or a rule off by one); the gauge just
+            // sits at its edge until the game itself moves the rank.
+            var edge = RankRules.ValidWins(m.RankCode);
+            Log.Info($"ladder held: rules said {next.rank}, game still reports {m.RankCode}");
+            next = (m.RankCode, edge.Length == 0 ? null : m.Result == "win" ? edge.Max() : edge.Min());
+        }
         m.RankCode = next.rank;
         var valid = RankRules.ValidWins(next.rank);
         m.Wins = valid.Length == 0 ? null : next.wins is int w && valid.Contains(w) ? w : valid[0];
