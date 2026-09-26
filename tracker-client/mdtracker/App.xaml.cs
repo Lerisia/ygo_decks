@@ -8,9 +8,9 @@ namespace MdTracker;
 public partial class App : System.Windows.Application
 {
 #if TEST_BUILD
-    public const string Version = "0.6.6-test";
+    public const string Version = "0.6.7-test";
 #else
-    public const string Version = "0.6.6";
+    public const string Version = "0.6.7";
 #endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;

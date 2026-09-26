@@ -69,6 +69,31 @@ internal sealed class Recorder
     }
 #endif
 
+    /// The ranked ladder as the game itself keeps it ($.Challenge["1"].info.rank_info): current rank/tier and the
+    /// win gauge (`con_win`, already updated for the duel that just ended — checked 2026-09-27: a loss showed 0, the
+    /// next win 1). When present it replaces every estimate; rankChange from the result screen still wins on a
+    /// promotion or demotion.
+    private void ReadLadder(PendingMatch m)
+    {
+        if (m.GameMode != 3) return;
+        try
+        {
+            using var ch = ReadJson("$.Challenge");
+            if (ch == null) return;
+            var root = ch.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("1", out var one)) return;
+            if (!one.TryGetProperty("info", out var info) || !info.TryGetProperty("rank_info", out var ri)) return;
+            if (!ri.TryGetProperty("now", out var now) || !ri.TryGetProperty("condition", out var cond)) return;
+            int? rank = GetInt(now, "rank"), tier = GetInt(now, "tier"), conWin = GetInt(cond, "con_win");
+            if (rank == null || tier == null || conWin == null) return;
+            if (m.RankAfter == null) { m.RankAfter = rank; m.TierAfter = tier; }
+            m.Wins = conWin;
+            m.LadderObserved = true;
+            Log.Info($"ladder observed: {RankCode(rank, tier)} con_win {conWin} require {GetInt(cond, "require_point")}");
+        }
+        catch (Exception ex) { Log.Info("ladder read failed: " + ex.Message); }
+    }
+
     private static int? GetInt(JsonElement e, string key) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
     private static double? GetDouble(JsonElement e, string key)
@@ -315,6 +340,7 @@ internal sealed class Recorder
             }
         }
         m.RankCode = RankCode(m.RankBefore, m.TierBefore);
+        ReadLadder(m);
 #if TEST_BUILD
         m.Research = DumpResearchPaths();
 #endif

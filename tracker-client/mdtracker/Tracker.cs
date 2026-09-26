@@ -326,6 +326,15 @@ public sealed class Tracker
     public void ApplyGauge(PendingMatch m)
     {
         if (m.RankCode == null || m.RankBefore is not int rb || m.TierBefore is not int tb) return;
+        if (m.LadderObserved && m.RankAfter is int ora && m.TierAfter is int ota && Recorder.RankCode(ora, ota) is { } observed)
+        {
+            // The game told us the post-duel rank and gauge outright: no rules, no drift.
+            m.RankCode = observed;
+            m.WinsEstimated = false;
+            Store.Config.Gauge = new Gauge { Rank = ora, Tier = ota, Wins = m.Wins ?? 0 };
+            Store.SaveConfig();
+            return;
+        }
         var g = Store.Config.Gauge;
         if (g == null || g.Rank != rb || g.Tier != tb) g = new Gauge { Rank = rb, Tier = tb, Wins = 0 };
         var next = RankRules.NextState(m.RankCode, g.Wins, m.Result);

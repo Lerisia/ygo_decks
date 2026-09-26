@@ -302,6 +302,7 @@ public sealed class PendingMatch
     public string? RankCode { get; set; }       // post-game rank code (site convention)
     public int? Wins { get; set; }              // post-game gauge (site convention)
     public bool WinsEstimated { get; set; }
+    public bool LadderObserved { get; set; }    // rank + wins read from the game's ladder object ($.Challenge) at duel end
     public string? RawDuelResult { get; set; }  // $.DuelResult as captured (kept locally for schema research)
     public Dictionary<string, string>? Research { get; set; }  // test build: extra game paths dumped at duel end (ranked win gauge hunt)
     public double? RatingBefore { get; set; }
