@@ -328,9 +328,18 @@ public sealed class Tracker
         if (m.RankCode == null || m.RankBefore is not int rb || m.TierBefore is not int tb) return;
         if (m.LadderObserved && m.RankAfter is int ora && m.TierAfter is int ota && Recorder.RankCode(ora, ota) is { } observed)
         {
-            // The game told us the post-duel rank and gauge outright: no rules, no drift.
+            // The game told us the post-duel rank and gauge outright: no rules, no drift. The one blind spot is
+            // the demotion count below 0 (the game only exposes wins still required), so a loss that lands on an
+            // observed 0 keeps the rules' negative estimate when the gauge was already at or below 0.
+            var prev = Store.Config.Gauge;
+            if (m.Wins == 0 && m.Result != "win" && observed == m.RankCode && prev != null && prev.Rank == rb && prev.Tier == tb && prev.Wins <= 0)
+            {
+                var est = RankRules.NextState(m.RankCode, prev.Wins, m.Result);
+                if (est.rank == m.RankCode && est.wins is int ew && ew < 0) { m.Wins = ew; m.WinsEstimated = true; }
+                else m.WinsEstimated = false;
+            }
+            else m.WinsEstimated = false;
             m.RankCode = observed;
-            m.WinsEstimated = false;
             Store.Config.Gauge = new Gauge { Rank = ora, Tier = ota, Wins = m.Wins ?? 0 };
             Store.SaveConfig();
             return;
