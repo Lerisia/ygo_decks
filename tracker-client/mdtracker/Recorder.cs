@@ -43,12 +43,12 @@ internal sealed class Recorder
             if (root == 0) return outp;
             var keys = _g.IL.DictKeys(root).ToList();
             outp["$.keys"] = string.Join(",", keys);
+            // everything except the card database and deck lists, which are huge and cannot hold a gauge
+            var skip = new HashSet<string> { "Master", "Cards", "CardDecoder", "CardPoolList", "Deck", "DeckList", "TDeckList", "TDeck", "EXHDeck", "EXHDeckList",
+                "RDCDeck", "RDCDeckList", "CUPDeck", "CUPDeckList", "WCSDeck", "WCSDeckList", "REDeck", "REDeckList", "DTDeck", "DTDeckList", "VDeck", "VDeckList",
+                "DRDeck", "DRDeckList", "Duel", "DuelResult", "Structure", "CardFile", "Item", "Craft", "Shop", "GemShop", "Gacha", "Market", "Exchange", "Topics", "Announce" };
             foreach (var k in keys)
-            {
-                var kl = k.ToLowerInvariant();
-                if (k == "User" || kl.Contains("rank") || kl.Contains("season") || kl.Contains("match") || kl.Contains("duelmenu") || kl.Contains("solo") == false && kl.Contains("standard"))
-                    outp["$." + k] = JsonText("$." + k, 40000);
-            }
+                if (!skip.Contains(k)) outp["$." + k] = JsonText("$." + k, 60000);
         }
         catch (Exception ex) { outp["error"] = ex.Message; }
         return outp;
