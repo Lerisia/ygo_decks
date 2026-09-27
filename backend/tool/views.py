@@ -131,6 +131,11 @@ def add_match_to_record_group(request, record_group_id):
     if deck in ("null", "", None):
         deck = None  # '기타'
 
+    wins = data.get("wins")
+    if data.get("tracker_did") or data.get("tracker_pending_id"):
+        from tracker.ranks import clamp_wins
+        wins = clamp_wins(data.get("rank"), wins)
+
     match = MatchRecord(
         record_group=record_group,
         recorded_by=user,
@@ -142,7 +147,7 @@ def add_match_to_record_group(request, record_group_id):
         notes=data.get("notes"),
         coin_toss_result=data.get("coin_toss_result"),
         rank=data.get("rank"),
-        wins=data.get("wins"),
+        wins=wins,
         score=data.get("score"),
         score_type=data.get("score_type") or None,
     )

@@ -758,3 +758,57 @@ class TrackerLearnedFallbackTest(TestCase):
             self._game([303], self.crown)
         self._learn()
         self.assertEqual(infer_decks([303])[0], [])
+
+
+class TrackerRankWinsTest(TestCase):
+    """A win count outside its rank's gauge never reaches the archive or a sheet, whatever the client sent."""
+
+    def setUp(self):
+        from tool.models import RecordGroup
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="rw@test.com", username="gauge", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck("푸른 눈")
+        self.group = RecordGroup.objects.create(user=self.user, name="테스트")
+        self.base = {"did": "7709189150693852090", "game_mode": 3, "result": "win", "my_cards": [4007], "opp_cards": [],
+                     "ended_at": "2026-09-27T19:29:00"}
+        self.record = {"deck": self.deck.id, "opponent_deck": None, "first_or_second": "first", "result": "win",
+                       "coin_toss_result": "win", "tracker_did": self.base["did"]}
+
+    def test_clamp_wins(self):
+        from tracker.ranks import clamp_wins
+        self.assertEqual(clamp_wins("rookie1", 1), 0)        # rookie and bronze have no gauge
+        self.assertEqual(clamp_wins("bronze3", 2), 0)
+        self.assertEqual(clamp_wins("silver2", 4), 1)
+        self.assertEqual(clamp_wins("gold3", -1), 0)         # no demotion count below platinum 4
+        self.assertEqual(clamp_wins("platinum5", -2), 0)
+        self.assertEqual(clamp_wins("platinum1", 4), 3)      # 0.6.7 wrote the win streak at a promotion
+        self.assertEqual(clamp_wins("platinum3", -3), -3)
+        self.assertEqual(clamp_wins("diamond2", -3), -2)
+        self.assertEqual(clamp_wins("master5", -1), 0)
+        self.assertEqual(clamp_wins("master3", 4), 4)
+        self.assertIsNone(clamp_wins("master1", 2))          # the top rank has no gauge at all
+        self.assertIsNone(clamp_wins("platinum1", None))     # unknown stays unknown
+        self.assertEqual(clamp_wins("", 3), 3)               # no rank: nothing to check against
+        self.assertEqual(clamp_wins("platinum1", "2"), 2)
+        self.assertIsNone(clamp_wins("platinum1", "x"))
+
+    def test_archive_clamps_wins(self):
+        from tracker.models import TrackerGame
+        self.client.post("/api/tracker/games/", {**self.base, "rank_code": "rookie1", "wins": 1}, format="json")
+        self.assertEqual(TrackerGame.objects.get(did=self.base["did"]).wins, 0)
+
+    def test_pending_clamps_wins(self):
+        res = self.client.post("/api/tracker/pending/", {**self.base, "coin_win": True, "first": True, "rank_code": "platinum1", "wins": 4}, format="json")
+        self.assertEqual(res.json()["wins"], 3)
+
+    def test_tracker_record_clamps_wins_but_a_hand_entry_is_left_alone(self):
+        from tool.models import MatchRecord
+        self.client.post("/api/tracker/games/", self.base, format="json")
+        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, "rank": "rookie1", "wins": 1}, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(MatchRecord.objects.get(id=res.json()["match_id"]).wins, 0)
+        hand = {k: v for k, v in self.record.items() if k != "tracker_did"}
+        res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**hand, "rank": "gold3", "wins": 4}, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(MatchRecord.objects.get(id=res.json()["match_id"]).wins, 4)

@@ -1,6 +1,7 @@
 """Pending-match lifecycle shared by the tracker API and the record API."""
 from .inference import card_names, infer_decks
 from .models import TrackerDeckMap, TrackerPendingMatch
+from .ranks import clamp_wins
 
 CAPTURE_FIELDS = (
     "game_mode", "result", "finish", "coin_win", "first", "my_id", "my_name", "opp_name",
@@ -12,6 +13,7 @@ CAPTURE_FIELDS = (
 def build_payload(user, data):
     """Keep the tracker's capture fields and add server-side deck inference / card names."""
     payload = {k: data.get(k) for k in CAPTURE_FIELDS}
+    payload["wins"] = clamp_wins(payload.get("rank_code"), payload.get("wins"))
     my_cards = [int(c) for c in (data.get("my_cards") or []) if str(c).isdigit()]
     opp_cards = [int(c) for c in (data.get("opp_cards") or []) if str(c).isdigit()]
     payload["my_cards"], payload["opp_cards"] = my_cards, opp_cards
@@ -111,7 +113,7 @@ def upsert_game(user, data, legacy_turn=False):
         "rank_before": data.get("rank_before"),
         "rank_after": data.get("rank_after"),
         "rank_code": str(data.get("rank_code") or "")[:16],
-        "wins": data.get("wins"),
+        "wins": clamp_wins(str(data.get("rank_code") or "")[:16], data.get("wins")),
         "rating_before": data.get("rating_before"),
         "rating_after": data.get("rating_after"),
         "turn": int(data.get("turn") or 0) + (1 if legacy_turn else 0),
