@@ -236,6 +236,7 @@ export type MetaDeckStat = {
   meta_deck_name: string;
   appearance_percent: number;
   win_rate: number;
+  cover_image_small?: string | null;
 };
 
 export type PlayerDeckStat = {

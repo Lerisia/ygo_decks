@@ -12,7 +12,6 @@ import {
   joinSheetByCode,
   MetaDeckStat,
 } from "@/api/toolApi";
-import { getDeckData } from "@/api/deckApi";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
@@ -121,6 +120,7 @@ const RecordGroups = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [metaStats, setMetaStats] = useState<MetaDeckStat[]>([]);
   const [showMetaStats, setShowMetaStats] = useState(false);
+  const [showMoreMeta, setShowMoreMeta] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
   const [totalMatches, setTotalMatches] = useState<number>(0);
   const [joinCode, setJoinCode] = useState("");
@@ -190,26 +190,57 @@ const RecordGroups = () => {
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));
   }, []);
 
+  // Covers come with the stats (up to 30 decks), so no per-deck request.
   useEffect(() => {
-    const fetchCovers = async () => {
-      const coverMap: Record<number, string> = {};
-  
-      for (const deck of metaStats) {
-        try {
-          const data = await getDeckData(deck.meta_deck_id);
-          coverMap[deck.meta_deck_id] = data.cover_image_small;
-        } catch (e) {
-          console.warn(`커버 불러오기 실패: ${deck.meta_deck_name}`);
-        }
-      }
-  
-      setDeckCovers(coverMap);
-    };
-  
-    if (metaStats.length > 0) {
-      fetchCovers();
+    const coverMap: Record<number, string> = {};
+    for (const deck of metaStats) {
+      if (deck.cover_image_small) coverMap[deck.meta_deck_id] = deck.cover_image_small;
     }
+    setDeckCovers(coverMap);
   }, [metaStats]);
+
+  const topMeta = metaStats.slice(0, 10);
+  const moreMeta = metaStats.slice(10, 30);
+
+  const renderMetaRow = (deck: MetaDeckStat, idx: number) => (
+    <div
+      key={deck.meta_deck_id}
+      className="flex items-center justify-between border-b pb-2"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-lg font-mono w-6 text-right">
+          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`}
+        </span>
+        {deckCovers[deck.meta_deck_id] && (
+          <img
+            src={deckCovers[deck.meta_deck_id]}
+            alt={deck.meta_deck_name}
+            className="w-10 h-10 rounded object-cover hidden sm:block"
+          />
+        )}
+        <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
+      </div>
+      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
+        <div>
+          사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
+        </div>
+        <div>
+          승률:{" "}
+          <span
+            className={`font-semibold ${
+              deck.win_rate >= 55
+                ? "text-blue-600"
+                : deck.win_rate <= 45
+                ? "text-red-500"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            {deck.win_rate}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -296,55 +327,43 @@ const RecordGroups = () => {
               <p className="text-xs text-gray-700 dark:text-gray-300">
                 ※ 월초 셀렉션 팩 출시 시 초기화
               </p>
-              <p className="text-xs text-gray-700 dark:text-gray-300 mb-3 font-medium">
-                총 집계 게임 수: {totalMatches.toLocaleString()}
-              </p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
+                  총 집계 게임 수: {totalMatches.toLocaleString()}
+                </p>
+                {moreMeta.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreMeta((v) => !v)}
+                    aria-label={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
+                    aria-expanded={showMoreMeta}
+                    title={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
+                    className={`w-6 h-6 rounded-full border text-xs font-bold leading-none flex items-center justify-center transition ${
+                      showMoreMeta
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "border-gray-400 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    i
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="hidden md:block">
-                  <MetaDeckPieChart data={metaStats} deckCovers={deckCovers} />
+                  <MetaDeckPieChart data={topMeta} deckCovers={deckCovers} />
                 </div>
                 <div className="space-y-2">
-                  {metaStats.map((deck, idx) => (
-                    <div
-                      key={deck.meta_deck_id}
-                      className="flex items-center justify-between border-b pb-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-mono w-6 text-right">
-                          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`}
-                        </span>
-                        {deckCovers[deck.meta_deck_id] && (
-                          <img
-                            src={deckCovers[deck.meta_deck_id]}
-                            alt={deck.meta_deck_name}
-                            className="w-10 h-10 rounded object-cover hidden sm:block"
-                          />
-                        )}
-                        <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
-                      </div>
-                      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
-                        <div>
-                          사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
-                        </div>
-                        <div>
-                          승률:{" "}
-                          <span
-                            className={`font-semibold ${
-                              deck.win_rate >= 55
-                                ? "text-blue-600"
-                                : deck.win_rate <= 45
-                                ? "text-red-500"
-                                : "text-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            {deck.win_rate}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {topMeta.map((deck, idx) => renderMetaRow(deck, idx))}
                 </div>
               </div>
+              {showMoreMeta && moreMeta.length > 0 && (
+                <div className="mt-4 pt-3 border-t dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">11위 ~ {10 + moreMeta.length}위</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    {moreMeta.map((deck, i) => renderMetaRow(deck, i + 10))}
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
