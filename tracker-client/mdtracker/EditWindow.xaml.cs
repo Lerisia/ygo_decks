@@ -19,7 +19,7 @@ public partial class EditWindow : Window
         Pick(ResultBox, m.Result == "lose" ? "lose" : "win");
         Pick(CoinBox, m.CoinWin ? "win" : "lose");
         Pick(FirstBox, m.First ? "first" : "second");
-        _myDeck = t.Store.Decks.FirstOrDefault(d => d.Name == m.SavedDeckName);
+        _myDeck = t.Store.FindMyDeck(m.SavedDeckName);
         MyDeckBox.Text = m.SavedDeckName ?? "";
         _oppDeck = t.Store.Decks.FirstOrDefault(d => d.Name == m.SavedOppDeckName);
         _oppUnknown = _oppDeck == null;
@@ -37,7 +37,8 @@ public partial class EditWindow : Window
     {
         var q = box.Text.Trim();
         if (q.Length == 0 || !box.IsKeyboardFocusWithin) { list.Visibility = Visibility.Collapsed; return; }
-        var hits = _t.Store.Decks.Where(d => Hangul.Matches(q, d.Name, d.Aliases)).Take(6).ToList();
+        var pool = box == MyDeckBox ? _t.Store.MyDeckChoices : _t.Store.Decks;
+        var hits = pool.Where(d => Hangul.Matches(q, d.Name, d.Aliases)).Take(6).ToList();
         list.ItemsSource = hits; list.DisplayMemberPath = "Name";
         list.Visibility = hits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -56,7 +57,7 @@ public partial class EditWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_myDeck == null || _myDeck.Name != MyDeckBox.Text.Trim()) _myDeck = _t.Store.Decks.FirstOrDefault(d => d.Name == MyDeckBox.Text.Trim()) ?? _myDeck;
+        if (_myDeck == null || _myDeck.Name != MyDeckBox.Text.Trim()) _myDeck = _t.Store.FindMyDeck(MyDeckBox.Text.Trim()) ?? _myDeck;
         if (!_oppUnknown && (_oppDeck == null || _oppDeck.Name != OppDeckBox.Text.Trim())) _oppDeck = _t.Store.Decks.FirstOrDefault(d => d.Name == OppDeckBox.Text.Trim()) ?? _oppDeck;
         if (_myDeck == null) { Msg.Text = "내 덱을 선택해 주세요"; return; }
         if (_m.MatchId is not int matchId) { Msg.Text = "사이트에 저장된 기록이 아닙니다"; return; }

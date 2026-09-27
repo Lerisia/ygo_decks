@@ -133,7 +133,7 @@ public partial class MainWindow : Window
             Result = m.Result == "win" ? "승" : m.Result == "lose" ? "패" : m.Result,
             Coin = m.CoinWin ? "앞면" : "뒷면",
             Turn = m.First ? "선공" : "후공",
-            MyDeck = m.SavedDeckName ?? DeckName(m.SuggestedMyDeckId) ?? "?",
+            MyDeck = m.SavedDeckName ?? T.Store.FindMyDeck(m.SuggestedMyDeckId)?.Name ?? "?",
             OppDeck = m.SavedOppDeckName ?? (m.Status == "saved" ? "모름" : DeckName(m.SuggestedOppDeckId) ?? "모름"),
             Rank = m.GameMode == 19
                 ? (m.RatingAfter is double r ? $"레이팅 {r:0.##}" : "레이팅")

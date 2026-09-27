@@ -54,7 +54,7 @@ public partial class OverlayWindow : Window
         parts.Add($"{_m.Turn}턴");
         SubLine.Text = string.Join(" · ", parts);
 
-        _myDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedMyDeckId);
+        _myDeck = _t.Store.FindMyDeck(_m.SuggestedMyDeckId);
         MyDeckBox.Text = _myDeck?.Name ?? "";
         _oppDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedOppDeckId);
         _oppUnknown = _oppDeck == null;
@@ -82,7 +82,7 @@ public partial class OverlayWindow : Window
     {
         var deck = _myDeck;
         var opp = _oppUnknown ? null : _oppDeck;
-        if (deck == null) { MatchupText.Text = ""; return; }
+        if (deck == null || deck.Id == SiteDeck.Other.Id) { MatchupText.Text = ""; return; }
         var r = await Task.Run(() => { try { return _t.Api.Matchup(deck.Id, opp?.Id); } catch { return null; } });
         MatchupText.Text = Tracker.MatchupLine(r) ?? "";
     }
@@ -134,7 +134,8 @@ public partial class OverlayWindow : Window
     {
         var q = box.Text.Trim();
         if (q.Length == 0) { list.Visibility = Visibility.Collapsed; return; }
-        var hits = _t.Store.Decks.Where(d => Hangul.Matches(q, d.Name, d.Aliases)).Take(6).ToList();
+        var pool = box == MyDeckBox ? _t.Store.MyDeckChoices : _t.Store.Decks;
+        var hits = pool.Where(d => Hangul.Matches(q, d.Name, d.Aliases)).Take(6).ToList();
         list.ItemsSource = hits; list.DisplayMemberPath = "Name";
         list.Visibility = hits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -169,7 +170,7 @@ public partial class OverlayWindow : Window
     {
         if (_busy) return;
         // resolve typed names that were never picked from the list
-        if (_myDeck == null || _myDeck.Name != MyDeckBox.Text.Trim()) _myDeck = _t.Store.Decks.FirstOrDefault(d => d.Name == MyDeckBox.Text.Trim()) ?? _myDeck;
+        if (_myDeck == null || _myDeck.Name != MyDeckBox.Text.Trim()) _myDeck = _t.Store.FindMyDeck(MyDeckBox.Text.Trim()) ?? _myDeck;
         if (!_oppUnknown && (_oppDeck == null || _oppDeck.Name != OppDeckBox.Text.Trim())) _oppDeck = _t.Store.Decks.FirstOrDefault(d => d.Name == OppDeckBox.Text.Trim()) ?? _oppDeck;
         if (_myDeck == null) { _timer.Stop(); Pause(); Msg.Text = "내 덱을 선택해 주세요"; MyDeckBox.Focus(); return; }
         _busy = true; SaveBtn.IsEnabled = false; Msg.Foreground = new SolidColorBrush(Color.FromRgb(156, 163, 175)); Msg.Text = "저장 중…";

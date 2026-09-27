@@ -931,28 +931,31 @@ class OtherMyDeckTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIsNone(resp.json()["matches"][0]["deck"])
 
-    def test_full_statistics_exclude_other_deck(self):
+    # 개인 통계(시트·내 전체)에는 '기타'가 별도 항목으로 들어가고, 사이트 메타 통계에서만 빠진다 (특이점 2026-09-27).
+    def test_full_statistics_include_other_deck_as_its_own_row(self):
         _create_match(self.group, None, self.opp, result="win")
         _create_match(self.group, None, self.opp, result="lose")
         _create_match(self.group, self.deck, self.opp, result="win")
         resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(data["basic"]["total_games"], 1)
-        self.assertEqual([s["deck"]["name"] for s in data["my_deck_stats"]], ["내덱"])
-        self.assertEqual(sum(s["count"] for s in data["opponent_deck_stats"]), 1)
+        self.assertEqual(data["basic"]["total_games"], 3)
+        mine = {(s["deck"] or {}).get("name"): s for s in data["my_deck_stats"]}
+        self.assertEqual(mine[None]["count"], 2)
+        self.assertEqual(mine[None]["win_rate"], 50.0)
+        self.assertEqual(mine["내덱"]["count"], 1)
 
-    def test_user_statistics_exclude_other_deck(self):
+    def test_user_statistics_include_other_deck(self):
         _create_match(self.group, None, self.opp)
         _create_match(self.group, self.deck, self.opp)
         resp = self.client.get("/api/record-groups/statistics/full/")
-        self.assertEqual(resp.json()["basic"]["total_games"], 1)
+        self.assertEqual(resp.json()["basic"]["total_games"], 2)
 
-    def test_basic_statistics_exclude_other_deck(self):
+    def test_basic_statistics_include_other_deck(self):
         _create_match(self.group, None, self.opp)
         _create_match(self.group, self.deck, self.opp)
         resp = self.client.get(f"/api/record-groups/{self.group.id}/statistics/")
-        self.assertEqual(resp.json()["total_games"], 1)
+        self.assertEqual(resp.json()["total_games"], 2)
 
     def test_meta_statistics_exclude_other_deck(self):
         _create_match(self.group, None, self.opp, rank="diamond3")

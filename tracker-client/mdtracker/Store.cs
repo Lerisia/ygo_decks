@@ -10,6 +10,10 @@ public sealed class Store
     public Config Config { get; private set; } = new();
     public readonly List<PendingMatch> Matches = new();
     public List<SiteDeck> Decks = new();
+    /// Choices for *my* deck: every 도감 deck plus '기타' (the opponent side has its own 모름/기타 button).
+    public IEnumerable<SiteDeck> MyDeckChoices => Decks.Append(SiteDeck.Other);
+    public SiteDeck? FindMyDeck(int? id) => id == SiteDeck.Other.Id ? SiteDeck.Other : Decks.FirstOrDefault(d => d.Id == id);
+    public SiteDeck? FindMyDeck(string? name) => MyDeckChoices.FirstOrDefault(d => d.Name == name);
     public DateTime DecksLoadedAt = DateTime.MinValue;
     private readonly object _lock = new();
 

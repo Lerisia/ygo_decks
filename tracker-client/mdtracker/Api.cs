@@ -179,7 +179,7 @@ public sealed class Api
     {
         var o = new JsonObject
         {
-            ["deck"] = deckId, ["opponent_deck"] = oppDeckId.HasValue ? oppDeckId.Value : null,
+            ["deck"] = deckId == SiteDeck.Other.Id ? null : deckId, ["opponent_deck"] = oppDeckId.HasValue ? oppDeckId.Value : null,
             ["first_or_second"] = first, ["result"] = result, ["coin_toss_result"] = coin, ["notes"] = notes,
         };
         var (status, _) = Send(Req(HttpMethod.Patch, $"/api/match-records/{matchId}/update/", o.ToJsonString()));
@@ -192,7 +192,7 @@ public sealed class Api
         bool rate = m.GameMode == 19;
         var o = new JsonObject
         {
-            ["deck"] = deckId,
+            ["deck"] = deckId == SiteDeck.Other.Id ? null : deckId,
             ["opponent_deck"] = oppDeckId.HasValue ? oppDeckId.Value : null,
             ["first_or_second"] = m.First ? "first" : "second",
             ["result"] = m.Result == "lose" ? "lose" : "win",

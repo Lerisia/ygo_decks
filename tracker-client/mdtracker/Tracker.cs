@@ -281,7 +281,7 @@ public sealed class Tracker
         {
             var (id, points) = Api.AddMatch(gid, m, deckId, oppDeckId, notes);
             m.Status = "saved"; m.MatchId = id; m.PointsAdded = points; m.Error = null; m.Notes = notes;
-            m.SavedDeckName = Store.Decks.FirstOrDefault(d => d.Id == deckId)?.Name;
+            m.SavedDeckName = Store.FindMyDeck(deckId)?.Name;
             m.SavedOppDeckName = oppDeckId.HasValue ? Store.Decks.FirstOrDefault(d => d.Id == oppDeckId)?.Name : null;
             if (m.MyMdDeckId != null) { Store.Config.DeckMap[m.MyMdDeckId] = deckId; Store.SaveConfig(); }
             Store.Save(m); MatchesChanged?.Invoke();

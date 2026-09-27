@@ -87,6 +87,9 @@ public sealed class SiteDeck
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("aliases")] public List<string> Aliases { get; set; } = new();
     public override string ToString() => Name;
+
+    /// My deck '기타' — a deck the 도감 doesn't list. Id 0 is sent to the site as deck = null.
+    public static readonly SiteDeck Other = new() { Id = 0, Name = "기타", Aliases = new() { "기타", "도감에 없는 덱" } };
 }
 
 public sealed class DecksResponse
