@@ -237,6 +237,9 @@ public sealed class LiveTick
 public sealed class LiveDuel
 {
     public string OppName { get; set; } = "";
+    /// Opponent cards last seen in hand that have since gone face-down on the field: still listed under the hand,
+    /// because a player at the table can't tell which card was set (fair play, 2026-09-28).
+    public List<int> OppHandGhosts { get; set; } = new();
     public int Turn { get; set; }
     public bool TurnMe { get; set; }
     public bool HoverMe { get; set; }

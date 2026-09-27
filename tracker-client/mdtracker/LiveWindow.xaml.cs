@@ -105,7 +105,8 @@ public partial class LiveWindow : Window
     }
 
     /// What the cursor pop-up should show for the zone the game cursor is on, or null for nothing.
-    /// My zones → their contents; an opponent's face-down field card → its name if ever seen; their piles → the list.
+    /// My zones → their contents; their piles → the list. An opponent's face-down field card shows nothing (its id is
+    /// blanked in release builds — fair play).
     public (string title, List<Row> rows)? HoverRows(LiveDuel s)
     {
         var r = HoverRowsRaw(s);
@@ -141,7 +142,7 @@ public partial class LiveWindow : Window
         {
             LiveCard.Grave => ("상대 묘지", Rows(opp.Where(c => c.Zone == LiveCard.Grave))),
             LiveCard.Banished => ("상대 제외", Rows(opp.Where(c => c.Zone == LiveCard.Banished))),
-            LiveCard.Hand => ("상대 패 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.Hand))),
+            LiveCard.Hand => ("상대 패 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.Hand).Concat(s.OppHandGhosts.Select(id => new LiveCard { Id = id })))),
             LiveCard.Deck => ("상대 덱 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.Deck))),
             LiveCard.ExtraDeck => ("상대 엑스트라 덱 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.ExtraDeck))),
             _ => null,
@@ -154,14 +155,14 @@ public partial class LiveWindow : Window
     {
         var rows = new List<Row>();
         var opp = s.Cards.Where(c => !c.Me).ToList();
-        void Section(string title, Func<LiveCard, bool> pick)
+        void Section(string title, Func<LiveCard, bool> pick, IEnumerable<LiveCard>? extra = null)
         {
-            var known = opp.Where(c => c.Id != 0 && pick(c)).ToList();
+            var known = opp.Where(c => c.Id != 0 && pick(c)).Concat(extra ?? Enumerable.Empty<LiveCard>()).ToList();
             if (known.Count == 0) return;
             rows.Add(new Row(0, $"{title} {known.Count}", 0, true));
             foreach (var g in known.GroupBy(c => s.Base(c.Id))) rows.Add(new Row(g.Key, Name(s, g.Key), g.Count(), Frame: s.Frames.GetValueOrDefault(g.Key, "")));
         }
-        Section("상대 패", c => c.Zone == LiveCard.Hand);
+        Section("상대 패", c => c.Zone == LiveCard.Hand, s.OppHandGhosts.Select(id => new LiveCard { Id = id }));
         Section("상대 덱", c => c.Zone == LiveCard.Deck);
         Section("상대 엑스트라 덱", c => c.Zone == LiveCard.ExtraDeck);
         Section("상대 세트", c => c.Zone <= 12 && !c.Face);

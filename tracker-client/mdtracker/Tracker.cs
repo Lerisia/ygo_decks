@@ -20,6 +20,8 @@ public sealed class Tracker
     private string _liveKey = "";
     private bool _liveBusy;
     private readonly Dictionary<int, int> _knownOpp = new();   // uid → card id, once the engine has shown it
+    private readonly Dictionary<int, int> _lastOppZone = new(); // uid → last zone the card was in while not face-down on the field
+    private readonly Dictionary<int, int> _handGhost = new();   // uid → id of a known hand card that went face-down
     private readonly Dictionary<int, int> _staleLog = new();     // uid → the game-log id it had while in the deck: not proof once it leaves
 
     public Tracker(Store store, Api api)
@@ -70,7 +72,7 @@ public sealed class Tracker
     // ---- mid-duel panel ----
     private void OnLiveTick(PendingMatch m, LiveTick t)
     {
-        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _staleLog.Clear(); _liveStart = DateTime.Now; }
+        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _staleLog.Clear(); _lastOppZone.Clear(); _handGhost.Clear(); _liveStart = DateTime.Now; }
         var L = Live!;
         // What was shown once stays known: the game log's uid → id table (hand opens, searches, flips) plus anything
         // the engine has named on a tick. A revealed card that goes back to hand or is set face-down keeps its name —
@@ -112,12 +114,35 @@ public sealed class Tracker
             if (c.Id != 0) { if (!_knownOpp.ContainsKey(c.Uid)) Reveal(m, stamp, c.Uid, c.Id, t.Cards, "engine"); _knownOpp[c.Uid] = c.Id; }
             else if (_knownOpp.TryGetValue(c.Uid, out var known)) c.Id = known;
         }
+#if !TEST_BUILD
+        // Fair play (특이점 report 2026-09-28): an opponent card face-down on the field shows no name, even when the
+        // tracker saw it earlier (a searched card that got set, a card revealed from hand and summoned face-down).
+        // Nobody at the table can follow a card into a face-down spot, so the tracker doesn't either. A known hand
+        // card that goes face-down stays listed under the hand, so the hand list can't tell which card was set.
+        var ghosts = new List<int>();
+        foreach (var c in t.Cards)
+        {
+            if (c.Me || c.Uid == 0) continue;
+            if (c.Zone <= 12 && !c.Face)
+            {
+                if (c.Id != 0 && _lastOppZone.GetValueOrDefault(c.Uid, -1) == LiveCard.Hand) _handGhost[c.Uid] = c.Id;
+                if (_handGhost.TryGetValue(c.Uid, out var ghost)) ghosts.Add(ghost);
+                c.Id = 0;
+            }
+            else
+            {
+                _handGhost.Remove(c.Uid);
+                _lastOppZone[c.Uid] = c.Zone;
+            }
+        }
+        L.OppHandGhosts = ghosts;
+#endif
         // research feed: the opponent's whole table every ~5s, engine id and shown id side by side
         if (++_tableTick % 10 == 0 && m.TableLog.Count < 400)
             m.TableLog.Add($"{stamp:0}|" + string.Join(",", t.Cards.Where(c => !c.Me).Select(c => $"{c.Uid}:{c.Zone}:{engineIds.GetValueOrDefault(c.Uid)}:{c.Id}:{(c.Face ? 1 : 0)}")));
         L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.Cards = t.Cards; L.HoverMe = t.HoverMe; L.HoverZone = t.HoverZone; L.HoverIndex = t.HoverIndex;
         L.MySecLeft = t.MySecLeft; L.OppSecLeft = t.OppSecLeft;
-        var opp = t.Cards.Where(c => !c.Me).Select(c => c.Id).ToList();
+        var opp = t.Cards.Where(c => !c.Me).Select(c => c.Id).Concat(L.OppHandGhosts).ToList();   // ghosts keep the deck read steady when a known card is set
         var key = string.Join(",", opp.OrderBy(x => x));
         // First call names my decklist even before the opponent shows anything; later calls follow new opponent cards.
         if ((key != _liveKey || L.MyDeckList.Count == 0) && !_liveBusy && Store.Config.Token != null)
