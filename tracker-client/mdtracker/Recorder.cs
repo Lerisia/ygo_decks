@@ -69,30 +69,25 @@ internal sealed class Recorder
     }
 #endif
 
-    /// The ranked ladder as the game itself keeps it ($.Challenge["1"].info.rank_info), already updated for the duel
-    /// that just ended. `con_win` is the win streak (resets to 0 on a loss), so the gauge is `wins needed for the
-    /// tier − require_point` (2026-09-27: 0/4 → 1/3 → 2/2 → loss 0/3, i.e. the gauge fell 2 → 1). Only the
-    /// demotion side below 0 is invisible here (require_point caps at the full need), so that part stays estimated.
-    private void ReadLadder(PendingMatch m)
+    /// The ranked ladder as the game itself keeps it ($.Challenge["1"].info.rank_info): the rank, and the wins
+    /// still needed for a promotion. `con_win` is the win streak (0 after any loss), not the gauge (2026-09-27:
+    /// 0/4 → 1/3 → 2/2 → loss 0/3, i.e. the gauge fell 2 → 1).
+    private (int rank, int tier, int? wins)? ReadLadder()
     {
-        if (m.GameMode != 3) return;
         try
         {
             using var ch = ReadJson("$.Challenge");
-            if (ch == null) return;
+            if (ch == null) return null;
             var root = ch.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("1", out var one)) return;
-            if (!one.TryGetProperty("info", out var info) || !info.TryGetProperty("rank_info", out var ri)) return;
-            if (!ri.TryGetProperty("now", out var now) || !ri.TryGetProperty("condition", out var cond)) return;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("1", out var one)) return null;
+            if (!one.TryGetProperty("info", out var info) || !info.TryGetProperty("rank_info", out var ri)) return null;
+            if (!ri.TryGetProperty("now", out var now) || !ri.TryGetProperty("condition", out var cond)) return null;
             int? rank = GetInt(now, "rank"), tier = GetInt(now, "tier"), require = GetInt(cond, "require_point");
-            if (rank == null || tier == null || require == null) return;
-            if (m.RankAfter == null) { m.RankAfter = rank; m.TierAfter = tier; }
-            var valid = RankRules.ValidWins(RankCode(rank, tier));
-            m.Wins = valid.Length == 0 ? null : Math.Max(0, valid.Max() + 1 - require.Value);
-            m.LadderObserved = true;
-            Log.Info($"ladder observed: {RankCode(rank, tier)} require {require} con_win {GetInt(cond, "con_win")} -> wins {m.Wins}");
+            if (rank == null || tier == null || require == null || RankCode(rank, tier) is not { } code) return null;
+            Log.Info($"ladder: {code} require {require} con_win {GetInt(cond, "con_win")}");
+            return (rank.Value, tier.Value, RankRules.Gauge(code, require.Value));
         }
-        catch (Exception ex) { Log.Info("ladder read failed: " + ex.Message); }
+        catch (Exception ex) { Log.Info("ladder read failed: " + ex.Message); return null; }
     }
 
     private static int? GetInt(JsonElement e, string key) =>
@@ -281,7 +276,14 @@ internal sealed class Recorder
                         }
         }
         using var profile = ReadJson("$.User.profile");
-        if (profile != null) { m.RankBefore = GetInt(profile.RootElement, "rank"); m.TierBefore = GetInt(profile.RootElement, "rate"); }
+        if (profile != null)
+        {
+            m.RankBefore = GetInt(profile.RootElement, "rank"); m.TierBefore = GetInt(profile.RootElement, "rate");
+            if (Get(profile.RootElement, "pcode") is { ValueKind: JsonValueKind.Number } pc && pc.TryGetInt64(out var account)) m.Account = account;
+        }
+        // The gauge going in, so duels played without the tracker cannot leave our count behind. Only while the
+        // ladder data agrees with the profile about the rank: otherwise it is stale.
+        if (mode == 3 && ReadLadder() is { } seen && seen.rank == m.RankBefore && seen.tier == m.TierBefore) m.WinsBefore = seen.wins;
         foreach (var path in mode == 19 ? new[] { "$.DuelMenu.RateDuel.deck_info.deck_id", "$.Deck.ratedeck_id" } : new[] { "$.Deck.maindeck_id" })
         {
             var p = _g.Path(path);
@@ -341,7 +343,11 @@ internal sealed class Recorder
             }
         }
         m.RankCode = RankCode(m.RankBefore, m.TierBefore);
-        ReadLadder(m);
+        if (m.GameMode == 3 && ReadLadder() is { } seen)
+        {
+            if (m.RankAfter == null) { m.RankAfter = seen.rank; m.TierAfter = seen.tier; }   // rankChange, when present, has the last word
+            if (seen.rank == m.RankAfter && seen.tier == m.TierAfter) { m.Wins = seen.wins; m.LadderObserved = true; }
+        }
 #if TEST_BUILD
         m.Research = DumpResearchPaths();
 #endif

@@ -320,33 +320,25 @@ public sealed class Tracker
         }
     }
 
-    /// Ranked ladder state, kept locally with the site's rules (RankRules). The site stores the rank/wins
-    /// *after* each game, so the record gets NextState(before, result); a promotion/demotion reported by the
-    /// game overrides the computed rank (and resets wins to 0) so drift can't accumulate.
+    /// The rank and gauge a ranked record gets (the site stores both as they stand *after* the duel). The game's own
+    /// ladder data decides both; our carried-over count only supplies the demotion count below 0, which the game
+    /// does not show. Without ladder data the site's rules (RankRules.NextState) stand in, held to the rank the
+    /// game reports so drift can't accumulate.
     public void ApplyGauge(PendingMatch m)
     {
         if (m.RankCode == null || m.RankBefore is not int rb || m.TierBefore is not int tb) return;
+        var kept = Store.Config.Gauge;
+        if (kept != null && (kept.Rank != rb || kept.Tier != tb || (kept.Account != 0 && m.Account != 0 && kept.Account != m.Account))) kept = null;
         if (m.LadderObserved && m.RankAfter is int ora && m.TierAfter is int ota && Recorder.RankCode(ora, ota) is { } observed)
         {
-            // The game told us the post-duel rank and gauge outright: no rules, no drift. The one blind spot is
-            // the demotion count below 0 (the game only exposes wins still required), so a loss that lands on an
-            // observed 0 keeps the rules' negative estimate when the gauge was already at or below 0.
-            var prev = Store.Config.Gauge;
-            if (m.Wins == 0 && m.Result != "win" && observed == m.RankCode && prev != null && prev.Rank == rb && prev.Tier == tb && prev.Wins <= 0)
-            {
-                var est = RankRules.NextState(m.RankCode, prev.Wins, m.Result);
-                if (est.rank == m.RankCode && est.wins is int ew && ew < 0) { m.Wins = ew; m.WinsEstimated = true; }
-                else m.WinsEstimated = false;
-            }
-            else m.WinsEstimated = false;
+            (m.Wins, m.WinsEstimated) = RankRules.Settle(m.RankCode, observed, kept?.Wins, m.WinsBefore, m.Wins, m.Result);
+            Log.Info($"gauge: {m.RankCode} {kept?.Wins.ToString() ?? "?"} (game showed {m.WinsBefore?.ToString() ?? "?"}) → {observed} {m.Wins?.ToString() ?? "-"}{(m.WinsEstimated ? " (estimated)" : "")}");
             m.RankCode = observed;
-            Store.Config.Gauge = new Gauge { Rank = ora, Tier = ota, Wins = m.Wins ?? 0 };
+            Store.Config.Gauge = new Gauge { Rank = ora, Tier = ota, Wins = m.Wins ?? 0, Account = m.Account };
             Store.SaveConfig();
             return;
         }
-        var g = Store.Config.Gauge;
-        if (g == null || g.Rank != rb || g.Tier != tb) g = new Gauge { Rank = rb, Tier = tb, Wins = 0 };
-        var next = RankRules.NextState(m.RankCode, g.Wins, m.Result);
+        var next = RankRules.NextState(m.RankCode, m.WinsBefore is > 0 ? m.WinsBefore : kept?.Wins ?? m.WinsBefore ?? 0, m.Result);
         var gameAfter = m.RankAfter is int ra && m.TierAfter is int ta ? Recorder.RankCode(ra, ta) : null;
         if (gameAfter != null && gameAfter != next.rank) { Log.Info($"ladder resync: rules said {next.rank}, game says {gameAfter}"); next = (gameAfter, 0); }
         else if (gameAfter == null && next.rank != m.RankCode)
@@ -360,10 +352,10 @@ public sealed class Tracker
         }
         m.RankCode = next.rank;
         var valid = RankRules.ValidWins(next.rank);
-        m.Wins = valid.Length == 0 ? null : next.wins is int w && valid.Contains(w) ? w : valid[0];
+        m.Wins = valid.Length == 0 ? null : Math.Clamp(next.wins ?? 0, valid.Min(), valid.Max());
         m.WinsEstimated = valid.Length > 0;
         var (nr, nt) = Recorder.ParseRankCode(next.rank) ?? (rb, tb);
-        Store.Config.Gauge = new Gauge { Rank = nr, Tier = nt, Wins = next.wins ?? 0 };
+        Store.Config.Gauge = new Gauge { Rank = nr, Tier = nt, Wins = m.Wins ?? 0, Account = m.Account };
         Store.SaveConfig();
     }
 

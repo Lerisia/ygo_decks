@@ -48,6 +48,7 @@ public sealed class Gauge
     public int Rank { get; set; }
     public int Tier { get; set; }
     public int Wins { get; set; }
+    public long Account { get; set; }   // the game account it belongs to (profile pcode); 0 = saved before 0.6.10
 }
 
 public sealed class DeckCandidate
@@ -298,8 +299,10 @@ public sealed class PendingMatch
     public int MyId { get; set; }
     public string MyName { get; set; } = "";
     public string OppName { get; set; } = "";
+    [JsonIgnore] public long Account { get; set; }   // the game account that played (profile pcode); stays on this PC
     public int? RankBefore { get; set; }
     public int? TierBefore { get; set; }
+    public int? WinsBefore { get; set; }        // the gauge the game showed at duel start (0 = 0 or below)
     public int? RankAfter { get; set; }
     public int? TierAfter { get; set; }
     public string? RankCode { get; set; }       // post-game rank code (site convention)
