@@ -8,6 +8,7 @@ import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
 import StatInfoButton from "@/components/StatInfoButton";
+import { statPlot, statText } from "@/utils/deckStats";
 
 interface DeckStats {
   consistency: number;
@@ -190,7 +191,7 @@ export default function DeckDetail() {
           const hasStats = deck.stats && deckStatLabels.some(({ key }) => deck.stats?.[key] != null);
           const data = deckStatLabels.map(({ key, label }) => ({
             stat: label,
-            value: deck.stats?.[key] ?? 0,
+            value: statPlot(deck.stats?.[key]),
             raw: deck.stats?.[key],
           }));
           return (
@@ -210,7 +211,7 @@ export default function DeckDetail() {
                         );
                       }
                       const raw = data[index]?.raw;
-                      const display = raw != null ? `${payload.value} ${raw}` : `${payload.value} -`;
+                      const display = `${payload.value} ${statText(raw)}`;
                       return (
                         <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current" style={{ fontSize: 15, fontWeight: 600 }}>
                           {display}

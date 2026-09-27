@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchDeckResult, DeckData } from "../api/deckApi";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
+import { statPlot, statText } from "@/utils/deckStats";
 
 const fieldMapping: { [key: string]: string } = {
   s: "strength",
@@ -83,7 +84,7 @@ function ResultPage() {
   const hasStats = result?.stats && statLabels.some(({ key }) => result.stats?.[key] != null);
   const chartData = statLabels.map(({ key, label }) => ({
     stat: label,
-    value: result?.stats?.[key] ?? 0,
+    value: statPlot(result?.stats?.[key]),
     raw: result?.stats?.[key],
   }));
 
@@ -120,7 +121,7 @@ function ResultPage() {
                   );
                 }
                 const raw = chartData[index]?.raw;
-                const display = raw != null ? `${payload.value} ${raw}` : `${payload.value} -`;
+                const display = `${payload.value} ${statText(raw)}`;
                 return (
                   <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current" style={{ fontSize: 15, fontWeight: 600 }}>
                     {display}

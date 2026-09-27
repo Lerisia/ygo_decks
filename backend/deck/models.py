@@ -105,11 +105,11 @@ class Deck(models.Model):
     summoning_methods = models.ManyToManyField(SummoningMethod)
     performance_tags = models.ManyToManyField(PerformanceTag, blank=True)  # 태그 없음 = 해당 없음 (2026-09-13)
     aesthetic_tags = models.ManyToManyField(AestheticTag, blank=True)
-    stat_consistency = models.PositiveSmallIntegerField(null=True, blank=True, help_text="안정성 (0~10)")
-    stat_breakthrough = models.PositiveSmallIntegerField(null=True, blank=True, help_text="돌파력 (0~10)")
-    stat_interruption = models.PositiveSmallIntegerField(null=True, blank=True, help_text="견제력 (0~10)")
-    stat_recovery = models.PositiveSmallIntegerField(null=True, blank=True, help_text="복구력 (0~10)")
-    stat_deck_space = models.PositiveSmallIntegerField(null=True, blank=True, help_text="덱 스페이스 (0~10)")
+    stat_consistency = models.PositiveSmallIntegerField(null=True, blank=True, help_text="안정성 (0~10, 11 = 그래프에 ?로 표시)")
+    stat_breakthrough = models.PositiveSmallIntegerField(null=True, blank=True, help_text="돌파력 (0~10, 11 = 그래프에 ?로 표시)")
+    stat_interruption = models.PositiveSmallIntegerField(null=True, blank=True, help_text="견제력 (0~10, 11 = 그래프에 ?로 표시)")
+    stat_recovery = models.PositiveSmallIntegerField(null=True, blank=True, help_text="복구력 (0~10, 11 = 그래프에 ?로 표시)")
+    stat_deck_space = models.PositiveSmallIntegerField(null=True, blank=True, help_text="덱 스페이스 (0~10, 11 = 그래프에 ?로 표시)")
     num_views = models.PositiveIntegerField(default=0)
     
 
