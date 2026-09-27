@@ -338,13 +338,18 @@ const RecordGroups = () => {
                     aria-label={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
                     aria-expanded={showMoreMeta}
                     title={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
-                    className={`w-6 h-6 rounded-full border text-xs font-bold leading-none flex items-center justify-center transition ${
-                      showMoreMeta
-                        ? "bg-blue-600 border-blue-600 text-white"
-                        : "border-gray-400 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    }`}
+                    className="group flex items-center gap-1 rounded-full hover:border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   >
-                    i
+                    <span className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200">더보기</span>
+                    <span
+                      className={`w-6 h-6 rounded-full border text-xs font-bold leading-none flex items-center justify-center transition ${
+                        showMoreMeta
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : "border-gray-400 text-gray-500 dark:text-gray-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700"
+                      }`}
+                    >
+                      i
+                    </span>
                   </button>
                 )}
               </div>
