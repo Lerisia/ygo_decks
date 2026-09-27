@@ -235,15 +235,15 @@ class TrackerGameArchiveTest(TestCase):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 
     def test_list_log_is_kept_as_a_research_file(self):
-        import glob, os, json
-        from django.conf import settings
+        import glob, os, json, tempfile
+        from django.test import override_settings
         cap = {**self.capture, "did": "7709189150704783635", "list_log": ["3|14|2|4007:88:1234,8933:89:1235"]}
-        self.assertEqual(self.client.post("/api/tracker/games/", cap, format="json").status_code, 201)
-        files = glob.glob(os.path.join(settings.BASE_DIR, "data", "tracker_snapshots", f"*_listlog_{cap['did']}.json"))
-        self.assertEqual(len(files), 1)
-        body = json.load(open(files[0], encoding="utf-8"))
-        self.assertEqual(body["list_log"], cap["list_log"])
-        os.remove(files[0])
+        with tempfile.TemporaryDirectory() as tmp, override_settings(BASE_DIR=tmp):   # never the live snapshot store
+            self.assertEqual(self.client.post("/api/tracker/games/", cap, format="json").status_code, 201)
+            files = glob.glob(os.path.join(tmp, "data", "tracker_snapshots", f"*_listlog_{cap['did']}.json"))
+            self.assertEqual(len(files), 1)
+            body = json.load(open(files[0], encoding="utf-8"))
+            self.assertEqual(body["list_log"], cap["list_log"])
 
     def test_timestamps_keep_the_clients_utc_offset(self):
         # 0.6.2+ sends the PC's local time with its offset: 17:05 on the US west coast is 09:05 the next day in Korea
@@ -431,18 +431,23 @@ class TrackerTestBuildTest(TestCase):
 
     def setUp(self):
         import tempfile
+        from django.test import override_settings
         self.client = APIClient()
         self.user = User.objects.create_user(email="t@test.com", username="testbuild", password="pass1234")
         self.key = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
         self.key.write("260924\n"); self.key.close()
         self.p_key = patch("tracker.views.TEST_KEY_FILE", self.key.name); self.p_key.start()
+        # Captures go to a directory of their own: a test user's id is a real user's id too, and cleaning up
+        # "*_u1_test_*" in the live snapshot store once removed the real test captures (2026-09-28).
+        self.tmp = tempfile.TemporaryDirectory()
+        self.p_dir = override_settings(BASE_DIR=self.tmp.name); self.p_dir.enable()
 
     def tearDown(self):
-        import glob, os
+        import os
+        self.p_dir.disable()
+        self.tmp.cleanup()
         self.p_key.stop()
         os.remove(self.key.name)
-        for f in glob.glob(os.path.join("data", "tracker_snapshots", f"*_u{self.user.id}_test_*")):
-            os.remove(f)
 
     def test_unlock_checks_the_password_even_for_a_test_version(self):
         ok = self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json", HTTP_X_TRACKER_VERSION="0.6.5-test")
@@ -460,7 +465,7 @@ class TrackerTestBuildTest(TestCase):
         with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
             res = self.client.post("/api/tracker/test/log/", body, format="json", HTTP_X_TRACKER_TEST_KEY="260924")
         self.assertEqual(res.status_code, 201)
-        self.assertEqual(len(glob.glob(os.path.join("data", "tracker_snapshots", f"*_u{self.user.id}_test_Room_77091.json"))), 1)
+        self.assertEqual(len(glob.glob(os.path.join(self.tmp.name, "data", "tracker_snapshots", f"*_u{self.user.id}_test_Room_77091.json"))), 1)
 
     def test_capture_is_refused_without_the_account_or_the_password(self):
         self.client.force_authenticate(user=self.user)
