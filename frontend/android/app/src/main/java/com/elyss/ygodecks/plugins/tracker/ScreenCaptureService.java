@@ -88,7 +88,7 @@ public class ScreenCaptureService extends Service {
         // Step 1: Notification channel
         try {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "듀얼 트래커", NotificationManager.IMPORTANCE_DEFAULT);
+                    CHANNEL_ID, "듀얼 레코더", NotificationManager.IMPORTANCE_DEFAULT);
             getSystemService(NotificationManager.class).createNotificationChannel(channel);
             statusLog = "채널 생성됨";
         } catch (Exception e) {
@@ -101,7 +101,7 @@ public class ScreenCaptureService extends Service {
         // Step 2: startForeground
         try {
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("YGODecks 트래커")
+                    .setContentTitle("YGO Decks 레코더")
                     .setContentText("시작됨")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setOngoing(true)
@@ -230,7 +230,7 @@ public class ScreenCaptureService extends Service {
     private void updateNotification(String text) {
         try {
             Notification n = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("YGODecks 트래커")
+                    .setContentTitle("YGO Decks 레코더")
                     .setContentText(text)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setOngoing(true)

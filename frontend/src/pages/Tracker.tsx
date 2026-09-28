@@ -70,7 +70,7 @@ export default function Tracker() {
 
   return (
     <div className="min-h-screen px-0 sm:px-4 py-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-2">듀얼 트래커</h1>
+      <h1 className="text-2xl font-bold text-center mb-2">듀얼 레코더</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 text-sm">
         마스터 듀얼을 플레이하면 자동으로 전적이 기록됩니다.
       </p>
@@ -83,7 +83,7 @@ export default function Tracker() {
 
       {!isNative && isLoggedIn && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6 text-center">
-          <p className="text-yellow-700 dark:text-yellow-300 text-sm">듀얼 트래커는 Android 앱에서만 사용할 수 있습니다.</p>
+          <p className="text-yellow-700 dark:text-yellow-300 text-sm">듀얼 레코더는 Android 앱에서만 사용할 수 있습니다.</p>
         </div>
       )}
 
@@ -100,7 +100,7 @@ export default function Tracker() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1">트래킹 모드</label>
+              <label className="block text-sm font-semibold mb-1">기록 모드</label>
               <div className="flex gap-2">
                 {[
                   { value: "none", label: "프리 매치" },
@@ -172,12 +172,12 @@ export default function Tracker() {
               {!t.isTracking ? (
                 <button onClick={handleStart} disabled={!t.selectedGroup || !t.selectedDeck}
                   className={`w-full py-4 text-lg font-semibold rounded-xl transition shadow-lg ${!t.selectedGroup || !t.selectedDeck ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
-                  트래킹 시작
+                  기록 시작
                 </button>
               ) : (
                 <button onClick={handleStop}
                   className="w-full py-4 bg-red-500 text-white text-lg font-semibold rounded-xl hover:bg-red-600 transition shadow-lg">
-                  트래킹 중지
+                  기록 중지
                 </button>
               )}
             </div>

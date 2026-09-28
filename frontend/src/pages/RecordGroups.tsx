@@ -292,10 +292,10 @@ const RecordGroups = () => {
       {isLoggedIn && <PcTrackerBanner />}
       {Capacitor.isNativePlatform() && isLoggedIn && (
         <button
-          onClick={() => navigate("/tracker")}
+          onClick={() => navigate("/recorder")}
           className="w-full mb-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow"
         >
-          듀얼 트래커 시작
+          듀얼 레코더 시작
         </button>
       )}
       {metaStats?.length > 0 ? (

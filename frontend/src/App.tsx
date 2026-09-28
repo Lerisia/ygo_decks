@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import './App.css'
 import Navbar from "./components/Navbar";
@@ -119,7 +119,8 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
-          <Route path="/tracker" element={<Tracker />} />
+          <Route path="/recorder" element={<Tracker />} />
+          <Route path="/tracker" element={<Navigate to="/recorder" replace />} />
           <Route path="/changelog" element={<Changelog />} />
           <Route path="*" element={<NotFound />} />
       </Routes>

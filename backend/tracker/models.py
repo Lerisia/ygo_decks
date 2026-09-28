@@ -17,8 +17,8 @@ class TrackerPendingMatch(models.Model):
     class Meta:
         ordering = ["-created_at"]
         constraints = [models.UniqueConstraint(fields=["user", "did"], name="uniq_tracker_pending_user_did")]
-        verbose_name = "트래커 확인 대기 게임"
-        verbose_name_plural = "트래커 확인 대기 게임"
+        verbose_name = "레코더 확인 대기 게임"
+        verbose_name_plural = "레코더 확인 대기 게임"
 
     def __str__(self):
         return f"{self.user.username} {self.did} ({self.status})"
@@ -70,8 +70,8 @@ class TrackerGame(models.Model):
     class Meta:
         ordering = ["-ended_at"]
         constraints = [models.UniqueConstraint(fields=["user", "did"], name="uniq_tracker_game_user_did")]
-        verbose_name = "트래커 게임 원본"
-        verbose_name_plural = "트래커 게임 원본"
+        verbose_name = "레코더 게임 원본"
+        verbose_name_plural = "레코더 게임 원본"
 
     def __str__(self):
         return f"{self.user.username} {self.did} {self.result}"
@@ -85,8 +85,8 @@ class TrackerClient(models.Model):
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "트래커 클라이언트"
-        verbose_name_plural = "트래커 클라이언트"
+        verbose_name = "레코더 클라이언트"
+        verbose_name_plural = "레코더 클라이언트"
 
     def __str__(self):
         return f"{self.user.username} {self.version or '(구버전)'}"
