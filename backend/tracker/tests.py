@@ -354,7 +354,7 @@ class TrackerVersionTest(TestCase):
         res = self.client.get("/api/tracker/version/")
         self.assertEqual(res.status_code, 200)
         self.assertIn("latest", res.json())
-        self.assertTrue(res.json()["url"].endswith("mdtracker.exe"))
+        self.assertTrue(res.json()["url"].endswith(".exe"))
 
     def test_status_before_any_tracker_use(self):
         body = self.client.get("/api/tracker/client-status/").json()
@@ -403,8 +403,22 @@ class TrackerVersionGateTest(TestCase):
     def test_old_build_is_refused_with_an_update_hint(self):
         res = self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION="0.6.3")
         self.assertEqual(res.status_code, 426)
-        self.assertTrue(res.json()["url"].endswith("mdtracker.exe"))
+        self.assertTrue(res.json()["url"].endswith(".exe"))
         self.assertEqual(self.client.get("/api/record-groups/", HTTP_X_TRACKER_VERSION="0.6.3").status_code, 426)
+
+    def test_every_beta_build_is_refused(self):
+        # 1.0.0 (2026-09-28): the 0.x builds showed opponent cards during a duel; none of them may keep working
+        for v in ("0.6.13", "0.6.13-test", "0.9.9", "junk", ""):
+            res = self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION=v)
+            self.assertEqual(res.status_code, 426, v)
+
+    def test_a_test_build_passes_on_its_version_not_on_the_account(self):
+        from tracker import version as ver
+        self.assertEqual(ver.GATE_EXEMPT_USER_IDS, set())
+        self.assertFalse(ver.is_outdated("1.0.0-test", "1.0.0"))
+        self.assertTrue(ver.is_outdated("0.6.6-test", "1.0.0"))
+        res = self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json", HTTP_X_TRACKER_VERSION=ver.MIN_SUPPORTED + "-test")
+        self.assertEqual(res.status_code, 200)
 
     def test_old_build_can_still_check_the_version_and_log_in(self):
         self.assertEqual(self.client.get("/api/tracker/version/", HTTP_X_TRACKER_VERSION="0.6.3").status_code, 200)
@@ -450,9 +464,18 @@ class TrackerTestBuildTest(TestCase):
         os.remove(self.key.name)
 
     def test_unlock_checks_the_password_even_for_a_test_version(self):
-        ok = self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json", HTTP_X_TRACKER_VERSION="0.6.5-test")
+        from tracker import version as ver
+        ok = self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json", HTTP_X_TRACKER_VERSION=ver.MIN_SUPPORTED + "-test")
         self.assertEqual(ok.status_code, 200)
-        self.assertEqual(self.client.post("/api/tracker/test/unlock/", {"password": "0000"}, format="json").status_code, 403)
+        self.assertEqual(self.client.post("/api/tracker/test/unlock/", {"password": "0000"}, format="json", HTTP_X_TRACKER_VERSION=ver.MIN_SUPPORTED + "-test").status_code, 403)
+
+    def test_an_old_test_build_stays_locked_even_with_the_right_password(self):
+        # the old test builds still follow opponent cards into hidden zones: knowing the password must not start one
+        with patch("tracker.version.MIN_SUPPORTED", "1.0.0"):
+            for v in ("0.6.6-test", "0.6.13-test", ""):
+                res = self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json", HTTP_X_TRACKER_VERSION=v)
+                self.assertEqual(res.status_code, 403, v)
+            self.assertEqual(self.client.post("/api/tracker/test/unlock/", {"password": "260924"}, format="json").status_code, 403)   # no version at all
 
     def test_no_password_file_locks_everything(self):
         with patch("tracker.views.TEST_KEY_FILE", "/nonexistent/key.txt"):
@@ -462,16 +485,16 @@ class TrackerTestBuildTest(TestCase):
         import glob, os
         self.client.force_authenticate(user=self.user)
         body = {"did": "77091", "gameModeName": "Room", "revealLog": ["1|2|3|15|1|engine"]}
-        with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
+        with patch("tracker.version.TEST_ACCOUNT_IDS", {self.user.id}):
             res = self.client.post("/api/tracker/test/log/", body, format="json", HTTP_X_TRACKER_TEST_KEY="260924")
         self.assertEqual(res.status_code, 201)
         self.assertEqual(len(glob.glob(os.path.join(self.tmp.name, "data", "tracker_snapshots", f"*_u{self.user.id}_test_Room_77091.json"))), 1)
 
     def test_capture_is_refused_without_the_account_or_the_password(self):
         self.client.force_authenticate(user=self.user)
-        with patch("tracker.version.GATE_EXEMPT_USER_IDS", set()):
+        with patch("tracker.version.TEST_ACCOUNT_IDS", set()):
             self.assertEqual(self.client.post("/api/tracker/test/log/", {"did": "1"}, format="json", HTTP_X_TRACKER_TEST_KEY="260924").status_code, 403)
-        with patch("tracker.version.GATE_EXEMPT_USER_IDS", {self.user.id}):
+        with patch("tracker.version.TEST_ACCOUNT_IDS", {self.user.id}):
             self.assertEqual(self.client.post("/api/tracker/test/log/", {"did": "1"}, format="json", HTTP_X_TRACKER_TEST_KEY="bad").status_code, 403)
 
 

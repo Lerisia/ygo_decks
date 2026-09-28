@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const DOWNLOAD_URL = "/media/tracker/mdtracker.exe";
+const DOWNLOAD_URL = "/media/recorder/YGODecksRecorder.exe";
 const DISMISS_KEY = "database_tracker_promo_dismissed";
 
 const readDismissed = () => {
@@ -43,7 +43,7 @@ export default function DatabaseTrackerPromo() {
           aria-expanded={mobileOpen}
           className="w-full px-4 py-2 bg-blue-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5"
         >
-          <span>PC 트래커로 마스터듀얼 전적 자동 기록</span>
+          <span>PC 레코더로 마스터듀얼 전적 자동 기록</span>
           <span className="opacity-70">{mobileOpen ? "▲" : "▼"}</span>
         </button>
 
@@ -74,14 +74,14 @@ export default function DatabaseTrackerPromo() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="font-semibold">
-              PC 마스터듀얼 트래커{" "}
-              <span className="text-xs font-normal text-blue-600 dark:text-blue-300">베타</span>
+              PC 마스터듀얼 레코더{" "}
+              <span className="text-xs font-normal text-blue-600 dark:text-blue-300">정식 출시</span>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-300">
               랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용.
             </div>
             <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">
-              트래커로 '승리'를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다!!
+              레코더로 '승리'를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다!!
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -112,7 +112,7 @@ export default function DatabaseTrackerPromo() {
         {howtoOpen && (
           <ol className="mt-3 text-sm text-gray-700 dark:text-gray-200 list-decimal pl-5 space-y-1">
             <li>
-              <b>mdtracker.exe</b>를 받아 실행합니다. Windows가 "확인되지 않은 앱"이라고 막으면{" "}
+              <b>YGODecksRecorder.exe</b>를 받아 실행합니다. Windows가 "확인되지 않은 앱"이라고 막으면{" "}
               <b>추가 정보 → 실행</b>을 누르세요 (아직 코드 서명이 없어서 뜨는 안내입니다).
             </li>
             <li>ygodecks.com 계정으로 로그인하고 <b>기록할 시트</b>를 고릅니다. 창을 닫아도 트레이에서 계속 돌아갑니다.</li>

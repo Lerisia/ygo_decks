@@ -86,8 +86,12 @@ public sealed class Tracker
         L.Memory = Store.Config.EffectiveOverlayMode >= 3;
         if (!L.Memory) { L.OppHandGhosts = new(); opp = PublicOnly(t, false); }
 #else
+        // The release shows no card (1.0.0): what the opponent has shown in the open feeds the deck read, and then every
+        // card loses its id, so nothing downstream could list one even by mistake.
         L.BlockedText = PanelBlock;
         var opp = PublicOnly(t, L.Blocked);
+        foreach (var c in t.Cards) c.Id = 0;
+        t.OppSecLeft = 0;
 #endif
         L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.Cards = t.Cards; L.HoverMe = t.HoverMe; L.HoverZone = t.HoverZone; L.HoverIndex = t.HoverIndex;
         L.MySecLeft = t.MySecLeft; L.OppSecLeft = t.OppSecLeft;
@@ -101,8 +105,8 @@ public sealed class Tracker
         LiveUpdated?.Invoke();
     }
 
-    /// Public information only (overlay mode 2, the most a release build does — 엘리스 2026-09-28): the graveyards,
-    /// my banished cards and the opponent's face-up banished cards. An opponent card anywhere else — hand, deck, extra
+    /// Public information only (overlay mode 2 in the test build; in the release only the deck read uses it): the
+    /// graveyards, my banished cards and the opponent's face-up banished cards. An opponent card anywhere else — hand, deck, extra
     /// deck, face-down — gets no name, whatever the engine or the game log said about it, and nothing about it is
     /// kept. The deck read follows what the opponent has shown in the open (face-up on the field, graveyard, face-up
     /// banished). blocked: the site no longer vouches for this build, so no card gets a name at all.
@@ -194,7 +198,7 @@ public sealed class Tracker
     }
 #endif
 
-    /// Why the duel panel names no card right now, or null when it may. The site has to vouch for this build: it is
+    /// Why the duel panel reads no deck (and, in a test build, names no card) right now, or null when it may. The site has to vouch for this build: it is
     /// asked at start, every 30 minutes and whenever a duel starts. Until it has said yes — and once it says no, or
     /// has not answered for two hours — no card gets a name, so a build found unsafe later stops showing cards even
     /// for someone who never updates or keeps the tracker offline.
@@ -202,9 +206,9 @@ public sealed class Tracker
 #if TEST_BUILD
         null;   // the test build has its own lock (TestGate)
 #else
-        _refused ? "업데이트가 필요합니다 — 카드 표시가 꺼져 있습니다"
+        _refused ? "업데이트가 필요합니다"
         : _vouched && (DateTime.UtcNow - _vouchedAt).TotalHours < 2 ? null
-        : "서버 확인 중 — 확인되면 카드 표시가 켜집니다";
+        : "서버 확인 중…";
 #endif
     private volatile bool _refused;
     private volatile bool _vouched;

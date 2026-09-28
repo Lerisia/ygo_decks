@@ -138,8 +138,9 @@ def _test_key_ok(given):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def test_unlock(request):
-    """Test build start-up: the build runs only while this accepts its password."""
-    ok = _test_key_ok(request.data.get("password"))
+    """Test build start-up: the build runs only while this accepts its password — and its version. An old test build
+    still follows opponent cards into hidden zones, so knowing the password does not start one."""
+    ok = _test_key_ok(request.data.get("password")) and not ver.is_outdated(request.headers.get("X-Tracker-Version") or "", ver.MIN_SUPPORTED)
     return Response({"ok": ok}, status=status.HTTP_200_OK if ok else status.HTTP_403_FORBIDDEN)
 
 
@@ -147,7 +148,7 @@ def test_unlock(request):
 @permission_classes([IsAuthenticated])
 def test_log(request):
     """Test build: the whole capture of every duel (any mode), kept as a research file beside the snapshots."""
-    if request.user.id not in ver.GATE_EXEMPT_USER_IDS or not _test_key_ok(request.headers.get("X-Tracker-Test-Key")):
+    if request.user.id not in ver.TEST_ACCOUNT_IDS or not _test_key_ok(request.headers.get("X-Tracker-Test-Key")):
         return Response({"error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
     safe = lambda v: re.sub(r"[^0-9A-Za-z_-]", "", str(v or ""))[:40] or "x"
     out_dir = os.path.join(settings.BASE_DIR, "data", "tracker_snapshots")

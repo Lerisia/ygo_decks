@@ -24,7 +24,7 @@ internal static class TestGate
                 }
                 if (ok == null)
                 {
-                    MessageBox.Show("서버에 연결할 수 없어 테스트 빌드를 켤 수 없습니다.", "YGO Decks 트래커 (테스트 빌드)", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("서버에 연결할 수 없어 테스트 빌드를 켤 수 없습니다.", "YGO Decks 레코더 (테스트 빌드)", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
                 note = "비밀번호가 맞지 않습니다.";
@@ -49,7 +49,7 @@ internal static class TestGate
         panel.Children.Add(buttons);
         var w = new Window
         {
-            Title = "YGO Decks 트래커 (테스트 빌드)", Content = panel, SizeToContent = SizeToContent.WidthAndHeight,
+            Title = "YGO Decks 레코더 (테스트 빌드)", Content = panel, SizeToContent = SizeToContent.WidthAndHeight,
             MinWidth = 320, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen,
         };
         ok.Click += (_, _) => w.DialogResult = true;

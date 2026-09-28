@@ -18,7 +18,7 @@ export default function TrackerPendingPanel({ items, activeId, onFill, onDiscard
   return (
     <div className="mb-4 max-w-2xl w-full mx-auto bg-blue-50 dark:bg-blue-900/20 border-y sm:border border-blue-200 dark:border-blue-800 sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold">트래커에서 들어온 게임 {items.length}개</span>
+        <span className="font-semibold">레코더에서 들어온 게임 {items.length}개</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">누르면 아래 등록 폼에 채워집니다</span>
       </div>
       <ul className="flex flex-col gap-2">

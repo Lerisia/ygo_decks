@@ -281,7 +281,7 @@ const RecordGroups = () => {
 
       {isLoggedIn && pendingCount > 0 && (
         <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-3">
-          <div className="font-semibold">트래커에서 올라온 게임 {pendingCount}건이 확인을 기다리고 있습니다</div>
+          <div className="font-semibold">레코더에서 올라온 게임 {pendingCount}건이 확인을 기다리고 있습니다</div>
           <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">
             {recordGroups.length === 0
               ? "아래에서 시트를 먼저 만들면, 그 시트에서 확인하고 기록할 수 있습니다."

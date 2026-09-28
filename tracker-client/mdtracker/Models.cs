@@ -6,7 +6,13 @@ namespace MdTracker;
 public sealed class Config
 {
     public string? TestKey { get; set; }   // test build only: the password the server last accepted
+#if DEBUG
     public string ServerUrl { get; set; } = "https://ygodecks.com";
+#else
+    /// Fixed in published builds: the version lock and the test-build lock are the site's word, so a config file must
+    /// not be able to point them at another server.
+    [JsonIgnore] public string ServerUrl => "https://ygodecks.com";
+#endif
     public string? Token { get; set; }
     public string? Email { get; set; }
     public int? RecordGroupId { get; set; }
@@ -20,16 +26,16 @@ public sealed class Config
     public bool StartWithWindows { get; set; }
     /// Side panel during the duel (kept for configs written before OverlayMode existed).
     public bool LivePanel { get; set; } = true;
-    /// What is drawn over the game: 0 nothing, 1 record only (idle card + deck read/record lines), 2 public cards too
-    /// (graveyards, my banished, the opponent's face-up banished; opponent clock estimate, cursor pop-ups), 3 also
-    /// the cards the opponent showed and hid again (the hidden-card memory — not in release builds while it is
-    /// reworked). -1 = not set yet → derived from LivePanel.
+    /// What is drawn over the game: 0 nothing, 1 the record (today's record between duels; during a duel the
+    /// opponent's deck read and my record against it). The release stops there: since 1.0.0 it shows no card and no
+    /// clock of the opponent's. The test build goes on: 2 public cards too (graveyards, my banished, the opponent's
+    /// face-up banished; cursor pop-ups), 3 also the cards the opponent showed and hid again. -1 = not set yet → derived from LivePanel.
     public int OverlayMode { get; set; } = -1;
     [JsonIgnore] public int EffectiveOverlayMode => Math.Min(OverlayMode >= 0 ? OverlayMode : (LivePanel ? 2 : 0), MaxOverlayMode);
 #if TEST_BUILD || HIDDEN_MEMORY
     public const int MaxOverlayMode = 3;
 #else
-    public const int MaxOverlayMode = 2;
+    public const int MaxOverlayMode = 1;
 #endif
     /// Sound when my clock starts running (a choice opens or my turn begins) while the game is not the front window.
     public bool AlertMyTurn { get; set; }

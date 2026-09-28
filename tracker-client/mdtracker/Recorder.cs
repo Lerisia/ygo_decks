@@ -49,9 +49,47 @@ internal sealed class Recorder
                 "DRDeck", "DRDeckList", "Duel", "DuelResult", "Structure", "CardFile", "Item", "Craft", "Shop", "GemShop", "Gacha", "Market", "Exchange", "Topics", "Announce" };
             foreach (var k in keys)
                 if (!skip.Contains(k)) outp["$." + k] = JsonText("$." + k, 60000);
+            // the deck the player picked: does the game keep its name? The lists themselves are dropped (arrays cut to
+            // their first three items), only the shape and the names are wanted
+            foreach (var k in new[] { "Deck", "DeckList" })
+                if (keys.Contains(k)) outp["$." + k + " (trimmed)"] = Trimmed("$." + k, 60000);
         }
         catch (Exception ex) { outp["error"] = ex.Message; }
         return outp;
+    }
+
+    private string Trimmed(string path, int max)
+    {
+        try
+        {
+            using var doc = ReadJson(path);
+            if (doc == null) return "(missing)";
+            var ms = new MemoryStream();
+            using (var w = new Utf8JsonWriter(ms)) Trim(w, doc.RootElement, 0);
+            var s = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+            return s.Length > max ? s[..max] + "…" : s;
+        }
+        catch (Exception ex) { return "(error: " + ex.Message + ")"; }
+    }
+
+    private static void Trim(Utf8JsonWriter w, JsonElement e, int depth)
+    {
+        switch (e.ValueKind)
+        {
+            case JsonValueKind.Object:
+                w.WriteStartObject();
+                foreach (var p in e.EnumerateObject()) { w.WritePropertyName(p.Name); if (depth < 8) Trim(w, p.Value, depth + 1); else w.WriteStringValue("…"); }
+                w.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                w.WriteStartArray();
+                int n = 0;
+                foreach (var item in e.EnumerateArray()) { if (n++ >= 3) break; Trim(w, item, depth + 1); }
+                if (e.GetArrayLength() > 3) w.WriteStringValue($"… {e.GetArrayLength()} items");
+                w.WriteEndArray();
+                break;
+            default: e.WriteTo(w); break;
+        }
     }
 
     private string JsonText(string path, int max)

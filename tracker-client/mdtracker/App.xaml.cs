@@ -8,9 +8,9 @@ namespace MdTracker;
 public partial class App : System.Windows.Application
 {
 #if TEST_BUILD
-    public const string Version = "0.6.13-test";
+    public const string Version = "1.0.0-test";
 #else
-    public const string Version = "0.6.13";
+    public const string Version = "1.0.0";
 #endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
@@ -47,7 +47,7 @@ public partial class App : System.Windows.Application
             System.IO.File.AppendAllText(CrashLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}{Environment.NewLine}{Environment.NewLine}");
         }
         catch { }
-        try { System.Windows.MessageBox.Show($"트래커에 오류가 발생했습니다.\n\n{(ex as Exception)?.Message ?? ex}\n\n자세한 내용: {CrashLog}", "YGO Decks 트래커", MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+        try { System.Windows.MessageBox.Show($"레코더에 오류가 발생했습니다.\n\n{(ex as Exception)?.Message ?? ex}\n\n자세한 내용: {CrashLog}", "YGO Decks 레코더", MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
     }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -57,7 +57,7 @@ public partial class App : System.Windows.Application
         if (AnotherInstanceRunning())
         {
             if (!e.Args.Contains(AutoStart.MinimizedArg))
-                System.Windows.MessageBox.Show("트래커가 이미 실행 중입니다. 트레이 아이콘을 확인하세요.\n(두 개를 켜면 같은 게임이 두 번 기록됩니다)", "YGO Decks 트래커", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("레코더가 이미 실행 중입니다. 트레이 아이콘을 확인하세요.\n(두 개를 켜면 같은 게임이 두 번 기록됩니다)", "YGO Decks 레코더", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -77,7 +77,7 @@ public partial class App : System.Windows.Application
         _idleTimer.Tick += (_, _) => IdleTick();
         _idleTimer.Start();
 
-        _tray = new WinForms.NotifyIcon { Icon = MakeIcon(), Text = "YGO Decks 트래커", Visible = true };
+        _tray = new WinForms.NotifyIcon { Icon = MakeIcon(), Text = "YGO Decks 레코더", Visible = true };
         var menu = new WinForms.ContextMenuStrip();
         menu.Opening += (_, _) => BuildTrayMenu(menu);
         BuildTrayMenu(menu);
@@ -87,14 +87,14 @@ public partial class App : System.Windows.Application
         MainWin = new MainWindow();
 #if TEST_BUILD
         MainWin.Title += " — 테스트 빌드";
-        _tray.Text = "YGO Decks 트래커 (테스트 빌드)";
+        _tray.Text = "YGO Decks 레코더 (테스트 빌드)";
 #endif
         if (Tracker.Store.Config.StartWithWindows) AutoStart.Apply(true);
         if (e.Args.Contains(AutoStart.MinimizedArg)) HideToTray();
         else MainWin.Show();
         Tracker.Start();
         new Thread(Updater.Cleanup) { IsBackground = true }.Start();
-        if (e.Args.Contains(Updater.UpdatedArg)) _tray?.ShowBalloonTip(5000, "YGO Decks 트래커", $"{Version}(으)로 업데이트했습니다.", WinForms.ToolTipIcon.Info);
+        if (e.Args.Contains(Updater.UpdatedArg)) _tray?.ShowBalloonTip(5000, "YGO Decks 레코더", $"{Version}(으)로 업데이트했습니다.", WinForms.ToolTipIcon.Info);
         _startArgs = e.Args;
 #if !TEST_BUILD
         new Thread(AutoUpdateLoop) { IsBackground = true, Name = "update" }.Start();
@@ -161,7 +161,7 @@ public partial class App : System.Windows.Application
         }
 
         var pause = new WinForms.ToolStripMenuItem("기록 일시 정지") { Checked = RecordingPaused, CheckOnClick = true };
-        pause.CheckedChanged += (_, _) => { RecordingPaused = pause.Checked; _tray!.Text = RecordingPaused ? "YGO Decks 트래커 — 기록 일시 정지" : "YGO Decks 트래커"; };
+        pause.CheckedChanged += (_, _) => { RecordingPaused = pause.Checked; _tray!.Text = RecordingPaused ? "YGO Decks 레코더 — 기록 일시 정지" : "YGO Decks 레코더"; };
         menu.Items.Add(pause);
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("열기", null, (_, _) => ShowMain());
@@ -183,13 +183,13 @@ public partial class App : System.Windows.Application
     {
         if (RecordingPaused && !m.IsDemo)
         {
-            _tray?.ShowBalloonTip(4000, "YGO Decks 트래커", "기록 일시 정지 중이라 이번 게임은 기록하지 않았습니다.", WinForms.ToolTipIcon.Info);
+            _tray?.ShowBalloonTip(4000, "YGO Decks 레코더", "기록 일시 정지 중이라 이번 게임은 기록하지 않았습니다.", WinForms.ToolTipIcon.Info);
             return;
         }
         if (!m.IsDemo && Tracker.Store.Config.Token == null)
         {
             ShowMain();
-            _tray?.ShowBalloonTip(6000, "YGO Decks 트래커", "로그인하지 않아 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
+            _tray?.ShowBalloonTip(6000, "YGO Decks 레코더", "로그인하지 않아 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
             return;
         }
         if (!m.IsDemo && Tracker.Store.Config.RecordGroupId == null)
@@ -203,10 +203,10 @@ public partial class App : System.Windows.Application
                     if (!ok)
                     {
                         ShowMain();
-                        _tray?.ShowBalloonTip(6000, "YGO Decks 트래커", "시트를 만들지 못해 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
+                        _tray?.ShowBalloonTip(6000, "YGO Decks 레코더", "시트를 만들지 못해 이번 게임은 기록되지 않았습니다.", WinForms.ToolTipIcon.Warning);
                         return;
                     }
-                    _tray?.ShowBalloonTip(5000, "YGO Decks 트래커", $"기록할 시트 '{Tracker.Store.Config.RecordGroupName}'을(를) 만들었습니다.", WinForms.ToolTipIcon.Info);
+                    _tray?.ShowBalloonTip(5000, "YGO Decks 레코더", $"기록할 시트 '{Tracker.Store.Config.RecordGroupName}'을(를) 만들었습니다.", WinForms.ToolTipIcon.Info);
                     MainWin?.Refresh();
                     ShowOverlay(m);
                 });
@@ -390,7 +390,7 @@ public partial class App : System.Windows.Application
         if (!_balloonShown && _tray != null)
         {
             _balloonShown = true;
-            _tray.ShowBalloonTip(3000, "YGO Decks 트래커", "트레이에서 계속 실행 중입니다. 게임이 끝나면 오버레이가 뜹니다.", WinForms.ToolTipIcon.Info);
+            _tray.ShowBalloonTip(3000, "YGO Decks 레코더", "트레이에서 계속 실행 중입니다. 게임이 끝나면 오버레이가 뜹니다.", WinForms.ToolTipIcon.Info);
         }
     }
 

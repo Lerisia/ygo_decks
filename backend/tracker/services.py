@@ -151,10 +151,10 @@ def link_game(user, did, match):
         game.match = match
         game.save(update_fields=["match"])
         if first_link and game.result == match.result == "win":
-            award_points(user, TRACKER_WIN_POINTS, kind="tracker_win", note=f"트래커 승리 기록 #{match.id}")
+            award_points(user, TRACKER_WIN_POINTS, kind="tracker_win", note=f"레코더 승리 기록 #{match.id}")
             return TRACKER_WIN_POINTS
         if first_link and game.result == match.result == "lose":
-            award_points(user, TRACKER_LOSS_POINTS, kind="tracker_loss", note=f"트래커 패배 기록 #{match.id}")
+            award_points(user, TRACKER_LOSS_POINTS, kind="tracker_loss", note=f"레코더 패배 기록 #{match.id}")
             return TRACKER_LOSS_POINTS
     return 0
 

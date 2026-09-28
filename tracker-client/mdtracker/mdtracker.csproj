@@ -19,7 +19,11 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.6.13</Version>
+    <Version>1.0.0</Version>
+    <Product>YGO Decks Recorder</Product>
+    <AssemblyTitle>YGO Decks Recorder</AssemblyTitle>
+    <Description>Records Master Duel results to ygodecks.com</Description>
+    <Company>ygodecks.com</Company>
   </PropertyGroup>
 
   <!-- dotnet publish -p:TestBuild=true: the password-locked test build (leak kept visible, whole captures sent, no updates) -->

@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = $"YGO Decks 트래커 {App.Version}  ·  빌드 {BuildStamp()}";
+        Title = $"YGO Decks 레코더 {App.Version}  ·  빌드 {BuildStamp()}";
         T.StatusChanged += _ => Dispatcher.BeginInvoke(RefreshStatus);
         T.MatchesChanged += () => Dispatcher.BeginInvoke(() => { RefreshRecent(); RefreshToday(); });
         Loaded += (_, _) => { RefreshAll(); if (T.Store.Config.Token != null) LoadGroups(); CheckVersion(); };
@@ -83,7 +83,14 @@ public partial class MainWindow : Window
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
         _settingAutoStart = true;
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
-        if (Config.MaxOverlayMode >= 3) { MemoryModeItem.IsEnabled = true; MemoryModeItem.Content = "확인한 카드까지"; MemoryModeItem.ToolTip = null; }
+#if TEST_BUILD || HIDDEN_MEMORY
+        if (OverlayModeBox.Items.Count == 2)
+        {
+            ((ComboBoxItem)OverlayModeBox.Items[1]).Content = "전적만";
+            OverlayModeBox.Items.Add(new ComboBoxItem { Content = "공개 카드까지" });
+            OverlayModeBox.Items.Add(new ComboBoxItem { Content = "확인한 카드까지" });
+        }
+#endif
         OverlayModeBox.SelectedIndex = T.Store.Config.EffectiveOverlayMode;
         OverlayModeHint.Text = OverlayHints[Math.Clamp(OverlayModeBox.SelectedIndex, 0, OverlayHints.Length - 1)];
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
@@ -112,9 +119,11 @@ public partial class MainWindow : Window
     private static readonly string[] OverlayHints =
     {
         "게임 위에 아무것도 띄우지 않습니다. 기록은 그대로 됩니다.",
-        "오늘 전적, 상대 덱 판독, 매치업 전적만 보여 줍니다.",
-        "누구나 볼 수 있는 카드 목록도 보여 줍니다: 묘지, 내 제외, 상대의 앞면 제외.",
-        "상대가 한 번 공개한 패·덱·세트 카드도 기억해 보여 줍니다. 준비 중인 기능이라 테스트 빌드에서만 고를 수 있습니다.",
+        "듀얼 사이에는 오늘 전적을, 듀얼 중에는 상대 덱 판독과 그 덱 상대 내 전적을 보여 줍니다.",
+#if TEST_BUILD || HIDDEN_MEMORY
+        "(테스트 빌드) 누구나 볼 수 있는 카드 목록도 보여 줍니다: 묘지, 내 제외, 상대의 앞면 제외.",
+        "(테스트 빌드) 상대가 한 번 공개한 패·덱·세트 카드도 기억해 보여 줍니다.",
+#endif
     };
 
     private void OverlayModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

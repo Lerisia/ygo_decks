@@ -16,7 +16,7 @@ def card_thumb(request, konami_id):
     # to 0.6.11 never said who they were, so a build the site has refused loses the pictures in its card lists too.
     from tracker import version as ver
     if ver.is_outdated(request.GET.get("v") or "", ver.MIN_SUPPORTED):
-        return JsonResponse({"error": "트래커를 최신 버전으로 업데이트해 주세요.", "min_supported": ver.MIN_SUPPORTED}, status=426)
+        return JsonResponse({"error": "새 버전으로 업데이트해 주세요. 이 버전은 더 이상 쓸 수 없습니다.", "min_supported": ver.MIN_SUPPORTED}, status=426)
     alias = CardIdAlias.objects.filter(md_id=konami_id).select_related("card").first()
     card = alias.card if alias else Card.objects.filter(konami_id=str(konami_id)).exclude(card_illust="").first()
     if not card or not card.card_illust:

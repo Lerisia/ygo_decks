@@ -5,9 +5,9 @@ using System.Windows.Media;
 
 namespace MdTracker;
 
-/// Side card pinned to the game window while a duel runs: opponent deck read, my record, clocks, and the opponent's
-/// public piles (graveyard, face-up banished). The lists of cards the opponent showed and hid again belong to overlay
-/// mode 3, the hidden-card memory (LiveDuel.Memory), which release builds do not have.
+/// Side card pinned to the game window while a duel runs: the opponent's deck read and my record against it. That is
+/// all the release shows (1.0.0). The test build can add the opponent's public piles (overlay mode 2) and the cards
+/// they showed and hid again (mode 3, LiveDuel.Memory), with the cursor pop-ups.
 public partial class LiveWindow : Window
 {
     private bool _dragged;
@@ -46,14 +46,13 @@ public partial class LiveWindow : Window
         Dispatcher.BeginInvoke(Place, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
-    /// full=false is the record-only mode: no card lists, no opponent clock estimate.
+    /// full=false is the record-only mode: no card lists. The opponent's clock estimate is gone from every build (1.0.0).
     public void Update(LiveDuel s, bool full = true)
     {
         SyncVisibility(this);
         if (_full != full || (StripRows.Visibility == Visibility.Visible) != (full && !s_minimized)) { _full = full; ApplyMinimized(); }
         StripHead.Text = $"vs {s.OppName}";
         StripTurn.Text = s.Turn == 0 ? "듀얼 시작" : $"{s.Turn}턴 · {(s.TurnMe ? "내 턴" : "상대 턴")}";
-        if (full && s.Turn > 0 && s.MySecLeft > 0) StripTurn.Text += $" · 상대 남은 시간(추정) {s.OppSecLeft}초";   // my own clock is on screen already; the opponent's is never sent, so this is our replay of the clock rules
         var top2 = s.OppCandidates.Take(2).Select(c => $"{c.Name} {Math.Round(c.Share * 100)}%").ToList();
         bool anyOpp = s.Cards.Any(c => !c.Me);
         StripDeck.Text = s.BlockedText ?? (top2.Count > 0 ? string.Join(" · 또는 ", top2) : anyOpp ? "판독 중…" : "아직 공개된 카드 없음");
