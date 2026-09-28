@@ -58,6 +58,42 @@ internal sealed class Recorder
         return outp;
     }
 
+    /// Research (2026-09-28): screens like the duel history or the replay list load their data only when opened.
+    /// Outside a duel, every few seconds: a top-level key that was not there before, or a history-looking key whose
+    /// contents changed, is sent once (arrays cut to their first three items) so the shape can be studied.
+    private HashSet<string>? _seenKeys;
+    private readonly Dictionary<string, int> _watchedLen = new();
+    private DateTime _lastWatch;
+    private void WatchNewData()
+    {
+        if ((DateTime.Now - _lastWatch).TotalSeconds < 3) return;
+        _lastWatch = DateTime.Now;
+        try
+        {
+            var root = _g.ClientWorkData;
+            if (root == 0) return;
+            var keys = _g.IL.DictKeys(root).ToList();
+            if (_seenKeys == null) { _seenKeys = keys.ToHashSet(); return; }
+            var found = new Dictionary<string, string>();
+            foreach (var k in keys)
+            {
+                bool fresh = _seenKeys.Add(k);
+                bool watched = System.Text.RegularExpressions.Regex.IsMatch(k, "Replay|History|Record|Log|Result|Ranking|Friend|Profile", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!fresh && !watched) continue;
+                var text = Trimmed("$." + k, 60000);
+                if (!fresh && _watchedLen.TryGetValue(k, out var len) && len == text.Length) continue;
+                _watchedLen[k] = text.Length;
+                found["$." + k] = text;
+            }
+            if (found.Count == 0) return;
+            Log.Info("research: new or changed game data " + string.Join(", ", found.Keys));
+            var m = new PendingMatch { Did = "keys" + DateTime.Now.Ticks, GameModeName = "Research", StartedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:sszzz"), Research = found };
+            m.Research["$.keys"] = string.Join(",", keys);
+            OnResearch?.Invoke(m);
+        }
+        catch (Exception ex) { Log.Info("research watch: " + ex.Message); }
+    }
+
     private string Trimmed(string path, int max)
     {
         try
@@ -158,6 +194,9 @@ internal sealed class Recorder
             try
             {
                 var d = _g.ReadDuel();
+#if TEST_BUILD
+                if (d == null) WatchNewData();
+#endif
                 if (d == null)
                 {
                     if (cur != null) { Log.Info("duel client gone before result — dropped"); cur = null; EndLive(); }
