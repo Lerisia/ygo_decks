@@ -83,7 +83,9 @@ public partial class MainWindow : Window
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
         _settingAutoStart = true;
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
+        if (Config.MaxOverlayMode >= 3) { MemoryModeItem.IsEnabled = true; MemoryModeItem.Content = "확인한 카드까지"; MemoryModeItem.ToolTip = null; }
         OverlayModeBox.SelectedIndex = T.Store.Config.EffectiveOverlayMode;
+        OverlayModeHint.Text = OverlayHints[Math.Clamp(OverlayModeBox.SelectedIndex, 0, OverlayHints.Length - 1)];
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
         if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
         int idx = Array.FindIndex(OverlayScale.Options, o => Math.Abs(o.scale - T.Store.Config.OverlayScale) < 0.01);
@@ -107,9 +109,18 @@ public partial class MainWindow : Window
 
     private bool _settingAutoStart;
 
+    private static readonly string[] OverlayHints =
+    {
+        "게임 위에 아무것도 띄우지 않습니다. 기록은 그대로 됩니다.",
+        "오늘 전적, 상대 덱 판독, 매치업 전적만 보여 줍니다.",
+        "누구나 볼 수 있는 카드 목록도 보여 줍니다: 묘지, 내 제외, 상대의 앞면 제외.",
+        "상대가 한 번 공개한 패·덱·세트 카드도 기억해 보여 줍니다. 준비 중인 기능이라 테스트 빌드에서만 고를 수 있습니다.",
+    };
+
     private void OverlayModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_settingAutoStart || OverlayModeBox.SelectedIndex < 0) return;
+        if (OverlayModeBox.SelectedIndex >= 0) OverlayModeHint.Text = OverlayHints[Math.Min(OverlayModeBox.SelectedIndex, OverlayHints.Length - 1)];
+        if (_settingAutoStart || OverlayModeBox.SelectedIndex < 0 || OverlayModeBox.SelectedIndex > Config.MaxOverlayMode) return;
         T.Store.Config.OverlayMode = OverlayModeBox.SelectedIndex;
         T.Store.Config.LivePanel = OverlayModeBox.SelectedIndex > 0;
         T.Store.SaveConfig();

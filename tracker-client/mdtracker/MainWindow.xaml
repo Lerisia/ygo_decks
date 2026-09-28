@@ -84,12 +84,15 @@
                 <TextBlock x:Name="SetupMsg" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                     <TextBlock Text="게임 위 오버레이" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="OverlayModeBox" MinWidth="150" SelectionChanged="OverlayModeBox_SelectionChanged">
+                    <ComboBox x:Name="OverlayModeBox" MinWidth="190" SelectionChanged="OverlayModeBox_SelectionChanged">
                         <ComboBoxItem Content="끄기"/>
                         <ComboBoxItem Content="전적만"/>
-                        <ComboBoxItem Content="전체"/>
+                        <ComboBoxItem Content="공개 카드까지"/>
+                        <ComboBoxItem x:Name="MemoryModeItem" Content="확인한 카드까지 (준비 중)" IsEnabled="False"
+                                      ToolTipService.ShowOnDisabled="True" ToolTip="상대가 한 번 공개한 패·덱·세트 카드를 기억하는 기능입니다. 준비 중이라 지금은 고를 수 없습니다."/>
                     </ComboBox>
                 </StackPanel>
+                <TextBlock x:Name="OverlayModeHint" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"/>
                 <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"
                            Text="상대 남은 시간은 서버가 알려주는 값이 아닙니다. 게임의 시간 규칙(시작 300초, 내 턴 +60초, 상대 턴 +30초, 최대 300초)으로 트래커가 계산한 추정치라 실제와 몇 초 다를 수 있습니다."/>
                 <CheckBox x:Name="AlertBox" Margin="0,6,0,0" Checked="Alert_Changed" Unchecked="Alert_Changed"

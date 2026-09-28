@@ -20,10 +20,17 @@ public sealed class Config
     public bool StartWithWindows { get; set; }
     /// Side panel during the duel (kept for configs written before OverlayMode existed).
     public bool LivePanel { get; set; } = true;
-    /// What is drawn over the game: 0 nothing, 1 record only (idle card + deck read/record lines), 2 everything
-    /// (card lists by zone, opponent clock estimate, cursor pop-ups). -1 = not set yet → derived from LivePanel.
+    /// What is drawn over the game: 0 nothing, 1 record only (idle card + deck read/record lines), 2 public cards too
+    /// (graveyards, my banished, the opponent's face-up banished; opponent clock estimate, cursor pop-ups), 3 also
+    /// the cards the opponent showed and hid again (the hidden-card memory — not in release builds while it is
+    /// reworked). -1 = not set yet → derived from LivePanel.
     public int OverlayMode { get; set; } = -1;
-    public int EffectiveOverlayMode => OverlayMode >= 0 ? OverlayMode : (LivePanel ? 2 : 0);
+    [JsonIgnore] public int EffectiveOverlayMode => Math.Min(OverlayMode >= 0 ? OverlayMode : (LivePanel ? 2 : 0), MaxOverlayMode);
+#if TEST_BUILD || HIDDEN_MEMORY
+    public const int MaxOverlayMode = 3;
+#else
+    public const int MaxOverlayMode = 2;
+#endif
     /// Sound when my clock starts running (a choice opens or my turn begins) while the game is not the front window.
     public bool AlertMyTurn { get; set; }
     /// Upload per-duel research samples (clock, card table, reveals) to the site. Off by default; set in config.json.
@@ -244,6 +251,8 @@ public sealed class LiveDuel
     /// names no card.
     public string? BlockedText { get; set; }
     public bool Blocked => BlockedText != null;
+    /// Overlay mode 3: the lists also hold what the opponent showed of their hand, deck, extra deck and set cards.
+    public bool Memory { get; set; }
     public int Turn { get; set; }
     public bool TurnMe { get; set; }
     public bool HoverMe { get; set; }

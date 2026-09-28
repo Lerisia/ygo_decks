@@ -82,7 +82,9 @@ public sealed class Tracker
         }
         var L = Live!;
 #if TEST_BUILD || HIDDEN_MEMORY
-        var opp = RememberHidden(m, t, L);
+        var opp = RememberHidden(m, t, L);   // always runs here: it also writes the research logs
+        L.Memory = Store.Config.EffectiveOverlayMode >= 3;
+        if (!L.Memory) { L.OppHandGhosts = new(); opp = PublicOnly(t, false); }
 #else
         L.BlockedText = PanelBlock;
         var opp = PublicOnly(t, L.Blocked);
@@ -99,12 +101,11 @@ public sealed class Tracker
         LiveUpdated?.Invoke();
     }
 
-#if !(TEST_BUILD || HIDDEN_MEMORY)
-    /// Release builds show public information only (엘리스 2026-09-28): the graveyards, my banished cards and the
-    /// opponent's face-up banished cards. An opponent card anywhere else — hand, deck, extra deck, face-down — gets no
-    /// name, whatever the engine or the game log said about it, and nothing about it is kept. The deck read follows
-    /// what the opponent has shown in the open (face-up on the field, graveyard, face-up banished).
-    /// blocked: the site no longer vouches for this build, so no card gets a name at all.
+    /// Public information only (overlay mode 2, the most a release build does — 엘리스 2026-09-28): the graveyards,
+    /// my banished cards and the opponent's face-up banished cards. An opponent card anywhere else — hand, deck, extra
+    /// deck, face-down — gets no name, whatever the engine or the game log said about it, and nothing about it is
+    /// kept. The deck read follows what the opponent has shown in the open (face-up on the field, graveyard, face-up
+    /// banished). blocked: the site no longer vouches for this build, so no card gets a name at all.
     private List<int> PublicOnly(LiveTick t, bool blocked)
     {
         foreach (var c in t.Cards)
@@ -117,9 +118,10 @@ public sealed class Tracker
         }
         return blocked ? new List<int>() : _shown.Values.ToList();
     }
-#else
-    /// The uid → id memory of cards the opponent showed and hid again (hand, set cards, deck, extra deck). Off in
-    /// release builds since 0.6.12 while it is reworked; the test build and -p:HiddenMemory=true builds still run it.
+
+#if TEST_BUILD || HIDDEN_MEMORY
+    /// The uid → id memory of cards the opponent showed and hid again (hand, set cards, deck, extra deck): overlay
+    /// mode 3. Not compiled into release builds since 0.6.12 while it is reworked, so the mode cannot be picked there.
     private List<int> RememberHidden(PendingMatch m, LiveTick t, LiveDuel L)
     {
         // What was shown once stays known: the game log's uid → id table (hand opens, searches, flips) plus anything

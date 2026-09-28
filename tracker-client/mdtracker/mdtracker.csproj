@@ -19,7 +19,7 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.6.12</Version>
+    <Version>0.6.13</Version>
   </PropertyGroup>
 
   <!-- dotnet publish -p:TestBuild=true: the password-locked test build (leak kept visible, whole captures sent, no updates) -->
@@ -27,8 +27,8 @@
     <DefineConstants>$(DefineConstants);TEST_BUILD</DefineConstants>
   </PropertyGroup>
 
-  <!-- dotnet publish -p:HiddenMemory=true: a build that still follows opponent cards into hidden zones (hand, set cards,
-       deck). Never the public download: release builds name public cards only since 0.6.12, while that memory is reworked. -->
+  <!-- dotnet publish -p:HiddenMemory=true: a build where overlay mode 3 can be picked (opponent cards followed into
+       hidden zones: hand, set cards, deck). Never the public download while that memory is reworked (since 0.6.12). -->
   <PropertyGroup Condition="'$(HiddenMemory)' == 'true'">
     <DefineConstants>$(DefineConstants);HIDDEN_MEMORY</DefineConstants>
   </PropertyGroup>

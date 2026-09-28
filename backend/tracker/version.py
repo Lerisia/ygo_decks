@@ -5,7 +5,7 @@ client reported an older version (or none at all, which means a build from befor
 reporting existed).
 """
 
-LATEST = "0.6.12"
+LATEST = "0.6.13"
 MIN_SUPPORTED = "0.6.12"  # builds below this are refused by TrackerVersionGate (0.6.12: public cards only; older builds follow cards into hidden zones)
 GATE_EXEMPT_USER_IDS = {1, 170, 508}  # 엘리스, 블이수, 특이점 (leak testing) may keep running old builds
 DOWNLOAD_URL = "https://ygodecks.com/media/tracker/mdtracker.exe"

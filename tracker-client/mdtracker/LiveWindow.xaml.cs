@@ -6,8 +6,8 @@ using System.Windows.Media;
 namespace MdTracker;
 
 /// Side card pinned to the game window while a duel runs: opponent deck read, my record, clocks, and the opponent's
-/// public piles (graveyard, face-up banished). Release builds name public cards only; the lists of cards the opponent
-/// showed and hid again belong to the hidden-card memory (test build / -p:HiddenMemory=true).
+/// public piles (graveyard, face-up banished). The lists of cards the opponent showed and hid again belong to overlay
+/// mode 3, the hidden-card memory (LiveDuel.Memory), which release builds do not have.
 public partial class LiveWindow : Window
 {
     private bool _dragged;
@@ -59,15 +59,9 @@ public partial class LiveWindow : Window
         StripDeck.Text = s.BlockedText ?? (top2.Count > 0 ? string.Join(" · 또는 ", top2) : anyOpp ? "판독 중…" : "아직 공개된 카드 없음");
         StripMatchup.Text = s.Blocked ? "" : s.MatchupText ?? (top2.Count > 0 ? "이 매치업은 첫 대결" : "");
         StripMatchup.Visibility = StripMatchup.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        if (full) Fill(StripRows, OppRows(s), ref _stripKey, s.Blocked ? "" : EmptyText);
+        if (full) Fill(StripRows, OppRows(s), ref _stripKey, s.Blocked ? "" : s.Memory ? "상대가 아직 보여준 카드 없음" : "상대 묘지·제외에 카드 없음");
         Place();
     }
-
-#if TEST_BUILD || HIDDEN_MEMORY
-    private const string EmptyText = "상대가 아직 보여준 카드 없음";
-#else
-    private const string EmptyText = "상대 묘지·제외에 카드 없음";
-#endif
 
     private string Name(LiveDuel s, int id) => s.Names.TryGetValue(s.Base(id), out var n) ? n : $"#{id}";
 
@@ -139,7 +133,13 @@ public partial class LiveWindow : Window
             };
         }
         var opp = s.Cards.Where(c => !c.Me).ToList();
-#if TEST_BUILD || HIDDEN_MEMORY
+        if (!s.Memory)
+            return s.HoverZone switch
+            {
+                LiveCard.Grave => ("상대 묘지", Rows(opp.Where(c => c.Zone == LiveCard.Grave))),
+                LiveCard.Banished => ("상대 제외 (앞면)", Rows(opp.Where(c => c.Zone == LiveCard.Banished && c.Face))),
+                _ => null,
+            };
         if (s.HoverZone <= 12)
         {
             var slot = opp.FirstOrDefault(c => c.Zone == s.HoverZone && c.Index == s.HoverIndex);
@@ -155,14 +155,6 @@ public partial class LiveWindow : Window
             LiveCard.ExtraDeck => ("상대 엑스트라 덱 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.ExtraDeck))),
             _ => null,
         };
-#else
-        return s.HoverZone switch
-        {
-            LiveCard.Grave => ("상대 묘지", Rows(opp.Where(c => c.Zone == LiveCard.Grave))),
-            LiveCard.Banished => ("상대 제외 (앞면)", Rows(opp.Where(c => c.Zone == LiveCard.Banished && c.Face))),
-            _ => null,
-        };
-#endif
     }
 
     /// The opponent's graveyard and face-up banished cards. With the hidden-card memory: everything the opponent has
@@ -178,17 +170,20 @@ public partial class LiveWindow : Window
             rows.Add(new Row(0, $"{title} {known.Count}", 0, true));
             foreach (var g in known.GroupBy(c => s.Base(c.Id))) rows.Add(new Row(g.Key, Name(s, g.Key), g.Count(), Frame: s.Frames.GetValueOrDefault(g.Key, "")));
         }
-#if TEST_BUILD || HIDDEN_MEMORY
-        Section("상대 패", c => c.Zone == LiveCard.Hand, s.OppHandGhosts.Select(id => new LiveCard { Id = id }));
-        Section("상대 덱", c => c.Zone == LiveCard.Deck);
-        Section("상대 엑스트라 덱", c => c.Zone == LiveCard.ExtraDeck);
-        Section("상대 세트", c => c.Zone <= 12 && !c.Face);
-        Section("상대 묘지", c => c.Zone == LiveCard.Grave);
-        Section("상대 제외", c => c.Zone == LiveCard.Banished);
-#else
-        Section("상대 묘지", c => c.Zone == LiveCard.Grave);
-        Section("상대 제외 (앞면)", c => c.Zone == LiveCard.Banished && c.Face);
-#endif
+        if (s.Memory)
+        {
+            Section("상대 패", c => c.Zone == LiveCard.Hand, s.OppHandGhosts.Select(id => new LiveCard { Id = id }));
+            Section("상대 덱", c => c.Zone == LiveCard.Deck);
+            Section("상대 엑스트라 덱", c => c.Zone == LiveCard.ExtraDeck);
+            Section("상대 세트", c => c.Zone <= 12 && !c.Face);
+            Section("상대 묘지", c => c.Zone == LiveCard.Grave);
+            Section("상대 제외", c => c.Zone == LiveCard.Banished);
+        }
+        else
+        {
+            Section("상대 묘지", c => c.Zone == LiveCard.Grave);
+            Section("상대 제외 (앞면)", c => c.Zone == LiveCard.Banished && c.Face);
+        }
         return rows;
     }
 
