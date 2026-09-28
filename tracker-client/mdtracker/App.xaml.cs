@@ -8,9 +8,9 @@ namespace MdTracker;
 public partial class App : System.Windows.Application
 {
 #if TEST_BUILD
-    public const string Version = "0.6.11-test";
+    public const string Version = "0.6.12-test";
 #else
-    public const string Version = "0.6.11";
+    public const string Version = "0.6.12";
 #endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
@@ -279,6 +279,7 @@ public partial class App : System.Windows.Application
             try
             {
                 var info = Tracker.Api.LatestVersion();
+                Tracker.Vouch(info);
                 bool must = info != null && !string.IsNullOrEmpty(info.MinSupported) && Behind(info.MinSupported);
                 if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url) && (_offered != info.Latest || must))
                 {

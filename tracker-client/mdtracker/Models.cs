@@ -240,6 +240,10 @@ public sealed class LiveDuel
     /// Opponent cards last seen in hand that have since gone face-down on the field: still listed under the hand,
     /// because a player at the table can't tell which card was set (fair play, 2026-09-28).
     public List<int> OppHandGhosts { get; set; } = new();
+    /// Set while the site does not vouch for this build (refused, or not yet asked): the panel shows this line and
+    /// names no card.
+    public string? BlockedText { get; set; }
+    public bool Blocked => BlockedText != null;
     public int Turn { get; set; }
     public bool TurnMe { get; set; }
     public bool HoverMe { get; set; }

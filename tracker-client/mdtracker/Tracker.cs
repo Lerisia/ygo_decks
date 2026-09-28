@@ -23,6 +23,7 @@ public sealed class Tracker
     private readonly Dictionary<int, int> _lastOppZone = new(); // uid → last zone the card was in while not face-down on the field
     private readonly Dictionary<int, int> _handGhost = new();   // uid → id of a known hand card that went face-down
     private readonly Dictionary<int, int> _staleLog = new();     // uid → the game-log id it had while in the deck: not proof once it leaves
+    private readonly Dictionary<int, int> _shown = new();        // uid → id of opponent cards seen in the open (the deck read's input)
 
     public Tracker(Store store, Api api)
     {
@@ -35,6 +36,7 @@ public sealed class Tracker
         new Thread(GameLoop) { IsBackground = true, Name = "game" }.Start();
         new Thread(RetryLoop) { IsBackground = true, Name = "retry" }.Start();
         new Thread(() => { try { RefreshDecks(); } catch { } }) { IsBackground = true }.Start();
+        CheckSupport();
     }
 
     private void SetStatus(string s, bool connected)
@@ -72,8 +74,54 @@ public sealed class Tracker
     // ---- mid-duel panel ----
     private void OnLiveTick(PendingMatch m, LiveTick t)
     {
-        if (_liveMatch != m) { _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = ""; _knownOpp.Clear(); _staleLog.Clear(); _lastOppZone.Clear(); _handGhost.Clear(); _liveStart = DateTime.Now; }
+        if (_liveMatch != m)
+        {
+            _liveMatch = m; Live = new LiveDuel { OppName = m.OppName, MyExtraIds = m.MyExtraCards.ToHashSet() }; _liveKey = "";
+            _knownOpp.Clear(); _staleLog.Clear(); _lastOppZone.Clear(); _handGhost.Clear(); _shown.Clear(); _liveStart = DateTime.Now;
+            CheckSupport();
+        }
         var L = Live!;
+#if TEST_BUILD || HIDDEN_MEMORY
+        var opp = RememberHidden(m, t, L);
+#else
+        L.BlockedText = PanelBlock;
+        var opp = PublicOnly(t, L.Blocked);
+#endif
+        L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.Cards = t.Cards; L.HoverMe = t.HoverMe; L.HoverZone = t.HoverZone; L.HoverIndex = t.HoverIndex;
+        L.MySecLeft = t.MySecLeft; L.OppSecLeft = t.OppSecLeft;
+        var key = string.Join(",", opp.OrderBy(x => x));
+        // First call names my decklist even before the opponent shows anything; later calls follow new opponent cards.
+        if ((key != _liveKey || L.MyDeckList.Count == 0) && !_liveBusy && !L.Blocked && Store.Config.Token != null)
+        {
+            _liveKey = key; _liveBusy = true;
+            new Thread(() => LiveLookup(m, L, opp)) { IsBackground = true }.Start();
+        }
+        LiveUpdated?.Invoke();
+    }
+
+#if !(TEST_BUILD || HIDDEN_MEMORY)
+    /// Release builds show public information only (엘리스 2026-09-28): the graveyards, my banished cards and the
+    /// opponent's face-up banished cards. An opponent card anywhere else — hand, deck, extra deck, face-down — gets no
+    /// name, whatever the engine or the game log said about it, and nothing about it is kept. The deck read follows
+    /// what the opponent has shown in the open (face-up on the field, graveyard, face-up banished).
+    /// blocked: the site no longer vouches for this build, so no card gets a name at all.
+    private List<int> PublicOnly(LiveTick t, bool blocked)
+    {
+        foreach (var c in t.Cards)
+        {
+            if (blocked) { c.Id = 0; continue; }
+            if (c.Me || c.Id == 0) continue;
+            bool open = c.Zone == LiveCard.Grave || (c.Face && (c.Zone == LiveCard.Banished || c.Zone <= 12));
+            if (!open) c.Id = 0;
+            else if (c.Uid != 0) _shown[c.Uid] = c.Id;
+        }
+        return blocked ? new List<int>() : _shown.Values.ToList();
+    }
+#else
+    /// The uid → id memory of cards the opponent showed and hid again (hand, set cards, deck, extra deck). Off in
+    /// release builds since 0.6.12 while it is reworked; the test build and -p:HiddenMemory=true builds still run it.
+    private List<int> RememberHidden(PendingMatch m, LiveTick t, LiveDuel L)
+    {
         // What was shown once stays known: the game log's uid → id table (hand opens, searches, flips) plus anything
         // the engine has named on a tick. A revealed card that goes back to hand or is set face-down keeps its name —
         // unless it passes through the deck (below).
@@ -140,17 +188,44 @@ public sealed class Tracker
         // research feed: the opponent's whole table every ~5s, engine id and shown id side by side
         if (++_tableTick % 10 == 0 && m.TableLog.Count < 400)
             m.TableLog.Add($"{stamp:0}|" + string.Join(",", t.Cards.Where(c => !c.Me).Select(c => $"{c.Uid}:{c.Zone}:{engineIds.GetValueOrDefault(c.Uid)}:{c.Id}:{(c.Face ? 1 : 0)}")));
-        L.Turn = t.Turn; L.TurnMe = t.TurnMe; L.Cards = t.Cards; L.HoverMe = t.HoverMe; L.HoverZone = t.HoverZone; L.HoverIndex = t.HoverIndex;
-        L.MySecLeft = t.MySecLeft; L.OppSecLeft = t.OppSecLeft;
-        var opp = t.Cards.Where(c => !c.Me).Select(c => c.Id).Concat(L.OppHandGhosts).ToList();   // ghosts keep the deck read steady when a known card is set
-        var key = string.Join(",", opp.OrderBy(x => x));
-        // First call names my decklist even before the opponent shows anything; later calls follow new opponent cards.
-        if ((key != _liveKey || L.MyDeckList.Count == 0) && !_liveBusy && Store.Config.Token != null)
+        return t.Cards.Where(c => !c.Me).Select(c => c.Id).Concat(L.OppHandGhosts).ToList();   // ghosts keep the deck read steady when a known card is set
+    }
+#endif
+
+    /// Why the duel panel names no card right now, or null when it may. The site has to vouch for this build: it is
+    /// asked at start, every 30 minutes and whenever a duel starts. Until it has said yes — and once it says no, or
+    /// has not answered for two hours — no card gets a name, so a build found unsafe later stops showing cards even
+    /// for someone who never updates or keeps the tracker offline.
+    public string? PanelBlock =>
+#if TEST_BUILD
+        null;   // the test build has its own lock (TestGate)
+#else
+        _refused ? "업데이트가 필요합니다 — 카드 표시가 꺼져 있습니다"
+        : _vouched && (DateTime.UtcNow - _vouchedAt).TotalHours < 2 ? null
+        : "서버 확인 중 — 확인되면 카드 표시가 켜집니다";
+#endif
+    private volatile bool _refused;
+    private volatile bool _vouched;
+    private DateTime _vouchedAt;
+    private int _vouchBusy;
+
+    public void CheckSupport()
+    {
+        if (Interlocked.Exchange(ref _vouchBusy, 1) == 1) return;
+        new Thread(() =>
         {
-            _liveKey = key; _liveBusy = true;
-            new Thread(() => LiveLookup(m, L, opp)) { IsBackground = true }.Start();
-        }
-        LiveUpdated?.Invoke();
+            try { Vouch(Api.LatestVersion()); }
+            catch (Exception ex) { Log.Info("support check: " + ex.Message); }
+            finally { Interlocked.Exchange(ref _vouchBusy, 0); }
+        }) { IsBackground = true }.Start();
+    }
+
+    public void Vouch(VersionResponse? info)
+    {
+        if (info == null || string.IsNullOrEmpty(info.MinSupported)) return;   // no answer: the last one stands until it is two hours old
+        bool ok = !App.Behind(info.MinSupported);
+        if (ok != _vouched || ok == _refused) Log.Info(ok ? "the site vouches for this build" : $"the site no longer supports this build (needs {info.MinSupported}): the duel panel names no card");
+        _vouchedAt = DateTime.UtcNow; _vouched = ok; _refused = !ok;
     }
 
     /// Opponent deck read + this user's record in that matchup, refreshed whenever new opponent cards appear.
@@ -180,7 +255,9 @@ public sealed class Tracker
     private void EndLive() { _liveMatch = null; Live = null; LiveEnded?.Invoke(); }
 
     private DateTime _liveStart;
+#if TEST_BUILD || HIDDEN_MEMORY
     private int _tableTick;
+#endif
     /// Research feed: note the moment an opponent card in a hidden zone (hand/deck/extra) first got a name.
     private static void Reveal(PendingMatch m, double t, int uid, int id, List<LiveCard> cards, string src)
     {

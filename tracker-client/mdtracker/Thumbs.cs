@@ -18,7 +18,8 @@ public static class Thumbs
         {
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.UriSource = new Uri($"{App.Tracker.Store.Config.ServerUrl.TrimEnd('/')}/api/card-thumb/{cardId}/");
+            // ?v=: the site only hands pictures to a build it still supports
+            bmp.UriSource = new Uri($"{App.Tracker.Store.Config.ServerUrl.TrimEnd('/')}/api/card-thumb/{cardId}/?v={App.Version.Split('-')[0]}");
             bmp.DecodePixelWidth = 48;
             bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.EndInit();

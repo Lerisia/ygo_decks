@@ -342,6 +342,9 @@ class QuizAllTimeBestBackfillTest(TestCase):
             QuizAllTimeBest.objects.create(user=u, score=10, streak=1, achieved_at=timezone.now())
 
 
+from tracker.version import MIN_SUPPORTED
+
+
 class CardThumbTests(TestCase):
     """Tracker overlay thumbnails: cut once from the illustration, then served from media."""
 
@@ -355,11 +358,20 @@ class CardThumbTests(TestCase):
                 card = Card.objects.create(card_id="c1", konami_id="4041", name="Dark Magician",
                                            card_illust=SimpleUploadedFile("4041.jpg", buf.getvalue(), content_type="image/jpeg"))
                 CardIdAlias.objects.create(md_id=23487, card=card)
-                res = self.client.get("/api/card-thumb/4041/")
+                res = self.client.get("/api/card-thumb/4041/?v=" + MIN_SUPPORTED)
                 self.assertEqual(res.status_code, 302)
                 self.assertTrue(res["Location"].endswith("/card_thumbs/4041_48.jpg"))
                 out = os.path.join(media, "card_thumbs", "4041_48.jpg")
                 self.assertEqual(Image.open(out).size, (48, 48))
                 # an alt-art id resolves to the same base card
-                self.assertEqual(self.client.get("/api/card-thumb/23487/")["Location"], res["Location"])
-                self.assertEqual(self.client.get("/api/card-thumb/999999/").status_code, 404)
+                self.assertEqual(self.client.get("/api/card-thumb/23487/?v=" + MIN_SUPPORTED)["Location"], res["Location"])
+                self.assertEqual(self.client.get("/api/card-thumb/999999/?v=" + MIN_SUPPORTED).status_code, 404)
+
+    def test_thumb_is_refused_to_a_build_the_site_no_longer_supports(self):
+        # Builds up to 0.6.11 ask without saying who they are: refused, so an old build's card lists lose their pictures too.
+        with patch("tracker.version.MIN_SUPPORTED", "0.6.12"):
+            self.assertEqual(self.client.get("/api/card-thumb/4041/").status_code, 426)
+            self.assertEqual(self.client.get("/api/card-thumb/4041/?v=0.6.11").status_code, 426)
+            self.assertEqual(self.client.get("/api/card-thumb/4041/?v=junk").status_code, 426)
+            self.assertEqual(self.client.get("/api/card-thumb/4041/?v=0.6.12").status_code, 404)   # let through: no such card here
+            self.assertEqual(self.client.get("/api/card-thumb/4041/?v=0.7.0").status_code, 404)

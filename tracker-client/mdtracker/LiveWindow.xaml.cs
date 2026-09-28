@@ -5,8 +5,9 @@ using System.Windows.Media;
 
 namespace MdTracker;
 
-/// Side card pinned to the game window while a duel runs: opponent deck read, my record, clocks, and every card the
-/// opponent has shown, by zone. My own deck is a separate pop-up beside the cursor (DeckPopupWindow).
+/// Side card pinned to the game window while a duel runs: opponent deck read, my record, clocks, and the opponent's
+/// public piles (graveyard, face-up banished). Release builds name public cards only; the lists of cards the opponent
+/// showed and hid again belong to the hidden-card memory (test build / -p:HiddenMemory=true).
 public partial class LiveWindow : Window
 {
     private bool _dragged;
@@ -55,12 +56,18 @@ public partial class LiveWindow : Window
         if (full && s.Turn > 0 && s.MySecLeft > 0) StripTurn.Text += $" · 상대 남은 시간(추정) {s.OppSecLeft}초";   // my own clock is on screen already; the opponent's is never sent, so this is our replay of the clock rules
         var top2 = s.OppCandidates.Take(2).Select(c => $"{c.Name} {Math.Round(c.Share * 100)}%").ToList();
         bool anyOpp = s.Cards.Any(c => !c.Me);
-        StripDeck.Text = top2.Count > 0 ? string.Join(" · 또는 ", top2) : anyOpp ? "판독 중…" : "아직 공개된 카드 없음";
-        StripMatchup.Text = s.MatchupText ?? (top2.Count > 0 ? "이 매치업은 첫 대결" : "");
+        StripDeck.Text = s.BlockedText ?? (top2.Count > 0 ? string.Join(" · 또는 ", top2) : anyOpp ? "판독 중…" : "아직 공개된 카드 없음");
+        StripMatchup.Text = s.Blocked ? "" : s.MatchupText ?? (top2.Count > 0 ? "이 매치업은 첫 대결" : "");
         StripMatchup.Visibility = StripMatchup.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        if (full) Fill(StripRows, OppRows(s), ref _stripKey, "상대가 아직 보여준 카드 없음");
+        if (full) Fill(StripRows, OppRows(s), ref _stripKey, s.Blocked ? "" : EmptyText);
         Place();
     }
+
+#if TEST_BUILD || HIDDEN_MEMORY
+    private const string EmptyText = "상대가 아직 보여준 카드 없음";
+#else
+    private const string EmptyText = "상대 묘지·제외에 카드 없음";
+#endif
 
     private string Name(LiveDuel s, int id) => s.Names.TryGetValue(s.Base(id), out var n) ? n : $"#{id}";
 
@@ -104,9 +111,9 @@ public partial class LiveWindow : Window
         return rows;
     }
 
-    /// What the cursor pop-up should show for the zone the game cursor is on, or null for nothing.
-    /// My zones → their contents; their piles → the list. An opponent's face-down field card shows nothing (its id is
-    /// blanked in release builds — fair play).
+    /// What the cursor pop-up should show for the zone the game cursor is on, or null for nothing: a graveyard, my
+    /// banished cards, the opponent's face-up banished cards. The hidden-card memory adds the opponent's hand, deck,
+    /// extra deck and set cards (what they showed of them).
     public (string title, List<Row> rows)? HoverRows(LiveDuel s)
     {
         var r = HoverRowsRaw(s);
@@ -117,7 +124,7 @@ public partial class LiveWindow : Window
 
     private (string title, List<Row> rows)? HoverRowsRaw(LiveDuel s)
     {
-        if (s.HoverZone < 0) return null;
+        if (s.HoverZone < 0 || s.Blocked) return null;
         List<Row> Rows(IEnumerable<LiveCard> cards) => cards.Where(c => c.Id != 0)
             .GroupBy(c => s.Base(c.Id)).Select(g => new Row(g.Key, Name(s, g.Key), g.Count(), Frame: s.Frames.GetValueOrDefault(g.Key, ""))).ToList();
         if (s.HoverMe)
@@ -132,6 +139,7 @@ public partial class LiveWindow : Window
             };
         }
         var opp = s.Cards.Where(c => !c.Me).ToList();
+#if TEST_BUILD || HIDDEN_MEMORY
         if (s.HoverZone <= 12)
         {
             var slot = opp.FirstOrDefault(c => c.Zone == s.HoverZone && c.Index == s.HoverIndex);
@@ -147,10 +155,18 @@ public partial class LiveWindow : Window
             LiveCard.ExtraDeck => ("상대 엑스트라 덱 (공개된 것)", Rows(opp.Where(c => c.Zone == LiveCard.ExtraDeck))),
             _ => null,
         };
+#else
+        return s.HoverZone switch
+        {
+            LiveCard.Grave => ("상대 묘지", Rows(opp.Where(c => c.Zone == LiveCard.Grave))),
+            LiveCard.Banished => ("상대 제외 (앞면)", Rows(opp.Where(c => c.Zone == LiveCard.Banished && c.Face))),
+            _ => null,
+        };
+#endif
     }
 
-    /// Everything the opponent has ever shown, by where it is now: hand, deck, extra deck, set cards (only the ones
-    /// ever seen), graveyard, banished. Face-up field cards are visible in the game itself.
+    /// The opponent's graveyard and face-up banished cards. With the hidden-card memory: everything the opponent has
+    /// ever shown, by where it is now (hand, deck, extra deck, set cards). Face-up field cards are visible in the game.
     private List<Row> OppRows(LiveDuel s)
     {
         var rows = new List<Row>();
@@ -162,12 +178,17 @@ public partial class LiveWindow : Window
             rows.Add(new Row(0, $"{title} {known.Count}", 0, true));
             foreach (var g in known.GroupBy(c => s.Base(c.Id))) rows.Add(new Row(g.Key, Name(s, g.Key), g.Count(), Frame: s.Frames.GetValueOrDefault(g.Key, "")));
         }
+#if TEST_BUILD || HIDDEN_MEMORY
         Section("상대 패", c => c.Zone == LiveCard.Hand, s.OppHandGhosts.Select(id => new LiveCard { Id = id }));
         Section("상대 덱", c => c.Zone == LiveCard.Deck);
         Section("상대 엑스트라 덱", c => c.Zone == LiveCard.ExtraDeck);
         Section("상대 세트", c => c.Zone <= 12 && !c.Face);
         Section("상대 묘지", c => c.Zone == LiveCard.Grave);
         Section("상대 제외", c => c.Zone == LiveCard.Banished);
+#else
+        Section("상대 묘지", c => c.Zone == LiveCard.Grave);
+        Section("상대 제외 (앞면)", c => c.Zone == LiveCard.Banished && c.Face);
+#endif
         return rows;
     }
 
