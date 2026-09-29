@@ -38,9 +38,19 @@ class TrackerDeckMap(models.Model):
         return f"{self.user.username}: {self.md_deck_id} → {self.deck.name}"
 
 
+class TrackerGameQuerySet(models.QuerySet):
+    def corrected(self):
+        """Saved games whose opponent deck differs from what the server suggested at duel end — the user fixed it.
+        '모름/기타' (no deck) is not counted: that is giving up, not a correction."""
+        return (self.filter(match__isnull=False, match__is_deleted=False, match__opponent_deck__isnull=False,
+                            suggested_opp_deck__isnull=False)
+                .exclude(match__opponent_deck=models.F("suggested_opp_deck")))
+
+
 class TrackerGame(models.Model):
     """Raw capture of every duel the tracker sees — full own decklist and every opponent card revealed —
     kept regardless of whether the user confirmed a record. Card ids are Konami ids (alt arts resolved)."""
+    objects = TrackerGameQuerySet.as_manager()
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tracker_games")
     did = models.CharField(max_length=32)
     game_mode = models.IntegerField(help_text="3 rank, 19 rate")
@@ -65,6 +75,8 @@ class TrackerGame(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
     match = models.ForeignKey("tool.MatchRecord", on_delete=models.SET_NULL, null=True, blank=True, related_name="tracker_games")
+    suggested_opp_deck = models.ForeignKey("deck.Deck", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                           help_text="판이 끝났을 때 서버가 제안한 상대 덱 (유저가 다른 덱으로 저장하면 교정)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -72,6 +84,12 @@ class TrackerGame(models.Model):
         constraints = [models.UniqueConstraint(fields=["user", "did"], name="uniq_tracker_game_user_did")]
         verbose_name = "레코더 게임 원본"
         verbose_name_plural = "레코더 게임 원본"
+
+    @property
+    def corrected(self):
+        m = self.match
+        return bool(m and not m.is_deleted and m.opponent_deck_id and self.suggested_opp_deck_id
+                    and m.opponent_deck_id != self.suggested_opp_deck_id)
 
     def __str__(self):
         return f"{self.user.username} {self.did} {self.result}"

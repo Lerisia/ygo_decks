@@ -909,3 +909,48 @@ class TrackerCardSpecificityTest(TestCase):
         cands, _ = infer_decks([307])
         self.assertAlmostEqual(cands[0]["score"], 1.0, places=2)
 
+
+
+class TrackerSuggestionCaptureTest(TestCase):
+    """판이 끝날 때 서버가 제안한 상대 덱을 남겨, 유저가 다른 덱으로 저장하면 '교정'으로 구분한다 (특이점 2026-09-30)."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        from tool.models import RecordGroup
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="sg@test.com", username="suggest", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.ign = _create_deck("@이그니스터")
+        self.mal = _create_deck("M∀LICE")
+        DeckArchetype.objects.create(deck=self.ign, name="@Ignister")
+        Card.objects.create(card_id="c501", konami_id="501", name="이그니스터 카드", archetype="@Ignister", frame_type="effect")
+        self.group = RecordGroup.objects.create(user=self.user, name="교정")
+        self.capture = {"did": "900000000000000001", "game_mode": 3, "result": "win", "coin_win": True, "first": True,
+                        "turn": 3, "my_cards": [], "opp_cards": [501], "ended_at": "2026-09-30T10:00:00"}
+
+    def _game(self):
+        from tracker.models import TrackerGame
+        return TrackerGame.objects.get(user=self.user, did=self.capture["did"])
+
+    def test_game_upload_keeps_the_deck_suggested_at_duel_end(self):
+        self.assertEqual(self.client.post("/api/tracker/games/", self.capture, format="json").status_code, 201)
+        self.assertEqual(self._game().suggested_opp_deck_id, self.ign.id)
+
+    def test_reupload_does_not_overwrite_the_first_suggestion(self):
+        from deck.models import DeckArchetype
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        DeckArchetype.objects.filter(deck=self.ign).update(deck=self.mal)   # inference would now say M∀LICE
+        self.client.post("/api/tracker/games/", {**self.capture, "turn": 4}, format="json")
+        self.assertEqual(self._game().suggested_opp_deck_id, self.ign.id)
+
+    def test_saving_a_different_deck_marks_the_game_corrected(self):
+        from tracker.models import TrackerGame
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {
+            "deck": None, "opponent_deck": self.mal.id, "first_or_second": "first", "result": "win",
+            "coin_toss_result": "win", "tracker_did": self.capture["did"]}, format="json")
+        g = self._game()
+        self.assertEqual(g.match.opponent_deck_id, self.mal.id)
+        self.assertTrue(g.corrected)
+        self.assertEqual(list(TrackerGame.objects.corrected()), [g])

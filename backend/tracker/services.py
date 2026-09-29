@@ -126,6 +126,14 @@ def upsert_game(user, data, legacy_turn=False):
         "ended_at": _dt(data.get("ended_at")),
     }
     obj, created = TrackerGame.objects.update_or_create(user=user, did=did, defaults=fields)
+    # Keep what the server suggested when the duel ended, so a record saved with another deck reads as a correction.
+    # Only the first suggestion counts — a later re-upload must not rewrite what the person was shown.
+    if obj.suggested_opp_deck_id is None and opp_ids:
+        from .inference import infer_decks
+        cands, _ = infer_decks(opp_ids)
+        if cands:
+            obj.suggested_opp_deck_id = cands[0]["deck_id"]
+            obj.save(update_fields=["suggested_opp_deck"])
     return obj, created
 
 
