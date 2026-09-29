@@ -840,3 +840,72 @@ class TrackerRankWinsTest(TestCase):
         res = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**hand, "rank": "gold3", "wins": 4}, format="json")
         self.assertEqual(res.status_code, 201)
         self.assertEqual(MatchRecord.objects.get(id=res.json()["match_id"]).wins, 4)
+
+
+class TrackerCardSpecificityTest(TestCase):
+    """지엽적인 카드일수록 표가 무겁게 (특이점 2026-09-29): 범용 카드(알미라지)가 전용 카드(해머·로어)를 이기지 못하게."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        from tracker.models import TrackerCardDeckStat
+        self.tri = _create_deck("트라이브리게이드")
+        self.tri.is_engine = True
+        self.tri.save(update_fields=["is_engine"])
+        self.sala = _create_deck("샐러맨그레이트")
+        self.others = [_create_deck(f"다른덱{i}") for i in range(5)]
+        DeckArchetype.objects.create(deck=self.tri, name="Tri-Brigade")
+        DeckArchetype.objects.create(deck=self.sala, name="Salamangreat")
+        Card.objects.create(card_id="c301", konami_id="301", name="해머", archetype="Tri-Brigade", frame_type="spell")
+        Card.objects.create(card_id="c302", konami_id="302", name="로어", archetype="Tri-Brigade", frame_type="spell")
+        Card.objects.create(card_id="c303", konami_id="303", name="알미라지", archetype="Salamangreat", frame_type="link")
+        Card.objects.create(card_id="c304", konami_id="304", name="샐러 메인", archetype="Salamangreat", frame_type="effect")
+        # 알미라지: 30 labeled duels, only 2 of them Salamangreat
+        TrackerCardDeckStat.objects.create(konami_id=303, deck=self.sala, games=2)
+        for d in self.others:
+            TrackerCardDeckStat.objects.create(konami_id=303, deck=d, games=5)
+        # the Salamangreat main-deck card is almost always Salamangreat
+        TrackerCardDeckStat.objects.create(konami_id=304, deck=self.sala, games=9)
+
+    def test_generic_card_does_not_beat_specific_cards(self):
+        cands, _ = infer_decks([301, 302, 303])
+        self.assertEqual(cands[0]["name"], "트라이브리게이드")
+
+    def test_specific_card_keeps_full_weight(self):
+        cands, _ = infer_decks([304])
+        self.assertEqual(cands[0]["name"], "샐러맨그레이트")
+        self.assertAlmostEqual(cands[0]["score"], 1.0, places=1)
+
+    def test_extra_deck_card_without_data_counts_less_than_main_deck_card(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        code = _create_deck("코드 토커")
+        DeckArchetype.objects.create(deck=code, name="Code Talker")
+        Card.objects.create(card_id="c305", konami_id="305", name="액세스코드", archetype="Code Talker", frame_type="link")
+        cands, _ = infer_decks([305, 304])   # both non-engine, neither has enough records to judge
+        self.assertEqual(cands[0]["name"], "샐러맨그레이트")
+
+    def test_generic_card_alone_cannot_push_down_an_engine_deck(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        from tracker.models import TrackerCardDeckStat
+        code = _create_deck("코드 토커")
+        DeckArchetype.objects.create(deck=code, name="Code Talker")
+        Card.objects.create(card_id="c306", konami_id="306", name="범용 링크", archetype="Code Talker", frame_type="link")
+        TrackerCardDeckStat.objects.create(konami_id=306, deck=code, games=1)
+        TrackerCardDeckStat.objects.create(konami_id=306, deck=self.others[0], games=9)   # weight ≈ 0.28, above 20% of 1.0
+        cands, _ = infer_decks([301, 306])
+        self.assertEqual(cands[0]["name"], "트라이브리게이드")
+
+    def test_branded_cards_keep_full_weight_even_when_splashed(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        from tracker.models import TrackerCardDeckStat
+        branded = _create_deck("낙인")
+        DeckArchetype.objects.create(deck=branded, name="Branded")
+        Card.objects.create(card_id="c307", konami_id="307", name="낙인 카드", archetype="Branded", frame_type="spell")
+        TrackerCardDeckStat.objects.create(konami_id=307, deck=branded, games=2)
+        TrackerCardDeckStat.objects.create(konami_id=307, deck=self.others[1], games=10)
+        cands, _ = infer_decks([307])
+        self.assertAlmostEqual(cands[0]["score"], 1.0, places=2)
+

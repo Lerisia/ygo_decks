@@ -5,6 +5,18 @@ from card.models import Card, CardIdAlias, CardArchetypeOverride
 from deck.models import DeckArchetype, DeckInferencePriority
 from .learned import learned_decks
 
+# 지엽적인 카드에 더 큰 표를 준다 (특이점 2026-09-29). 기록된 듀얼에서 그 카드가 보였을 때 실제로 자기 테마 덱이었던
+# 비율이 SPEC_FULL_SHARE 이상이면 표 1, 그보다 낮으면 비례해서 줄인다(최소 SPEC_FLOOR). 기록이 SPEC_MIN_GAMES 판
+# 미만이면 판단 근거가 없으니 엑스트라 덱 몬스터는 EXTRA_PRIOR, 메인 덱 카드는 1로 본다(액세스코드 토커 같은 범용 엑덱).
+SPEC_MIN_GAMES = 5
+SPEC_FULL_SHARE = 0.6
+SPEC_FLOOR = 0.1
+EXTRA_PRIOR = 0.6
+EXTRA_FRAME_WORDS = ("fusion", "synchro", "xyz", "link")
+# 엔진 덱을 뒤로 미는 근거는 지엽적인 카드(가중치 SPECIFIC_MIN 이상)만 인정한다 — 범용 카드 한 장이 전용 카드를 보인
+# 엔진 덱을 밀어내지 않게.
+SPECIFIC_MIN = 0.5
+
 # 엔진 덱은 다른 덱의 용병으로 섞이는 경우가 많아, 비엔진 덱이 함께 보이면 그쪽을 먼저 제안한다
 # (특이점 2026-09-15). 비엔진 후보 점수가 엔진 후보 점수의 이 비율 이상이면 엔진 후보를 뒤로 보낸다.
 ENGINE_DEMOTE_MIN_RATIO = 0.2
@@ -42,27 +54,40 @@ def infer_decks(card_ids, limit=3):
     counts = Counter(str(c) for c in resolved if c)
     if not counts:
         return [], []
-    cards = {c.konami_id: c for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype")}
+    cards = {}
+    for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype", "frame_type"):
+        if c.konami_id not in cards or (c.frame_type and not cards[c.konami_id].frame_type):
+            cards[c.konami_id] = c
     unknown = sorted(int(k) for k in counts if k not in cards and k.isdigit())
     overrides = {o.konami_id: o.archetype for o in CardArchetypeOverride.objects.filter(konami_id__in=list(counts))}
-    arch_votes = Counter()
-    for kid, n in counts.items():
+    card_arch = {}
+    for kid in counts:
         card = cards.get(kid)
-        if not card:
-            continue
-        archetype = overrides.get(kid, card.archetype)
+        archetype = overrides.get(kid, card.archetype) if card else None
         if archetype:
-            arch_votes[archetype] += n
-    if not arch_votes:
+            card_arch[kid] = archetype
+    if not card_arch:
         return learned_decks(resolved, limit), unknown
+    arch_rows = defaultdict(list)
+    for da in DeckArchetype.objects.filter(name__in=set(card_arch.values())).select_related("deck"):
+        arch_rows[da.name].append(da)
+    weights = card_specificity(card_arch, arch_rows, cards)
+    arch_votes = Counter()
+    for kid, archetype in card_arch.items():
+        arch_votes[archetype] += counts[kid] * weights[kid]
+    arch_specific = defaultdict(float)
+    for kid, archetype in card_arch.items():
+        arch_specific[archetype] = max(arch_specific[archetype], weights[kid])
     scores = defaultdict(float)
-    names, engines = {}, {}
-    for da in DeckArchetype.objects.filter(name__in=list(arch_votes)).select_related("deck"):
-        scores[da.deck_id] += arch_votes[da.name] * da.weight
-        names[da.deck_id] = da.deck.name
-        engines[da.deck_id] = da.deck.is_engine
+    names, engines, specific = {}, {}, defaultdict(float)
+    for archetype, rows in arch_rows.items():
+        for da in rows:
+            scores[da.deck_id] += arch_votes[archetype] * da.weight
+            names[da.deck_id] = da.deck.name
+            engines[da.deck_id] = da.deck.is_engine
+            specific[da.deck_id] = max(specific[da.deck_id], arch_specific[archetype])
     total = sum(arch_votes.values())
-    best_plain = max((s for d, s in scores.items() if not engines[d]), default=0.0)
+    best_plain = max((s for d, s in scores.items() if not engines[d] and specific[d] >= SPECIFIC_MIN), default=0.0)
     beaten = {p.loser_id for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores)}
 
     def demoted(deck_id, score):
@@ -72,6 +97,28 @@ def infer_decks(card_ids, limit=3):
     if not ranked:
         return learned_decks(resolved, limit), unknown
     return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d]} for d, s in ranked], unknown
+
+
+def card_specificity(card_arch, arch_rows, cards):
+    """Vote weight per card id: how reliably seeing this card meant its own theme's deck in recorded duels."""
+    from .models import TrackerCardDeckStat
+    seen, hits = Counter(), Counter()
+    for kid, deck_id, n in TrackerCardDeckStat.objects.filter(konami_id__in=[int(k) for k in card_arch]).values_list("konami_id", "deck_id", "games"):
+        k = str(kid)
+        seen[k] += n
+        if deck_id in {da.deck_id for da in arch_rows.get(card_arch.get(k), [])}:
+            hits[k] += n
+    weights = {}
+    for kid in card_arch:
+        if any(da.deck.name in ENGINE_ALWAYS_TOP for da in arch_rows.get(card_arch[kid], [])):
+            weights[kid] = 1.0   # 낙인: its cards also get splashed elsewhere, but pure builds dominate — keep full weight
+        elif seen[kid] >= SPEC_MIN_GAMES:
+            share = (hits[kid] + 1) / (seen[kid] + 2)   # smoothed so one odd label doesn't swing it
+            weights[kid] = max(SPEC_FLOOR, min(1.0, share / SPEC_FULL_SHARE))
+        else:
+            frame = (cards[kid].frame_type or "") if kid in cards else ""
+            weights[kid] = EXTRA_PRIOR if any(w in frame for w in EXTRA_FRAME_WORDS) else 1.0
+    return weights
 
 
 def card_names(card_ids):
