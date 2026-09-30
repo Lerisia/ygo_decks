@@ -352,7 +352,7 @@ export default function DatabasePage() {
               <img
                 src={deck.cover_image || "/default_cover.png"}
                 alt={deck.name}
-                className="w-full h-24 md:h-28 object-cover rounded-lg"
+                className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
               />
               {deck.is_engine && (
                 <span
