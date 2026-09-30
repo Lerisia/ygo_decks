@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import cases from "./deckSearchCases.json";
 import { expandCompoundJamo, getInitials, isInitialsOnly, matchesDeckQuery, matchesInitials } from "./hangul";
 
 describe("expandCompoundJamo", () => {
@@ -58,5 +59,11 @@ describe("matchesDeckQuery", () => {
   });
   it("is case-insensitive", () => {
     expect(matchesDeckQuery("bf", "BF")).toBe(true);
+  });
+});
+
+describe("shared deck search cases (same file the PC recorder tests against)", () => {
+  it.each(cases.cases)("$query → $name", (c) => {
+    expect(matchesDeckQuery(c.query, c.name, c.aliases ?? [])).toBe(c.expect);
   });
 });

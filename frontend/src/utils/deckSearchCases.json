@@ -1,0 +1,25 @@
+{
+  "_comment": "Deck search cases shared by the site (hangul.test.ts) and the PC recorder (tracker-client/mdtracker.Tests). Both engines must agree on every case.",
+  "cases": [
+    { "query": "하얀숲", "name": "하얀 숲", "expect": true },
+    { "query": "하얀 숲", "name": "하얀 숲", "expect": true },
+    { "query": "얀숲", "name": "하얀 숲", "expect": true },
+    { "query": "블랙매", "name": "블랙 매지션", "expect": true },
+    { "query": "하얀숲", "name": "크샤트리라", "expect": false },
+    { "query": "블랙페더", "name": "BF", "aliases": ["블랙 페더"], "expect": true },
+    { "query": "bf", "name": "BF", "expect": true },
+    { "query": "ㅎㅇㅅ", "name": "하얀 숲", "expect": true },
+    { "query": "ㅎㅇ ㅅ", "name": "하얀 숲", "expect": true },
+    { "query": "ㅋㄹㅌ", "name": "킬러튠", "expect": true },
+    { "query": "ㅋㄾ", "name": "킬러튠", "expect": true },
+    { "query": "ㅋㄾ", "name": "크샤트리라", "expect": false },
+    { "query": "ㅄㄷ", "name": "라뷰린스", "aliases": ["백설 던전"], "expect": true },
+    { "query": "ㄳ", "name": "기사", "expect": true },
+    { "query": "ㅀ", "name": "라헬", "expect": true },
+    { "query": "ㄲ", "name": "꼬마", "expect": true },
+    { "query": "ㄱ", "name": "꼬마", "expect": false },
+    { "query": "ㄹㅌ", "name": "킬러튠", "expect": false },
+    { "query": "ㅍㄹㄴㅇㅂㄹ", "name": "푸른 눈의 백룡", "expect": true },
+    { "query": "", "name": "아무 덱", "expect": true }
+  ]
+}
