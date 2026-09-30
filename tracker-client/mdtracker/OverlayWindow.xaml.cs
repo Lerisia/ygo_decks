@@ -59,8 +59,9 @@ public partial class OverlayWindow : Window
         _oppDeck = _t.Store.Decks.FirstOrDefault(d => d.Id == _m.SuggestedOppDeckId);
         _oppUnknown = _oppDeck == null;
         OppDeckBox.Text = _oppDeck?.Name ?? "모름/기타";
-        var top2 = _m.OppCandidates.Take(2).Select(c => $"{c.Name} {Math.Round(c.Share * 100)}%").ToList();
-        OppHint.Text = top2.Count > 0 ? "추천 " + string.Join(" · 또는 ", top2) : "판독 근거 없음";
+        var top = _m.OppCandidates.FirstOrDefault();
+        OppHint.Text = top != null ? $"추천 {top.Name} {Math.Round(top.Share * 100)}%" : "판독 근거 없음";
+        RenderOppAlts();
         if (_m.Error != null) Msg.Text = _m.Error;
         if (_m.IsDemo) { Headline.Text += "   (미리보기 — 저장되지 않음)"; }
 
@@ -170,14 +171,38 @@ public partial class OverlayWindow : Window
         if (MyDeckList.SelectedItem is SiteDeck d) { _myDeck = d; MyDeckBox.Text = d.Name; MyDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); LoadMatchup(); }
     }
 
+    /// The other inferred decks (2nd, 3rd, or the 1st once another is picked) as one-click choices under the box.
+    private void RenderOppAlts()
+    {
+        OppAltPanel.Children.Clear();
+        var alts = _m.OppCandidates.Where(c => c.DeckId != _oppDeck?.Id).Take(2).ToList();
+        if (alts.Count == 0) { OppAltPanel.Visibility = Visibility.Collapsed; return; }
+        OppAltPanel.Children.Add(new TextBlock { Text = "다른 후보", Foreground = new SolidColorBrush(Color.FromRgb(156, 163, 175)), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
+        foreach (var c in alts)
+        {
+            var b = new Button { Content = $"{c.Name} {Math.Round(c.Share * 100)}%", Style = (Style)FindResource("Ghost"), Padding = new Thickness(8, 2, 8, 2), FontSize = 12, Margin = new Thickness(0, 0, 4, 0) };
+            b.Click += (_, _) => PickOpp(c.DeckId);
+            OppAltPanel.Children.Add(b);
+        }
+        OppAltPanel.Visibility = Visibility.Visible;
+    }
+
+    private void PickOpp(int deckId)
+    {
+        var d = _t.Store.Decks.FirstOrDefault(x => x.Id == deckId);
+        if (d == null) return;
+        Touch(); _oppDeck = d; _oppUnknown = false; _oppBeforeClear = null; OppDeckBox.Text = d.Name;
+        OppDeckList.Visibility = Visibility.Collapsed; RenderOppAlts(); LoadMatchup();
+    }
+
     private void OppDeckList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (OppDeckList.SelectedItem is SiteDeck d) { _oppDeck = d; _oppUnknown = false; OppDeckBox.Text = d.Name; OppDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); LoadMatchup(); }
+        if (OppDeckList.SelectedItem is SiteDeck d) { _oppDeck = d; _oppUnknown = false; OppDeckBox.Text = d.Name; OppDeckList.Visibility = Visibility.Collapsed; MemoBox.Focus(); RenderOppAlts(); LoadMatchup(); }
     }
 
     private void Unknown_Click(object sender, RoutedEventArgs e)
     {
-        Touch(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed; LoadMatchup();
+        Touch(); _oppDeck = null; _oppUnknown = true; OppDeckBox.Text = "모름/기타"; OppDeckList.Visibility = Visibility.Collapsed; RenderOppAlts(); LoadMatchup();
     }
 
     // ---- actions ----

@@ -43,6 +43,7 @@
             </Grid>
             <ListBox x:Name="OppDeckList" Visibility="Collapsed" MaxHeight="130" Background="#111827" Foreground="White" BorderBrush="#374151"
                      Margin="0,-8,0,8" SelectionChanged="OppDeckList_SelectionChanged"/>
+            <WrapPanel x:Name="OppAltPanel" Margin="0,-4,0,8" Visibility="Collapsed"/>
 
             <TextBlock x:Name="MatchupText" Foreground="#93C5FD" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
