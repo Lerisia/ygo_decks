@@ -94,6 +94,10 @@ public partial class MainWindow : Window
         OverlayModeBox.SelectedIndex = T.Store.Config.EffectiveOverlayMode;
         OverlayModeHint.Text = OverlayHints[Math.Clamp(OverlayModeBox.SelectedIndex, 0, OverlayHints.Length - 1)];
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
+        if (AutoSaveBox.Items.Count == 0) foreach (var (label, _) in AutoSaveOptions) AutoSaveBox.Items.Add(label);
+        int si = Array.FindIndex(AutoSaveOptions, o => o.sec == T.Store.Config.AutoSaveSeconds);
+        AutoSaveBox.SelectedIndex = si < 0 ? 1 : si;
+        AutoSaveHint.Visibility = T.Store.Config.AutoSaveSeconds <= 0 ? Visibility.Visible : Visibility.Collapsed;
         CloseActionBox.SelectedIndex = T.Store.Config.CloseToTray ? 0 : 1;
         CloseActionHint.Text = CloseActionHints[CloseActionBox.SelectedIndex];
         if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
@@ -117,6 +121,18 @@ public partial class MainWindow : Window
     }
 
     private bool _settingAutoStart;
+
+    private static readonly (string label, int sec)[] AutoSaveOptions =
+    {
+        ("5초 후", 5), ("10초 후 (기본)", 10), ("20초 후", 20), ("30초 후", 30), ("1분 후", 60), ("자동 저장 안 함", 0),
+    };
+
+    private void AutoSaveBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_settingAutoStart || AutoSaveBox.SelectedIndex < 0) return;
+        T.Store.Config.AutoSaveSeconds = AutoSaveOptions[AutoSaveBox.SelectedIndex].sec; T.Store.SaveConfig();
+        AutoSaveHint.Visibility = T.Store.Config.AutoSaveSeconds <= 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private static readonly string[] CloseActionHints =
     {

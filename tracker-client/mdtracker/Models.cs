@@ -47,6 +47,8 @@ public sealed class Config
     public double OverlayScale { get; set; } = 1.2;
     /// Main window close button: true hides to the tray and keeps recording, false quits the program.
     public bool CloseToTray { get; set; } = true;
+    /// Seconds the post-game card waits before saving with the suggested values; 0 = never saves by itself.
+    public int AutoSaveSeconds { get; set; } = 10;
     public int OverlayScaleVersion { get; set; }   // 2: the 1.0/1.2/1.4/1.6 steps; missing = a 0.6.0 config
     /// Where the person dragged the overlays, as offsets from the game window's top-left (null = default spot).
     public double? LiveCardX { get; set; }

@@ -108,16 +108,19 @@ public partial class OverlayWindow : Window
     // ---- countdown ----
     private void Tick()
     {
-        if (_paused || _busy) return;
+        if (_paused || _busy || AutoSaveOff) return;
         _left--;
         UpdateCountdown();
         if (_left <= 0) { _timer.Stop(); _ = SaveAsync(auto: true); }
     }
 
-    /// Auto-save delay. Touching the card restarts it rather than stopping it, so the card never lingers forever;
+    /// Auto-save delay chosen in the main window (0 = off). Touching the card restarts it rather than stopping it;
     /// it only stops when a person has to act (deck missing, save failed).
-    private const int AutoSaveSeconds = 10;
-    private void UpdateCountdown() => Countdown.Text = _paused ? "자동 저장 멈춤 · 저장을 눌러주세요" : $"{_left}초 후 자동 저장";
+    private int AutoSaveSeconds => _t.Store.Config.AutoSaveSeconds;
+    private bool AutoSaveOff => AutoSaveSeconds <= 0;
+    private void UpdateCountdown() => Countdown.Text =
+        AutoSaveOff ? "자동 저장 꺼짐 · 저장을 눌러주세요"
+        : _paused ? "자동 저장 멈춤 · 저장을 눌러주세요" : $"{_left}초 후 자동 저장";
     private void Pause() { if (!_paused) { _paused = true; UpdateCountdown(); } }
     private void Touch() { if (!_paused) { _left = AutoSaveSeconds; UpdateCountdown(); } }
     private void Input_Focus(object sender, RoutedEventArgs e) => Touch();
