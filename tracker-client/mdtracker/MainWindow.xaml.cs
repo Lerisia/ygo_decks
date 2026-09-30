@@ -94,6 +94,8 @@ public partial class MainWindow : Window
         OverlayModeBox.SelectedIndex = T.Store.Config.EffectiveOverlayMode;
         OverlayModeHint.Text = OverlayHints[Math.Clamp(OverlayModeBox.SelectedIndex, 0, OverlayHints.Length - 1)];
         AlertBox.IsChecked = T.Store.Config.AlertMyTurn;
+        CloseActionBox.SelectedIndex = T.Store.Config.CloseToTray ? 0 : 1;
+        CloseActionHint.Text = CloseActionHints[CloseActionBox.SelectedIndex];
         if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
         int idx = Array.FindIndex(OverlayScale.Options, o => Math.Abs(o.scale - T.Store.Config.OverlayScale) < 0.01);
         ScaleBox.SelectedIndex = idx < 0 ? 1 : idx;
@@ -115,6 +117,20 @@ public partial class MainWindow : Window
     }
 
     private bool _settingAutoStart;
+
+    private static readonly string[] CloseActionHints =
+    {
+        "창만 닫히고 레코더는 트레이에서 계속 게임을 기록합니다.",
+        "레코더가 완전히 종료되어 다시 켤 때까지 게임이 기록되지 않습니다.",
+    };
+
+    private void CloseActionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CloseActionBox.SelectedIndex < 0) return;
+        CloseActionHint.Text = CloseActionHints[CloseActionBox.SelectedIndex];
+        if (_settingAutoStart) return;
+        T.Store.Config.CloseToTray = CloseActionBox.SelectedIndex == 0; T.Store.SaveConfig();
+    }
 
     private static readonly string[] OverlayHints =
     {
@@ -293,10 +309,12 @@ public partial class MainWindow : Window
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
     }
 
-    // Closing the window keeps the tracker running in the tray.
+    // The close button hides to the tray unless the user chose to quit.
     protected override void OnClosing(CancelEventArgs e)
     {
         e.Cancel = true;
-        ((App)System.Windows.Application.Current).HideToTray();
+        var app = (App)System.Windows.Application.Current;
+        if (T.Store.Config.CloseToTray) app.HideToTray();
+        else app.Quit();
     }
 }
