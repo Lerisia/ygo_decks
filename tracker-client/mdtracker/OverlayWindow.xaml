@@ -37,7 +37,8 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="OppDeckBox" Grid.Column="0" Background="#1F2937" Foreground="White" BorderBrush="#374151" CaretBrush="White"
-                         TextChanged="OppDeckBox_TextChanged" GotKeyboardFocus="Input_Focus" PreviewKeyDown="DeckBox_PreviewKeyDown"/>
+                         TextChanged="OppDeckBox_TextChanged" GotKeyboardFocus="Input_Focus" PreviewKeyDown="DeckBox_PreviewKeyDown"
+                         PreviewMouseLeftButtonDown="OppDeckBox_PreviewMouseDown" LostKeyboardFocus="OppDeckBox_LostFocus"/>
                 <Button Grid.Column="2" Content="모름" Style="{StaticResource Ghost}" Padding="10,4" Click="Unknown_Click"/>
             </Grid>
             <ListBox x:Name="OppDeckList" Visibility="Collapsed" MaxHeight="130" Background="#111827" Foreground="White" BorderBrush="#374151"

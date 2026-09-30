@@ -131,6 +131,20 @@ public partial class OverlayWindow : Window
     // ---- deck search ----
     // TextChanged also fires when Fill() sets the suggestion, so only the user's typing counts.
     private void MyDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (MyDeckBox.IsKeyboardFocusWithin) { Touch(); Search(MyDeckBox, MyDeckList); } }
+    // Clicking into the opponent box means the suggestion is not wanted: start from an empty box.
+    // Leaving it empty puts the previous choice back so the box always shows what will be saved.
+    private string? _oppBeforeClear;
+    private void OppDeckBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (OppDeckBox.IsKeyboardFocusWithin) return;
+        _oppBeforeClear = OppDeckBox.Text;
+        OppDeckBox.Text = "";
+    }
+    private void OppDeckBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (OppDeckBox.Text.Trim().Length == 0 && _oppBeforeClear != null) OppDeckBox.Text = _oppBeforeClear;
+        _oppBeforeClear = null;
+    }
     private void OppDeckBox_TextChanged(object sender, TextChangedEventArgs e) { if (OppDeckBox.IsKeyboardFocusWithin) { Touch(); _oppUnknown = false; Search(OppDeckBox, OppDeckList); } }
 
     private void Search(TextBox box, ListBox list)
