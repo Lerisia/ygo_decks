@@ -99,6 +99,8 @@ public partial class MainWindow : Window
         AutoSaveBox.SelectedIndex = si < 0 ? 1 : si;
         AutoSaveHint.Visibility = T.Store.Config.AutoSaveSeconds <= 0 ? Visibility.Visible : Visibility.Collapsed;
         CloseActionBox.SelectedIndex = T.Store.Config.CloseToTray ? 0 : 1;
+        UpdateModeBox.SelectedIndex = T.Store.Config.AutoInstallUpdates ? 1 : 0;
+        UpdateModeHint.Text = UpdateModeHints[UpdateModeBox.SelectedIndex];
         CloseActionHint.Text = CloseActionHints[CloseActionBox.SelectedIndex];
         if (ScaleBox.Items.Count == 0) foreach (var (label, _) in OverlayScale.Options) ScaleBox.Items.Add(label);
         int idx = Array.FindIndex(OverlayScale.Options, o => Math.Abs(o.scale - T.Store.Config.OverlayScale) < 0.01);
@@ -132,6 +134,20 @@ public partial class MainWindow : Window
         if (_settingAutoStart || AutoSaveBox.SelectedIndex < 0) return;
         T.Store.Config.AutoSaveSeconds = AutoSaveOptions[AutoSaveBox.SelectedIndex].sec; T.Store.SaveConfig();
         AutoSaveHint.Visibility = T.Store.Config.AutoSaveSeconds <= 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static readonly string[] UpdateModeHints =
+    {
+        "새 버전이 나오면 안내 창을 띄우고, 업데이트할지 직접 고릅니다.",
+        "듀얼 중이 아닐 때 새 버전을 받아 자동으로 재시작합니다. 끝나면 트레이 알림으로 알려 드립니다.",
+    };
+
+    private void UpdateModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UpdateModeBox.SelectedIndex < 0) return;
+        UpdateModeHint.Text = UpdateModeHints[UpdateModeBox.SelectedIndex];
+        if (_settingAutoStart) return;
+        T.Store.Config.AutoInstallUpdates = UpdateModeBox.SelectedIndex == 1; T.Store.SaveConfig();
     }
 
     private static readonly string[] CloseActionHints =

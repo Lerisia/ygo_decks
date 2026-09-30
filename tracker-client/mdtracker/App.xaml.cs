@@ -284,6 +284,12 @@ public partial class App : System.Windows.Application
                 if (info != null && Behind(info.Latest) && !string.IsNullOrEmpty(info.Url) && (_offered != info.Latest || must))
                 {
                     if (Tracker.Live != null || _overlay != null) wait = 5000;   // ask after the duel
+                    else if (Tracker.Store.Config.AutoInstallUpdates)
+                    {
+                        // Not while the person is working in the main window; try again a minute later.
+                        if (Dispatcher.Invoke(() => MainWin?.IsActive ?? false)) wait = 60 * 1000;
+                        else if (!InstallQuietly(info.Latest, info.Url!) && (Tracker.Live != null || _overlay != null)) wait = 5000;
+                    }
                     else
                     {
                         _offered = info.Latest;
@@ -300,6 +306,28 @@ public partial class App : System.Windows.Application
             catch (Exception ex) { Log.Info("update check: " + ex.Message); }
             Thread.Sleep(wait);
         }
+    }
+
+    /// Auto-install path: download in the background, then swap and relaunch the way the program was running
+    /// (tray only if the window was hidden). The relaunched copy says so in a tray balloon.
+    private bool InstallQuietly(string latest, string url)
+    {
+        if (!_updateStaged)
+        {
+            SetUpdateState($"새 버전 {latest} 내려받는 중…");
+            if (Updater.Download(url, p => SetUpdateState($"새 버전 {latest} 내려받는 중… {p}")) == null) { SetUpdateState("자동 업데이트 내려받기에 실패했습니다"); return false; }
+            _updateStaged = true;
+        }
+        if (Tracker.Live != null || _overlay != null) return false;   // a duel began during the download: next round
+        Dispatcher.Invoke(() =>
+        {
+            bool hidden = !(MainWin?.IsVisible ?? false);
+            var args = _startArgs.Where(a => a != AutoStart.MinimizedArg).ToList();
+            if (hidden) args.Add(AutoStart.MinimizedArg);
+            _startArgs = args.ToArray();
+            RestartForUpdate();
+        });
+        return true;
     }
 
     internal static bool Behind(string latest)
