@@ -42,7 +42,7 @@ public sealed class Config
     /// Upload per-duel research samples (clock, card table, reveals) to the site. Off by default; set in config.json.
     public bool ResearchFeed { get; set; }
     /// New version: false asks first (the update dialog), true downloads it and swaps it in between duels by itself.
-    public bool AutoInstallUpdates { get; set; }
+    public bool AutoInstallUpdates { get; set; } = true;
     /// Size of everything drawn over the game (1.0 = as designed).
     public double OverlayScale { get; set; } = 1.2;
     /// Main window close button: true hides to the tray and keeps recording, false quits the program.
