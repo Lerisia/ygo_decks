@@ -6,6 +6,11 @@ import {
 } from "@/api/avatarApi";
 import { isAuthenticated, getUserInfo } from "@/api/accountApi";
 import { RARITY_LABEL, RARITY_BADGE, type IconRarity } from "@/api/cardIconApi";
+import ThemeSearchChip, { chipClass } from "@/components/ThemeSearchChip";
+import { orderThemes, NO_THEME } from "@/utils/themeChips";
+
+// Folded theme row shows only the themes with the most recent new icons (참혈 2026-10-02).
+const RECENT_THEME_CHIPS = 8;
 
 const RARITY_ORDER: Record<Exclude<IconRarity, "">, number> = {
   common: 0, rare: 1, epic: 2, legendary: 3,
@@ -114,17 +119,9 @@ export default function IconShop() {
     }
   };
 
-  const allThemes = useMemo(() => {
-    const set = new Set<string>();
-    let hasNoTheme = false;
-    for (const i of icons) {
-      if (i.theme) set.add(i.theme);
-      else hasNoTheme = true;
-    }
-    const arr = [...set].sort((a, b) => a.localeCompare(b));
-    if (hasNoTheme) arr.push("__none__");
-    return arr;
-  }, [icons]);
+  const themeOrder = useMemo(() => orderThemes(icons, RECENT_THEME_CHIPS), [icons]);
+  const allThemes = useMemo(() => [...themeOrder.pinned, ...themeOrder.rest], [themeOrder]);
+  const [themesExpanded, setThemesExpanded] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -350,24 +347,28 @@ export default function IconShop() {
       </div>
 
       {groupBy === "theme" && allThemes.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {allThemes.map((t) => {
-            const label = t === "__none__" ? "기타" : t;
-            const active = selectedTheme === t;
-            return (
-              <button
-                key={t}
-                onClick={() => toggleTheme(t)}
-                className={`px-3 py-1.5 text-sm rounded-full border ${
-                  active
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {(themesExpanded ? allThemes : themeOrder.pinned).map((t) => (
+            <button key={t} onClick={() => toggleTheme(t)} className={chipClass(selectedTheme === t)}>
+              {t === NO_THEME ? "기타" : t}
+            </button>
+          ))}
+          {!themesExpanded && (
+            <ThemeSearchChip
+              themes={allThemes}
+              value={selectedTheme && !themeOrder.pinned.includes(selectedTheme) ? (selectedTheme === NO_THEME ? "기타" : selectedTheme) : ""}
+              onApply={(t) => setSelectedTheme(t)}
+              onClear={() => setSelectedTheme("")}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setThemesExpanded((v) => !v)}
+            aria-expanded={themesExpanded}
+            className="px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline hover:border-transparent focus:outline-none"
+          >
+            {themesExpanded ? "접기 ▴" : `전체 테마 ${allThemes.length}개 펼치기 ▾`}
+          </button>
         </div>
       )}
 
