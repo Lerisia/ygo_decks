@@ -263,3 +263,22 @@ button:focus-visible {
   display: block;
   margin: 0 auto; /* 필요하다면 가운데 정렬 */
 }
+
+/* Skill name game: rows of portraits that scroll forever. Each row is one strip image repeated, so the loop has no seam. */
+.portrait-row { height: var(--h); overflow: hidden; }
+.portrait-strip {
+  --w: calc(var(--n) * var(--h) * 80 / 72);
+  height: var(--h);
+  width: calc(var(--w) + 100%);
+  background-repeat: repeat-x;
+  background-size: var(--w) var(--h);
+  animation: portrait-scroll var(--dur) linear infinite;
+}
+.portrait-strip.reverse { animation-direction: reverse; }
+@keyframes portrait-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-1 * var(--w))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portrait-strip { animation: none; }
+}

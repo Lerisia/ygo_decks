@@ -164,9 +164,11 @@ function SkillNames() {
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-1">
         스킬 이름 대기 <span className="text-amber-600 dark:text-amber-400">(베타)</span>
       </h1>
-      <p className="text-center text-gray-500 dark:text-gray-400 mb-6 text-sm md:text-base">
+      <p className="text-center text-gray-500 dark:text-gray-400 mb-4 text-sm md:text-base">
         나는 롤 스킬을 {GOAL}가지 이상 알고 있다
       </p>
+
+      <PortraitMarquee />
 
       {phase === "ready" && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
@@ -296,6 +298,39 @@ function SkillNames() {
       <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
         스킬 이름: 리그 오브 레전드 {data.version} 한국어판
       </p>
+    </div>
+  );
+}
+
+const PORTRAIT_ROWS = [
+  { n: 58, seconds: 100, reverse: false },
+  { n: 58, seconds: 125, reverse: true },
+  { n: 57, seconds: 110, reverse: false },
+];
+const EDGE_FADE = "linear-gradient(to right, transparent, black 6%, black 94%, transparent)";
+
+/** Champion portraits drifting past in three rows, the middle one the other way. */
+function PortraitMarquee() {
+  return (
+    <div
+      aria-hidden
+      className="mb-5 space-y-1 md:space-y-1.5 [--h:32px] md:[--h:44px]"
+      style={{ maskImage: EDGE_FADE, WebkitMaskImage: EDGE_FADE }}
+    >
+      {PORTRAIT_ROWS.map((r, i) => (
+        <div key={i} className="portrait-row">
+          <div
+            className={`portrait-strip${r.reverse ? " reverse" : ""}`}
+            style={
+              {
+                "--n": r.n,
+                "--dur": `${r.seconds}s`,
+                backgroundImage: `url(/images/lol/champions-${i + 1}.webp)`,
+              } as React.CSSProperties
+            }
+          />
+        </div>
+      ))}
     </div>
   );
 }
