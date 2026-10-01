@@ -46,6 +46,7 @@ import TierListMaker from "./pages/TierListMaker";
 import Multiplayer from "./pages/Multiplayer";
 import MultiplayerRoom from "./pages/MultiplayerRoom";
 import AdminCardIcons from "./pages/AdminCardIcons";
+import AdminBorders from "./pages/AdminBorders";
 import AdminEffectTags from "./pages/AdminEffectTags";
 import AdminDuchMindWords from "./pages/AdminDuchMindWords";
 import DuchMindWordPacks from "./pages/DuchMindWordPacks";
@@ -110,6 +111,7 @@ function App() {
           <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />
           <Route path="/manage" element={<AdminIndex />} />
           <Route path="/manage/card-icons" element={<AdminCardIcons />} />
+          <Route path="/manage/borders" element={<AdminBorders />} />
           <Route path="/manage/effect-tags" element={<AdminEffectTags />} />
           <Route path="/manage/duchmind-words" element={<AdminDuchMindWords />} />
           <Route path="/manage/points-grant" element={<AdminPointsGrant />} />

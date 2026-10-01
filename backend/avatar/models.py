@@ -28,7 +28,7 @@ class Border(models.Model):
     key = models.SlugField(max_length=40, unique=True, help_text="programmatic identifier")
     name = models.CharField(max_length=60)
     color = models.CharField(max_length=20, default="#ffffff", help_text="CSS color for the ring (used when no image)")
-    image = models.ImageField(upload_to="border_assets/", blank=True, null=True, help_text="optional ring asset (square PNG with transparent center)")
+    image = models.ImageField(upload_to="border_assets/", blank=True, null=True, help_text="frame drawn over the icon (square, transparent background, the middle left clear)")
     is_default = models.BooleanField(default=False, help_text="auto-grant to all users when they sign up")
     category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default="exclusive")
     rarity = models.CharField(max_length=16, choices=RARITY_CHOICES, blank=True, default="", help_text="등급 (상점 판매 시 가격 자동 결정)")
@@ -46,6 +46,13 @@ class Border(models.Model):
         elif self.category != "shop":
             self.price = 0
         super().save(*args, **kwargs)
+
+    UPLOADED_KEY_PREFIX = "img-"
+
+    @property
+    def is_uploaded(self):
+        """Made by uploading a frame image in border management (the built-in ones are drawn by the site itself)."""
+        return self.key.startswith(self.UPLOADED_KEY_PREFIX)
 
     def __str__(self):
         return f"{self.name} ({self.key})"

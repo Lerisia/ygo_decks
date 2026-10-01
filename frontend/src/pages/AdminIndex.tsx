@@ -14,6 +14,12 @@ const tiles = [
     description: "카드 아이콘 등록/편집/배포",
   },
   {
+    to: "/manage/borders",
+    icon: "🖼️",
+    label: "테두리 관리",
+    description: "테두리 올리기·등급·가격",
+  },
+  {
     to: "/manage/duchmind-words",
     icon: "📚",
     label: "기본 단어장 관리",

@@ -463,8 +463,15 @@ def list_borders_admin(request):
     """Admin: every border with its category/rarity/price for the
     icon-management '테두리' tab. (Borders are seeded fixtures — no
     create/delete here, just re-pricing.)"""
-    qs = Border.objects.all().order_by("sort_order", "id")
-    return Response({"borders": BorderSerializer(qs, many=True).data})
+    qs = Border.objects.all().order_by("sort_order", "id").annotate(
+        unlock_count=models.Count("user_unlocks", distinct=True),
+    )
+    rows = []
+    for b in qs:
+        row = BorderSerializer(b).data
+        row["owners"] = b.unlock_count
+        rows.append(row)
+    return Response({"borders": rows})
 
 
 @api_view(["PATCH"])
@@ -476,19 +483,139 @@ def update_border(request, border_id):
         border = Border.objects.get(id=int(border_id))
     except (Border.DoesNotExist, ValueError, TypeError):
         return Response({"error": "테두리를 찾을 수 없습니다."}, status=404)
+    if "name" in request.data:
+        name = " ".join(str(request.data.get("name") or "").split())
+        if not name or len(name) > BORDER_NAME_MAX:
+            return Response({"error": f"이름을 1~{BORDER_NAME_MAX}자로 입력해 주세요."}, status=400)
+        border.name = name
+    _set_border_listing(border, request.data)
+    border.save()
+    return Response(BorderSerializer(border).data)
+
+
+BORDER_NAME_MAX = 60
+BORDER_IMAGE_SIZE = 512             # what is stored and served, whatever was uploaded
+BORDER_UPLOAD_MIN_SIZE = 256
+BORDER_UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+BORDER_CLEAR_MIDDLE = 0.5           # the icon shows through the middle 74%; at least this much must be empty
+
+
+def _set_border_listing(border, data):
+    """Category and rarity from a request; the price follows in Border.save()."""
     valid_cat = {c[0] for c in Border.CATEGORY_CHOICES}
     valid_rar = {r[0] for r in Border.RARITY_CHOICES}
-    if "category" in request.data:
-        cat = (request.data.get("category") or "").strip()
+    if "category" in data:
+        cat = (data.get("category") or "").strip()
         if cat in valid_cat:
             border.category = cat
-    if "rarity" in request.data:
-        rar = (request.data.get("rarity") or "").strip()
+    if "rarity" in data:
+        rar = (data.get("rarity") or "").strip()
         border.rarity = rar if rar in valid_rar else ""
     if border.category == "shop" and not border.rarity:
         border.rarity = "rare"  # shop borders need a tier for pricing
+
+
+def _border_image(upload):
+    """An uploaded frame as the file the site serves (512x512 WebP), or ValueError saying what is wrong with it.
+
+    The frame is drawn over the icon, so it has to be a square with a transparent background whose middle is empty.
+    """
+    from io import BytesIO
+    from django.core.files.base import ContentFile
+    from PIL import Image, ImageChops, ImageDraw, ImageStat
+
+    if upload is None:
+        raise ValueError("이미지 파일을 골라 주세요.")
+    if upload.size > BORDER_UPLOAD_MAX_BYTES:
+        raise ValueError("파일이 너무 큽니다. 5MB 이하로 올려 주세요.")
+    try:
+        img = Image.open(upload)
+        img.load()
+    except Exception:
+        raise ValueError("이미지 파일이 아닙니다. PNG 또는 WebP로 올려 주세요.")
+    if getattr(img, "is_animated", False):
+        raise ValueError("움직이는 이미지는 올릴 수 없습니다.")
+    w, h = img.size
+    if w != h:
+        raise ValueError(f"정사각형이어야 합니다. (올린 이미지: {w}×{h})")
+    if w < BORDER_UPLOAD_MIN_SIZE:
+        raise ValueError(f"너무 작습니다. 한 변이 {BORDER_UPLOAD_MIN_SIZE}px 이상이어야 합니다. (올린 이미지: {w}×{h})")
+    if img.mode not in ("RGBA", "LA", "PA") and "transparency" not in img.info:
+        raise ValueError("배경이 투명한 이미지여야 합니다. PNG 또는 WebP로 저장해 주세요.")
+    img = img.convert("RGBA")
+    alpha = img.getchannel("A")
+    if alpha.getbbox() is None:
+        raise ValueError("아무것도 그려져 있지 않습니다.")
+    middle = Image.new("L", img.size, 0)
+    m = w * (1 - BORDER_CLEAR_MIDDLE) / 2
+    ImageDraw.Draw(middle).ellipse((m, m, w - m, w - m), fill=255)
+    if ImageStat.Stat(ImageChops.multiply(alpha, middle), mask=middle).mean[0] > 255 * 0.05:
+        raise ValueError("가운데가 비어 있어야 합니다. 아이콘이 들어갈 자리(가운데 원)를 투명하게 지워 주세요.")
+    if w != BORDER_IMAGE_SIZE:
+        img = img.resize((BORDER_IMAGE_SIZE, BORDER_IMAGE_SIZE), Image.LANCZOS)
+    buf = BytesIO()
+    img.save(buf, "WEBP", quality=90, method=6)
+    return ContentFile(buf.getvalue())
+
+
+def _save_border_image(border, content):
+    """A fresh file name each time, so a replaced frame is not hidden behind a cached copy of the old one."""
+    import secrets
+    if border.image:
+        border.image.delete(save=False)
+    border.image.save(f"border_{secrets.token_hex(6)}.webp", content, save=False)
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def create_border(request):
+    """Admin: a new border from an uploaded frame image. Unlisted (비매품) unless a category is given."""
+    import secrets
+    name = " ".join(str(request.data.get("name") or "").split())
+    if not name or len(name) > BORDER_NAME_MAX:
+        return Response({"error": f"이름을 1~{BORDER_NAME_MAX}자로 입력해 주세요."}, status=400)
+    try:
+        content = _border_image(request.FILES.get("image"))
+    except ValueError as e:
+        return Response({"error": str(e)}, status=400)
+    last = Border.objects.aggregate(m=models.Max("sort_order"))["m"] or 0
+    border = Border(key=Border.UPLOADED_KEY_PREFIX + secrets.token_hex(6), name=name, sort_order=last + 10)
+    _set_border_listing(border, request.data)
+    _save_border_image(border, content)
+    border.save()
+    return Response(BorderSerializer(border).data, status=201)
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def replace_border_image(request, border_id):
+    """Admin: a new frame image for an uploaded border. Everyone who has it sees the new one."""
+    border = get_object_or_404(Border, id=border_id)
+    if not border.is_uploaded:
+        return Response({"error": "기본 제공 테두리는 이미지를 바꿀 수 없습니다."}, status=400)
+    try:
+        content = _border_image(request.FILES.get("image"))
+    except ValueError as e:
+        return Response({"error": str(e)}, status=400)
+    _save_border_image(border, content)
     border.save()
     return Response(BorderSerializer(border).data)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAdminUser])
+def delete_border(request, border_id):
+    """Admin: remove an uploaded border, as long as nobody has it — a border someone bought or was given stays."""
+    border = get_object_or_404(Border, id=border_id)
+    if not border.is_uploaded:
+        return Response({"error": "기본 제공 테두리는 지울 수 없습니다."}, status=400)
+    owners = border.user_unlocks.count() + border.equipped_by_users.count()
+    if owners:
+        return Response({"error": "이미 가진 이용자가 있어 지울 수 없습니다. 비매품으로 돌려 더 풀리지 않게 할 수 있습니다."}, status=409)
+    if border.image:
+        border.image.delete(save=False)
+    border.delete()
+    return Response({"ok": True})
 
 
 @api_view(["POST"])

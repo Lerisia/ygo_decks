@@ -59,6 +59,10 @@ export type Border = {
   price?: number;
   unlocked?: boolean;
   unlock_condition?: string;
+  /** Made from an uploaded frame image (drawn over the icon); the built-in ones are drawn by the site. */
+  uploaded?: boolean;
+  /** Admin list only: how many users have it. */
+  owners?: number;
 };
 
 export const listPublicIcons = (q?: string) =>
@@ -114,8 +118,34 @@ export const purchaseBorder = (borderId: number) =>
 export const listAdminBorders = () =>
   request<{ borders: Border[] }>("/borders/admin/");
 
-export const updateBorder = (borderId: number, data: { category?: IconCategory; rarity?: IconRarity }) =>
+export const updateBorder = (borderId: number, data: { name?: string; category?: IconCategory; rarity?: IconRarity }) =>
   request<Border>(`/borders/${borderId}/`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+
+async function upload<T>(path: string, fd: FormData): Promise<T> {
+  // No Content-Type here: the browser sets the multipart boundary itself.
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: authHeaders(), body: fd });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || body.detail || `HTTP ${res.status}`);
+  return body;
+}
+
+export const createBorder = (name: string, image: File, category: IconCategory, rarity: IconRarity) => {
+  const fd = new FormData();
+  fd.append("name", name);
+  fd.append("image", image);
+  fd.append("category", category);
+  fd.append("rarity", rarity);
+  return upload<Border>("/borders/create/", fd);
+};
+
+export const replaceBorderImage = (borderId: number, image: File) => {
+  const fd = new FormData();
+  fd.append("image", image);
+  return upload<Border>(`/borders/${borderId}/image/`, fd);
+};
+
+export const deleteBorder = (borderId: number) =>
+  request<{ ok: true }>(`/borders/${borderId}/delete/`, { method: "DELETE" });

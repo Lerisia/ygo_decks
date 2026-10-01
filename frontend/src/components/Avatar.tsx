@@ -30,8 +30,10 @@ interface Props {
 }
 
 // Solid-color borders use a thin ring; image borders need more room for the artwork.
+// An image border is a frame drawn over the icon: the icon fills the middle 74% and the frame's own
+// transparent middle lets it show through (border management states this geometry to whoever draws one).
 const BORDER_THICKNESS_RATIO_PLAIN = 0.05;
-const BORDER_THICKNESS_RATIO_IMAGE = 0.13;
+export const BORDER_THICKNESS_RATIO_IMAGE = 0.13;
 
 // Cache natural dimensions per URL across all Avatar instances so we don't
 // decode the same image dozens of times on shop/admin pages.
@@ -88,7 +90,8 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
   // Overlay borders shrink the icon like other borders, but draw decorations on top.
   const animated = isAnimatedKey(border?.key);
   const overlay = !!border && OVERLAY_BORDER_KEYS.has(border.key);
-  const ratio = !animated && border?.image_url
+  const frameUrl = !animated && border?.image_url ? border.image_url : null;
+  const ratio = frameUrl
     ? BORDER_THICKNESS_RATIO_IMAGE
     : BORDER_THICKNESS_RATIO_PLAIN;
   const ringThickness = border ? Math.max(2, Math.round(size * ratio)) : 0;
@@ -114,10 +117,10 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
   // Wrapper handles the ring; inner div renders the icon
   const ringStyle: React.CSSProperties = animated
     ? { background: "transparent", position: "relative" }
+    : frameUrl
+    ? { background: "transparent", position: "relative" }
     : border
-    ? border.image_url
-      ? { backgroundImage: `url(${border.image_url})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat" }
-      : { background: border.color || "#ffffff" }
+    ? { background: border.color || "#ffffff" }
     : {};
 
   // Admin border gets a subtle moving-gradient animation so it stands out
@@ -172,6 +175,14 @@ export default function Avatar({ icon, border, size = 48, className = "" }: Prop
             backgroundRepeat: "no-repeat",
             position: "relative",
             zIndex: 1,
+          }}
+        />
+      )}
+      {frameUrl && (
+        <div
+          style={{
+            position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+            backgroundImage: `url(${frameUrl})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
           }}
         />
       )}

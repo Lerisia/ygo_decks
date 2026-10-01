@@ -4,11 +4,12 @@ from .models import CardIcon, Border
 
 class BorderSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
+    uploaded = serializers.BooleanField(source="is_uploaded", read_only=True)
 
     class Meta:
         model = Border
         fields = ["id", "key", "name", "color", "image_url", "is_default",
-                  "category", "rarity", "price"]
+                  "category", "rarity", "price", "uploaded"]
 
     def get_image_url(self, obj):
         try:

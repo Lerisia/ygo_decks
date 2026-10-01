@@ -7,7 +7,7 @@ import {
   RARITY_LABEL, RARITY_PRICE, RARITY_BADGE,
   type CardSearchResult, type CardIcon, type IconCategory, type IconRarity,
 } from "@/api/cardIconApi";
-import { getMyBorders, listAdminBorders, updateBorder, type Border } from "@/api/avatarApi";
+import { getMyBorders, type Border } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 
 const CATEGORY_LABEL: Record<IconCategory, string> = {
@@ -62,11 +62,6 @@ export default function AdminCardIcons() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkTheme, setBulkTheme] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
-  // 테두리(프레임) pricing panel — list all borders, set category/rarity.
-  const [borderPanelOpen, setBorderPanelOpen] = useState(false);
-  const [adminBorders, setAdminBorders] = useState<Border[]>([]);
-  const [adminBordersLoaded, setAdminBordersLoaded] = useState(false);
-  const [borderSavingId, setBorderSavingId] = useState<number | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,26 +90,6 @@ export default function AdminCardIcons() {
       const t = await listThemes();
       setKnownThemes(t.themes);
     } catch {}
-  };
-
-  // Lazy-load the full border list when the pricing panel opens.
-  useEffect(() => {
-    if (!borderPanelOpen || adminBordersLoaded) return;
-    listAdminBorders()
-      .then((d) => { setAdminBorders(d.borders); setAdminBordersLoaded(true); })
-      .catch((e: any) => setError(e.message || "테두리 목록 로드 실패"));
-  }, [borderPanelOpen, adminBordersLoaded]);
-
-  const saveBorder = async (id: number, patch: { category?: IconCategory; rarity?: IconRarity }) => {
-    setBorderSavingId(id);
-    try {
-      const updated = await updateBorder(id, patch);
-      setAdminBorders((prev) => prev.map((b) => b.id === id ? { ...b, ...updated } : b));
-    } catch (e: any) {
-      setError(e.message || "테두리 저장 실패");
-    } finally {
-      setBorderSavingId(null);
-    }
   };
 
   // Debounced search. Custom-tab pages 20 at a time (newest first); empty
@@ -389,67 +364,6 @@ export default function AdminCardIcons() {
           {error}
         </div>
       )}
-
-      {/* 테두리(프레임) pricing — borders are seeded fixtures; this just
-          sets category + rarity (price auto-derives from rarity). */}
-      <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-6">
-        <button
-          onClick={() => setBorderPanelOpen((v) => !v)}
-          className="w-full flex items-center justify-between font-semibold"
-        >
-          <span>🖼️ 테두리(프레임) 등급·가격 관리</span>
-          <span className="text-xs text-gray-500">{borderPanelOpen ? "▲ 닫기" : "▼ 열기"}</span>
-        </button>
-        {borderPanelOpen && (
-          <div className="mt-3">
-            {!adminBordersLoaded ? (
-              <p className="text-sm text-gray-500">불러오는 중...</p>
-            ) : adminBorders.length === 0 ? (
-              <p className="text-sm text-gray-500">테두리가 없습니다.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {adminBorders.map((b) => (
-                  <div key={b.id} className="flex items-center gap-3 p-2 border rounded-lg border-gray-200 dark:border-gray-700">
-                    <Avatar icon={null} border={b} size={56} className="shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate">{b.name}</div>
-                      <div className="text-[11px] text-gray-400">{b.key}{b.is_default ? " · 기본" : ""}</div>
-                      <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                        <select
-                          value={b.category || "exclusive"}
-                          onChange={(e) => saveBorder(b.id, { category: e.target.value as IconCategory })}
-                          disabled={borderSavingId === b.id}
-                          className="text-xs px-1.5 py-1 border rounded bg-white dark:bg-gray-800"
-                        >
-                          {(["default", "shop", "exclusive"] as IconCategory[]).map((c) => (
-                            <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={b.rarity || ""}
-                          onChange={(e) => saveBorder(b.id, { rarity: e.target.value as IconRarity })}
-                          disabled={borderSavingId === b.id || (b.category !== "shop")}
-                          className="text-xs px-1.5 py-1 border rounded bg-white dark:bg-gray-800 disabled:opacity-40"
-                        >
-                          <option value="">(등급 없음)</option>
-                          {(["rare", "epic", "legendary"] as Exclude<IconRarity, "">[]).map((r) => (
-                            <option key={r} value={r}>{RARITY_LABEL[r]}</option>
-                          ))}
-                        </select>
-                        <span className={`text-xs font-bold ${b.category === "shop" ? "text-blue-600 dark:text-blue-400" : "text-gray-400"}`}>
-                          {b.category === "shop" ? `${b.price ?? 0}P` : "—"}
-                        </span>
-                        {borderSavingId === b.id && <span className="text-xs text-gray-400">저장 중…</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="text-[11px] text-gray-400 mt-3">상점 판매로 바꾸면 등급 선택이 활성화되고, 등급에서 가격이 자동 결정됩니다. 만들기/삭제는 여기서 안 됩니다.</p>
-          </div>
-        )}
-      </div>
 
       {/* Card search */}
       {!selectedCard && (

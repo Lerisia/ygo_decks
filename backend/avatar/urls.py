@@ -28,6 +28,9 @@ urlpatterns = [
     path("borders/grant/", views.grant_border, name="avatar-grant-border"),
     path("borders/shop/", views.shop_list_borders, name="avatar-shop-borders"),
     path("borders/admin/", views.list_borders_admin, name="avatar-list-borders-admin"),
+    path("borders/create/", views.create_border, name="avatar-create-border"),
+    path("borders/<int:border_id>/image/", views.replace_border_image, name="avatar-replace-border-image"),
+    path("borders/<int:border_id>/delete/", views.delete_border, name="avatar-delete-border"),
     path("borders/<int:border_id>/purchase/", views.purchase_border, name="avatar-purchase-border"),
     path("borders/<int:border_id>/", views.update_border, name="avatar-update-border"),
 ]
