@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
@@ -18,15 +18,17 @@ interface Deck {
   is_engine: boolean;
 }
 
-const POWER_COLORS: { label: string; ring: string; dot: string }[] = [
-  { label: "최상위권", ring: "ring-red-500", dot: "bg-red-500" },
-  { label: "상위권", ring: "ring-orange-500", dot: "bg-orange-500" },
-  { label: "중상위권", ring: "ring-yellow-400", dot: "bg-yellow-400" },
-  { label: "중하위권", ring: "ring-green-500", dot: "bg-green-500" },
-  { label: "하위권", ring: "ring-sky-400", dot: "bg-sky-400" },
-  { label: "최하위권", ring: "ring-purple-500", dot: "bg-purple-500" },
+const POWER_COLORS: { label: string; color: string }[] = [
+  { label: "최상위권", color: "#ef4444" },
+  { label: "상위권", color: "#f97316" },
+  { label: "중상위권", color: "#facc15" },
+  { label: "중하위권", color: "#22c55e" },
+  { label: "하위권", color: "#38bdf8" },
+  { label: "최하위권", color: "#7e22ce" },
 ];
-const POWER_RING: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.ring]));
+const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.color]));
+// 3px ring in the deck power colour plus a faint glow of the same colour outside it (drawn outside the box, so no layout shift).
+const powerRing = (color: string): CSSProperties => ({ boxShadow: `0 0 0 3px ${color}, 0 0 9px 2px ${color}99` });
 
 export default function DatabasePage() {
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -244,7 +246,7 @@ export default function DatabasePage() {
         <div className="-mt-2 mb-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
           {POWER_COLORS.map((p) => (
             <span key={p.label} className="inline-flex items-center gap-1">
-              <span className={`inline-block w-2.5 h-2.5 rounded-full ${p.dot}`} />
+              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
               {p.label}
             </span>
           ))}
@@ -395,7 +397,8 @@ export default function DatabasePage() {
                 alt={deck.name}
                 loading="lazy"
                 decoding="async"
-                className={`w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg ${powerBorder && POWER_RING[deck.strength] ? `ring-[3px] ${POWER_RING[deck.strength]}` : ""}`}
+                className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
+                style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />
               {deck.is_engine && (
                 <span
