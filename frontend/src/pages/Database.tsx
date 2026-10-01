@@ -23,7 +23,7 @@ const POWER_COLORS: { label: string; color: string }[] = [
   { label: "상위권", color: "#f97316" },
   { label: "중상위권", color: "#facc15" },
   { label: "중하위권", color: "#22c55e" },
-  { label: "하위권", color: "#38bdf8" },
+  { label: "하위권", color: "#3b8df5" },
   { label: "최하위권", color: "#7e22ce" },
 ];
 const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.color]));
