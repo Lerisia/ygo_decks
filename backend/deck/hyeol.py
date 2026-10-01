@@ -11,7 +11,7 @@ DECK_URL = "https://mdarchive.pages.dev/#hyeol/ygo-{id}"
 SEV_ORDER = {"R": 0, "Y": 1, "G": 2, "N": 3}
 # Left out of the deck page: cards few people run (특이점, 2026-10-02).
 HIDDEN_HANDTRAPS = {"crow_bystial", "special_meta", "gamma"}
-SHORT_NAMES = {"ogre": "유령토끼", "maxxc": "증식의 G", "imperm_veiler": "무한포영·이펙트 뵐러"}
+SHORT_NAMES = {"ash": "하루 우라라", "imperm_veiler": "무한포영·이펙트 뵐러", "belle": "저택 와라시", "ogre": "유령토끼", "maxxc": "증식의 G"}
 
 
 def fetch_archive_text(timeout=60):

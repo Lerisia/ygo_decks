@@ -622,7 +622,7 @@ class DeckHyeolTest(TestCase):
         self.assertEqual(cards[0]["name"], "크라운 클랜 『말라바리즘』")   # empty label falls back to the card table
         self.assertEqual(d["source_url"], f"https://mdarchive.pages.dev/#hyeol/ygo-{self.deck.id}")
         # 특이점 2026-10-02: 크로우·비스테드, 메타 카드, 감마는 빼고, 토끼는 '유령토끼'로
-        self.assertEqual([s["short"] for s in d["sections"]], ["우라라", "유령토끼"])
+        self.assertEqual([s["short"] for s in d["sections"]], ["하루 우라라", "유령토끼"])
         self.assertEqual([o["short"] for o in d["overview"]], ["드롤", "증식의 G"])
 
     def test_api_serves_stored_summary_and_detail_flags_it(self):
