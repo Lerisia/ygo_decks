@@ -4,7 +4,7 @@ import { getDeckHyeol, DeckHyeol, HyeolCard } from "@/api/deckApi";
 // 혈자리 아카이브(듀얼 아카이브, Hort) 요약 — 특이점 요청(2026-10-02), 자료 사용 허락받음.
 const SEV: Record<string, { label: string; badge: string; ring: string }> = {
   R: { label: "1순위", badge: "bg-red-500 text-white", ring: "ring-red-400" },
-  Y: { label: "2순위", badge: "bg-amber-400 text-white", ring: "ring-amber-300" },
+  Y: { label: "2순위", badge: "bg-amber-500 text-white", ring: "ring-amber-400" },
   G: { label: "3순위", badge: "bg-emerald-500 text-white", ring: "ring-emerald-400" },
   N: { label: "미정", badge: "bg-gray-400 text-white", ring: "ring-gray-300" },
 };
