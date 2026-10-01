@@ -237,7 +237,7 @@ function SkillNames() {
         ← 솔로 플레이
       </button>
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-1">
-        스킬 이름 대기 <span className="text-amber-600 dark:text-amber-400">(베타)</span>
+        스킬 릴레이 <span className="text-amber-600 dark:text-amber-400">(베타)</span>
       </h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-4 text-sm md:text-base">
         나는 롤 스킬을 {GOAL}가지 이상 알고 있다
