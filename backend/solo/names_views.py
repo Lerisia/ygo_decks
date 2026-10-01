@@ -3,8 +3,9 @@
 The page judges each name itself so typing feels instant; the ranking does not take its word for the result. A game
 starts with a signed token, ends with the list of names and when each was typed, and is recorded only if that list
 could have been played: real skills, none twice, each inside the 20-second clock, and no faster than the wall clock.
-Guests are let in during the beta and leave a nickname.
+Guests are let in during the beta and leave a nickname; guests at one address count as one player.
 """
+import ipaddress
 import json
 import os
 import re
@@ -76,14 +77,41 @@ def _played(answers, elapsed_ms):
     return names if last <= elapsed_ms + CLOCK_GRACE_MS else None
 
 
-def _best_rows():
-    """Every player's best game, best first. Members are one player each; guests are told apart by nickname."""
-    seen, rows = set(), []
-    for s in SkillNameScore.objects.select_related("user", "user__avatar_icon", "user__avatar_icon__card", "user__equipped_border"):
-        who = ("u", s.user_id) if s.user_id else ("g", s.nickname)
-        if who not in seen:
-            seen.add(who); rows.append(s)
-    return rows
+def _client_ip(request):
+    ip = (request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR") or "").strip()
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    return ip
+
+
+def _players():
+    """Every player's best game, best first, and which player each game belongs to.
+
+    A member is the account. Guests cannot be told apart for certain, so two guest games are taken as one player's
+    when they share an address or a nickname: one person trying several nicknames stays one row, and so does one
+    person whose phone changes address between games.
+    """
+    games = list(SkillNameScore.objects.select_related("user", "user__avatar_icon", "user__avatar_icon__card", "user__equipped_border"))
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for g in games:
+        if g.user_id is None and g.ip:
+            parent[find(("name", g.nickname))] = find(("ip", g.ip))
+    who = {g.id: ("user", g.user_id) if g.user_id else find(("name", g.nickname)) for g in games}
+    seen, best = set(), []
+    for g in games:
+        if who[g.id] not in seen:
+            seen.add(who[g.id]); best.append(g)
+    return best, who
 
 
 @api_view(["POST"])
@@ -114,14 +142,15 @@ def submit(request):
 
     try:
         with transaction.atomic():
-            score = SkillNameScore.objects.create(user=user, nickname=nickname, count=len(names), names=names, game_id=game["g"])
+            score = SkillNameScore.objects.create(
+                user=user, nickname=nickname, count=len(names), names=names, game_id=game["g"], ip=_client_ip(request)
+            )
     except IntegrityError:
         score = SkillNameScore.objects.get(game_id=game["g"])   # sent twice: the first one stands
 
-    rows = _best_rows()
-    mine = ("u", score.user_id) if score.user_id else ("g", score.nickname)
-    rank = next(i for i, s in enumerate(rows, 1) if (("u", s.user_id) if s.user_id else ("g", s.nickname)) == mine)
-    return Response({"count": score.count, "rank": rank, "best": rows[rank - 1].count, "players": len(rows)})
+    best, who = _players()
+    rank = next(i for i, g in enumerate(best, 1) if who[g.id] == who[score.id])
+    return Response({"count": score.count, "rank": rank, "best": best[rank - 1].count, "players": len(best)})
 
 
 @api_view(["GET"])
@@ -131,7 +160,7 @@ def leaderboard(request):
     default_icon_data = CardIconSerializer(default_icon).data if default_icon else None
     default_border_data = BorderSerializer(default_border).data if default_border else None
 
-    rows = _best_rows()
+    rows, _ = _players()
     board = []
     for s in rows[:BOARD_SIZE]:
         u = s.user

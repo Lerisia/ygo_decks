@@ -26,8 +26,8 @@ class SkillNameRankingTest(TestCase):
         """A start token as the server would have issued it `age_seconds` ago."""
         return signing.dumps({"g": f"game{time.time_ns()}", "t": time.time() - age_seconds}, salt=nv.TOKEN_SALT)
 
-    def submit(self, client=None, **body):
-        return (client or self.c).post("/api/solo/names/submit/", body, format="json")
+    def submit(self, client=None, ip="10.0.0.1", **body):
+        return (client or self.c).post("/api/solo/names/submit/", body, format="json", HTTP_X_REAL_IP=ip)
 
     def test_data_matches_the_copy_the_page_ships(self):
         front = os.path.join(settings.BASE_DIR, "..", "frontend", "src", "data", "lolSkills.json")
@@ -103,9 +103,34 @@ class SkillNameRankingTest(TestCase):
         self.submit(c, token=self.token(), answers=log("여우불", "매혹", "혼령 질주"))
         self.submit(token=self.token(), nickname="롤충", answers=log("여우불", "매혹"))
         self.submit(token=self.token(), nickname="롤충", answers=log("여우불"))
-        self.submit(token=self.token(), nickname="뉴비", answers=log("여우불"))
+        self.submit(token=self.token(), nickname="뉴비", answers=log("여우불"), ip="10.0.0.2")
         r = c.get("/api/solo/names/leaderboard/")
         rows = [(e["name"], e["count"], e["guest"]) for e in r.data["leaderboard"]]
         self.assertEqual(rows, [("회원", 3, False), ("롤충", 2, True), ("뉴비", 1, True)])
         self.assertEqual(r.data["my_best"], 3)
         self.assertIsNone(self.c.get("/api/solo/names/leaderboard/").data["my_best"])
+
+    def board(self):
+        r = self.c.get("/api/solo/names/leaderboard/")
+        return [(e["name"], e["count"]) for e in r.data["leaderboard"]], r.data["players"]
+
+    def test_guests_at_one_address_are_one_player(self):
+        self.submit(token=self.token(), nickname="부캐1", answers=log("여우불"), ip="10.0.0.7")
+        self.submit(token=self.token(), nickname="부캐2", answers=log("여우불", "매혹", "혼령 질주"), ip="10.0.0.7")
+        r = self.submit(token=self.token(), nickname="부캐3", answers=log("여우불", "매혹"), ip="10.0.0.7")
+        self.assertEqual((r.data["rank"], r.data["best"], r.data["players"]), (1, 3, 1))
+        self.assertEqual(self.board(), ([("부캐2", 3)], 1))
+        self.assertEqual(SkillNameScore.objects.filter(ip="10.0.0.7").count(), 3)
+
+    def test_a_guest_keeps_the_nickname_across_addresses(self):
+        self.submit(token=self.token(), nickname="폰유저", answers=log("여우불", "매혹"), ip="10.0.1.1")
+        self.submit(token=self.token(), nickname="폰유저", answers=log("여우불"), ip="10.0.1.2")
+        self.submit(token=self.token(), nickname="딴사람", answers=log("여우불"), ip="10.0.1.3")
+        self.assertEqual(self.board(), ([("폰유저", 2), ("딴사람", 1)], 2))
+
+    def test_a_member_is_never_merged_with_a_guest_at_the_same_address(self):
+        u = User.objects.create_user(email="a@example.com", username="회원", password="x")
+        c = APIClient(); c.force_authenticate(u)
+        self.submit(c, token=self.token(), answers=log("여우불", "매혹"), ip="10.0.0.9")
+        self.submit(token=self.token(), nickname="손님", answers=log("여우불"), ip="10.0.0.9")
+        self.assertEqual(self.board(), ([("회원", 2), ("손님", 1)], 2))

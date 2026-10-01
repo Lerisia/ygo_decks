@@ -246,6 +246,8 @@ class SkillNameScore(models.Model):
     count = models.PositiveIntegerField(db_index=True)
     names = models.JSONField(default=list)
     game_id = models.CharField(max_length=40, unique=True)
+    # Where the game was sent from: guests at one address are listed as one player.
+    ip = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
