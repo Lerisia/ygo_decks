@@ -18,6 +18,16 @@ interface Deck {
   is_engine: boolean;
 }
 
+const POWER_COLORS: { label: string; ring: string; dot: string }[] = [
+  { label: "최상위권", ring: "ring-red-500", dot: "bg-red-500" },
+  { label: "상위권", ring: "ring-orange-500", dot: "bg-orange-500" },
+  { label: "중상위권", ring: "ring-yellow-400", dot: "bg-yellow-400" },
+  { label: "중하위권", ring: "ring-green-500", dot: "bg-green-500" },
+  { label: "하위권", ring: "ring-sky-400", dot: "bg-sky-400" },
+  { label: "최하위권", ring: "ring-purple-500", dot: "bg-purple-500" },
+];
+const POWER_RING: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.ring]));
+
 export default function DatabasePage() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [filteredDecks, setFilteredDecks] = useState<Deck[]>([]);
@@ -34,6 +44,13 @@ export default function DatabasePage() {
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(null);
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  // 덱 파워별 테두리 색 (특이점 2026-10-02) — 기본 켬, 켜고 끈 상태는 이 브라우저에 저장
+  const [powerBorder, setPowerBorder] = useState(() => localStorage.getItem("deck_power_border") !== "off");
+  const togglePowerBorder = () =>
+    setPowerBorder((on) => {
+      localStorage.setItem("deck_power_border", on ? "off" : "on");
+      return !on;
+    });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -205,10 +222,34 @@ export default function DatabasePage() {
         className="mb-4"
       />
 
-      {/* Filter expand / fold */}
-      <button onClick={toggleFilterSection} className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
-        {filterExpanded ? "필터 숨기기 ▲" : "필터 보기 ▼"}
-      </button>
+      {/* Filter expand / fold + deck power border toggle */}
+      <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
+        <button onClick={toggleFilterSection} className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
+          {filterExpanded ? "필터 숨기기 ▲" : "필터 보기 ▼"}
+        </button>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={powerBorder}
+          onClick={togglePowerBorder}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+        >
+          덱 파워 테두리
+          <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${powerBorder ? "bg-blue-600" : "bg-gray-400"}`}>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${powerBorder ? "translate-x-4" : ""}`} />
+          </span>
+        </button>
+      </div>
+      {powerBorder && (
+        <div className="-mt-2 mb-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+          {POWER_COLORS.map((p) => (
+            <span key={p.label} className="inline-flex items-center gap-1">
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${p.dot}`} />
+              {p.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Single selection filter 필터 */}
       {filterExpanded && (
@@ -354,7 +395,7 @@ export default function DatabasePage() {
                 alt={deck.name}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
+                className={`w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg ${powerBorder && POWER_RING[deck.strength] ? `ring-[3px] ${POWER_RING[deck.strength]}` : ""}`}
               />
               {deck.is_engine && (
                 <span
