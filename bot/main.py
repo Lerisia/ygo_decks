@@ -1,14 +1,20 @@
 """Discord bot that delegates natural-language requests to Claude Code.
 
-The bot listens in a specific channel (and optionally in DMs from whitelisted
-users), hands the message to a `claude -p --output-format stream-json`
-subprocess, and reports progress live by editing its Discord reply as tool
-calls and assistant text stream in. Final result overwrites the same message.
+The bot listens in a specific channel, in the threads under it (and optionally
+in DMs from whitelisted users), hands the message to a
+`claude -p --output-format stream-json` subprocess, and reports progress live
+by editing its Discord reply as tool calls and assistant text stream in. Final
+result overwrites the same message.
+
+Conversations: the channel is one Claude session, each thread under it is its
+own, each DM user has one. Requests in a thread run one at a time, so a
+thread's conversation stays in a single session.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -497,17 +503,66 @@ intents.dm_messages = True
 bot = discord.Client(intents=intents)
 
 
-def _is_allowed(message: discord.Message) -> bool:
-    is_dm = isinstance(message.channel, discord.DMChannel)
-    is_configured_channel = (
-        COOP_CHANNEL_ID is not None
-        and getattr(message.channel, "id", None) == COOP_CHANNEL_ID
-    )
-    if is_dm:
-        return message.author.id in ALLOWED_USER_IDS
-    if is_configured_channel:
-        return not ALLOWED_USER_IDS or message.author.id in ALLOWED_USER_IDS
-    return False
+THREAD_KEY_PREFIX = "thread-"
+# What a person typed. Everything else is a notice Discord wrote ("X started a thread: <name>", a pin, a join):
+# not a request, and Discord refuses a reply to it.
+_TYPED_MESSAGE_TYPES = (discord.MessageType.default, discord.MessageType.reply)
+
+
+def is_request(message: discord.Message) -> bool:
+    if message.author.bot or message.type not in _TYPED_MESSAGE_TYPES:
+        return False
+    return bool(message.content.strip())
+
+
+def session_key_for(message: discord.Message) -> str | None:
+    """Which conversation a message belongs to, or None when the bot does not answer there.
+
+    A DM is one conversation per whitelisted user. The co-op channel is one conversation; every thread under it
+    is a conversation of its own, shared by whoever writes in that thread.
+    """
+    channel = message.channel
+    if isinstance(channel, discord.DMChannel):
+        return f"dm-{message.author.id}" if message.author.id in ALLOWED_USER_IDS else None
+    if COOP_CHANNEL_ID is None:
+        return None
+    if ALLOWED_USER_IDS and message.author.id not in ALLOWED_USER_IDS:
+        return None
+    if getattr(channel, "id", None) == COOP_CHANNEL_ID:
+        return str(channel.id)
+    if getattr(channel, "parent_id", None) == COOP_CHANNEL_ID:
+        return f"{THREAD_KEY_PREFIX}{channel.id}"
+    return None
+
+
+# One request at a time per thread: two `claude -r` runs on the same session would each fork it, and the thread
+# would end up split across sessions. The channel keeps running requests side by side, as before.
+_thread_locks: dict[str, asyncio.Lock] = {}
+
+
+def is_busy(session_key: str) -> bool:
+    lock = _thread_locks.get(session_key)
+    return lock is not None and lock.locked()
+
+
+@contextlib.asynccontextmanager
+async def conversation_turn(session_key: str):
+    """Holds a thread's conversation for one request; other conversations pass straight through."""
+    if not session_key.startswith(THREAD_KEY_PREFIX):
+        yield
+        return
+    async with _thread_locks.setdefault(session_key, asyncio.Lock()):
+        yield
+
+
+async def _reply(message: discord.Message, text: str) -> discord.Message:
+    """A reply to the message, or a plain message in the same place if Discord will not take a reply."""
+    try:
+        return await message.reply(text)
+    except discord.Forbidden:
+        raise
+    except discord.HTTPException:
+        return await message.channel.send(text)
 
 
 @bot.event
@@ -521,26 +576,51 @@ async def on_ready():
 
 
 @bot.event
+async def on_thread_create(thread: discord.Thread):
+    # Joining is what guarantees the bot is sent a thread's messages and may write in it.
+    if COOP_CHANNEL_ID is not None and thread.parent_id == COOP_CHANNEL_ID:
+        try:
+            await thread.join()
+        except discord.HTTPException as e:
+            log.warning("Could not join thread %s: %s", thread.id, e)
+
+
+@bot.event
 async def on_message(message: discord.Message):
-    if message.author.bot:
+    if not is_request(message):
         return
-    if not _is_allowed(message):
+    session_key = session_key_for(message)
+    if session_key is None:
         return
-    if not message.content.strip():
-        return
+    in_thread = session_key.startswith(THREAD_KEY_PREFIX)
 
-    log.info("Request from %s: %s", message.author.name, message.content[:200])
+    log.info("Request from %s%s: %s", message.author.name, f" in {session_key}" if in_thread else "", message.content[:200])
 
-    # Role & channel key for session lookup. DMs get a per-user session key,
-    # guild channels get a per-channel key.
-    is_dm = isinstance(message.channel, discord.DMChannel)
-    session_key = f"dm-{message.author.id}" if is_dm else str(message.channel.id)
+    try:
+        if message.content.strip().lower() in RESET_COMMANDS:
+            await clear_session(session_key)
+            await _reply(message, "🧹 세션을 초기화했습니다. 다음 요청부터 새 대화로 시작합니다.")
+            return
+        if is_busy(session_key):
+            await _reply(message, "⏳ 이 스레드의 앞선 요청을 처리하고 있습니다. 끝나는 대로 이어서 처리합니다.")
+        async with conversation_turn(session_key):
+            await _handle_request(message, session_key)
+    except discord.Forbidden:
+        # Usually a thread the bot's role may read but not write in.
+        log.warning("No permission to answer %s in %s", message.author.name, session_key)
+        parent = getattr(message.channel, "parent", None)
+        if in_thread and parent is not None:
+            try:
+                await parent.send(
+                    f"{message.author.mention} 스레드에 글을 쓸 권한이 봇에게 없습니다. "
+                    "봇 역할에 '스레드에서 메시지 보내기' 권한을 켜 주세요."
+                )
+            except discord.HTTPException:
+                pass
 
-    if message.content.strip().lower() in RESET_COMMANDS:
-        await clear_session(session_key)
-        await message.reply("🧹 세션을 초기화했습니다. 다음 요청부터 새 대화로 시작합니다.")
-        return
 
+async def _handle_request(message: discord.Message, session_key: str):
+    """One request, start to finish, in the conversation `session_key` names."""
     sender_role = "오너" if message.author.name == "rb_elyss" else "부운영자"
     raw_msg = message.content
     user_msg = build_user_message(
@@ -558,7 +638,7 @@ async def on_message(message: discord.Message):
             user_msg = preamble + user_msg
 
     prefix = "🔄 이어가는 중" if resume_id else "🆕 새 세션"
-    status_msg = await message.reply(f"🤔 작업 시작... ({prefix}, 최대 {CLAUDE_TIMEOUT_SEC // 60}분)")
+    status_msg = await _reply(message, f"🤔 작업 시작... ({prefix}, 최대 {CLAUDE_TIMEOUT_SEC // 60}분)")
 
     # Debounce edits so we don't hit Discord's rate limit even if events arrive
     # rapidly (a batch of tool calls can fire back-to-back).
