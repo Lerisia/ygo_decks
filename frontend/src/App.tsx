@@ -41,6 +41,7 @@ import SoloDuchmind from "./pages/SoloDuchmind";
 import SoloDraw from "./pages/SoloDraw";
 import SoloDrawingDetail from "./pages/SoloDrawingDetail";
 import SoloTwenty from "./pages/SoloTwenty";
+import SkillNames from "./pages/SkillNames";
 import TierListMaker from "./pages/TierListMaker";
 import Multiplayer from "./pages/Multiplayer";
 import MultiplayerRoom from "./pages/MultiplayerRoom";
@@ -102,6 +103,7 @@ function App() {
           <Route path="/solo-duchmind/draw" element={<SoloDraw />} />
           <Route path="/solo-duchmind/:id" element={<SoloDrawingDetail />} />
           <Route path="/solo-twenty" element={<SoloTwenty />} />
+          <Route path="/skill-names" element={<SkillNames />} />
           <Route path="/card-quiz" element={<CardQuiz />} />
           <Route path="/tier-list-maker" element={<TierListMaker />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
