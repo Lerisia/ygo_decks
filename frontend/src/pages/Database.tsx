@@ -352,6 +352,8 @@ export default function DatabasePage() {
               <img
                 src={deck.cover_image || "/default_cover.png"}
                 alt={deck.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
               />
               {deck.is_engine && (

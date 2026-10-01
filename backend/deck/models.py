@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from PIL import Image
 import os
@@ -93,6 +94,8 @@ class Deck(models.Model):
     )
     
     cover_image_small = models.ImageField(upload_to='deck_covers/small/', blank=True, null=True)
+    # Deck database list: up to 480px (a 224px-wide card on a 2x screen), scaled down from the original, never up.
+    cover_image_list = models.ImageField(upload_to='deck_covers/list/', blank=True, null=True)
 
     strength = models.IntegerField(choices=_Strength.choices)
     difficulty = models.IntegerField(choices=_Difficulty.choices)
@@ -132,17 +135,29 @@ class Deck(models.Model):
         super().save(*args, **kwargs)
 
         if self.cover_image:
-            small_img_path = os.path.join("media/deck_covers/small/", os.path.basename(self.cover_image.name))
-            small_img_relative_path = f"deck_covers/small/{os.path.basename(self.cover_image.name)}"
+            base = os.path.basename(self.cover_image.name)
+            small_img_relative_path = f"deck_covers/small/{base}"
+            small_img_path = os.path.join(settings.MEDIA_ROOT, small_img_relative_path)
 
             os.makedirs(os.path.dirname(small_img_path), exist_ok=True)
             img = Image.open(self.cover_image.path)
-            img = img.resize((200, 200))
-            img.save(small_img_path)
+            img.resize((200, 200)).save(small_img_path)
 
             # Save auto-created small cover image
             self.cover_image_small.name = small_img_relative_path
-            super().save(update_fields=["cover_image_small"])
+            self.cover_image_list.name = self.make_list_cover(img, self.pk, base)
+            super().save(update_fields=["cover_image_small", "cover_image_list"])
+
+    @staticmethod
+    def make_list_cover(img, deck_id, base, size=480):
+        rel = f"deck_covers/list/{deck_id}_{os.path.splitext(base)[0]}.webp"
+        path = os.path.join(settings.MEDIA_ROOT, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        im = img.convert("RGB")
+        if max(im.size) > size:
+            im.thumbnail((size, size), Image.LANCZOS)
+        im.save(path, "WEBP", quality=85, method=6)
+        return rel
     
     def increment_views(self):
         self.num_views += 1

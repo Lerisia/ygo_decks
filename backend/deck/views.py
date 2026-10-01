@@ -194,6 +194,11 @@ def get_deck_result(request):
 
     return JsonResponse(result_data, safe=False)
 
+def _list_cover_url(deck):
+    cover = deck.cover_image_list or deck.cover_image_small
+    return cover.url if cover else None
+
+
 @api_view(["GET"])
 def get_all_decks(request):
     decks = Deck.objects.all().prefetch_related(
@@ -213,7 +218,7 @@ def get_all_decks(request):
             "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
             "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
             "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
-            "cover_image": deck.cover_image_small.url if deck.cover_image_small else None,
+            "cover_image": _list_cover_url(deck),
         }
         for deck in decks
     ]

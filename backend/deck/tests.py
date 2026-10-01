@@ -512,3 +512,53 @@ class UntaggedDeckSaveTest(TestCase):
         form.save()
         deck.refresh_from_db()
         self.assertEqual(deck.performance_tags.count(), 0)
+
+
+import io
+import shutil
+import tempfile
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
+from PIL import Image as PILImage
+
+
+def _png(size):
+    buf = io.BytesIO()
+    PILImage.new("RGB", size, (200, 30, 30)).save(buf, "PNG")
+    return SimpleUploadedFile("cover.png", buf.getvalue(), content_type="image/png")
+
+
+class ListCoverImageTest(TestCase):
+    """The deck database list shows a 480px thumbnail scaled down from the original, never the 200px one stretched up."""
+
+    def setUp(self):
+        self.media = tempfile.mkdtemp()
+        self.override = override_settings(MEDIA_ROOT=self.media)
+        self.override.enable()
+
+    def tearDown(self):
+        self.override.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+
+    def test_save_makes_list_thumbnail_from_original(self):
+        deck = _create_deck(cover_image=_png((1024, 1024)))
+        self.assertTrue(deck.cover_image_list)
+        with PILImage.open(deck.cover_image_list.path) as im:
+            self.assertEqual(im.size, (480, 480))
+        self.assertTrue(deck.cover_image_list.path.startswith(self.media))
+        self.assertTrue(deck.cover_image_small.path.startswith(self.media))
+
+    def test_small_original_is_not_upscaled(self):
+        deck = _create_deck(cover_image=_png((375, 375)))
+        with PILImage.open(deck.cover_image_list.path) as im:
+            self.assertEqual(im.size, (375, 375))
+
+    def test_list_api_serves_list_thumbnail(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        data = Client().get("/api/deck/").json()["decks"][0]
+        self.assertEqual(data["cover_image"], deck.cover_image_list.url)
+
+    def test_detail_keeps_original(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        data = Client().get(f"/api/deck/{deck.id}/").json()
+        self.assertEqual(data["cover_image"], deck.cover_image.url)
