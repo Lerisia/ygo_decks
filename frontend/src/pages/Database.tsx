@@ -236,7 +236,7 @@ export default function DatabasePage() {
           onClick={togglePowerBorder}
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
-          덱 파워 테두리
+          덱 파워
           <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${powerBorder ? "bg-blue-600" : "bg-gray-400"}`}>
             <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${powerBorder ? "translate-x-4" : ""}`} />
           </span>
