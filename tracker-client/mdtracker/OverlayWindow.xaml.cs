@@ -52,6 +52,7 @@ public partial class OverlayWindow : Window
         if (_m.GameMode == 19) parts.Add(_m.RatingAfter is double r ? $"레이팅 {_m.RatingBefore:0.##} → {r:0.##}" : "레이팅");
         else if (_m.RankCode != null) parts.Add($"{RankLabel(_m.RankCode)}{(_m.Wins is int w ? $" · {w}승" : "")}");
         parts.Add($"{_m.Turn}턴");
+        if (!_m.IsDemo && _t.Store.Config.GroupFor(_m.GameMode).Name is { Length: > 0 } sheet) parts.Add($"'{sheet}' 시트");
         SubLine.Text = string.Join(" · ", parts);
 
         _myDeck = _t.Store.FindMyDeck(_m.SuggestedMyDeckId);

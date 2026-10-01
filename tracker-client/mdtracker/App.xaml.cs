@@ -8,9 +8,9 @@ namespace MdTracker;
 public partial class App : System.Windows.Application
 {
 #if TEST_BUILD
-    public const string Version = "1.0.1-test";
+    public const string Version = "1.0.2-test";
 #else
-    public const string Version = "1.0.1";
+    public const string Version = "1.0.2";
 #endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
@@ -139,7 +139,7 @@ public partial class App : System.Windows.Application
 
         if (loggedIn)
         {
-            var sheets = new WinForms.ToolStripMenuItem("기록할 시트");
+            var sheets = new WinForms.ToolStripMenuItem("랭크전 시트");
             if (_trayGroups.Count == 0) sheets.DropDownItems.Add(new WinForms.ToolStripMenuItem("불러오는 중…") { Enabled = false });
             foreach (var g in _trayGroups)
             {
@@ -148,6 +148,17 @@ public partial class App : System.Windows.Application
                 sheets.DropDownItems.Add(it);
             }
             menu.Items.Add(sheets);
+            var rateSheets = new WinForms.ToolStripMenuItem("레이팅전 시트");
+            var same = new WinForms.ToolStripMenuItem("랭크전과 같은 시트") { Checked = Tracker.Store.Config.RateGroupId == null };
+            same.Click += (_, _) => { Tracker.Store.Config.RateGroupId = null; Tracker.Store.Config.RateGroupName = null; Tracker.Store.SaveConfig(); MainWin?.Refresh(); };
+            rateSheets.DropDownItems.Add(same);
+            foreach (var g in _trayGroups)
+            {
+                var it = new WinForms.ToolStripMenuItem(g.Name) { Checked = g.Id == Tracker.Store.Config.RateGroupId };
+                it.Click += (_, _) => { Tracker.Store.Config.RateGroupId = g.Id; Tracker.Store.Config.RateGroupName = g.Name; Tracker.Store.SaveConfig(); MainWin?.Refresh(); };
+                rateSheets.DropDownItems.Add(it);
+            }
+            menu.Items.Add(rateSheets);
             if (DateTime.Now - _trayGroupsAt > TimeSpan.FromSeconds(60))
                 new Thread(() => { try { _trayGroups = Tracker.Api.Groups(); _trayGroupsAt = DateTime.Now; } catch { } }) { IsBackground = true }.Start();
 

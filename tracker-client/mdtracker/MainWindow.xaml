@@ -62,7 +62,7 @@
                     <TextBlock Foreground="#991B1B" TextWrapping="Wrap" FontWeight="SemiBold"
                                Text="⚠ 기록할 시트가 없어 게임이 기록되지 않습니다. 아래에서 시트를 만들어 주세요."/>
                 </Border>
-                <TextBlock Text="기록할 시트" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock Text="랭크전 시트" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -72,6 +72,8 @@
                     <ComboBox x:Name="GroupBox" Grid.Column="0" SelectionChanged="GroupBox_SelectionChanged"/>
                     <Button Grid.Column="2" Content="새로고침" Style="{StaticResource Secondary}" Click="RefreshGroups_Click"/>
                 </Grid>
+                <TextBlock Text="레이팅전 시트" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <ComboBox x:Name="RateGroupBox" Margin="0,0,0,8" SelectionChanged="RateGroupBox_SelectionChanged"/>
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

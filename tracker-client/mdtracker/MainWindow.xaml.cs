@@ -79,6 +79,7 @@ public partial class MainWindow : Window
         bool noSheet = loggedIn && T.Store.Config.RecordGroupId == null;
         NoSheetWarn.Visibility = noSheet ? Visibility.Visible : Visibility.Collapsed;
         SetupMsg.Text = noSheet ? "시트를 만들면 다음 게임부터 기록됩니다."
+                      : T.Store.Config.RateGroupId != null ? $"랭크전은 '{T.Store.Config.RecordGroupName}', 레이팅전은 '{T.Store.Config.RateGroupName}' 시트에 기록됩니다."
                                 : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
         _settingAutoStart = true;
@@ -280,7 +281,7 @@ public partial class MainWindow : Window
     private void Logout_Click(object sender, RoutedEventArgs e)
     {
         T.Store.Config.Token = null; T.Store.SaveConfig();
-        GroupBox.ItemsSource = null;
+        GroupBox.ItemsSource = null; RateGroupBox.ItemsSource = null;
         RefreshPanels();
     }
 
@@ -302,6 +303,14 @@ public partial class MainWindow : Window
             {
                 T.Store.Config.RecordGroupId = cur.Id; T.Store.Config.RecordGroupName = cur.Name; T.Store.SaveConfig();
             }
+            // Rated duels: the first entry means "no sheet of their own"; a sheet deleted on the site falls back to it.
+            var rate = new List<RecordGroup> { SameAsRank };
+            rate.AddRange(groups);
+            RateGroupBox.ItemsSource = rate;
+            RateGroupBox.DisplayMemberPath = "Name";
+            var curRate = groups.FirstOrDefault(g => g.Id == T.Store.Config.RateGroupId);
+            RateGroupBox.SelectedItem = curRate ?? SameAsRank;
+            if (curRate == null && T.Store.Config.RateGroupId != null) { T.Store.Config.RateGroupId = null; T.Store.Config.RateGroupName = null; T.Store.SaveConfig(); }
             if (groups.Count == 0 && NewGroupBox.Text.Length == 0) NewGroupBox.Text = $"{DateTime.Now:yyyy-MM} 시즌";
             RefreshPanels();
         }
@@ -316,6 +325,16 @@ public partial class MainWindow : Window
     {
         if (_loadingGroups || GroupBox.SelectedItem is not RecordGroup g) return;
         T.Store.Config.RecordGroupId = g.Id; T.Store.Config.RecordGroupName = g.Name; T.Store.SaveConfig();
+        RefreshPanels();
+    }
+
+    private static readonly RecordGroup SameAsRank = new() { Id = 0, Name = "랭크전과 같은 시트" };
+
+    private void RateGroupBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingGroups || RateGroupBox.SelectedItem is not RecordGroup g) return;
+        bool own = !ReferenceEquals(g, SameAsRank);
+        T.Store.Config.RateGroupId = own ? g.Id : null; T.Store.Config.RateGroupName = own ? g.Name : null; T.Store.SaveConfig();
         RefreshPanels();
     }
 

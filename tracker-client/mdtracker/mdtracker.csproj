@@ -19,7 +19,7 @@
     <RootNamespace>MdTracker</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Product>YGO Decks Recorder</Product>
     <AssemblyTitle>YGO Decks Recorder</AssemblyTitle>
     <Description>Records Master Duel results to ygodecks.com</Description>

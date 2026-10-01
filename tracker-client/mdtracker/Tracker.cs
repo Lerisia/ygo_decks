@@ -384,7 +384,7 @@ public sealed class Tracker
     public string? Save(PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
         if (m.IsDemo) { Thread.Sleep(400); m.Status = "discarded"; return null; }
-        if (Store.Config.RecordGroupId is not int gid) return "기록할 시트가 선택되지 않았습니다";
+        if (Store.Config.GroupFor(m.GameMode).Id is not int gid) return "기록할 시트가 선택되지 않았습니다";
         try
         {
             var (id, points) = Api.AddMatch(gid, m, deckId, oppDeckId, notes);

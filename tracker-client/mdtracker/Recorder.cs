@@ -257,7 +257,12 @@ internal sealed class Recorder
                     // Turn clock: the counter only moves while the duel runs (step 16); leaving that step ends the last turn.
                     if (cur != null && clockTurn >= 0 && (d.Step != 16 || (int)d.Turn != clockTurn)) { CloseTurn(cur, clockTurn, turnStart); clockTurn = -1; }
                     if (cur != null && d.Step == 16 && clockTurn < 0) { clockTurn = (int)d.Turn; turnStart = DateTime.Now; }
-                    if (cur != null && d.Step == 16 && OnLive != null && (RecordedModes.Contains(cur.GameMode) || d.Online))   // friendly/free: overlay only, never recorded
+#if TEST_BUILD
+                    bool live = cur != null && (RecordedModes.Contains(cur.GameMode) || d.Online);   // friendly/free: overlay only, never recorded
+#else
+                    bool live = cur != null && RecordedModes.Contains(cur.GameMode);   // friendly/free: nothing drawn, nothing recorded
+#endif
+                    if (cur != null && live && d.Step == 16 && OnLive != null)
                     {
                         // Card table every poll: the engine lists ~120 instances, and a searched card shows its id only briefly.
                         if (liveTick++ % 1 == 0)

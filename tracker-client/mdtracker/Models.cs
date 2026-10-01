@@ -17,6 +17,12 @@ public sealed class Config
     public string? Email { get; set; }
     public int? RecordGroupId { get; set; }
     public string? RecordGroupName { get; set; }
+    /// Sheet for rated duels; null = the same sheet as ranked duels (RecordGroupId).
+    public int? RateGroupId { get; set; }
+    public string? RateGroupName { get; set; }
+    /// The sheet a game of this mode is saved to.
+    public (int? Id, string? Name) GroupFor(int gameMode) =>
+        gameMode == 19 && RateGroupId != null ? (RateGroupId, RateGroupName) : (RecordGroupId, RecordGroupName);
     /// Master Duel deck id → site deck id, remembered after the first save.
     public Dictionary<string, int> DeckMap { get; set; } = new();
     /// Seconds the overlay waits before saving with the suggested values.
