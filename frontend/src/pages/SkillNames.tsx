@@ -7,7 +7,7 @@ import {
   type Answer, type Leaderboard, type SubmitResult,
 } from "@/api/skillNamesApi";
 import data from "@/data/lolSkills.json";
-import { buildNameIndex, judgeName, type NameEntry } from "@/utils/nameGame";
+import { buildNameIndex, championProgress, judgeName, type ChampionProgress, type KeyState, type NameEntry } from "@/utils/nameGame";
 
 const TURN_MS = 20_000;
 const GOAL = 100;
@@ -33,6 +33,8 @@ const NOTE_COLOR = {
 function ownersLabel(e: NameEntry) {
   return e.owners.map((o) => `${o.c} ${o.k === "P" ? "패시브" : o.k}`).join(" · ");
 }
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 function readBest() {
   try {
@@ -174,7 +176,11 @@ function SkillNames() {
     usedRef.current = new Set();
     logRef.current = [];
     startAtRef.current = performance.now();
-    tokenRef.current = startGame().catch(() => null);
+    // A server restart takes a few seconds; asking again shortly after still fits the server's clock check.
+    tokenRef.current = startGame()
+      .catch(() => wait(1500).then(startGame))
+      .catch(() => wait(2500).then(startGame))
+      .catch(() => null);
     deadlineRef.current = startAtRef.current + TURN_MS;
     phaseRef.current = "playing";
     // The input has to exist before this click handler returns, or a phone will not open its keyboard.
@@ -225,6 +231,7 @@ function SkillNames() {
   };
 
   const count = answered.length;
+  const progress = useMemo(() => (phase === "over" ? championProgress(data.skills, usedRef.current) : []), [phase]);
   const seconds = Math.max(0, left) / 1000;
   const urgent = left <= 5000;
 
@@ -326,7 +333,16 @@ function SkillNames() {
             {note?.text}
           </p>
 
-          <AnsweredList answered={answered} />
+          {/* Fixed height: the page keeps its length however many names pile up. */}
+          <div className="mt-1 h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 [scrollbar-gutter:stable]">
+            {answered.length === 0 ? (
+              <p className="h-full flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+                맞힌 스킬이 여기에 쌓입니다.
+              </p>
+            ) : (
+              <AnsweredList answered={answered} />
+            )}
+          </div>
         </div>
       )}
 
@@ -348,6 +364,11 @@ function SkillNames() {
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               {newBest ? "새 최고 기록입니다." : `내 최고 기록: ${best}개`} · 전체 {index.size}개
             </p>
+            {count > 0 && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                챔피언 {progress.length}명 · 다 맞힌 챔피언 {progress.filter((p) => p.complete).length}명
+              </p>
+            )}
             {lastTry && (
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 break-words">
                 마지막 입력 “{lastTry.text}” — {lastTry.kind === "repeat" ? "이미 말한 스킬" : "없는 스킬"}
@@ -363,7 +384,14 @@ function SkillNames() {
                 ) : saving.status === "saving" ? (
                   <p className="text-gray-500 dark:text-gray-400">랭킹에 기록하는 중…</p>
                 ) : member ? (
-                  saving.status === "error" && <p className="text-red-600 dark:text-red-400">{saving.message}</p>
+                  saving.status === "error" && (
+                    <p className="text-red-600 dark:text-red-400">
+                      {saving.message}{" "}
+                      <button onClick={() => save(null)} className="underline font-semibold">
+                        다시 시도
+                      </button>
+                    </p>
+                  )
                 ) : (
                   <form onSubmit={saveAsGuest}>
                     <div className="flex gap-2">
@@ -411,8 +439,8 @@ function SkillNames() {
               </button>
             </div>
           </div>
+          {count > 0 && <ResultTable progress={progress} answered={answered} />}
           <RankingBoard board={board} />
-          <AnsweredList answered={answered} />
         </div>
       )}
 
@@ -509,14 +537,100 @@ function RankingBoard({ board }: { board: Leaderboard | null }) {
   );
 }
 
-function AnsweredList({ answered }: { answered: NameEntry[] }) {
-  if (answered.length === 0) return null;
+const FACE_COLS = 15;
+const FACE_INDEX = new Map(data.champions.map((c, i) => [c, i]));
+
+/** One champion's portrait, cut out of the sheet that holds them all. */
+function Face({ champion, size }: { champion: string; size: number }) {
+  const i = FACE_INDEX.get(champion) ?? 0;
   return (
-    <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+    <span
+      aria-hidden
+      className="shrink-0 rounded-md bg-gray-200 dark:bg-gray-700"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: "url(/images/lol/champion-faces.webp)",
+        backgroundSize: `${FACE_COLS * size}px auto`,
+        backgroundPosition: `-${(i % FACE_COLS) * size}px -${Math.floor(i / FACE_COLS) * size}px`,
+      }}
+    />
+  );
+}
+
+const KEY_COLOR: Record<KeyState, string> = {
+  full: "text-blue-600 dark:text-blue-400",
+  part: "text-amber-500 dark:text-amber-400",
+  none: "text-gray-300 dark:text-gray-600",
+};
+
+/** The finished game: by champion (which skills of each were named), or in the order they were named. */
+function ResultTable({ progress, answered }: { progress: ChampionProgress[]; answered: NameEntry[] }) {
+  const [byChampion, setByChampion] = useState(true);
+  const tab = (on: boolean) =>
+    `px-3 py-1 text-sm font-semibold transition ${
+      on ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+    }`;
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-lg font-semibold">맞힌 스킬</h2>
+        <div className="flex rounded-lg overflow-hidden">
+          <button onClick={() => setByChampion(true)} className={tab(byChampion)}>
+            챔피언별
+          </button>
+          <button onClick={() => setByChampion(false)} className={tab(!byChampion)}>
+            맞힌 순서
+          </button>
+        </div>
+      </div>
+      {byChampion ? (
+        <>
+          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {progress.map((p) => (
+              <li
+                key={p.c}
+                className={`flex items-center gap-2 px-2 h-12 rounded-lg border ${
+                  p.complete
+                    ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700"
+                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                }`}
+              >
+                <Face champion={p.c} size={32} />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate leading-tight">{p.c}</div>
+                  <div className="flex gap-1.5 text-xs font-bold leading-tight mt-0.5">
+                    {p.keys.map((k) => (
+                      <span key={k.k} className={KEY_COLOR[k.state]}>
+                        {k.k}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            파란 글자는 맞힌 스킬, 주황 글자는 이름이 둘인 스킬 중 하나만 맞힌 것입니다.
+          </p>
+        </>
+      ) : (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+          <AnsweredList answered={answered} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnsweredList({ answered }: { answered: NameEntry[] }) {
+  return (
+    <ul className="divide-y divide-gray-200 dark:divide-gray-700 text-sm">
       {answered.map((e, i) => (
-        <li key={e.name} className="py-1.5 flex items-baseline gap-2">
-          <span className="w-8 shrink-0 text-right tabular-nums text-gray-400">{answered.length - i}</span>
-          <span className="font-medium">{e.name}</span>
+        <li key={e.name} className="px-2 h-8 flex items-center gap-2">
+          <span className="w-7 shrink-0 text-right tabular-nums text-gray-400">{answered.length - i}</span>
+          <Face champion={e.owners[0].c} size={20} />
+          <span className="font-medium shrink-0">{e.name}</span>
           <span className="min-w-0 truncate text-gray-500 dark:text-gray-400">{ownersLabel(e)}</span>
         </li>
       ))}

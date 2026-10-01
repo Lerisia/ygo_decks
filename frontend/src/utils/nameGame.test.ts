@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNameIndex, judgeName, normalizeName } from "./nameGame";
+import { buildNameIndex, championProgress, judgeName, normalizeName } from "./nameGame";
 
 const skills = [
   { n: "현혹의 구슬", c: "아리", k: "Q" },
@@ -55,5 +55,43 @@ describe("judgeName", () => {
   });
   it("treats blank input as nothing typed", () => {
     expect(judgeName(index, new Set(), "   ").kind).toBe("empty");
+  });
+});
+
+describe("championProgress", () => {
+  const things = [
+    { n: "정기 흡수", c: "아리", k: "P" },
+    { n: "현혹의 구슬", c: "아리", k: "Q" },
+    { n: "여우불", c: "아리", k: "W" },
+    { n: "매혹", c: "아리", k: "E" },
+    { n: "혼령 질주", c: "아리", k: "R" },
+    { n: "질풍", c: "리 신", k: "P" },
+    { n: "음파", c: "리 신", k: "Q" },
+    { n: "공명의 일격", c: "리 신", k: "Q" },
+    { n: "방호", c: "리 신", k: "W" },
+    { n: "동상", c: "애니비아", k: "E" },
+    { n: "동상", c: "세주아니", k: "P" },
+    { n: "가시 박힌 뭉치", c: "가렌", k: "Q" },
+  ];
+  const used = (...names: string[]) => new Set(names.map(normalizeName));
+
+  it("leaves out champions with nothing named", () => {
+    expect(championProgress(things, used("여우불")).map((p) => p.c)).toEqual(["아리"]);
+  });
+  it("marks each key none, part or full", () => {
+    const [lee] = championProgress(things, used("음파", "방호"));
+    expect(lee.keys).toEqual([
+      { k: "P", state: "none" },
+      { k: "Q", state: "part" },
+      { k: "W", state: "full" },
+    ]);
+    expect([lee.got, lee.total, lee.complete]).toEqual([2, 4, false]);
+  });
+  it("puts finished champions first, then the ones with more named", () => {
+    const all = championProgress(things, used("정기 흡수", "현혹의 구슬", "여우불", "매혹", "혼령 질주", "음파", "방호", "가시 박힌 뭉치"));
+    expect(all.map((p) => [p.c, p.complete])).toEqual([["아리", true], ["가렌", true], ["리 신", false]]);
+  });
+  it("counts a name two champions share for both", () => {
+    expect(championProgress(things, used("동상")).map((p) => p.c)).toEqual(["세주아니", "애니비아"]);
   });
 });
