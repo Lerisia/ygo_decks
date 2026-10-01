@@ -234,3 +234,22 @@ class SoloTwentyGame(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["user", "status"])]
+
+
+class SkillNameScore(models.Model):
+    """One finished game of the skill name game (beta). A member's game belongs to the account;
+    a guest's carries the nickname typed after the game."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name="skill_name_scores"
+    )
+    nickname = models.CharField(max_length=12, blank=True)
+    count = models.PositiveIntegerField(db_index=True)
+    names = models.JSONField(default=list)
+    game_id = models.CharField(max_length=40, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-count", "created_at"]
+
+    def __str__(self):
+        return f"{self.user.username if self.user else self.nickname + ' (비회원)'}: {self.count}"

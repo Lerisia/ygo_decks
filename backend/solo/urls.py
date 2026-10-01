@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, twenty_views
+from . import names_views, views, twenty_views
 
 urlpatterns = [
     path("start_draw/", views.start_draw, name="solo_start_draw"),
@@ -22,4 +22,8 @@ urlpatterns = [
     path("twenty/give_up/", twenty_views.give_up, name="solo_tw_give_up"),
     path("twenty/hint_dims/", twenty_views.hint_dims, name="solo_tw_hint_dims"),
     path("twenty/hint/", twenty_views.use_hint, name="solo_tw_hint"),
+    # Skill name game (beta)
+    path("names/start/", names_views.start, name="solo_names_start"),
+    path("names/submit/", names_views.submit, name="solo_names_submit"),
+    path("names/leaderboard/", names_views.leaderboard, name="solo_names_leaderboard"),
 ]

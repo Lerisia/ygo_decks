@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (
     SoloDailyPoints, SoloDrawing, SoloDrawingGuess, SoloDrawingRecommend,
-    SoloTwentyGame,
+    SoloTwentyGame, SkillNameScore,
 )
 
 
@@ -43,3 +43,10 @@ class SoloTwentyGameAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "card_name_snapshot")
     readonly_fields = ("started_at", "ended_at", "history")
     date_hierarchy = "started_at"
+
+
+@admin.register(SkillNameScore)
+class SkillNameScoreAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "nickname", "count", "created_at")
+    search_fields = ("nickname", "user__username")
+    readonly_fields = ("created_at",)
