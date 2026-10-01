@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import get_deck_result, get_all_decks, get_deck_data, get_tags, update_wiki_content, recommend_step, get_deck_videos, get_deck_notes
+from .views import get_deck_result, get_all_decks, get_deck_data, get_tags, update_wiki_content, recommend_step, get_deck_videos, get_deck_notes, get_deck_hyeol
 
 urlpatterns = [
     path("deck/result", get_deck_result),
@@ -8,6 +8,7 @@ urlpatterns = [
     path("deck/<int:deck_id>/", get_deck_data, name="deck-detail"),
     path("deck/<int:deck_id>/videos/", get_deck_videos, name="deck-videos"),
     path("deck/<int:deck_id>/notes/", get_deck_notes, name="deck-notes"),
+    path("deck/<int:deck_id>/hyeol/", get_deck_hyeol, name="deck-hyeol"),
     path("tags/", get_tags, name="get-tags"),
     path("deck/<int:deck_id>/update_wiki/", update_wiki_content, name="update_wiki_content"),
 ]

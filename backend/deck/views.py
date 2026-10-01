@@ -244,6 +244,7 @@ def get_deck_data(request, deck_id):
         "play_video_url": deck.play_video_url,
         "video_count": 1 if _featured(deck) else 0,
         "note_count": _note_entry_count(_visible_notes(deck)),
+        "has_hyeol": hasattr(deck, "hyeol"),
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -348,3 +349,25 @@ def get_deck_notes(request, deck_id):
         first.setdefault(n.series or f"#{n.id}", i)
     notes.sort(key=lambda n: (first[n.series or f"#{n.id}"], n.part or 0))
     return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in notes]})
+
+
+@api_view(["GET"])
+def get_deck_hyeol(request, deck_id):
+    """혈자리 summary (듀얼 아카이브 혈자리 아카이브, with permission) with our card pictures attached."""
+    from card.models import Card
+    from .models import DeckHyeol
+
+    h = DeckHyeol.objects.filter(deck_id=deck_id).first()
+    if not h:
+        return Response({"error": "no data"}, status=404)
+    data = h.data
+    cids = {str(c["cid"]) for s in data.get("sections", []) for c in s["cards"] if c.get("cid") is not None}
+    pics = {}
+    for c in Card.objects.filter(konami_id__in=cids).only("konami_id", "card_image", "card_illust"):
+        img = c.card_illust or c.card_image  # the art (Korean site; the full scans are English cards)
+        if img and c.konami_id not in pics:
+            pics[c.konami_id] = img.url
+    for s in data.get("sections", []):
+        for c in s["cards"]:
+            c["image"] = pics.get(str(c.get("cid")))
+    return Response({"deck_id": deck_id, **data})

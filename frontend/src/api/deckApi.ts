@@ -103,6 +103,32 @@ export type DeckNote = {
   part_label: string;
 };
 
+export type HyeolCard = {
+  cid: number | null;
+  name: string;
+  desc: string;
+  sev: "R" | "Y" | "G" | "N";
+  timing: string;
+  text: string;
+  basis: string;
+  image: string | null;
+};
+
+export type DeckHyeol = {
+  deck_id: number;
+  overview: { t: string; name: string; short: string; level: string; label: string; note: string }[];
+  sections: { id: string; name: string; short: string; hint: string; note: string; cards: HyeolCard[] }[];
+  updated_at: string;
+  stale: boolean;
+  source_url: string;
+};
+
+export const getDeckHyeol = async (deckId: number): Promise<DeckHyeol> => {
+  const response = await fetch(`/api/deck/${deckId}/hyeol/`);
+  if (!response.ok) throw new Error("Failed to fetch deck hyeol");
+  return response.json();
+};
+
 export const getDeckNotes = async (deckId: number): Promise<{ deck_id: number; notes: DeckNote[] }> => {
   const response = await fetch(`/api/deck/${deckId}/notes/`);
   if (!response.ok) throw new Error("Failed to fetch deck notes");

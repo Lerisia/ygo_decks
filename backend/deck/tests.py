@@ -574,3 +574,54 @@ class ListCoverImageTest(TestCase):
         deck = _create_deck(cover_image=_png((800, 800)))
         data = Client().get(f"/api/deck/{deck.id}/").json()
         self.assertEqual(data["cover_image"], deck.cover_image.url)
+
+
+import json as _json
+from .hyeol import parse_archive, store_archive
+from .models import DeckHyeol
+
+_ARCHIVE = "window.HYEOL_V2 = " + _json.dumps({
+    "meta": {"report_date": "2026-09-29"},
+    "handtraps": [
+        {"id": "droll", "name": "드롤 & 로크 버드", "short": "드롤", "group": "draw_search"},
+        {"id": "ash", "name": "하루 우라라", "short": "우라라", "group": "handtrap"},
+    ],
+    "cards": {"22570": {"n": "크라운 클랜 『말라바리즘』", "desc": "①: 덱에서 특수 소환한다."}},
+    "decks": {
+        "ygo-{ID}": {"report_deck": "혈자리덱", "curated_at": "2026-09-29", "admin_saved_at": "2026-09-30T23:58:29", "stale": False,
+                     "legacy_view": {
+                         "overview": [{"t": "droll", "level": "high", "label": "아픔", "note": "엔진 안에 드롤 대처가 없음"}],
+                         "sections": [{"handtrap": "ash", "name": "하루우라라 · 퍼지", "hint": "서치·덱 특소", "note": "",
+                                       "cards": [{"sev": "Y", "card": 22571, "label": "두 번째", "timing": "", "text": "후속"},
+                                                 {"sev": "R", "card": 22570, "label": "", "timing": "우라라 1순위", "text": "2체 특소를 막음", "basis": "SOURCE"}]}]}},
+        "namu-abc": {"report_deck": "도감에 없는 덱", "legacy_view": {"overview": [], "sections": []}},
+    },
+}, ensure_ascii=False) + ";\r\n"
+
+
+class DeckHyeolTest(TestCase):
+    """2026-10-02 특이점: 듀얼 아카이브(Hort)의 혈자리 자료를 덱 문서에 요약해 보여 줌 (허락받음)."""
+
+    def setUp(self):
+        self.deck = _create_deck(name="혈자리덱")
+        self.text = _ARCHIVE.replace("{ID}", str(self.deck.id))
+
+    def test_parse_keeps_only_our_decks_and_orders_cards_by_priority(self):
+        data = parse_archive(self.text)
+        self.assertEqual(list(data), [self.deck.id])
+        d = data[self.deck.id]
+        self.assertEqual(d["overview"][0]["short"], "드롤")
+        cards = d["sections"][0]["cards"]
+        self.assertEqual([c["sev"] for c in cards], ["R", "Y"])
+        self.assertEqual(cards[0]["name"], "크라운 클랜 『말라바리즘』")   # empty label falls back to the card table
+        self.assertEqual(d["source_url"], f"https://mdarchive.pages.dev/#hyeol/ygo-{self.deck.id}")
+
+    def test_api_serves_stored_summary_and_detail_flags_it(self):
+        self.assertEqual(store_archive(parse_archive(self.text)), 1)
+        body = APIClient().get(f"/api/deck/{self.deck.id}/hyeol/").json()
+        self.assertEqual(body["sections"][0]["cards"][0]["timing"], "우라라 1순위")
+        self.assertTrue(APIClient().get(f"/api/deck/{self.deck.id}/").json()["has_hyeol"])
+
+    def test_deck_without_data(self):
+        self.assertEqual(APIClient().get(f"/api/deck/{self.deck.id}/hyeol/").status_code, 404)
+        self.assertFalse(APIClient().get(f"/api/deck/{self.deck.id}/").json()["has_hyeol"])

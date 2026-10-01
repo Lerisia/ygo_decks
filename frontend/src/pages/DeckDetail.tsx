@@ -7,6 +7,10 @@ import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
+import DeckHyeolSection from "@/components/DeckHyeolSection";
+
+// 혈자리 섹션 시안(2026-10-02): 승인 전까지 주소에 ?hyeol=1 을 붙였을 때만 보임.
+const HYEOL_PREVIEW = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("hyeol");
 import StatInfoButton from "@/components/StatInfoButton";
 import { statPlot, statText } from "@/utils/deckStats";
 
@@ -33,6 +37,7 @@ interface Deck {
   is_engine?: boolean;
   play_video_url?: string | null;
   video_count?: number;
+  has_hyeol?: boolean;
   stats?: DeckStats;
 }
 
@@ -279,6 +284,7 @@ export default function DeckDetail() {
           <DeckVideosModal deckId={deck.id} deckName={deck.name} onClose={() => setShowVideos(false)} />
         )}
         <DeckNotesSection deckId={deck.id} />
+        {deck.has_hyeol && HYEOL_PREVIEW && <DeckHyeolSection deckId={deck.id} />}
         {editing ? (
           <>
             {/* react-simplemde-editor로 마크다운 작성 */}

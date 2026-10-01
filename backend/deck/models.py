@@ -248,6 +248,22 @@ class DeckNote(models.Model):
         return f"{self.deck.name}: {self.title}"
 
 
+class DeckHyeol(models.Model):
+    """혈자리 summary for one deck, from 듀얼 아카이브's 혈자리 아카이브 (mdarchive.pages.dev, by Hort — used with
+    permission, 2026-10-02). Refreshed by `manage.py sync_hyeol`; `data` is the compact shape built in deck/hyeol.py."""
+    deck = models.OneToOneField(Deck, on_delete=models.CASCADE, related_name="hyeol")
+    data = models.JSONField(default=dict)
+    source_updated_at = models.CharField(max_length=40, blank=True, default="")
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "덱 혈자리"
+        verbose_name_plural = "덱 혈자리"
+
+    def __str__(self):
+        return f"{self.deck.name} 혈자리"
+
+
 class DeckInferencePriority(models.Model):
     """Deck inference only: when both decks are candidates for the same duel, rank `winner` above `loser`.
 
