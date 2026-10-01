@@ -177,7 +177,10 @@ function SkillNames() {
             <li>띄어쓰기와 특수문자는 틀려도 됩니다.</li>
             <li>다른 창이나 탭으로 나가면 그 판은 끝납니다. 붙여넣기는 되지 않습니다.</li>
           </ul>
-          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">내 최고 기록: {best}개</p>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            원래 유희왕 카드로 하려 했는데, 일단 롤대남들 데리고 테스트하느라 롤이 되어버림.
+          </p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">내 최고 기록: {best}개</p>
           <button
             onClick={start}
             className="mt-4 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
