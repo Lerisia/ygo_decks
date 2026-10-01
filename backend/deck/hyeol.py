@@ -9,6 +9,9 @@ import urllib.request
 ARCHIVE_URL = "https://mdarchive.pages.dev/"
 DECK_URL = "https://mdarchive.pages.dev/#hyeol/ygo-{id}"
 SEV_ORDER = {"R": 0, "Y": 1, "G": 2, "N": 3}
+# Left out of the deck page: cards few people run (특이점, 2026-10-02).
+HIDDEN_HANDTRAPS = {"crow_bystial", "special_meta", "gamma"}
+SHORT_NAMES = {"ogre": "유령토끼"}
 
 
 def fetch_archive_text(timeout=60):
@@ -48,6 +51,8 @@ def parse_archive(text):
         } for o in view.get("overview", [])]
         sections = []
         for s in view.get("sections", []):
+            if s.get("handtrap") in HIDDEN_HANDTRAPS:
+                continue
             rows = []
             for c in s.get("cards", []):
                 cid = c.get("card")
@@ -68,7 +73,7 @@ def parse_archive(text):
             sections.append({
                 "id": s.get("handtrap"),
                 "name": s.get("name") or t.get("name", ""),
-                "short": t.get("short") or s.get("name", ""),
+                "short": SHORT_NAMES.get(s.get("handtrap")) or t.get("short") or s.get("name", ""),
                 "hint": s.get("hint") or "",
                 "note": s.get("note") or "",
                 "cards": rows,

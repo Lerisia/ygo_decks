@@ -585,6 +585,8 @@ _ARCHIVE = "window.HYEOL_V2 = " + _json.dumps({
     "handtraps": [
         {"id": "droll", "name": "드롤 & 로크 버드", "short": "드롤", "group": "draw_search"},
         {"id": "ash", "name": "하루 우라라", "short": "우라라", "group": "handtrap"},
+        {"id": "ogre", "name": "유령토끼", "short": "토끼", "group": "handtrap"},
+        {"id": "gamma", "name": "PSY프레임기어 감마", "short": "감마", "group": "handtrap"},
     ],
     "cards": {"22570": {"n": "크라운 클랜 『말라바리즘』", "desc": "①: 덱에서 특수 소환한다."}},
     "decks": {
@@ -593,7 +595,9 @@ _ARCHIVE = "window.HYEOL_V2 = " + _json.dumps({
                          "overview": [{"t": "droll", "level": "high", "label": "아픔", "note": "엔진 안에 드롤 대처가 없음"}],
                          "sections": [{"handtrap": "ash", "name": "하루우라라 · 퍼지", "hint": "서치·덱 특소", "note": "",
                                        "cards": [{"sev": "Y", "card": 22571, "label": "두 번째", "timing": "", "text": "후속"},
-                                                 {"sev": "R", "card": 22570, "label": "", "timing": "우라라 1순위", "text": "2체 특소를 막음", "basis": "SOURCE"}]}]}},
+                                                 {"sev": "R", "card": 22570, "label": "", "timing": "우라라 1순위", "text": "2체 특소를 막음", "basis": "SOURCE"}]},
+                                      {"handtrap": "ogre", "name": "유령토끼", "cards": [{"sev": "R", "card": 22570, "text": "파괴"}]},
+                                      {"handtrap": "gamma", "name": "PSY프레임기어 감마", "cards": [{"sev": "Y", "card": 22570, "text": "무효"}]}]}},
         "namu-abc": {"report_deck": "도감에 없는 덱", "legacy_view": {"overview": [], "sections": []}},
     },
 }, ensure_ascii=False) + ";\r\n"
@@ -615,6 +619,8 @@ class DeckHyeolTest(TestCase):
         self.assertEqual([c["sev"] for c in cards], ["R", "Y"])
         self.assertEqual(cards[0]["name"], "크라운 클랜 『말라바리즘』")   # empty label falls back to the card table
         self.assertEqual(d["source_url"], f"https://mdarchive.pages.dev/#hyeol/ygo-{self.deck.id}")
+        # 특이점 2026-10-02: 크로우·비스테드, 메타 카드, 감마는 빼고, 토끼는 '유령토끼'로
+        self.assertEqual([s["short"] for s in d["sections"]], ["우라라", "유령토끼"])
 
     def test_api_serves_stored_summary_and_detail_flags_it(self):
         self.assertEqual(store_archive(parse_archive(self.text)), 1)
