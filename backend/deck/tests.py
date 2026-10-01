@@ -490,6 +490,18 @@ class DeckNotesTest(TestCase):
     def test_unknown_deck_404(self):
         self.assertEqual(self.client.get("/api/deck/999999/videos/").status_code, 404)
 
+    def test_series_parts_come_together_and_count_once(self):
+        """2026-10-01 특이점: 1편·2편·3편으로 나눠 올린 공략은 하나의 공략으로 묶어 보여 줌."""
+        base = "https://gall.dcinside.com/mgallery/board/view/?id=masterduel&no="
+        for part, label in [(2, "범용마함1"), (1, "버제스토마")]:
+            DeckNote.objects.create(deck=self.deck, title=f"버제스토마란 무엇일까…{part}편", author="M", url=f"{base}{part}",
+                                    source="dcinside", series="버제스토마란 무엇일까…", part=part, part_label=label)
+        DeckNote.objects.create(deck=self.deck, title="단편 공략", url=f"{base}9", source="dcinside")
+        notes = self.client.get(f"/api/deck/{self.deck.id}/notes/").json()["notes"]
+        parts = [n for n in notes if n["series"]]
+        self.assertEqual([(n["part"], n["part_label"]) for n in parts], [(1, "버제스토마"), (2, "범용마함1")])
+        self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["note_count"], 2)
+
     def test_detail_video_count_ignores_channel_videos(self):
         """2026-09-12 엘리스: 김빠방·한국 유튜버 영상은 버튼 활성 기준에서 제외."""
         self.assertEqual(self.client.get(f"/api/deck/{self.deck.id}/").json()["video_count"], 0)

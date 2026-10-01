@@ -232,6 +232,10 @@ class DeckNote(models.Model):
     summary = models.CharField(max_length=300, blank=True, default="")
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    # One guide posted as several parts (1편, 2편, …): same series title → shown as one entry with a link per part.
+    series = models.CharField(max_length=200, blank=True, default="", help_text="여러 편으로 나뉜 공략의 공통 제목 (같으면 하나로 묶임)")
+    part = models.PositiveSmallIntegerField(null=True, blank=True, help_text="편 번호")
+    part_label = models.CharField(max_length=100, blank=True, default="", help_text="편 부제 (예: 덱 소개)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

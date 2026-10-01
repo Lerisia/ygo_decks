@@ -98,6 +98,9 @@ export type DeckNote = {
   price: string;
   published_at: string | null;
   summary: string;
+  series: string;
+  part: number | null;
+  part_label: string;
 };
 
 export const getDeckNotes = async (deckId: number): Promise<{ deck_id: number; notes: DeckNote[] }> => {

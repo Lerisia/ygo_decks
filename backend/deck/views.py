@@ -243,7 +243,7 @@ def get_deck_data(request, deck_id):
         "is_engine": deck.is_engine,
         "play_video_url": deck.play_video_url,
         "video_count": 1 if _featured(deck) else 0,
-        "note_count": _visible_notes(deck).count(),
+        "note_count": _note_entry_count(_visible_notes(deck)),
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -317,6 +317,9 @@ def serialize_note(n):
         "price": n.price,
         "published_at": n.published_at.isoformat() if n.published_at else None,
         "summary": n.summary,
+        "series": n.series,
+        "part": n.part,
+        "part_label": n.part_label,
     }
 
 
@@ -329,8 +332,19 @@ def _visible_notes(deck):
     return qs if SHOW_PAID_NOTES else qs.filter(is_paid=False)
 
 
+def _note_entry_count(notes):
+    """A guide split into parts counts once."""
+    return len({("s", n.series) if n.series else ("n", n.id) for n in notes})
+
+
 @api_view(["GET"])
 def get_deck_notes(request, deck_id):
     """한국어 강의노트 목록 (활성·무료만, 정렬순)."""
     deck = get_object_or_404(Deck, id=deck_id)
-    return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in _visible_notes(deck)]})
+    # Parts of a series sit together, at the position of the series' first-ranked part, in part order.
+    notes = list(_visible_notes(deck))
+    first = {}
+    for i, n in enumerate(notes):
+        first.setdefault(n.series or f"#{n.id}", i)
+    notes.sort(key=lambda n: (first[n.series or f"#{n.id}"], n.part or 0))
+    return Response({"deck_id": deck.id, "notes": [serialize_note(n) for n in notes]})
