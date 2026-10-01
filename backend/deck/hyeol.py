@@ -11,7 +11,7 @@ DECK_URL = "https://mdarchive.pages.dev/#hyeol/ygo-{id}"
 SEV_ORDER = {"R": 0, "Y": 1, "G": 2, "N": 3}
 # Left out of the deck page: cards few people run (특이점, 2026-10-02).
 HIDDEN_HANDTRAPS = {"crow_bystial", "special_meta", "gamma"}
-SHORT_NAMES = {"ogre": "유령토끼"}
+SHORT_NAMES = {"ogre": "유령토끼", "maxxc": "증식의 G"}
 
 
 def fetch_archive_text(timeout=60):
@@ -44,7 +44,7 @@ def parse_archive(text):
         overview = [{
             "t": o.get("t"),
             "name": traps.get(o.get("t"), {}).get("name", o.get("t")),
-            "short": traps.get(o.get("t"), {}).get("short", o.get("t")),
+            "short": SHORT_NAMES.get(o.get("t")) or traps.get(o.get("t"), {}).get("short", o.get("t")),
             "level": o.get("level") or "unknown",
             "label": o.get("label") or "미분류",
             "note": o.get("note") or "",

@@ -584,6 +584,7 @@ _ARCHIVE = "window.HYEOL_V2 = " + _json.dumps({
     "meta": {"report_date": "2026-09-29"},
     "handtraps": [
         {"id": "droll", "name": "드롤 & 로크 버드", "short": "드롤", "group": "draw_search"},
+        {"id": "maxxc", "name": "증식의 G", "short": "G", "group": "draw_search"},
         {"id": "ash", "name": "하루 우라라", "short": "우라라", "group": "handtrap"},
         {"id": "ogre", "name": "유령토끼", "short": "토끼", "group": "handtrap"},
         {"id": "gamma", "name": "PSY프레임기어 감마", "short": "감마", "group": "handtrap"},
@@ -592,7 +593,8 @@ _ARCHIVE = "window.HYEOL_V2 = " + _json.dumps({
     "decks": {
         "ygo-{ID}": {"report_deck": "혈자리덱", "curated_at": "2026-09-29", "admin_saved_at": "2026-09-30T23:58:29", "stale": False,
                      "legacy_view": {
-                         "overview": [{"t": "droll", "level": "high", "label": "아픔", "note": "엔진 안에 드롤 대처가 없음"}],
+                         "overview": [{"t": "droll", "level": "high", "label": "아픔", "note": "엔진 안에 드롤 대처가 없음"},
+                                      {"t": "maxxc", "level": "conditional", "label": "할만함", "note": ""}],
                          "sections": [{"handtrap": "ash", "name": "하루우라라 · 퍼지", "hint": "서치·덱 특소", "note": "",
                                        "cards": [{"sev": "Y", "card": 22571, "label": "두 번째", "timing": "", "text": "후속"},
                                                  {"sev": "R", "card": 22570, "label": "", "timing": "우라라 1순위", "text": "2체 특소를 막음", "basis": "SOURCE"}]},
@@ -621,6 +623,7 @@ class DeckHyeolTest(TestCase):
         self.assertEqual(d["source_url"], f"https://mdarchive.pages.dev/#hyeol/ygo-{self.deck.id}")
         # 특이점 2026-10-02: 크로우·비스테드, 메타 카드, 감마는 빼고, 토끼는 '유령토끼'로
         self.assertEqual([s["short"] for s in d["sections"]], ["우라라", "유령토끼"])
+        self.assertEqual([o["short"] for o in d["overview"]], ["드롤", "증식의 G"])
 
     def test_api_serves_stored_summary_and_detail_flags_it(self):
         self.assertEqual(store_archive(parse_archive(self.text)), 1)

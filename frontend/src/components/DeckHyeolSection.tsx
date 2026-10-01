@@ -73,7 +73,6 @@ function CardDetail({ c, trap, onClose }: { c: HyeolCard; trap: string; onClose:
 export default function DeckHyeolSection({ deckId }: { deckId: number }) {
   const [data, setData] = useState<DeckHyeol | null>(null);
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ c: HyeolCard; trap: string } | null>(null);
 
@@ -133,31 +132,17 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
               </span>
             </div>
             <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-              {data.sections.map((s) => {
-                const top = s.cards.filter((c) => c.sev === "R");
-                const shown = expanded[s.id] ? s.cards : top.length ? top : s.cards.slice(0, 1);
-                const rest = s.cards.length - shown.length;
-                return (
-                  <li key={s.id} className="py-2 sm:flex sm:gap-3">
-                    <p className="sm:w-24 shrink-0 pt-1 text-sm font-bold text-gray-900 dark:text-gray-100" title={s.hint}>{s.short}</p>
-                    <div className="min-w-0 flex-1">
-                      {expanded[s.id] && s.note && <p className="px-1 mb-1 text-xs text-gray-600 dark:text-gray-300">{s.note}</p>}
-                      {shown.map((c, i) => (
-                        <CardRow key={`${c.cid}-${i}`} c={c} onOpen={() => setDetail({ c, trap: s.name })} />
-                      ))}
-                      {(rest > 0 || (expanded[s.id] && s.cards.length > shown.length - 0 && s.cards.length > 1)) && (
-                        <button
-                          type="button"
-                          onClick={() => setExpanded((v) => ({ ...v, [s.id]: !v[s.id] }))}
-                          className="ml-1 text-xs text-blue-600 dark:text-blue-400 hover:underline hover:border-transparent focus:outline-none"
-                        >
-                          {expanded[s.id] ? "접기" : `2·3순위 더 보기 (+${rest})`}
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
+              {data.sections.map((s) => (
+                <li key={s.id} className="py-2 sm:flex sm:gap-3">
+                  <p className="sm:w-24 shrink-0 pt-1 text-sm font-bold text-gray-900 dark:text-gray-100" title={s.hint}>{s.short}</p>
+                  <div className="min-w-0 flex-1">
+                    {s.note && <p className="px-1 mb-1 text-xs text-gray-600 dark:text-gray-300">{s.note}</p>}
+                    {s.cards.map((c, i) => (
+                      <CardRow key={`${c.cid}-${i}`} c={c} onOpen={() => setDetail({ c, trap: s.name })} />
+                    ))}
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
 
