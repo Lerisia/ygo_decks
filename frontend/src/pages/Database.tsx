@@ -24,7 +24,7 @@ const POWER_COLORS: { label: string; color: string }[] = [
   { label: "중상위권", color: "#facc15" },
   { label: "중하위권", color: "#22c55e" },
   { label: "하위권", color: "#3b8df5" },
-  { label: "최하위권", color: "#7e22ce" },
+  { label: "최하위권", color: "#4b5563" },
 ];
 const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.color]));
 // 3px ring in the deck power colour plus a faint glow of the same colour outside it (drawn outside the box, so no layout shift).
