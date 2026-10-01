@@ -85,12 +85,6 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
     };
   }, [deckId]);
 
-  const first = data?.sections.find((s) => s.cards.some((c) => c.sev === "R"));
-  const firstCard = first?.cards.find((c) => c.sev === "R");
-  const pains = (data?.overview ?? []).filter((o) => o.level === "high" || o.level === "very_high").map((o) => o.short);
-  const summary = data
-    ? [firstCard && `${first!.short} → ${firstCard.name}`, pains.length > 0 && `${pains.join("·")} 아픔`].filter(Boolean).join(" · ")
-    : "";
   const note = data?.overview.find((o) => o.t === noteFor);
 
   return (
@@ -99,16 +93,13 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="w-full text-left rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition"
+        className="w-full flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition"
       >
-        <span className="flex items-center justify-between">
-          <span className="text-base font-bold text-gray-900 dark:text-gray-100">🎯 혈자리 · 상대할 때</span>
-          <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            {data ? `패트랩 ${data.sections.length}종` : ""}
-            <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
-          </span>
+        <span className="text-base font-bold text-gray-900 dark:text-gray-100">🎯 상대법</span>
+        <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          {data ? `패트랩 ${data.sections.length}종` : ""}
+          <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
         </span>
-        <span className="block mt-0.5 min-h-[1rem] text-xs text-gray-600 dark:text-gray-400 truncate">{summary}</span>
       </button>
 
       {open && data && (
