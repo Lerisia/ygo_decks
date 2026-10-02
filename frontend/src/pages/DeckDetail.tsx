@@ -7,6 +7,7 @@ import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
+import EngineBadge from "@/components/EngineBadge";
 import DeckHyeolSection from "@/components/DeckHyeolSection";
 import StatInfoButton from "@/components/StatInfoButton";
 import { statPlot, statText } from "@/utils/deckStats";
@@ -118,7 +119,7 @@ export default function DeckDetail() {
                 {deck.name}
                 {deck.is_engine && (
                   <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
-                    <span className="inline-flex w-5 h-5 rounded-full bg-amber-400 text-black font-extrabold text-[11px] leading-none items-center justify-center" aria-label="Engine">E</span>
+                    <EngineBadge className="w-5 h-5 text-[11px]" />
                     <span><span className="font-semibold">Engine</span> — 다양한 덱에 섞어 사용할 수 있는 덱</span>
                   </div>
                 )}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
+import EngineBadge from "@/components/EngineBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 
@@ -402,13 +403,7 @@ export default function DatabasePage() {
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />
               {deck.is_engine && (
-                <span
-                  className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-400 text-black text-[11px] sm:text-xs font-extrabold leading-none flex items-center justify-center shadow ring-2 ring-white dark:ring-gray-900"
-                  title="Engine — 다양한 덱에 섞어 사용할 수 있는 덱"
-                  aria-label="Engine"
-                >
-                  E
-                </span>
+                <EngineBadge className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />
               )}
             </div>
             <p className="mt-1 text-sm sm:text-base">{deck.name}</p>
