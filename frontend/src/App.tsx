@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useEffect } from "react";
 import './App.css'
 import Navbar from "./components/Navbar";
 import BottomTabBar from "./components/BottomTabBar";
@@ -22,6 +21,7 @@ import PointsHistory from "./pages/PointsHistory";
 import AdminPointsGrant from "./pages/AdminPointsGrant";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import { usePageTracking } from "./hooks/usePageTracking";
+import { useScrollRestoration } from "./hooks/useScrollRestoration";
 import AdminIndex from "./pages/AdminIndex";
 import Mydecks from "./pages/Mydecks";
 import Noresults from "./pages/Noresults";
@@ -61,7 +61,7 @@ import Tracker from "./pages/Tracker";
 
 function App() {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useScrollRestoration();
   usePageTracking();
   const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
   // While a player is actively drawing (DuchMind turn / Solo draw page),

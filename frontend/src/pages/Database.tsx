@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
@@ -30,21 +30,57 @@ const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map(
 // 3px ring in the deck power colour plus a faint glow of the same colour outside it (drawn outside the box, so no layout shift).
 const powerRing = (color: string): CSSProperties => ({ boxShadow: `0 0 0 3px ${color}, 0 0 9px 2px ${color}99` });
 
+// Kept across visits so coming back from a deck page draws the list at once instead of an empty grid
+// while /api/deck/ answers again (엘리스 2026-10-02); refreshed quietly in the background.
+let cachedDecks: Deck[] | null = null;
+let cachedTags: { performance: string[]; aesthetic: string[] } | null = null;
+
+type SavedFilters = {
+  searchQuery?: string;
+  selectedPerformanceTags?: string[];
+  selectedAestheticTags?: string[];
+  selectedSummoningMethod?: string | null;
+  selectedStrength?: string | null;
+  selectedDifficulty?: string | null;
+  selectedDeckType?: string | null;
+  selectedArtStyle?: string | null;
+  selectedRole?: string | null;
+};
+const readSavedFilters = (): SavedFilters => {
+  try {
+    return JSON.parse(localStorage.getItem("deck_filters") || "{}") || {};
+  } catch {
+    return {};
+  }
+};
+
 export default function DatabasePage() {
-  const [decks, setDecks] = useState<Deck[]>([]);
-  const [filteredDecks, setFilteredDecks] = useState<Deck[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPerformanceTags, setSelectedPerformanceTags] = useState<string[]>([]);
-  const [selectedAestheticTags, setSelectedAestheticTags] = useState<string[]>([]);
-  const [selectedSummoningMethod, setSelectedSummoningMethod] = useState<string | null>(null);
-  const [performanceTags, setPerformanceTags] = useState<string[]>([]);
-  const [aestheticTags, setAestheticTags] = useState<string[]>([]);
-  const [selectedStrength, setSelectedStrength] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);  // "main" | "engine"
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
-  const [selectedDeckType, setSelectedDeckType] = useState<string | null>(null);
-  const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(null);
-  const [filterExpanded, setFilterExpanded] = useState(false);
+  // Saved filters are read before the first render so the list never shows unfiltered for a frame.
+  const [saved] = useState(readSavedFilters);
+  const [decks, setDecks] = useState<Deck[]>(() => cachedDecks ?? []);
+  const [searchQuery, setSearchQuery] = useState(saved.searchQuery || "");
+  const [selectedPerformanceTags, setSelectedPerformanceTags] = useState<string[]>(saved.selectedPerformanceTags || []);
+  const [selectedAestheticTags, setSelectedAestheticTags] = useState<string[]>(saved.selectedAestheticTags || []);
+  const [selectedSummoningMethod, setSelectedSummoningMethod] = useState<string | null>(saved.selectedSummoningMethod || null);
+  const [performanceTags, setPerformanceTags] = useState<string[]>(() => cachedTags?.performance ?? []);
+  const [aestheticTags, setAestheticTags] = useState<string[]>(() => cachedTags?.aesthetic ?? []);
+  const [selectedStrength, setSelectedStrength] = useState<string | null>(saved.selectedStrength || null);
+  const [selectedRole, setSelectedRole] = useState<string | null>(saved.selectedRole || null);  // "main" | "engine"
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
+  const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
+  const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(saved.selectedArtStyle || null);
+  const [filterExpanded, setFilterExpanded] = useState(() =>
+    Boolean(
+      (saved.selectedPerformanceTags?.length ?? 0) > 0 ||
+        (saved.selectedAestheticTags?.length ?? 0) > 0 ||
+        saved.selectedSummoningMethod ||
+        saved.selectedStrength ||
+        saved.selectedDifficulty ||
+        saved.selectedDeckType ||
+        saved.selectedArtStyle ||
+        saved.selectedRole,
+    ),
+  );
   const [showScrollTop, setShowScrollTop] = useState(false);
   // 덱 파워별 테두리 색 (특이점 2026-10-02) — 기본 켬, 켜고 끈 상태는 이 브라우저에 저장
   const [powerBorder, setPowerBorder] = useState(() => localStorage.getItem("deck_power_border") !== "off");
@@ -93,61 +129,27 @@ export default function DatabasePage() {
     selectedArtStyle, selectedRole]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("deck_filters");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSearchQuery(parsed.searchQuery || "");
-        setSelectedPerformanceTags(parsed.selectedPerformanceTags || []);
-        setSelectedAestheticTags(parsed.selectedAestheticTags || []);
-        setSelectedSummoningMethod(parsed.selectedSummoningMethod || null);
-        setSelectedStrength(parsed.selectedStrength || null);
-        setSelectedDifficulty(parsed.selectedDifficulty || null);
-        setSelectedDeckType(parsed.selectedDeckType || null);
-        setSelectedArtStyle(parsed.selectedArtStyle || null);
-        setSelectedRole(parsed.selectedRole || null);
-  
-        const hasAnyFilter =
-          (parsed.selectedPerformanceTags?.length ?? 0) > 0 ||
-          (parsed.selectedAestheticTags?.length ?? 0) > 0 ||
-          parsed.selectedSummoningMethod ||
-          parsed.selectedStrength ||
-          parsed.selectedDifficulty ||
-          parsed.selectedDeckType ||
-          parsed.selectedArtStyle ||
-          parsed.selectedRole;
-  
-        if (hasAnyFilter) {
-          setFilterExpanded(true);
-        }
-      } catch (err) {
-        console.error("필터 복원 실패:", err);
-      }
-    }
-  }, []);
-  
-
-  useEffect(() => {
     // Get decks from backend
     fetch("/api/deck/")
-    .then((res) => res.json())
-    .then((data) => {
-      console.log("API에서 받은 데이터:", data);
-      setDecks(Array.isArray(data.decks) ? data.decks : []);
-      setFilteredDecks(Array.isArray(data.decks) ? data.decks : []);
+      .then((res) => res.json())
+      .then((data) => {
+        const list: Deck[] = Array.isArray(data.decks) ? data.decks : [];
+        cachedDecks = list;
+        setDecks(list);
       });
 
     // Get tags from backend
     fetch("/api/tags/")
       .then((res) => res.json())
       .then((data) => {
+        cachedTags = { performance: data.performance_tags, aesthetic: data.aesthetic_tags };
         setPerformanceTags(data.performance_tags);
         setAestheticTags(data.aesthetic_tags);
       });
   }, []);
 
   // Apply filtering
-  useEffect(() => {
+  const filteredDecks = useMemo(() => {
     let filtered = decks.filter((deck) => {
       const lowerQuery = searchQuery.toLowerCase();
       return (
@@ -188,7 +190,7 @@ export default function DatabasePage() {
       filtered = filtered.filter((deck) => deck.summoning_methods.includes(selectedSummoningMethod));
     }
 
-    setFilteredDecks(filtered);
+    return filtered;
   }, [searchQuery,
     selectedPerformanceTags,
     selectedAestheticTags,
@@ -396,7 +398,6 @@ export default function DatabasePage() {
                 src={deck.cover_image || "/default_cover.png"}
                 alt={deck.name}
                 loading="lazy"
-                decoding="async"
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />
