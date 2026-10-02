@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { getDeckHyeol, DeckHyeol } from "@/api/deckApi";
 
-// 상대법 — 혈자리 아카이브(듀얼 아카이브, Hort) 요약. 제작자 요청(2026-10-02)으로 드롤·G·마루챠미 효과만 보여 주고
+// 상대법 — 혈자리 아카이브(듀얼 아카이브, Hort) 요약. 제작자 요청(2026-10-02)으로 잔존계 패 트랩 효과만 카드 그림과 함께 보여 주고
 // 패트랩별 사용 위치·순위·타이밍은 mdarchive에서 보도록 연결한다.
 
-const levelStyle = (level: string) =>
-  level === "very_high" || level === "high"
-    ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800"
-    : level === "conditional" || level === "medium"
-    ? "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800"
-    : level === "low" || level === "none"
-    ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
-    : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600";
+// 아픔 / 할만함 / 효과 적음 — ring + badge colour per level
+const LEVEL: Record<string, { ring: string; badge: string }> = {
+  high: { ring: "ring-red-500", badge: "bg-red-500 text-white" },
+  conditional: { ring: "ring-amber-500", badge: "bg-amber-500 text-white" },
+  low: { ring: "ring-emerald-500", badge: "bg-emerald-500 text-white" },
+};
+const levelOf = (level: string) =>
+  LEVEL[level === "very_high" ? "high" : level === "medium" ? "conditional" : level === "none" ? "low" : level] ??
+  { ring: "ring-gray-300 dark:ring-gray-600", badge: "bg-gray-400 text-white" };
 
 export default function DeckHyeolSection({ deckId }: { deckId: number }) {
   const [data, setData] = useState<DeckHyeol | null>(null);
@@ -43,14 +44,21 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
         <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 space-y-3">
           {data.overview.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">드롤·증식의 G·마루챠미 효과</p>
-              <div className="flex flex-wrap gap-1.5">
-                {data.overview.map((o) => (
-                  <span key={o.t} className={`px-2 py-1 rounded-full border text-xs font-semibold ${levelStyle(o.level)}`}>
-                    {o.short} · {o.label}
-                  </span>
-                ))}
-              </div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">잔존계 패 트랩 효과</p>
+              <ul className="grid grid-cols-5 gap-2 sm:gap-3">
+                {data.overview.map((o) => {
+                  const lv = levelOf(o.level);
+                  return (
+                    <li key={o.t} className="flex flex-col items-center text-center min-w-0">
+                      <div className={`w-full aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ${lv.ring}`}>
+                        {o.image && <img src={o.image} alt={o.name} loading="lazy" className="w-full h-full object-cover" />}
+                      </div>
+                      <span className={`mt-1.5 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-bold leading-tight ${lv.badge}`}>{o.label}</span>
+                      <span className="mt-1 text-[10px] sm:text-xs leading-tight text-gray-700 dark:text-gray-300 break-keep">{o.name}</span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 
