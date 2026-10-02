@@ -64,6 +64,10 @@ function App() {
   useScrollRestoration();
   usePageTracking();
   const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
+  // The deck database stays mounted (just hidden) while a deck page is open, so Back shows the same list with
+  // its pictures already drawn instead of rebuilding it (엘리스 2026-10-02).
+  const onDeckList = pathname === "/database";
+  const keepDeckList = onDeckList || pathname.startsWith("/database/");
   // While a player is actively drawing (DuchMind turn / Solo draw page),
   // all site chrome is hidden so nothing overlaps the canvas.
   const drawingMode = useDrawingMode();
@@ -72,6 +76,11 @@ function App() {
     <div>
       {!drawingMode && <TrackerBanner />}
       {!drawingMode && <Navbar />}
+      {keepDeckList && (
+        <div hidden={!onDeckList}>
+          <DatabasePage />
+        </div>
+      )}
       <Routes>
           <Route path="/" element={<Info />} />
           <Route path="/recommend" element ={<Recommend />} />
@@ -86,7 +95,7 @@ function App() {
           <Route path="/mypage/points" element={<PointsHistory />} />
           <Route path="/mypage/mydecks" element={<Mydecks />} />
           <Route path="/no-results" element={<Noresults />} />
-          <Route path="/database" element={<DatabasePage />} />
+          <Route path="/database" element={null} />
           <Route path="/database/:deckId" element={<DeckDetail />} />
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
