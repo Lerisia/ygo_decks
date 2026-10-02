@@ -106,7 +106,6 @@ export type DeckNote = {
 export type DeckHyeol = {
   deck_id: number;
   overview: { t: string; short: string; level: string; label: string }[];
-  sections: { id: string; short: string; cards: { cid: number | null; name: string }[] }[];
   updated_at: string;
   source_url: string;
 };

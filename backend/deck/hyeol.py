@@ -4,17 +4,15 @@ The archive publishes its data as `window.HYEOL_V2 = {...};` (hyeol-v2.js). Its 
 (`ygo-<id>`), so no name matching is needed.
 
 Brief only (the archive's maker asked on 2026-10-02 that the details stay on mdarchive so people visit and send
-feedback there): how much the draw/search hand traps hurt, and each hand trap's 1st-priority cards by name. No 2nd/3rd
-priority, timing, reasons or notes are kept — the deck page links to the archive for those."""
+feedback there): how much the draw/search hand traps (드롤, 증식의 G, 마루챠미) hurt the deck — nothing else.
+Which card to hit with each hand trap, priorities, timing and reasons are left to the archive, which the deck page links to."""
 import json
 import re
 import urllib.request
 
 ARCHIVE_URL = "https://mdarchive.pages.dev/"
 DECK_URL = "https://mdarchive.pages.dev/#hyeol/ygo-{id}"
-# Left out of the deck page: cards few people run (특이점, 2026-10-02).
-HIDDEN_HANDTRAPS = {"crow_bystial", "special_meta", "gamma"}
-SHORT_NAMES = {"ash": "하루 우라라", "imperm_veiler": "무한포영·이펙트 뵐러", "belle": "저택 와라시", "ogre": "유령토끼", "maxxc": "증식의 G"}
+SHORT_NAMES = {"maxxc": "증식의 G"}
 
 
 def fetch_archive_text(timeout=60):
@@ -35,7 +33,6 @@ def parse_archive(text):
     body = body[body.index("=") + 1:].strip().rstrip(";").strip()
     raw = json.loads(body)
     traps = {t["id"]: t for t in raw.get("handtraps", [])}
-    cards = raw.get("cards", {})
     ids = {int(k[4:]): v for k, v in raw.get("decks", {}).items() if k.startswith("ygo-") and k[4:].isdigit()}
     ours = set(Deck.objects.filter(id__in=ids).values_list("id", flat=True))
 
@@ -50,31 +47,10 @@ def parse_archive(text):
             "level": o.get("level") or "unknown",
             "label": o.get("label") or "미분류",
         } for o in view.get("overview", [])]
-        sections = []
-        for s in view.get("sections", []):
-            if s.get("handtrap") in HIDDEN_HANDTRAPS:
-                continue
-            top = []
-            for c in s.get("cards", []):
-                if c.get("sev") != "R":
-                    continue
-                cid = c.get("card")
-                name = c.get("label") or cards.get(str(cid), {}).get("n") or ""
-                if name and all(x["name"] != name for x in top):
-                    top.append({"cid": cid, "name": name})
-            if not top:
-                continue
-            t = traps.get(s.get("handtrap"), {})
-            sections.append({
-                "id": s.get("handtrap"),
-                "short": SHORT_NAMES.get(s.get("handtrap")) or t.get("short") or s.get("name", ""),
-                "cards": top,
-            })
-        if not overview and not sections:
+        if not overview:
             continue
         out[deck_id] = {
             "overview": overview,
-            "sections": sections,
             "updated_at": d.get("admin_saved_at") or d.get("curated_at") or "",
             "source_url": DECK_URL.format(id=deck_id),
         }
