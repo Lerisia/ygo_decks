@@ -17,6 +17,17 @@ echo "Building frontend..."
 cd /home/elyss/ygo_decks/frontend
 npm run build
 
+# The root step wipes /var/www/frontend before copying, so a phone that reopens a cached older index.html would ask
+# for bundles that no longer exist and stay white. Ship the last two days of bundles alongside the new ones.
+KEEP=/home/elyss/.cache/ygodecks_assets
+mkdir -p "$KEEP"
+for f in $(grep -o '/assets/[^"]*' /var/www/frontend/index.html 2>/dev/null); do
+    cp -n "/var/www/frontend$f" "$KEEP"/ 2>/dev/null || true
+done
+cp dist/assets/* "$KEEP"/
+find "$KEEP" -type f -mmin +2880 -delete
+cp -n "$KEEP"/* dist/assets/
+
 echo "Running backend migrations & collectstatic..."
 cd /home/elyss/ygo_decks/backend
 source venv/bin/activate

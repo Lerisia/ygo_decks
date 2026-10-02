@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png+xml" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // A phone can reopen a cached older page whose bundles a later deploy removed; reload once (at most every 10 s)
+      // so it fetches the current page instead of staying white.
+      addEventListener("error", function (e) {
+        var s = e.target;
+        if (!s || s.tagName !== "SCRIPT" || (s.src || "").indexOf("/assets/") < 0) return;
+        try {
+          if (Date.now() - (+sessionStorage.getItem("asset_reload") || 0) < 10000) return;
+          sessionStorage.setItem("asset_reload", String(Date.now()));
+        } catch (_) {
+          return;
+        }
+        location.reload();
+      }, true);
+    </script>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
     <title>YGO Decks - 유희왕 마스터 듀얼 전적 사이트</title>
