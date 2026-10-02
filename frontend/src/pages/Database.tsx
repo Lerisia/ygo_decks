@@ -118,10 +118,9 @@ export default function DatabasePage() {
     sessionStorage.setItem("deck_filters", JSON.stringify(filters));
   };
 
+  // Saved on every change (not only when leaving), so a reload in the same visit keeps them too.
   useEffect(() => {
-    return () => {
-      saveFilters();
-    };
+    saveFilters();
   }, [
     searchQuery,
     selectedPerformanceTags,
