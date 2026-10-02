@@ -1,11 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import PLogo from "@/components/PLogo";
 
-type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean };
+// `external` tiles are another site's page: they open in a new tab and say so.
+type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean; external?: boolean };
 const games: Game[] = [
   { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "여러 명이 함께 즐기는 게임", rewardBadge: true },
   { to: "/solo", icon: "🐤", title: "솔로 플레이", desc: "혼자 즐기는 미니 게임", rewardBadge: true },
   { to: "/tier-list-maker", icon: "📊", title: "티어표 만들기", desc: "덱 티어리스트 만들고 이미지로 저장" },
+  { to: "https://mdarchive.pages.dev/#climb", icon: "📜", title: "등반 덱 기록", desc: "달마다 사용한 덱을 기록하고 자랑하기", external: true },
   { to: "/icon-shop", icon: "🛍️", title: "아이콘 샵", desc: "포인트로 아이콘 구매" },
 ];
 
@@ -21,12 +23,17 @@ function Playground() {
         {games.map((g) => (
           <button
             key={g.to}
-            onClick={() => navigate(g.to)}
+            onClick={() => (g.external ? window.open(g.to, "_blank", "noopener,noreferrer") : navigate(g.to))}
             className="relative flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
           >
             {g.rewardBadge && (
               <span className="absolute top-1.5 left-1.5">
                 <PLogo size={20} />
+              </span>
+            )}
+            {g.external && (
+              <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-gray-500 text-white">
+                외부 사이트 ↗
               </span>
             )}
             <span className="text-3xl md:text-5xl mb-2">{g.icon}</span>

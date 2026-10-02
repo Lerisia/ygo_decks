@@ -3,15 +3,13 @@ import { useNavigate } from "react-router-dom";
 import PLogo from "@/components/PLogo";
 import { isAdmin } from "@/api/accountApi";
 
-// `external` tiles are another site's page: they open in a new tab and say so.
-type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean; beta?: boolean; adminOnly?: boolean; external?: boolean };
+type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean; beta?: boolean; adminOnly?: boolean };
 
 const games: Game[] = [
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞히기", rewardBadge: true },
   { to: "/solo-duchmind", icon: "🎨", title: "솔로 듀치마인드", desc: "그리고, 맞히고", rewardBadge: true },
   { to: "/solo-twenty", icon: "🧩", title: "솔로 딱무고개", desc: "20개 질문으로 카드 맞히기", rewardBadge: true, beta: true },
   { to: "/skill-names", icon: "⌨️", title: "스킬 릴레이", desc: "롤 스킬 이름을 아는 대로 입력하기", beta: true },
-  { to: "https://mdarchive.pages.dev/#climb", icon: "🧗", title: "등반 덱 기록", desc: "달마다 사용한 덱을 기록하고 자랑하기", external: true },
 ];
 
 function Solo() {
@@ -41,7 +39,7 @@ function Solo() {
         {visibleGames.map((g) => (
           <button
             key={g.to}
-            onClick={() => (g.external ? window.open(g.to, "_blank", "noopener,noreferrer") : navigate(g.to))}
+            onClick={() => navigate(g.to)}
             className="relative flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
           >
             {g.rewardBadge && (
@@ -52,11 +50,6 @@ function Solo() {
             {g.beta && (
               <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
                 BETA
-              </span>
-            )}
-            {g.external && (
-              <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-gray-500 text-white">
-                외부 사이트 ↗
               </span>
             )}
             <span className="text-3xl md:text-5xl mb-2">{g.icon}</span>
