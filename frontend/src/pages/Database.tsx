@@ -47,9 +47,12 @@ type SavedFilters = {
   selectedArtStyle?: string | null;
   selectedRole?: string | null;
 };
+// Search and filters last only for this visit (sessionStorage): closing the site starts the next visit fresh
+// (특이점 2026-10-02). They used to live in localStorage, so drop that old copy once.
+localStorage.removeItem("deck_filters");
 const readSavedFilters = (): SavedFilters => {
   try {
-    return JSON.parse(localStorage.getItem("deck_filters") || "{}") || {};
+    return JSON.parse(sessionStorage.getItem("deck_filters") || "{}") || {};
   } catch {
     return {};
   }
@@ -112,7 +115,7 @@ export default function DatabasePage() {
       selectedArtStyle,
       selectedRole,
     };
-    localStorage.setItem("deck_filters", JSON.stringify(filters));
+    sessionStorage.setItem("deck_filters", JSON.stringify(filters));
   };
 
   useEffect(() => {
@@ -380,7 +383,7 @@ export default function DatabasePage() {
             <button
               className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
               onClick={() => {
-                localStorage.removeItem("deck_filters");
+                sessionStorage.removeItem("deck_filters");
                 window.location.reload();
               }}
             >
