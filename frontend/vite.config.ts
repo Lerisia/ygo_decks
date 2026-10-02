@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["logo.png"],
+      includeAssets: ["logo.png", "pwa-192.png", "pwa-512.png", "pwa-maskable-192.png", "pwa-maskable-512.png"],
       manifest: {
         name: "YGO Decks",
         short_name: "YGO Decks",
@@ -20,13 +20,13 @@ export default defineConfig({
         background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
+        // Square icons; the maskable ones keep the logo inside the safe zone so Android's round/squircle mask
+        // doesn't clip the triangle's corners (특이점 2026-10-02).
         icons: [
-          {
-            src: "/logo.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any maskable",
-          },
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/pwa-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+          { src: "/pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
