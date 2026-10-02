@@ -68,7 +68,7 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition"
           >
-            패트랩 사용 위치·타이밍 자세히 보기 ↗
+            패트랩 사용 타이밍 자세히 보기 ↗
           </a>
           <p className="text-[11px] text-center text-gray-500 dark:text-gray-400">
             자료 제공: 듀얼 아카이브 · 혈자리 아카이브 (Hort)
