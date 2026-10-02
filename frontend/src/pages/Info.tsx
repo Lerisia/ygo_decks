@@ -84,7 +84,7 @@ function Info() {
       )}
 
       <div className="order-1 sm:order-2 text-center mb-8 md:mb-10">
-        <img src="/images/logo_big.png" alt="YGO Decks" className="h-28 sm:hidden mx-auto mb-2 dark:invert" />
+        <img src="/images/logo_big.webp" alt="YGO Decks" className="h-28 sm:hidden mx-auto mb-2 dark:invert" />
         <h1 className="text-2xl md:text-4xl font-bold hidden sm:block">YGO Decks</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1 md:text-lg">유희왕 마스터 듀얼 전적 관리 및 덱 추천</p>
       </div>

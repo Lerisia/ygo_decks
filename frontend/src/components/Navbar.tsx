@@ -4,7 +4,7 @@ import { isAuthenticated, logout, getUserInfo, claimDailyBonus, isAdmin } from "
 import { getMyAvatar } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
-import logo from "/images/logo_big.png";
+import logo from "/images/logo_big.webp";
 
 function Navbar() {
   const isLoggedIn = isAuthenticated();
