@@ -353,21 +353,10 @@ def get_deck_notes(request, deck_id):
 
 @api_view(["GET"])
 def get_deck_hyeol(request, deck_id):
-    """혈자리 summary (듀얼 아카이브 혈자리 아카이브, with permission) with our card pictures attached."""
-    from card.models import Card
+    """상대법: brief 혈자리 summary (듀얼 아카이브 혈자리 아카이브, with permission); details stay on the archive."""
     from .models import DeckHyeol
 
     h = DeckHyeol.objects.filter(deck_id=deck_id).first()
     if not h:
         return Response({"error": "no data"}, status=404)
-    data = h.data
-    cids = {str(c["cid"]) for s in data.get("sections", []) for c in s["cards"] if c.get("cid") is not None}
-    pics = {}
-    for c in Card.objects.filter(konami_id__in=cids).only("konami_id", "card_image", "card_illust"):
-        img = c.card_illust or c.card_image  # the art (Korean site; the full scans are English cards)
-        if img and c.konami_id not in pics:
-            pics[c.konami_id] = img.url
-    for s in data.get("sections", []):
-        for c in s["cards"]:
-            c["image"] = pics.get(str(c.get("cid")))
-    return Response({"deck_id": deck_id, **data})
+    return Response({"deck_id": deck_id, **h.data})

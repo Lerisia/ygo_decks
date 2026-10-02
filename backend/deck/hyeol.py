@@ -1,14 +1,17 @@
 """혈자리 아카이브 (https://mdarchive.pages.dev/#hyeol, by Hort) → per-deck summary for the deck page.
 
 The archive publishes its data as `window.HYEOL_V2 = {...};` (hyeol-v2.js). Its deck keys are our own deck ids
-(`ygo-<id>`), so no name matching is needed. We keep only what the deck page shows and link back for the rest."""
+(`ygo-<id>`), so no name matching is needed.
+
+Brief only (the archive's maker asked on 2026-10-02 that the details stay on mdarchive so people visit and send
+feedback there): how much the draw/search hand traps hurt, and each hand trap's 1st-priority cards by name. No 2nd/3rd
+priority, timing, reasons or notes are kept — the deck page links to the archive for those."""
 import json
 import re
 import urllib.request
 
 ARCHIVE_URL = "https://mdarchive.pages.dev/"
 DECK_URL = "https://mdarchive.pages.dev/#hyeol/ygo-{id}"
-SEV_ORDER = {"R": 0, "Y": 1, "G": 2, "N": 3}
 # Left out of the deck page: cards few people run (특이점, 2026-10-02).
 HIDDEN_HANDTRAPS = {"crow_bystial", "special_meta", "gamma"}
 SHORT_NAMES = {"ash": "하루 우라라", "imperm_veiler": "무한포영·이펙트 뵐러", "belle": "저택 와라시", "ogre": "유령토끼", "maxxc": "증식의 G"}
@@ -43,40 +46,29 @@ def parse_archive(text):
         view = d.get("legacy_view") or {}
         overview = [{
             "t": o.get("t"),
-            "name": traps.get(o.get("t"), {}).get("name", o.get("t")),
             "short": SHORT_NAMES.get(o.get("t")) or traps.get(o.get("t"), {}).get("short", o.get("t")),
             "level": o.get("level") or "unknown",
             "label": o.get("label") or "미분류",
-            "note": o.get("note") or "",
         } for o in view.get("overview", [])]
         sections = []
         for s in view.get("sections", []):
             if s.get("handtrap") in HIDDEN_HANDTRAPS:
                 continue
-            rows = []
+            top = []
             for c in s.get("cards", []):
+                if c.get("sev") != "R":
+                    continue
                 cid = c.get("card")
-                info = cards.get(str(cid), {}) if cid is not None else {}
-                rows.append({
-                    "cid": cid,
-                    "name": c.get("label") or info.get("n") or "",
-                    "desc": info.get("desc", ""),
-                    "sev": c.get("sev") if c.get("sev") in SEV_ORDER else "N",
-                    "timing": c.get("timing") or "",
-                    "text": c.get("text") or "",
-                    "basis": c.get("basis") or "",
-                })
-            rows.sort(key=lambda r: SEV_ORDER[r["sev"]])
-            if not rows:
+                name = c.get("label") or cards.get(str(cid), {}).get("n") or ""
+                if name and all(x["name"] != name for x in top):
+                    top.append({"cid": cid, "name": name})
+            if not top:
                 continue
             t = traps.get(s.get("handtrap"), {})
             sections.append({
                 "id": s.get("handtrap"),
-                "name": s.get("name") or t.get("name", ""),
                 "short": SHORT_NAMES.get(s.get("handtrap")) or t.get("short") or s.get("name", ""),
-                "hint": s.get("hint") or "",
-                "note": s.get("note") or "",
-                "cards": rows,
+                "cards": top,
             })
         if not overview and not sections:
             continue
@@ -84,7 +76,6 @@ def parse_archive(text):
             "overview": overview,
             "sections": sections,
             "updated_at": d.get("admin_saved_at") or d.get("curated_at") or "",
-            "stale": bool(d.get("stale")),
             "source_url": DECK_URL.format(id=deck_id),
         }
     return out

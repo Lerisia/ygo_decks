@@ -103,23 +103,11 @@ export type DeckNote = {
   part_label: string;
 };
 
-export type HyeolCard = {
-  cid: number | null;
-  name: string;
-  desc: string;
-  sev: "R" | "Y" | "G" | "N";
-  timing: string;
-  text: string;
-  basis: string;
-  image: string | null;
-};
-
 export type DeckHyeol = {
   deck_id: number;
-  overview: { t: string; name: string; short: string; level: string; label: string; note: string }[];
-  sections: { id: string; name: string; short: string; hint: string; note: string; cards: HyeolCard[] }[];
+  overview: { t: string; short: string; level: string; label: string }[];
+  sections: { id: string; short: string; cards: { cid: number | null; name: string }[] }[];
   updated_at: string;
-  stale: boolean;
   source_url: string;
 };
 

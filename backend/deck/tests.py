@@ -576,6 +576,7 @@ class ListCoverImageTest(TestCase):
         self.assertEqual(data["cover_image"], deck.cover_image.url)
 
 
+import json
 import json as _json
 from .hyeol import parse_archive, store_archive
 from .models import DeckHyeol
@@ -612,23 +613,23 @@ class DeckHyeolTest(TestCase):
         self.deck = _create_deck(name="혈자리덱")
         self.text = _ARCHIVE.replace("{ID}", str(self.deck.id))
 
-    def test_parse_keeps_only_our_decks_and_orders_cards_by_priority(self):
+    def test_parse_keeps_only_our_decks_and_only_first_priority_names(self):
         data = parse_archive(self.text)
         self.assertEqual(list(data), [self.deck.id])
         d = data[self.deck.id]
-        self.assertEqual(d["overview"][0]["short"], "드롤")
-        cards = d["sections"][0]["cards"]
-        self.assertEqual([c["sev"] for c in cards], ["R", "Y"])
-        self.assertEqual(cards[0]["name"], "크라운 클랜 『말라바리즘』")   # empty label falls back to the card table
+        self.assertEqual(d["overview"][0], {"t": "droll", "short": "드롤", "level": "high", "label": "아픔"})
+        # 제작자 요청(10/2): 1순위 카드 이름만 — 2·3순위·타이밍·이유·효과 문구는 보관하지 않고 mdarchive로 연결
+        self.assertEqual(d["sections"][0]["cards"], [{"cid": 22570, "name": "크라운 클랜 『말라바리즘』"}])
+        self.assertNotIn("2체 특소", json.dumps(d, ensure_ascii=False))
         self.assertEqual(d["source_url"], f"https://mdarchive.pages.dev/#hyeol/ygo-{self.deck.id}")
-        # 특이점 2026-10-02: 크로우·비스테드, 메타 카드, 감마는 빼고, 토끼는 '유령토끼'로
+        # 특이점 2026-10-02: 크로우·비스테드, 메타 카드, 감마는 빼고, 토끼는 '유령토끼'로 (감마는 1순위가 없어도 빠짐)
         self.assertEqual([s["short"] for s in d["sections"]], ["하루 우라라", "유령토끼"])
         self.assertEqual([o["short"] for o in d["overview"]], ["드롤", "증식의 G"])
 
     def test_api_serves_stored_summary_and_detail_flags_it(self):
         self.assertEqual(store_archive(parse_archive(self.text)), 1)
         body = APIClient().get(f"/api/deck/{self.deck.id}/hyeol/").json()
-        self.assertEqual(body["sections"][0]["cards"][0]["timing"], "우라라 1순위")
+        self.assertEqual(body["sections"][0]["cards"][0]["name"], "크라운 클랜 『말라바리즘』")
         self.assertTrue(APIClient().get(f"/api/deck/{self.deck.id}/").json()["has_hyeol"])
 
     def test_deck_without_data(self):
