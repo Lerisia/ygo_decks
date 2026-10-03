@@ -9,6 +9,7 @@ import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
 import EngineBadge from "@/components/EngineBadge";
 import DeckHyeolSection from "@/components/DeckHyeolSection";
+import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import StatInfoButton from "@/components/StatInfoButton";
 import { statPlot, statText } from "@/utils/deckStats";
 
@@ -57,6 +58,7 @@ export default function DeckDetail() {
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [showVideos, setShowVideos] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
   const [descOpen, setDescOpen] = useState(true); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 접을 수 있되 기본은 펼침
 
   const mdeOptions = useMemo(() => {
@@ -242,7 +244,29 @@ export default function DeckDetail() {
             </div>
           );
         })()}
+        {isAdminUser && (
+          <button
+            type="button"
+            onClick={() => setEditingInfo(true)}
+            className="w-full mt-2 py-2 rounded-lg border border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+          >
+            ✏️ 덱 정보·스탯 수정
+          </button>
+        )}
       </div>
+      {editingInfo && (
+        <DeckInfoEditModal
+          deckId={deck.id}
+          deckName={deck.name}
+          onClose={() => setEditingInfo(false)}
+          onSaved={(updated) => {
+            setDeck(updated as Deck);
+            setEditingInfo(false);
+            // the deck list stays mounted behind this page; let it pick up the new power/tags
+            window.dispatchEvent(new Event("deck-info-changed"));
+          }}
+        />
+      )}
       
       {/* 본문 섹션 */}
       <div className="text-left rounded-lg">

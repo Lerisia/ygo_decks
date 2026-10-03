@@ -3,7 +3,9 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from .models import Deck, AestheticTag, PerformanceTag, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.db import transaction
+from .models import Deck, AestheticTag, PerformanceTag, SummoningMethod, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
 from .youtube import serialize_featured
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
@@ -230,8 +232,11 @@ def get_deck_data(request, deck_id):
         deck = Deck.objects.get(id=deck_id)
     except Deck.DoesNotExist:
         return Response({"error": "덱을 찾을 수 없습니다."}, status=404)
+    return Response(serialize_deck_detail(deck))
 
-    deck_data = {
+
+def serialize_deck_detail(deck):
+    return {
         "id": deck.id,
         "name": deck.name,
         "cover_image": deck.cover_image.url if deck.cover_image else None,
@@ -258,8 +263,6 @@ def get_deck_data(request, deck_id):
             "deck_space": deck.stat_deck_space,
         },
     }
-
-    return Response(deck_data)
 
 
 def _featured(deck):
@@ -303,6 +306,150 @@ def update_wiki_content(request, deck_id):
     deck.save()
 
     return Response({"message": "Wiki content updated successfully."})
+
+
+# 특이점 2026-10-03: 운영자가 덱 문서에서 덱 정보와 스탯을 바로 고친다. 고친 내용은 관리자 페이지 기록(LogEntry)에 남는다.
+EDIT_CHOICE_FIELDS = (
+    ("strength", "덱 파워", Deck._Strength),
+    ("difficulty", "난이도", Deck._Difficulty),
+    ("deck_type", "덱 타입", Deck._DeckType),
+    ("art_style", "아트 스타일", Deck._ArtStyle),
+)
+EDIT_STAT_FIELDS = (
+    ("consistency", "stat_consistency", "안정성"),
+    ("breakthrough", "stat_breakthrough", "돌파력"),
+    ("interruption", "stat_interruption", "견제력"),
+    ("recovery", "stat_recovery", "복구력"),
+    ("deck_space", "stat_deck_space", "덱 스페이스"),
+)
+EDIT_TAG_FIELDS = (
+    ("summoning_methods", "소환법"),
+    ("performance_tags", "태그(성능적)"),
+    ("aesthetic_tags", "태그(비성능적)"),
+)
+
+
+def _deck_edit_values(deck):
+    return {
+        **{field: getattr(deck, field) for field, _, _ in EDIT_CHOICE_FIELDS},
+        "is_engine": deck.is_engine,
+        "summoning_methods": sorted(deck.summoning_methods.values_list("method", flat=True)),
+        "performance_tags": list(deck.performance_tags.order_by("id").values_list("name", flat=True)),
+        "aesthetic_tags": list(deck.aesthetic_tags.order_by("id").values_list("name", flat=True)),
+        "stats": {key: getattr(deck, attr) for key, attr, _ in EDIT_STAT_FIELDS},
+    }
+
+
+def _is_int(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _validate_deck_edit(data):
+    """Return ({field: new value}, error message or None). Only fields present in `data` are touched."""
+    updates = {}
+    for field, label, choices in EDIT_CHOICE_FIELDS:
+        if field in data:
+            if not _is_int(data[field]) or data[field] not in choices.values:
+                return None, f"{label} 값이 올바르지 않습니다."
+            updates[field] = data[field]
+    if "is_engine" in data:
+        if not isinstance(data["is_engine"], bool):
+            return None, "엔진 여부 값이 올바르지 않습니다."
+        updates["is_engine"] = data["is_engine"]
+    if "stats" in data:
+        stats = data["stats"]
+        names = {key: (attr, label) for key, attr, label in EDIT_STAT_FIELDS}
+        if not isinstance(stats, dict) or not set(stats) <= set(names):
+            return None, "스탯 항목이 올바르지 않습니다."
+        for key, value in stats.items():
+            attr, label = names[key]
+            if value is not None and (not _is_int(value) or not 0 <= value <= 11):
+                return None, f"{label}은 0~11 사이여야 합니다."
+            updates[attr] = value
+    sources = {
+        "summoning_methods": lambda vals: SummoningMethod.objects.filter(method__in=vals),
+        "performance_tags": lambda vals: PerformanceTag.objects.filter(name__in=vals),
+        "aesthetic_tags": lambda vals: AestheticTag.objects.filter(name__in=vals),
+    }
+    for field, label in EDIT_TAG_FIELDS:
+        if field in data:
+            vals = data[field]
+            if not isinstance(vals, list) or len(set(map(str, vals))) != len(vals):
+                return None, f"{label} 값이 올바르지 않습니다."
+            objs = list(sources[field](vals))
+            if len(objs) != len(vals):
+                return None, f"{label}에 없는 항목이 있습니다."
+            updates[field] = objs
+    return updates, None
+
+
+def _describe_deck_changes(before, after):
+    """'덱 파워 상위권 → 중하위권, 안정성 5 → 6' style summary of what changed."""
+    def show(v):
+        if v is None:
+            return "-"
+        if v is True or v is False:
+            return "예" if v else "아니요"
+        if isinstance(v, list):
+            return ", ".join(map(str, v)) or "없음"
+        return "?" if v == 11 else str(v)
+
+    parts = []
+    for field, label, choices in EDIT_CHOICE_FIELDS:
+        if before[field] != after[field]:
+            parts.append(f"{label} {choices(before[field]).label} → {choices(after[field]).label}")
+    if before["is_engine"] != after["is_engine"]:
+        parts.append(f"엔진 {show(before['is_engine'])} → {show(after['is_engine'])}")
+    method_label = dict(SummoningMethod.SummonType.choices)
+    for field, label in EDIT_TAG_FIELDS:
+        old, new = before[field], after[field]
+        if field == "summoning_methods":
+            old, new = [method_label[m] for m in old], [method_label[m] for m in new]
+        if sorted(map(str, old)) != sorted(map(str, new)):
+            parts.append(f"{label} {show(old)} → {show(new)}")
+    for key, _, label in EDIT_STAT_FIELDS:
+        if before["stats"][key] != after["stats"][key]:
+            parts.append(f"{label} {show(before['stats'][key])} → {show(after['stats'][key])}")
+    return ", ".join(parts)
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([IsAdminUser])
+def edit_deck_info(request, deck_id):
+    deck = get_object_or_404(Deck, id=deck_id)
+    if request.method == "GET":
+        return Response({
+            "values": _deck_edit_values(deck),
+            "options": {
+                **{field: [{"value": v, "label": l} for v, l in choices.choices] for field, _, choices in EDIT_CHOICE_FIELDS},
+                "summoning_methods": [
+                    {"value": m.method, "label": m.get_method_display()} for m in SummoningMethod.objects.order_by("method")
+                ],
+                "performance_tags": list(PerformanceTag.objects.order_by("id").values_list("name", flat=True)),
+                "aesthetic_tags": list(AestheticTag.objects.order_by("id").values_list("name", flat=True)),
+            },
+        })
+
+    updates, error = _validate_deck_edit(request.data if isinstance(request.data, dict) else {})
+    if error:
+        return Response({"error": error}, status=400)
+    before = _deck_edit_values(deck)
+    with transaction.atomic():
+        for field, value in updates.items():
+            if field in dict(EDIT_TAG_FIELDS):
+                getattr(deck, field).set(value)
+            else:
+                setattr(deck, field, value)
+        deck.save()
+        summary = _describe_deck_changes(before, _deck_edit_values(deck))
+        if summary:
+            LogEntry.objects.log_actions(
+                user_id=request.user.id,
+                queryset=Deck.objects.filter(id=deck.id),
+                action_flag=CHANGE,
+                change_message=f"덱 문서에서 수정: {summary}",
+            )
+    return Response({"deck": serialize_deck_detail(deck), "changed": summary})
 
 def serialize_note(n):
     return {

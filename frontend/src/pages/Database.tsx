@@ -132,14 +132,17 @@ export default function DatabasePage() {
     selectedArtStyle, selectedRole]);
 
   useEffect(() => {
-    // Get decks from backend
-    fetch("/api/deck/")
-      .then((res) => res.json())
-      .then((data) => {
-        const list: Deck[] = Array.isArray(data.decks) ? data.decks : [];
-        cachedDecks = list;
-        setDecks(list);
-      });
+    // Get decks from backend (again whenever staff edit a deck's info on its page)
+    const loadDecks = () =>
+      fetch("/api/deck/")
+        .then((res) => res.json())
+        .then((data) => {
+          const list: Deck[] = Array.isArray(data.decks) ? data.decks : [];
+          cachedDecks = list;
+          setDecks(list);
+        });
+    loadDecks();
+    window.addEventListener("deck-info-changed", loadDecks);
 
     // Get tags from backend
     fetch("/api/tags/")
@@ -149,6 +152,7 @@ export default function DatabasePage() {
         setPerformanceTags(data.performance_tags);
         setAestheticTags(data.aesthetic_tags);
       });
+    return () => window.removeEventListener("deck-info-changed", loadDecks);
   }, []);
 
   // Apply filtering

@@ -643,3 +643,108 @@ class DeckHyeolTest(TestCase):
     def test_deck_without_data(self):
         self.assertEqual(APIClient().get(f"/api/deck/{self.deck.id}/hyeol/").status_code, 404)
         self.assertFalse(APIClient().get(f"/api/deck/{self.deck.id}/").json()["has_hyeol"])
+
+
+class EditDeckInfoTest(TestCase):
+    """특이점 2026-10-03: 운영자가 덱 문서에서 스탯과 덱 정보(파워·난이도·태그 등)를 바로 고친다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.fusion = SummoningMethod.objects.create(id=1, method=1)
+        self.link = SummoningMethod.objects.create(id=6, method=6)
+        self.combo_tag = PerformanceTag.objects.create(name="원턴킬")
+        self.grave_tag = PerformanceTag.objects.create(name="묘지소환")
+        self.dragon_tag = AestheticTag.objects.create(name="드래곤")
+        self.deck = _create_deck(name="수정덱", strength=1, stat_consistency=5)
+        self.deck.summoning_methods.add(self.fusion)
+        self.deck.performance_tags.add(self.combo_tag)
+        self.url = f"/api/deck/{self.deck.id}/edit/"
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+
+    def test_staff_gets_current_values_and_options(self):
+        self.client.force_authenticate(user=self.staff)
+        body = self.client.get(self.url).json()
+        self.assertEqual(body["values"]["strength"], 1)
+        self.assertEqual(body["values"]["summoning_methods"], [1])
+        self.assertEqual(body["values"]["performance_tags"], ["원턴킬"])
+        self.assertEqual(body["values"]["stats"]["consistency"], 5)
+        self.assertIsNone(body["values"]["stats"]["recovery"])
+        self.assertIn({"value": 2, "label": "중상위권"}, body["options"]["strength"])
+        self.assertIn({"value": 6, "label": "링크"}, body["options"]["summoning_methods"])
+        self.assertEqual(body["options"]["performance_tags"], ["원턴킬", "묘지소환"])
+        self.assertEqual(body["options"]["aesthetic_tags"], ["드래곤"])
+
+    def test_staff_updates_info_and_stats(self):
+        self.client.force_authenticate(user=self.staff)
+        resp = self.client.put(self.url, data={
+            "strength": 2, "difficulty": 2, "deck_type": 3, "art_style": 4, "is_engine": True,
+            "summoning_methods": [6], "performance_tags": ["묘지소환"], "aesthetic_tags": ["드래곤"],
+            "stats": {"consistency": 7, "breakthrough": 11, "interruption": 0, "recovery": None, "deck_space": 3},
+        }, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.deck.refresh_from_db()
+        self.assertEqual((self.deck.strength, self.deck.difficulty, self.deck.deck_type, self.deck.art_style), (2, 2, 3, 4))
+        self.assertTrue(self.deck.is_engine)
+        self.assertEqual(list(self.deck.summoning_methods.values_list("method", flat=True)), [6])
+        self.assertEqual(list(self.deck.performance_tags.values_list("name", flat=True)), ["묘지소환"])
+        self.assertEqual(list(self.deck.aesthetic_tags.values_list("name", flat=True)), ["드래곤"])
+        self.assertEqual(
+            (self.deck.stat_consistency, self.deck.stat_breakthrough, self.deck.stat_interruption,
+             self.deck.stat_recovery, self.deck.stat_deck_space),
+            (7, 11, 0, None, 3),
+        )
+        # 응답은 덱 문서와 같은 모양이라 화면을 바로 갱신할 수 있다
+        self.assertEqual(resp.json()["deck"]["strength"], "중상위권")
+        self.assertEqual(resp.json()["deck"]["stats"]["breakthrough"], 11)
+
+    def test_partial_update_leaves_other_fields(self):
+        self.client.force_authenticate(user=self.staff)
+        resp = self.client.put(self.url, data={"stats": {"recovery": 4}}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.deck.refresh_from_db()
+        self.assertEqual((self.deck.stat_recovery, self.deck.stat_consistency, self.deck.strength), (4, 5, 1))
+        self.assertEqual(list(self.deck.performance_tags.values_list("name", flat=True)), ["원턴킬"])
+
+    def test_invalid_values_change_nothing(self):
+        self.client.force_authenticate(user=self.staff)
+        for bad in (
+            {"strength": 9, "stats": {"consistency": 8}},
+            {"difficulty": "어려움"},
+            {"is_engine": "yes"},
+            {"stats": {"consistency": 12}},
+            {"stats": {"consistency": -1}},
+            {"stats": {"power": 3}},
+            {"summoning_methods": [42]},
+            {"performance_tags": ["없는 태그"]},
+        ):
+            resp = self.client.put(self.url, data=bad, format="json")
+            self.assertEqual(resp.status_code, 400, bad)
+        self.deck.refresh_from_db()
+        self.assertEqual((self.deck.strength, self.deck.stat_consistency), (1, 5))
+
+    def test_change_is_logged_with_old_and_new_values(self):
+        from django.contrib.admin.models import LogEntry
+        self.client.force_authenticate(user=self.staff)
+        self.client.put(self.url, data={"strength": 3, "stats": {"consistency": 6}}, format="json")
+        entry = LogEntry.objects.get(object_id=str(self.deck.id))
+        self.assertEqual(entry.user, self.staff)
+        self.assertIn("덱 파워 상위권 → 중하위권", entry.change_message)
+        self.assertIn("안정성 5 → 6", entry.change_message)
+
+    def test_unchanged_save_logs_nothing(self):
+        from django.contrib.admin.models import LogEntry
+        self.client.force_authenticate(user=self.staff)
+        self.client.put(self.url, data={"strength": 1, "summoning_methods": [1]}, format="json")
+        self.assertFalse(LogEntry.objects.exists())
+
+    def test_non_staff_cannot_read_or_edit(self):
+        user = User.objects.create_user(email="user@test.com", username="user", password="pass1234")
+        self.client.force_authenticate(user=user)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.put(self.url, data={"strength": 0}, format="json").status_code, 403)
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.put(self.url, data={"strength": 0}, format="json").status_code, (401, 403))
+        self.deck.refresh_from_db()
+        self.assertEqual(self.deck.strength, 1)

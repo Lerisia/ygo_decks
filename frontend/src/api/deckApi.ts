@@ -121,3 +121,45 @@ export const getDeckNotes = async (deckId: number): Promise<{ deck_id: number; n
   if (!response.ok) throw new Error("Failed to fetch deck notes");
   return response.json();
 };
+
+// 운영자 전용 덱 정보·스탯 수정 (특이점 2026-10-03)
+export type DeckEditOption = { value: number; label: string };
+export type DeckEditValues = {
+  strength: number;
+  difficulty: number;
+  deck_type: number;
+  art_style: number;
+  is_engine: boolean;
+  summoning_methods: number[];
+  performance_tags: string[];
+  aesthetic_tags: string[];
+  stats: DeckStats;
+};
+export type DeckEditInfo = {
+  values: DeckEditValues;
+  options: {
+    strength: DeckEditOption[];
+    difficulty: DeckEditOption[];
+    deck_type: DeckEditOption[];
+    art_style: DeckEditOption[];
+    summoning_methods: DeckEditOption[];
+    performance_tags: string[];
+    aesthetic_tags: string[];
+  };
+};
+
+const editRequest = async <T>(deckId: number, init?: RequestInit): Promise<T> => {
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`/api/deck/${deckId}/edit/`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || body.detail || `HTTP ${res.status}`);
+  return body as T;
+};
+
+export const getDeckEditInfo = (deckId: number) => editRequest<DeckEditInfo>(deckId);
+
+export const saveDeckEditInfo = (deckId: number, values: DeckEditValues) =>
+  editRequest<{ deck: unknown; changed: string }>(deckId, { method: "PUT", body: JSON.stringify(values) });
