@@ -57,6 +57,7 @@ export default function DeckDetail() {
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [showVideos, setShowVideos] = useState(false);
+  const [descOpen, setDescOpen] = useState(false); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 기본 접힘
 
   const mdeOptions = useMemo(() => {
     return {
@@ -283,6 +284,20 @@ export default function DeckDetail() {
         )}
         <DeckNotesSection deckId={deck.id} />
         {deck.has_hyeol && <DeckHyeolSection deckId={deck.id} />}
+        <section className="mb-5 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setDescOpen((v) => !v)}
+          aria-expanded={descOpen}
+          className="w-full flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition"
+        >
+          <span className="text-base font-bold text-gray-900 dark:text-gray-100">📖 덱 설명</span>
+          <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <span className={`inline-block transition-transform ${descOpen ? "rotate-180" : ""}`}>▾</span>
+          </span>
+        </button>
+        {descOpen && (
+        <div className="mt-2">
         {editing ? (
           <>
             {/* react-simplemde-editor로 마크다운 작성 */}
@@ -313,12 +328,14 @@ export default function DeckDetail() {
             {deck.wiki_content ? (
               <>
                 {/* 저장된 마크다운을 HTML로 변환 + 렌더링 */}
-                <div
-                  className="text-left markdown-content"
-                  dangerouslySetInnerHTML={{
-                    __html: converter.makeHtml(deck.wiki_content),
-                  }}
-                />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/60 shadow-sm px-4 py-4 sm:px-6 sm:py-5">
+                  <div
+                    className="text-left markdown-content leading-relaxed"
+                    dangerouslySetInnerHTML={{
+                      __html: converter.makeHtml(deck.wiki_content),
+                    }}
+                  />
+                </div>
                 <p className="text-center text-gray-800 dark:text-gray-200 mt-4">
                   틀린 내용이나 추가할 내용이 있나요?
                 </p>
@@ -357,6 +374,9 @@ export default function DeckDetail() {
             </div>
           </>
         )}
+        </div>
+        )}
+        </section>
       </div>
 
       <div className="clear-both" />
