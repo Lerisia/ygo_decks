@@ -12,6 +12,7 @@ import {
 } from "@/api/deckApi";
 import { chipClass } from "@/components/ThemeSearchChip";
 import { UNKNOWN_STAT } from "@/utils/deckStats";
+import { releaseIso, releaseParts, currentYearKst, daysInMonth } from "@/utils/releaseTime";
 
 // 운영자 전용 (특이점 2026-10-03): 덱 문서에서 덱 정보·스탯을 고치고, deckId 없이 열면 도감에 새 덱을 추가한다.
 // 이름·별칭·대표 이미지·짧은 설명도 같은 창에서 다룬다.
@@ -26,14 +27,6 @@ const STATS: { key: keyof DeckStats; label: string }[] = [
 const STAT_VALUES = Array.from({ length: UNKNOWN_STAT + 1 }, (_, i) => i);
 
 const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
-
-/** ISO time → value for <input type="datetime-local"> in the viewer's time zone. */
-const toLocalInput = (iso: string | null) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 const splitAliases = (text: string) => text.split(",").map((a) => a.trim()).filter(Boolean);
 
@@ -277,16 +270,7 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
                   Update — 업데이트 예정 덱
                 </button>
                 {form.is_upcoming && (
-                  <label className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                    자동 해제
-                    <input
-                      type="datetime-local"
-                      value={toLocalInput(form.upcoming_until)}
-                      onChange={(e) => set("upcoming_until", e.target.value ? new Date(e.target.value).toISOString() : null)}
-                      className="px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">비워 두면 직접 끌 때까지 유지</span>
-                  </label>
+                  <ReleaseDatePicker value={form.upcoming_until} onChange={(iso) => set("upcoming_until", iso)} />
                 )}
               </Field>
               <div>
@@ -346,6 +330,54 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{label}</p>
       <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** Auto-release day for the Update mark: month and day only — the year is this year and the time is fixed at 6 pm KST. */
+function ReleaseDatePicker({ value, onChange }: { value: string | null; onChange: (iso: string | null) => void }) {
+  const stored = releaseParts(value);
+  const year = stored?.year ?? currentYearKst();
+  const [month, setMonth] = useState<number | null>(stored?.month ?? null);
+  const [day, setDay] = useState<number | null>(stored?.day ?? null);
+
+  const pick = (m: number | null, d: number | null) => {
+    const fitDay = m && d ? Math.min(d, daysInMonth(year, m)) : d;
+    setMonth(m);
+    setDay(fitDay);
+    onChange(m && fitDay ? releaseIso(year, m, fitDay) : null);
+  };
+
+  const selectClass =
+    "px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100";
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      자동 해제
+      <span className="text-gray-500 dark:text-gray-400">{year}년</span>
+      <select aria-label="자동 해제 월" value={month ?? ""} onChange={(e) => pick(e.target.value ? Number(e.target.value) : null, day)} className={selectClass}>
+        <option value="">-</option>
+        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+          <option key={m} value={m}>
+            {m}월
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="자동 해제 일"
+        value={day ?? ""}
+        disabled={!month}
+        onChange={(e) => pick(month, e.target.value ? Number(e.target.value) : null)}
+        className={`${selectClass} disabled:opacity-50`}
+      >
+        <option value="">-</option>
+        {Array.from({ length: month ? daysInMonth(year, month) : 31 }, (_, i) => i + 1).map((d) => (
+          <option key={d} value={d}>
+            {d}일
+          </option>
+        ))}
+      </select>
+      <span>오후 6시</span>
+      <span className="w-full text-xs text-gray-500 dark:text-gray-400">비워 두면 직접 끌 때까지 유지</span>
     </div>
   );
 }
