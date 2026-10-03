@@ -9,6 +9,7 @@ class DeckAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'is_engine',
+        'is_upcoming',
         'strength',
         'difficulty',
         'deck_type',
@@ -24,6 +25,7 @@ class DeckAdmin(admin.ModelAdmin):
     )
     list_editable = (
         'is_engine',
+        'is_upcoming',
         'stat_consistency',
         'stat_breakthrough',
         'stat_interruption',
@@ -32,7 +34,7 @@ class DeckAdmin(admin.ModelAdmin):
     )
     search_fields = ('name', )
     list_display_links = ('name',)
-    list_filter = ('is_engine', 'strength', 'difficulty', 'deck_type', 'art_style')
+    list_filter = ('is_engine', 'is_upcoming', 'strength', 'difficulty', 'deck_type', 'art_style')
     readonly_fields = []
 
     def display_summoning_methods(self, obj):

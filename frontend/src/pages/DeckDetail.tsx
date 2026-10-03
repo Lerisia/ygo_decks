@@ -8,6 +8,7 @@ import * as Showdown from "showdown";
 import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
 import EngineBadge from "@/components/EngineBadge";
+import UpdateBadge from "@/components/UpdateBadge";
 import DeckHyeolSection from "@/components/DeckHyeolSection";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import StatInfoButton from "@/components/StatInfoButton";
@@ -34,6 +35,7 @@ interface Deck {
   aesthetic_tags: string[];
   wiki_content: string | null;
   is_engine?: boolean;
+  is_upcoming?: boolean;
   play_video_url?: string | null;
   video_count?: number;
   has_hyeol?: boolean;
@@ -124,6 +126,12 @@ export default function DeckDetail() {
                 colSpan={2}
               >
                 {deck.name}
+                {deck.is_upcoming && (
+                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
+                    <UpdateBadge className="w-5 h-5 text-[11px]" />
+                    <span><span className="font-semibold">Update</span> — 업데이트 예정 덱</span>
+                  </div>
+                )}
                 {deck.is_engine && (
                   <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
                     <EngineBadge className="w-5 h-5 text-[11px]" />

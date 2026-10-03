@@ -864,3 +864,45 @@ class CreateDeckTest(TestCase):
         self.assertEqual(res.json()["deck"]["cover_image"], self.existing.cover_image.url)
         self.client.force_authenticate(user=None)
         self.assertIn(self.client.post(url, {"cover_image": _png((600, 600))}, format="multipart").status_code, (401, 403))
+
+
+class DeckUpcomingFlagTest(TestCase):
+    """특이점 2026-10-03: 인게임 공지만 나오고 아직 출시되지 않은 덱을 '업데이트 예정'(파란 U)으로 표시하고 거를 수 있게 한다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        SummoningMethod.objects.create(id=6, method=6)
+        self.released = _create_deck(name="출시덱")
+        self.upcoming = _create_deck(name="예정덱", is_upcoming=True)
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+
+    def test_default_is_false(self):
+        self.assertFalse(Deck.objects.get(id=self.released.id).is_upcoming)
+
+    def test_list_and_detail_expose_flag(self):
+        decks = {d["name"]: d for d in self.client.get("/api/deck/").json()["decks"]}
+        self.assertTrue(decks["예정덱"]["is_upcoming"])
+        self.assertFalse(decks["출시덱"]["is_upcoming"])
+        self.assertTrue(self.client.get(f"/api/deck/{self.upcoming.id}/").json()["is_upcoming"])
+
+    def test_staff_toggles_flag_and_it_is_logged(self):
+        from django.contrib.admin.models import LogEntry
+        self.client.force_authenticate(user=self.staff)
+        url = f"/api/deck/{self.upcoming.id}/edit/"
+        self.assertTrue(self.client.get(url).json()["values"]["is_upcoming"])
+        self.assertEqual(self.client.put(url, {"is_upcoming": False}, format="json").status_code, 200)
+        self.upcoming.refresh_from_db()
+        self.assertFalse(self.upcoming.is_upcoming)
+        self.assertIn("업데이트 예정 예 → 아니요", LogEntry.objects.get(object_id=str(self.upcoming.id)).change_message)
+        self.assertEqual(self.client.put(url, {"is_upcoming": "yes"}, format="json").status_code, 400)
+
+    def test_new_deck_can_be_marked_upcoming(self):
+        self.client.force_authenticate(user=self.staff)
+        data = {"name": "신규예정", "strength": 2, "difficulty": 1, "deck_type": 0, "art_style": 0,
+                "summoning_methods": [6], "is_upcoming": True}
+        res = self.client.post("/api/deck/create/", {"data": _json.dumps(data)}, format="multipart")
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertTrue(Deck.objects.get(name="신규예정").is_upcoming)
+        self.assertTrue(res.json()["deck"]["is_upcoming"])

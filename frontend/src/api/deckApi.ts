@@ -134,6 +134,7 @@ export type DeckEditValues = {
   deck_type: number | null;
   art_style: number | null;
   is_engine: boolean;
+  is_upcoming: boolean;
   summoning_methods: number[];
   performance_tags: string[];
   aesthetic_tags: string[];

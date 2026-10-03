@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import EngineBadge from "@/components/EngineBadge";
+import UpdateBadge from "@/components/UpdateBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
@@ -19,6 +20,7 @@ interface Deck {
   aesthetic_tags: string[];
   aliases: string[];
   is_engine: boolean;
+  is_upcoming?: boolean;
 }
 
 const POWER_COLORS: { label: string; color: string }[] = [
@@ -48,6 +50,7 @@ type SavedFilters = {
   selectedDeckType?: string | null;
   selectedArtStyle?: string | null;
   selectedRole?: string | null;
+  selectedUpdate?: string | null;
 };
 // Search and filters last only for this visit (sessionStorage): closing the site starts the next visit fresh
 // (특이점 2026-10-02). They used to live in localStorage, so drop that old copy once.
@@ -72,6 +75,7 @@ export default function DatabasePage() {
   const [aestheticTags, setAestheticTags] = useState<string[]>(() => cachedTags?.aesthetic ?? []);
   const [selectedStrength, setSelectedStrength] = useState<string | null>(saved.selectedStrength || null);
   const [selectedRole, setSelectedRole] = useState<string | null>(saved.selectedRole || null);  // "main" | "engine"
+  const [selectedUpdate, setSelectedUpdate] = useState<string | null>(saved.selectedUpdate || null);  // "upcoming" | "released"
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(saved.selectedArtStyle || null);
@@ -84,7 +88,8 @@ export default function DatabasePage() {
         saved.selectedDifficulty ||
         saved.selectedDeckType ||
         saved.selectedArtStyle ||
-        saved.selectedRole,
+        saved.selectedRole ||
+        saved.selectedUpdate,
     ),
   );
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -122,6 +127,7 @@ export default function DatabasePage() {
       selectedDeckType,
       selectedArtStyle,
       selectedRole,
+      selectedUpdate,
     };
     sessionStorage.setItem("deck_filters", JSON.stringify(filters));
   };
@@ -137,7 +143,7 @@ export default function DatabasePage() {
     selectedStrength,
     selectedDifficulty,
     selectedDeckType,
-    selectedArtStyle, selectedRole]);
+    selectedArtStyle, selectedRole, selectedUpdate]);
 
   useEffect(() => {
     // Get decks from backend (again whenever staff edit a deck's info on its page)
@@ -184,6 +190,12 @@ export default function DatabasePage() {
       );
     }
 
+    if (selectedUpdate === "upcoming") {
+      filtered = filtered.filter((deck) => deck.is_upcoming);
+    } else if (selectedUpdate === "released") {
+      filtered = filtered.filter((deck) => !deck.is_upcoming);
+    }
+
     if (selectedRole === "engine") {
       filtered = filtered.filter((deck) => deck.is_engine);
     } else if (selectedRole === "main") {
@@ -214,7 +226,7 @@ export default function DatabasePage() {
     selectedDifficulty,
     selectedDeckType,
     selectedArtStyle,
-    decks, selectedRole]);
+    decks, selectedRole, selectedUpdate]);
 
 
   // Filter section toggle
@@ -332,6 +344,18 @@ export default function DatabasePage() {
               </select>
             </div>
             <div>
+              <label className="block text-left text-sm font-semibold mb-1">업데이트</label>
+              <select
+                value={selectedUpdate || ""}
+                onChange={(e) => setSelectedUpdate(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                <option value="released">출시된 덱</option>
+                <option value="upcoming">업데이트 예정 덱</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-left text-sm font-semibold mb-1">덱 타입</label>
               <select
                 value={selectedDeckType || ""}
@@ -435,8 +459,11 @@ export default function DatabasePage() {
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />
-              {deck.is_engine && (
-                <EngineBadge className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />
+              {(deck.is_engine || deck.is_upcoming) && (
+                <div className="absolute top-1 left-1 flex gap-1">
+                  {deck.is_upcoming && <UpdateBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
+                  {deck.is_engine && <EngineBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
+                </div>
               )}
             </div>
             <p className="mt-1 text-sm sm:text-base">{deck.name}</p>

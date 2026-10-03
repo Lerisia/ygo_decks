@@ -218,6 +218,7 @@ def get_all_decks(request):
             "deck_type": deck.get_deck_type_display(),
             "art_style": deck.get_art_style_display(),
             "is_engine": deck.is_engine,
+            "is_upcoming": deck.is_upcoming,
             "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
             "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
             "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
@@ -247,6 +248,7 @@ def serialize_deck_detail(deck):
         "deck_type": deck.get_deck_type_display(),
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
+        "is_upcoming": deck.is_upcoming,
         "play_video_url": deck.play_video_url,
         "video_count": 1 if _featured(deck) else 0,
         "note_count": _note_entry_count(_visible_notes(deck)),
@@ -337,6 +339,7 @@ def _deck_edit_values(deck):
         "description": deck.description or "",
         **{field: getattr(deck, field) for field, _, _ in EDIT_CHOICE_FIELDS},
         "is_engine": deck.is_engine,
+        "is_upcoming": deck.is_upcoming,
         "summoning_methods": sorted(deck.summoning_methods.values_list("method", flat=True)),
         "performance_tags": list(deck.performance_tags.order_by("id").values_list("name", flat=True)),
         "aesthetic_tags": list(deck.aesthetic_tags.order_by("id").values_list("name", flat=True)),
@@ -426,10 +429,11 @@ def _validate_deck_edit(data):
             if not _is_int(data[field]) or data[field] not in choices.values:
                 return None, f"{label} 값이 올바르지 않습니다."
             updates[field] = data[field]
-    if "is_engine" in data:
-        if not isinstance(data["is_engine"], bool):
-            return None, "엔진 여부 값이 올바르지 않습니다."
-        updates["is_engine"] = data["is_engine"]
+    for flag, label in (("is_engine", "엔진 여부"), ("is_upcoming", "업데이트 예정 여부")):
+        if flag in data:
+            if not isinstance(data[flag], bool):
+                return None, f"{label} 값이 올바르지 않습니다."
+            updates[flag] = data[flag]
     if "stats" in data:
         stats = data["stats"]
         names = {key: (attr, label) for key, attr, label in EDIT_STAT_FIELDS}
@@ -482,6 +486,8 @@ def _describe_deck_changes(before, after):
             parts.append(f"{label} {choices(before[field]).label} → {choices(after[field]).label}")
     if before["is_engine"] != after["is_engine"]:
         parts.append(f"엔진 {show(before['is_engine'])} → {show(after['is_engine'])}")
+    if before["is_upcoming"] != after["is_upcoming"]:
+        parts.append(f"업데이트 예정 {show(before['is_upcoming'])} → {show(after['is_upcoming'])}")
     method_label = dict(SummoningMethod.SummonType.choices)
     for field, label in EDIT_TAG_FIELDS:
         old, new = before[field], after[field]
@@ -531,7 +537,7 @@ def create_deck(request):
     """특이점 2026-10-03: 운영진이 도감에서 바로 새 덱을 추가한다. 본문은 multipart의 `data`(JSON)와 선택 `cover_image`."""
     if request.method == "GET":
         values = {"name": "", "aliases": [], "description": "", "strength": None, "difficulty": None, "deck_type": None,
-                  "art_style": None, "is_engine": False, "summoning_methods": [], "performance_tags": [], "aesthetic_tags": [],
+                  "art_style": None, "is_engine": False, "is_upcoming": False, "summoning_methods": [], "performance_tags": [], "aesthetic_tags": [],
                   "stats": {key: None for key, _, _ in EDIT_STAT_FIELDS}}
         return Response({"values": values, "options": _edit_options()})
 

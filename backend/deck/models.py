@@ -103,6 +103,8 @@ class Deck(models.Model):
     art_style = models.IntegerField(choices=_ArtStyle.choices)
     # 단일 덱으로는 드물고 다른 덱에 용병(엔진)으로 섞여 쓰이는 덱
     is_engine = models.BooleanField(default=False, verbose_name="Engine (용병)")
+    # 인게임 공지만 나오고 아직 출시되지 않은 덱 (특이점 2026-10-03, 도감에 파란 U 표시)
+    is_upcoming = models.BooleanField(default=False, verbose_name="Update (업데이트 예정)")
     # 덱 플레이 참고 영상 (예: 김빠방 유튜브). 비어 있으면 상세 페이지 버튼이 '준비 중'.
     play_video_url = models.URLField(max_length=300, blank=True, default="", verbose_name="플레이 영상 URL")
     summoning_methods = models.ManyToManyField(SummoningMethod)

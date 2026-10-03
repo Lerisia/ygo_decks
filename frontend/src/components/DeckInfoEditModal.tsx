@@ -257,6 +257,11 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
                   Engine — 다양한 덱에 섞어 사용
                 </button>
               </Field>
+              <Field label="업데이트 예정">
+                <button type="button" className={chipClass(form.is_upcoming)} onClick={() => set("is_upcoming", !form.is_upcoming)}>
+                  Update — 업데이트 예정 덱
+                </button>
+              </Field>
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">스탯 (11 = 그래프에 ?)</p>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
