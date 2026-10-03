@@ -41,7 +41,7 @@ function NoteMeta({ n, extra, stale }: { n: DeckNote; extra?: string; stale?: bo
           title={STALE_HINT}
           className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 text-[11px] font-semibold"
         >
-          ⏳ {STALE_YEARS}년 지난 노트
+          ⏳ {STALE_YEARS}년 이상 지난 노트
         </span>
       )}
       <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${SOURCE_STYLE[n.source] ?? SOURCE_STYLE.other}`}>{n.source_label}</span>
