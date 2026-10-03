@@ -39,15 +39,13 @@ class AestheticTag(models.Model):
     def __str__(self):
         return self.name
 
-# Strength survey "band" — each survey option maps to 1-2 tiers with intentional
-# overlap between neighbours. Deck.strength itself stays a single tier (0-5).
-# The old single 중위권 tier was split into 중상위권(2)/중하위권(3), so the two
-# middle bands each cover three tiers.
+# Strength survey "band" — each survey option covers two neighbouring tiers (특이점 2026-10-03):
+# 최상위·상위 / 상위·중상위 / 중상위·중하위 / 중하위·하위 / 하위·최하위. Deck.strength itself stays a single tier (0-5).
 STRENGTH_BAND_TO_TIERS = {
-    0: (0,),         # 최상위
-    1: (0, 1),       # 최상위 + 상위
-    2: (1, 2, 3),    # 상위 + 중상위 + 중하위
-    3: (2, 3, 4),    # 중상위 + 중하위 + 하위
+    0: (0, 1),       # 최상위 + 상위
+    1: (1, 2),       # 상위 + 중상위
+    2: (2, 3),       # 중상위 + 중하위
+    3: (3, 4),       # 중하위 + 하위
     4: (4, 5),       # 하위 + 최하위
 }
 # Reverse map: given a deck's tier, which bands include it (for lookup gen).

@@ -78,12 +78,12 @@ class GetDeckResultTest(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     def test_strength_band_covers_two_tiers(self):
-        # band 1 = {tier 0, tier 1} — both deck1(tier 0) and deck2(tier 1) should
-        # be candidates. Result is randomly one of them, so run multiple times
+        # band 0 = {tier 0, tier 1} (2026-10-03 bands) — both deck1(tier 0) and deck2(tier 1)
+        # should be candidates. Result is randomly one of them, so run multiple times
         # and confirm both names can appear.
         names_seen = set()
         for _ in range(40):
-            resp = self.client.get("/api/deck/result", {"key": "strength=1"})
+            resp = self.client.get("/api/deck/result", {"key": "strength=0"})
             self.assertEqual(resp.status_code, 200)
             names_seen.add(resp.json()["name"])
             self.client.cookies.clear()  # fresh session each request
@@ -259,7 +259,7 @@ class RecommendStepTest(TestCase):
         self.assertEqual(data["candidate_count"], 3)
         self.assertFalse(data["resolved"])
         av = data["available"]
-        self.assertEqual(av["s"], [0, 1, 2, 3])   # tiers 0,1,3 -> bands (0,1),(1,2),(2,3)
+        self.assertEqual(av["s"], [0, 1, 2, 3])   # tiers 0,1,3 -> bands (0,),(0,1),(2,3)
         self.assertEqual(av["d"], [0, 1, 2])
         self.assertEqual(av["t"], [0, 2])
         self.assertEqual(av["a"], [0, 1, 2])
@@ -276,7 +276,7 @@ class RecommendStepTest(TestCase):
         self.assertEqual(data["candidate_count"], 2)
         av = data["available"]
         self.assertEqual(av["d"], [0, 1])
-        self.assertEqual(av["s"], [0, 1, 2])
+        self.assertEqual(av["s"], [0, 1])   # tiers 0,1 -> bands (0,),(0,1)
         self.assertEqual(av["a"], [0, 2])
         self.assertEqual(av["sm"], [1, 3, 6])
         self.assertEqual(av["atag"], sorted([self.a1.id, self.a2.id]))
@@ -288,10 +288,10 @@ class RecommendStepTest(TestCase):
         self.assertTrue(data["resolved"])
 
     def test_strength_band_overlap(self):
-        self.assertEqual(self.step("s=1")["candidate_count"], 2)   # band 1 = tiers 0,1 -> D1, D2
-        self.assertEqual(self.step("s=0")["candidate_count"], 1)   # tier 0 only -> D1
-        self.assertEqual(self.step("s=2")["candidate_count"], 2)   # band 2 = tiers 1,2,3 -> D2, D3
-        self.assertEqual(self.step("s=3")["candidate_count"], 1)   # band 3 = tiers 2,3,4 -> D3
+        self.assertEqual(self.step("s=0")["candidate_count"], 2)   # band 0 = tiers 0,1 -> D1, D2
+        self.assertEqual(self.step("s=1")["candidate_count"], 1)   # band 1 = tiers 1,2 -> D2
+        self.assertEqual(self.step("s=2")["candidate_count"], 1)   # band 2 = tiers 2,3 -> D3
+        self.assertEqual(self.step("s=3")["candidate_count"], 1)   # band 3 = tiers 3,4 -> D3
         self.assertEqual(self.step("s=4")["candidate_count"], 0)   # band 4 = tiers 4,5 -> none
 
     def test_summoning_method_and_tags(self):
@@ -334,7 +334,7 @@ class RecommendStepTest(TestCase):
         """Whatever the step endpoint calls resolved must be servable by /deck/result."""
         mapping = {"s": "strength", "d": "difficulty", "t": "deck_type", "a": "art_style",
                    "sm": "summoning_methods", "ptag": "performance_tags", "atag": "aesthetic_tags"}
-        for key, expected in (("d=1|t=0", "D2"), ("s=0", "D1"), ("sm=6", "D2"), (f"atag={self.a2.id}", "D2")):
+        for key, expected in (("d=1|t=0", "D2"), ("s=1", "D2"), ("sm=6", "D2"), (f"atag={self.a2.id}", "D2")):
             self.assertTrue(self.step(key)["resolved"], key)
             long_key = "|".join(f"{mapping[k]}={v}" for k, v in (p.split("=") for p in key.split("|")))
             resp = self.client.get("/api/deck/result", {"key": long_key})
@@ -351,21 +351,29 @@ class SixTierStrengthTest(TestCase):
         self.assertEqual(labels, ["최상위권", "상위권", "중상위권", "중하위권", "하위권", "최하위권"])
 
     def test_band_to_tiers(self):
+        # 특이점 2026-10-03: 선택지마다 이웃한 두 단계 — 최상위·상위 / 상위·중상위 / 중상위·중하위 / 중하위·하위 / 하위·최하위
         from .models import STRENGTH_BAND_TO_TIERS
         self.assertEqual(STRENGTH_BAND_TO_TIERS, {
-            0: (0,),
-            1: (0, 1),
-            2: (1, 2, 3),
-            3: (2, 3, 4),
+            0: (0, 1),
+            1: (1, 2),
+            2: (2, 3),
+            3: (3, 4),
             4: (4, 5),
         })
 
     def test_tier_to_bands_covers_all_six_tiers(self):
         from .models import STRENGTH_TIER_TO_BANDS
-        self.assertEqual(set(STRENGTH_TIER_TO_BANDS), set(range(6)))
-        self.assertEqual(STRENGTH_TIER_TO_BANDS[2], (2, 3))   # new 중상위권 (old 중위권 slot)
-        self.assertEqual(STRENGTH_TIER_TO_BANDS[3], (2, 3))   # new 중하위권 (old 중위권 slot)
-        self.assertEqual(STRENGTH_TIER_TO_BANDS[5], (4,))
+        self.assertEqual(STRENGTH_TIER_TO_BANDS, {0: (0,), 1: (0, 1), 2: (1, 2), 3: (2, 3), 4: (3, 4), 5: (4,)})
+
+    def test_survey_labels_match_bands(self):
+        labels = [o["label"] for o in Client().get("/api/get_questions/").json()["questions"][1]["options"]]
+        self.assertEqual(labels[:5], [
+            "최상위~상위권의 강력한 티어 덱",
+            "상위~중상위권의 준수한 덱",
+            "중상위~중하위권의 무난한 덱",
+            "중하위~하위권의 개성있는 덱",
+            "하위~최하위권의 도전적인 덱",
+        ])
 
     def test_migration_remap_semantics(self):
         import importlib
