@@ -126,16 +126,16 @@ export default function DeckDetail() {
                 colSpan={2}
               >
                 {deck.name}
-                {deck.is_upcoming && (
-                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
-                    <UpdateBadge className="w-5 h-5 text-[11px]" />
-                    <span><span className="font-semibold">Update</span> — 업데이트 예정 덱</span>
-                  </div>
-                )}
                 {deck.is_engine && (
                   <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
                     <EngineBadge className="w-5 h-5 text-[11px]" />
                     <span><span className="font-semibold">Engine</span> — 다양한 덱에 섞어 사용할 수 있는 덱</span>
+                  </div>
+                )}
+                {deck.is_upcoming && (
+                  <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
+                    <UpdateBadge className="w-5 h-5 text-[11px]" />
+                    <span><span className="font-semibold">Update</span> — 업데이트 예정 덱</span>
                   </div>
                 )}
               </td>

@@ -9,10 +9,11 @@ const PALETTES: Record<"gold" | "blue", CSSProperties> = {
     textShadow: "0 1px 0 rgba(255,255,255,0.65)",
   },
   blue: {
-    background: "radial-gradient(circle at 32% 28%, #e0f2fe 0%, #60a5fa 30%, #2563eb 64%, #1e3a8a 100%)",
-    boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.5), inset 0 -2px 3px rgba(30,58,138,0.45), 0 1px 3px rgba(0,0,0,0.35)",
+    // 채도를 높이고 하이라이트를 줄임 (특이점 2026-10-03: 처음 색이 너무 밝았음)
+    background: "radial-gradient(circle at 32% 28%, #7aa7ff 0%, #1f5cff 30%, #0b3fd6 64%, #0a2a8f 100%)",
+    boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(10,30,100,0.55), 0 1px 3px rgba(0,0,0,0.35)",
     color: "#ffffff",
-    textShadow: "0 1px 1px rgba(30,58,138,0.85)",
+    textShadow: "0 1px 1px rgba(10,30,100,0.9)",
   },
 };
 

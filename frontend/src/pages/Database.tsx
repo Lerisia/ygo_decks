@@ -440,8 +440,8 @@ export default function DatabasePage() {
               />
               {(deck.is_engine || deck.is_upcoming) && (
                 <div className="absolute top-1 left-1 flex gap-1">
-                  {deck.is_upcoming && <UpdateBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
                   {deck.is_engine && <EngineBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
+                  {deck.is_upcoming && <UpdateBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
                 </div>
               )}
             </div>
