@@ -49,8 +49,7 @@ type SavedFilters = {
   selectedDifficulty?: string | null;
   selectedDeckType?: string | null;
   selectedArtStyle?: string | null;
-  selectedRole?: string | null;
-  selectedUpdate?: string | null;
+  selectedEtc?: string | null;
 };
 // Search and filters last only for this visit (sessionStorage): closing the site starts the next visit fresh
 // (특이점 2026-10-02). They used to live in localStorage, so drop that old copy once.
@@ -74,8 +73,8 @@ export default function DatabasePage() {
   const [performanceTags, setPerformanceTags] = useState<string[]>(() => cachedTags?.performance ?? []);
   const [aestheticTags, setAestheticTags] = useState<string[]>(() => cachedTags?.aesthetic ?? []);
   const [selectedStrength, setSelectedStrength] = useState<string | null>(saved.selectedStrength || null);
-  const [selectedRole, setSelectedRole] = useState<string | null>(saved.selectedRole || null);  // "main" | "engine"
-  const [selectedUpdate, setSelectedUpdate] = useState<string | null>(saved.selectedUpdate || null);  // "upcoming" | "released"
+  // 기타: 엔진 / 업데이트 예정 덱 (특이점 2026-10-03, 예전 '구축 형태'·'업데이트' 필터를 합침)
+  const [selectedEtc, setSelectedEtc] = useState<string | null>(saved.selectedEtc || null);  // "engine" | "upcoming"
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(saved.selectedArtStyle || null);
@@ -88,8 +87,7 @@ export default function DatabasePage() {
         saved.selectedDifficulty ||
         saved.selectedDeckType ||
         saved.selectedArtStyle ||
-        saved.selectedRole ||
-        saved.selectedUpdate,
+        saved.selectedEtc,
     ),
   );
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -126,8 +124,7 @@ export default function DatabasePage() {
       selectedDifficulty,
       selectedDeckType,
       selectedArtStyle,
-      selectedRole,
-      selectedUpdate,
+      selectedEtc,
     };
     sessionStorage.setItem("deck_filters", JSON.stringify(filters));
   };
@@ -143,7 +140,7 @@ export default function DatabasePage() {
     selectedStrength,
     selectedDifficulty,
     selectedDeckType,
-    selectedArtStyle, selectedRole, selectedUpdate]);
+    selectedArtStyle, selectedEtc]);
 
   useEffect(() => {
     // Get decks from backend (again whenever staff edit a deck's info on its page)
@@ -190,16 +187,10 @@ export default function DatabasePage() {
       );
     }
 
-    if (selectedUpdate === "upcoming") {
-      filtered = filtered.filter((deck) => deck.is_upcoming);
-    } else if (selectedUpdate === "released") {
-      filtered = filtered.filter((deck) => !deck.is_upcoming);
-    }
-
-    if (selectedRole === "engine") {
+    if (selectedEtc === "engine") {
       filtered = filtered.filter((deck) => deck.is_engine);
-    } else if (selectedRole === "main") {
-      filtered = filtered.filter((deck) => !deck.is_engine);
+    } else if (selectedEtc === "upcoming") {
+      filtered = filtered.filter((deck) => deck.is_upcoming);
     }
     if (selectedStrength) {
       filtered = filtered.filter((deck) => deck.strength === selectedStrength);
@@ -226,7 +217,7 @@ export default function DatabasePage() {
     selectedDifficulty,
     selectedDeckType,
     selectedArtStyle,
-    decks, selectedRole, selectedUpdate]);
+    decks, selectedEtc]);
 
 
   // Filter section toggle
@@ -332,30 +323,6 @@ export default function DatabasePage() {
               </select>
             </div>
             <div>
-              <label className="block text-left text-sm font-semibold mb-1">구축 형태</label>
-              <select
-                value={selectedRole || ""}
-                onChange={(e) => setSelectedRole(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                <option value="main">단일 덱</option>
-                <option value="engine">엔진</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">업데이트</label>
-              <select
-                value={selectedUpdate || ""}
-                onChange={(e) => setSelectedUpdate(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                <option value="released">출시된 덱</option>
-                <option value="upcoming">업데이트 예정 덱</option>
-              </select>
-            </div>
-            <div>
               <label className="block text-left text-sm font-semibold mb-1">덱 타입</label>
               <select
                 value={selectedDeckType || ""}
@@ -392,6 +359,18 @@ export default function DatabasePage() {
                 {summoningMethods.map((o) => (
                   <option key={o} value={o}>{o}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-left text-sm font-semibold mb-1">기타</label>
+              <select
+                value={selectedEtc || ""}
+                onChange={(e) => setSelectedEtc(e.target.value || null)}
+                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
+              >
+                <option value="">전체</option>
+                <option value="engine">엔진</option>
+                <option value="upcoming">업데이트 예정 덱</option>
               </select>
             </div>
           </div>
