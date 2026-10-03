@@ -23,6 +23,11 @@ ENGINE_DEMOTE_MIN_RATIO = 0.2
 # 순수 구축이 압도적이라 엔진 표시에도 불구하고 강등하지 않는 덱
 ENGINE_ALWAYS_TOP = {"낙인"}
 
+# 상대 덱은 확신이 없으면 제안하지 않는다 = 레코더가 모름/기타로 기록 (특이점 2026-10-03). 9/30~10/3 기록 1,840판에서
+# 1순위 근거가 엑스트라 덱 카드뿐이거나(다른 덱 카드가 묘지로 보낸 것일 수 있음) 1순위 표가 전체의 절반 미만이면
+# 이용자가 다른 덱으로 고친 비율이 약 20%였고, 그 밖은 3.6%였다.
+OPP_MIN_SHARE = 0.5
+
 RANK_NAMES = {1: "rookie", 2: "bronze", 3: "silver", 4: "gold", 5: "platinum", 6: "diamond", 7: "master"}
 
 
@@ -76,16 +81,20 @@ def infer_decks(card_ids, limit=3):
     for kid, archetype in card_arch.items():
         arch_votes[archetype] += counts[kid] * weights[kid]
     arch_specific = defaultdict(float)
+    arch_main = defaultdict(bool)   # does any main-deck card vote for this archetype?
     for kid, archetype in card_arch.items():
         arch_specific[archetype] = max(arch_specific[archetype], weights[kid])
+        frame = (cards[kid].frame_type or "") if kid in cards else ""
+        arch_main[archetype] = arch_main[archetype] or not any(w in frame for w in EXTRA_FRAME_WORDS)
     scores = defaultdict(float)
-    names, engines, specific = {}, {}, defaultdict(float)
+    names, engines, specific, has_main = {}, {}, defaultdict(float), defaultdict(bool)
     for archetype, rows in arch_rows.items():
         for da in rows:
             scores[da.deck_id] += arch_votes[archetype] * da.weight
             names[da.deck_id] = da.deck.name
             engines[da.deck_id] = da.deck.is_engine
             specific[da.deck_id] = max(specific[da.deck_id], arch_specific[archetype])
+            has_main[da.deck_id] = has_main[da.deck_id] or arch_main[archetype]
     total = sum(arch_votes.values())
     best_plain = max((s for d, s in scores.items() if not engines[d] and specific[d] >= SPECIFIC_MIN), default=0.0)
     beaten = {p.loser_id for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores)}
@@ -96,7 +105,25 @@ def infer_decks(card_ids, limit=3):
     ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, demoted(*kv), -kv[1], names[kv[0]]))[:limit]
     if not ranked:
         return learned_decks(resolved, limit), unknown
-    return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d]} for d, s in ranked], unknown
+    return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d],
+             "extra_only": not has_main[d]} for d, s in ranked], unknown
+
+
+def is_confident(candidate):
+    """Is this opponent guess safe to record? Learned guesses are already gated at their own threshold."""
+    if candidate.get("learned"):
+        return True
+    return not candidate.get("extra_only") and candidate["share"] >= OPP_MIN_SHARE
+
+
+def infer_opponent(card_ids, limit=3):
+    """infer_decks for the opponent's revealed cards → (candidates, unsure, unknown_ids).
+    When the top guess isn't confident, candidates is empty (the recorder then records 모름/기타) and the guesses
+    move to `unsure` so a later client can still offer them as one-click choices."""
+    cands, unknown = infer_decks(card_ids, limit)
+    if cands and not is_confident(cands[0]):
+        return [], cands, unknown
+    return cands, [], unknown
 
 
 def card_specificity(card_arch, arch_rows, cards):

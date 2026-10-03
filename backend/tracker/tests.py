@@ -954,3 +954,70 @@ class TrackerSuggestionCaptureTest(TestCase):
         self.assertEqual(g.match.opponent_deck_id, self.mal.id)
         self.assertTrue(g.corrected)
         self.assertEqual(list(TrackerGame.objects.corrected()), [g])
+
+
+class TrackerUnsureOpponentTest(TestCase):
+    """특이점 2026-10-03: 확신이 없으면 상대 덱을 모름/기타로 둔다.
+    제보: 상대 '피드라울리스＝하르모니아'가 엑스트라 덱의 '윈드페가수스＠이그니스터'를 묘지로 보냈는데 @이그니스터로 기록됨.
+    근거가 엑스트라 덱 카드뿐이거나 1순위 덱 표가 전체의 절반 미만이면 제안하지 않는다(과거 기록에서 교정률 ~20%)."""
+
+    def setUp(self):
+        from card.models import Card
+        from deck.models import DeckArchetype
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="u@test.com", username="unsure", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.ign = _create_deck("@이그니스터")
+        self.kewl = _create_deck("킬러튠")
+        self.blue = _create_deck("푸른 눈")
+        DeckArchetype.objects.create(deck=self.ign, name="@Ignister")
+        DeckArchetype.objects.create(deck=self.kewl, name="Kewl Tune")
+        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes")
+        for kid, name, arch, frame in [
+            ("14851", "Windpegasus @Ignister", "@Ignister", "synchro"),
+            ("22533", "Fidraulis Harmonia", None, "effect"),
+            ("9279", "Droll & Lock Bird", None, "effect"),
+            ("20001", "Kewl Tune Cue", "Kewl Tune", "effect"),
+            ("20002", "Kewl Tune Loudness War", "Kewl Tune", "effect"),
+            ("15000", "Achichi @Ignister", "@Ignister", "effect"),
+            ("4007", "Blue-Eyes White Dragon", "Blue-Eyes", "normal"),
+            ("30000", "Some Unmapped Card", "Unmapped Theme", "effect"),
+        ]:
+            Card.objects.create(card_id=f"c{kid}", konami_id=kid, name=name, archetype=arch, frame_type=frame)
+
+    def infer(self, opp, my=()):
+        res = self.client.post("/api/tracker/infer/", {"my_cards": list(my), "opp_cards": list(opp)}, format="json")
+        self.assertEqual(res.status_code, 200)
+        return res.data
+
+    def test_dumped_extra_deck_card_alone_is_not_enough(self):
+        data = self.infer([22533, 14851, 9279])
+        self.assertEqual(data["opp"]["candidates"], [])                      # recorder fills 모름/기타
+        self.assertEqual(data["opp"]["unsure_candidates"][0]["name"], "@이그니스터")
+
+    def test_main_deck_evidence_still_suggests(self):
+        self.assertEqual(self.infer([20001, 9279])["opp"]["candidates"][0]["name"], "킬러튠")
+        self.assertEqual(self.infer([22533, 14851, 15000])["opp"]["candidates"][0]["name"], "@이그니스터")
+
+    def test_split_votes_under_half_are_unsure(self):
+        data = self.infer([20001, 15000, 30000])                             # 킬러튠 1 / 이그니스터 1 / unmapped 1
+        self.assertEqual(data["opp"]["candidates"], [])
+        self.assertEqual(len(data["opp"]["unsure_candidates"]), 2)
+
+    def test_my_deck_is_not_gated(self):
+        self.assertEqual(self.infer([], my=[14851])["my"]["candidates"][0]["name"], "@이그니스터")
+
+    def test_archived_game_keeps_no_suggestion_when_unsure(self):
+        from tracker.models import TrackerGame
+        base = {"game_mode": 3, "result": "lose", "finish": "Surrender", "coin_win": True, "first": True, "turn": 2,
+                "my_cards": [4007], "started_at": "2026-10-03T19:40:00+09:00", "ended_at": "2026-10-03T19:44:00+09:00"}
+        self.client.post("/api/tracker/games/", {**base, "did": "1001", "opp_cards": [22533, 14851, 9279]}, format="json")
+        self.client.post("/api/tracker/games/", {**base, "did": "1002", "opp_cards": [20001, 20002]}, format="json")
+        self.assertIsNone(TrackerGame.objects.get(did="1001").suggested_opp_deck_id)
+        self.assertEqual(TrackerGame.objects.get(did="1002").suggested_opp_deck_id, self.kewl.id)
+
+    def test_pending_payload_suggests_nothing_when_unsure(self):
+        from tracker.services import build_payload
+        payload = build_payload(self.user, {"my_cards": [4007], "opp_cards": [22533, 14851]})
+        self.assertIsNone(payload["suggested_opp_deck"])
+        self.assertEqual(payload["opp_candidates"], [])

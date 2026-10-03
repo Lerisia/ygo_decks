@@ -1,5 +1,5 @@
 """Pending-match lifecycle shared by the tracker API and the record API."""
-from .inference import card_names, infer_decks
+from .inference import card_names, infer_decks, infer_opponent
 from .models import TrackerDeckMap, TrackerPendingMatch
 from .ranks import clamp_wins
 
@@ -18,7 +18,7 @@ def build_payload(user, data):
     opp_cards = [int(c) for c in (data.get("opp_cards") or []) if str(c).isdigit()]
     payload["my_cards"], payload["opp_cards"] = my_cards, opp_cards
     my_c, _ = infer_decks(my_cards)
-    opp_c, _ = infer_decks(opp_cards)
+    opp_c, _, _ = infer_opponent(opp_cards)
     payload["my_candidates"], payload["opp_candidates"] = my_c, opp_c
     payload["my_card_names"], payload["opp_card_names"] = card_names(my_cards), card_names(opp_cards)
     md_deck_id = str(data.get("md_deck_id") or "")
@@ -129,8 +129,7 @@ def upsert_game(user, data, legacy_turn=False):
     # Keep what the server suggested when the duel ended, so a record saved with another deck reads as a correction.
     # Only the first suggestion counts — a later re-upload must not rewrite what the person was shown.
     if obj.suggested_opp_deck_id is None and opp_ids:
-        from .inference import infer_decks
-        cands, _ = infer_decks(opp_ids)
+        cands, _, _ = infer_opponent(opp_ids)
         if cands:
             obj.suggested_opp_deck_id = cands[0]["deck_id"]
             obj.save(update_fields=["suggested_opp_deck"])

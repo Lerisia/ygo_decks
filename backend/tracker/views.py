@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .inference import card_names, infer_decks
+from .inference import card_names, infer_decks, infer_opponent
 from .services import touch_client
 from . import version as ver
 
@@ -28,10 +28,15 @@ def tracker_infer(request):
     out = {}
     for key in ("my", "opp"):
         ids = _ids(f"{key}_cards")
-        cands, unknown = infer_decks(ids)
+        if key == "opp":
+            cands, unsure, unknown = infer_opponent(ids)
+        else:
+            (cands, unknown), unsure = infer_decks(ids), []
         # alt-art ids the client will keep seeing in memory → the base ids the names/decklist use
         aliases = {str(raw): base for raw, base in zip(ids, resolve_aliases(ids)) if raw != base}
         out[key] = {"candidates": cands, "unknown_ids": unknown, "cards": card_names(ids), "aliases": aliases}
+        if key == "opp":
+            out[key]["unsure_candidates"] = unsure
     return Response(out)
 
 
