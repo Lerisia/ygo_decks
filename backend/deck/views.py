@@ -83,9 +83,9 @@ def filter_decks(criteria, user=None):
     if criteria.get("aesthetic_tags"):
         query &= Q(aesthetic_tags__id__in=criteria["aesthetic_tags"])
 
-    # Engine (용병) decks are splashed into other decks, not played alone —
-    # never recommend them.
-    decks = Deck.objects.filter(query).exclude(is_engine=True).distinct()
+    # Decks only announced in game can't be played yet — never recommend them (특이점 2026-10-03;
+    # engine decks are recommended again, the 9/4 exclusion was lifted).
+    decks = Deck.objects.filter(query).exclude(is_upcoming=True).distinct()
     if user is not None and user.is_authenticated and user.use_custom_lookup:
         owned = list(user.owned_decks.values_list("id", flat=True))
         if owned:
@@ -150,7 +150,7 @@ def get_deck_result(request):
     print("Filtered QuerySet count:", decks.count())
 
     if answer_key == "empty":
-        all_decks = Deck.objects.exclude(is_engine=True)
+        all_decks = Deck.objects.exclude(is_upcoming=True)
         deck = random.choice(list(all_decks)) if all_decks.exists() else None
 
     if not decks.exists():

@@ -406,28 +406,30 @@ class DeckEngineFlagTest(TestCase):
         self.assertFalse(Deck.objects.get(id=self.main.id).is_engine)
 
 
-class EngineExcludedFromRecommendationTest(TestCase):
+class RecommendationDeckPoolTest(TestCase):
+    """특이점 2026-10-03: 엔진 덱도 성향 테스트 추천에 나오고(9/4의 엔진 제외는 해제), 업데이트 예정 덱은 아직 쓸 수 없어 추천에서 뺀다."""
+
     def setUp(self):
         self.client = APIClient()
-        self.main = _create_deck(name="메인", strength=0, difficulty=0, deck_type=0, art_style=0)
         self.engine = _create_deck(name="엔진", strength=0, difficulty=0, deck_type=0, art_style=0, is_engine=True)
+        self.upcoming = _create_deck(name="예정", strength=0, difficulty=0, deck_type=0, art_style=0, is_upcoming=True)
 
-    def test_step_ignores_engine_decks(self):
+    def test_step_counts_engine_but_not_upcoming(self):
         data = self.client.get("/api/deck/recommend/step").json()
         self.assertEqual(data["candidate_count"], 1)
         self.assertTrue(data["resolved"])
 
-    def test_result_never_returns_engine_deck(self):
+    def test_result_can_be_engine_never_upcoming(self):
         for _ in range(5):
             resp = self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
             self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.json()["name"], "메인")
+            self.assertEqual(resp.json()["name"], "엔진")
 
-    def test_empty_key_random_pick_skips_engine_decks(self):
+    def test_empty_key_random_pick_skips_upcoming(self):
         for _ in range(5):
             resp = self.client.get("/api/deck/result", {"key": "empty"})
             self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.json()["name"], "메인")
+            self.assertEqual(resp.json()["name"], "엔진")
 
 
 class PlayVideoUrlTest(TestCase):
