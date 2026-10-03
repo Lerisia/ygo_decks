@@ -10,6 +10,7 @@ class DeckAdmin(admin.ModelAdmin):
         'name',
         'is_engine',
         'is_upcoming',
+        'upcoming_until',
         'strength',
         'difficulty',
         'deck_type',

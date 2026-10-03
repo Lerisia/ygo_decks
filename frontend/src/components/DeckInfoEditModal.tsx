@@ -27,6 +27,14 @@ const STAT_VALUES = Array.from({ length: UNKNOWN_STAT + 1 }, (_, i) => i);
 
 const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
 
+/** ISO time → value for <input type="datetime-local"> in the viewer's time zone. */
+const toLocalInput = (iso: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const splitAliases = (text: string) => text.split(",").map((a) => a.trim()).filter(Boolean);
 
 interface Props {
@@ -258,9 +266,28 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
                 </button>
               </Field>
               <Field label="업데이트 예정">
-                <button type="button" className={chipClass(form.is_upcoming)} onClick={() => set("is_upcoming", !form.is_upcoming)}>
+                <button
+                  type="button"
+                  className={chipClass(form.is_upcoming)}
+                  onClick={() => {
+                    if (form.is_upcoming) set("upcoming_until", null);
+                    set("is_upcoming", !form.is_upcoming);
+                  }}
+                >
                   Update — 업데이트 예정 덱
                 </button>
+                {form.is_upcoming && (
+                  <label className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    자동 해제
+                    <input
+                      type="datetime-local"
+                      value={toLocalInput(form.upcoming_until)}
+                      onChange={(e) => set("upcoming_until", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">비워 두면 직접 끌 때까지 유지</span>
+                  </label>
+                )}
               </Field>
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">스탯 (11 = 그래프에 ?)</p>

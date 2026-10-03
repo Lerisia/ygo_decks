@@ -135,6 +135,8 @@ export type DeckEditValues = {
   art_style: number | null;
   is_engine: boolean;
   is_upcoming: boolean;
+  /** ISO time the Update mark turns itself off; null = stays until turned off by hand */
+  upcoming_until: string | null;
   summoning_methods: number[];
   performance_tags: string[];
   aesthetic_tags: string[];

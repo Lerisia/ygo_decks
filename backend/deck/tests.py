@@ -908,3 +908,58 @@ class DeckUpcomingFlagTest(TestCase):
         self.assertEqual(res.status_code, 201, res.content)
         self.assertTrue(Deck.objects.get(name="신규예정").is_upcoming)
         self.assertTrue(res.json()["deck"]["is_upcoming"])
+
+
+class DeckUpcomingUntilTest(TestCase):
+    """특이점 2026-10-03: 업데이트 예정 마크에 자동 해제 시각을 둔다. 시각이 지나면 크론을 기다리지 않고 바로 일반 덱으로 보인다."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.client = APIClient()
+        now = timezone.now()
+        self.expired = _create_deck(name="출시됨", strength=0, difficulty=0, deck_type=0, art_style=0,
+                                    is_upcoming=True, upcoming_until=now - timedelta(minutes=1))
+        self.pending = _create_deck(name="곧출시", strength=0, difficulty=0, deck_type=0, art_style=0,
+                                    is_upcoming=True, upcoming_until=now + timedelta(days=2))
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+
+    def test_expired_mark_no_longer_shows(self):
+        decks = {d["name"]: d for d in self.client.get("/api/deck/").json()["decks"]}
+        self.assertFalse(decks["출시됨"]["is_upcoming"])
+        self.assertTrue(decks["곧출시"]["is_upcoming"])
+        self.assertFalse(self.client.get(f"/api/deck/{self.expired.id}/").json()["is_upcoming"])
+        self.assertIsNotNone(self.client.get(f"/api/deck/{self.pending.id}/").json()["upcoming_until"])
+
+    def test_expired_mark_is_recommended_again(self):
+        for _ in range(5):
+            resp = self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
+            self.assertEqual(resp.json()["name"], "출시됨")
+
+    def test_staff_sets_and_clears_release_time(self):
+        from django.contrib.admin.models import LogEntry
+        self.client.force_authenticate(user=self.staff)
+        deck = _create_deck(name="새예정")
+        url = f"/api/deck/{deck.id}/edit/"
+        res = self.client.put(url, {"is_upcoming": True, "upcoming_until": "2026-10-06T18:00:00+09:00"}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        deck.refresh_from_db()
+        self.assertTrue(deck.is_upcoming)
+        self.assertEqual(deck.upcoming_until.isoformat(), "2026-10-06T09:00:00+00:00")
+        self.assertIn("자동 해제 - → 10/6 18:00", LogEntry.objects.filter(object_id=str(deck.id)).first().change_message)
+        self.assertTrue(self.client.get(url).json()["values"]["upcoming_until"].startswith("2026-10-06T18:00"))
+        # turning the mark off drops the release time too
+        self.client.put(url, {"is_upcoming": False}, format="json")
+        deck.refresh_from_db()
+        self.assertEqual((deck.is_upcoming, deck.upcoming_until), (False, None))
+        self.assertEqual(self.client.put(url, {"upcoming_until": "다음 주"}, format="json").status_code, 400)
+
+    def test_expire_command_clears_old_marks(self):
+        from django.core.management import call_command
+        call_command("expire_upcoming", verbosity=0)
+        self.expired.refresh_from_db()
+        self.pending.refresh_from_db()
+        self.assertEqual((self.expired.is_upcoming, self.expired.upcoming_until), (False, None))
+        self.assertTrue(self.pending.is_upcoming)
