@@ -73,7 +73,7 @@ export default function DatabasePage() {
   const [performanceTags, setPerformanceTags] = useState<string[]>(() => cachedTags?.performance ?? []);
   const [aestheticTags, setAestheticTags] = useState<string[]>(() => cachedTags?.aesthetic ?? []);
   const [selectedStrength, setSelectedStrength] = useState<string | null>(saved.selectedStrength || null);
-  // 기타: 엔진 / 업데이트 예정 덱 (특이점 2026-10-03, 예전 '구축 형태'·'업데이트' 필터를 합침)
+  // 기타: 엔진 / 신규 업데이트 덱 (특이점 2026-10-03, 예전 '구축 형태'·'업데이트' 필터를 합침)
   const [selectedEtc, setSelectedEtc] = useState<string | null>(saved.selectedEtc || null);  // "engine" | "upcoming"
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
@@ -370,7 +370,7 @@ export default function DatabasePage() {
               >
                 <option value="">전체</option>
                 <option value="engine">엔진</option>
-                <option value="upcoming">업데이트 예정 덱</option>
+                <option value="upcoming">신규 업데이트 덱</option>
               </select>
             </div>
           </div>

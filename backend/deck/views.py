@@ -83,9 +83,8 @@ def filter_decks(criteria, user=None):
     if criteria.get("aesthetic_tags"):
         query &= Q(aesthetic_tags__id__in=criteria["aesthetic_tags"])
 
-    # Decks only announced in game can't be played yet — never recommend them (특이점 2026-10-03;
-    # engine decks are recommended again, the 9/4 exclusion was lifted).
-    decks = Deck.objects.filter(query).exclude(_upcoming_now_q()).distinct()
+    # Every deck can be recommended — engines (9/4 exclusion lifted) and new-update decks too (특이점 2026-10-03).
+    decks = Deck.objects.filter(query).distinct()
     if user is not None and user.is_authenticated and user.use_custom_lookup:
         owned = list(user.owned_decks.values_list("id", flat=True))
         if owned:
@@ -150,7 +149,7 @@ def get_deck_result(request):
     print("Filtered QuerySet count:", decks.count())
 
     if answer_key == "empty":
-        all_decks = Deck.objects.exclude(_upcoming_now_q())
+        all_decks = Deck.objects.all()
         deck = random.choice(list(all_decks)) if all_decks.exists() else None
 
     if not decks.exists():
@@ -197,17 +196,6 @@ def get_deck_result(request):
 
     return JsonResponse(result_data, safe=False)
 
-def _upcoming_now_q():
-    """Decks whose 'Update' mark is still on (no release time, or the release time hasn't come yet)."""
-    from django.utils import timezone
-    return Q(is_upcoming=True) & (Q(upcoming_until__isnull=True) | Q(upcoming_until__gt=timezone.now()))
-
-
-def _upcoming_until_iso(deck):
-    from django.utils import timezone
-    return timezone.localtime(deck.upcoming_until).isoformat() if deck.upcoming_now and deck.upcoming_until else None
-
-
 def _list_cover_url(deck):
     cover = deck.cover_image_list or deck.cover_image_small
     return cover.url if cover else None
@@ -229,7 +217,7 @@ def get_all_decks(request):
             "deck_type": deck.get_deck_type_display(),
             "art_style": deck.get_art_style_display(),
             "is_engine": deck.is_engine,
-            "is_upcoming": deck.upcoming_now,
+            "is_upcoming": deck.is_upcoming,
             "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
             "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
             "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
@@ -259,8 +247,7 @@ def serialize_deck_detail(deck):
         "deck_type": deck.get_deck_type_display(),
         "art_style": deck.get_art_style_display(),
         "is_engine": deck.is_engine,
-        "is_upcoming": deck.upcoming_now,
-        "upcoming_until": _upcoming_until_iso(deck),
+        "is_upcoming": deck.is_upcoming,
         "play_video_url": deck.play_video_url,
         "video_count": 1 if _featured(deck) else 0,
         "note_count": _note_entry_count(_visible_notes(deck)),
@@ -351,8 +338,7 @@ def _deck_edit_values(deck):
         "description": deck.description or "",
         **{field: getattr(deck, field) for field, _, _ in EDIT_CHOICE_FIELDS},
         "is_engine": deck.is_engine,
-        "is_upcoming": deck.upcoming_now,
-        "upcoming_until": _upcoming_until_iso(deck),
+        "is_upcoming": deck.is_upcoming,
         "summoning_methods": sorted(deck.summoning_methods.values_list("method", flat=True)),
         "performance_tags": list(deck.performance_tags.order_by("id").values_list("name", flat=True)),
         "aesthetic_tags": list(deck.aesthetic_tags.order_by("id").values_list("name", flat=True)),
@@ -405,8 +391,6 @@ def _apply_deck_updates(deck, updates):
             getattr(deck, field).set(value)
         else:
             setattr(deck, field, value)
-    if not deck.is_upcoming:
-        deck.upcoming_until = None
     deck.save()
 
 
@@ -444,22 +428,11 @@ def _validate_deck_edit(data):
             if not _is_int(data[field]) or data[field] not in choices.values:
                 return None, f"{label} 값이 올바르지 않습니다."
             updates[field] = data[field]
-    for flag, label in (("is_engine", "엔진 여부"), ("is_upcoming", "업데이트 예정 여부")):
+    for flag, label in (("is_engine", "엔진 여부"), ("is_upcoming", "신규 업데이트 여부")):
         if flag in data:
             if not isinstance(data[flag], bool):
                 return None, f"{label} 값이 올바르지 않습니다."
             updates[flag] = data[flag]
-    if "upcoming_until" in data:
-        value = data["upcoming_until"]
-        if value in (None, ""):
-            updates["upcoming_until"] = None
-        else:
-            from django.utils import timezone
-            from django.utils.dateparse import parse_datetime
-            when = parse_datetime(value) if isinstance(value, str) else None
-            if when is None:
-                return None, "자동 해제 시각이 올바르지 않습니다."
-            updates["upcoming_until"] = when if timezone.is_aware(when) else timezone.make_aware(when)
     if "stats" in data:
         stats = data["stats"]
         names = {key: (attr, label) for key, attr, label in EDIT_STAT_FIELDS}
@@ -513,15 +486,7 @@ def _describe_deck_changes(before, after):
     if before["is_engine"] != after["is_engine"]:
         parts.append(f"엔진 {show(before['is_engine'])} → {show(after['is_engine'])}")
     if before["is_upcoming"] != after["is_upcoming"]:
-        parts.append(f"업데이트 예정 {show(before['is_upcoming'])} → {show(after['is_upcoming'])}")
-    if before["upcoming_until"] != after["upcoming_until"]:
-        def when(iso):
-            if not iso:
-                return "-"
-            from django.utils.dateparse import parse_datetime
-            d = parse_datetime(iso)
-            return f"{d.month}/{d.day} {d:%H:%M}"
-        parts.append(f"자동 해제 {when(before['upcoming_until'])} → {when(after['upcoming_until'])}")
+        parts.append(f"신규 업데이트 {show(before['is_upcoming'])} → {show(after['is_upcoming'])}")
     method_label = dict(SummoningMethod.SummonType.choices)
     for field, label in EDIT_TAG_FIELDS:
         old, new = before[field], after[field]
@@ -571,7 +536,7 @@ def create_deck(request):
     """특이점 2026-10-03: 운영진이 도감에서 바로 새 덱을 추가한다. 본문은 multipart의 `data`(JSON)와 선택 `cover_image`."""
     if request.method == "GET":
         values = {"name": "", "aliases": [], "description": "", "strength": None, "difficulty": None, "deck_type": None,
-                  "art_style": None, "is_engine": False, "is_upcoming": False, "upcoming_until": None, "summoning_methods": [], "performance_tags": [], "aesthetic_tags": [],
+                  "art_style": None, "is_engine": False, "is_upcoming": False, "summoning_methods": [], "performance_tags": [], "aesthetic_tags": [],
                   "stats": {key: None for key, _, _ in EDIT_STAT_FIELDS}}
         return Response({"values": values, "options": _edit_options()})
 

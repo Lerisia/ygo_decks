@@ -139,7 +139,7 @@ export default function DeckDetail() {
                 {deck.is_upcoming && (
                   <div className="mt-1 text-xs font-normal text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1.5">
                     <UpdateBadge className="w-5 h-5 text-[11px]" />
-                    <span><span className="font-semibold">Update</span> — 업데이트 예정 덱</span>
+                    <span><span className="font-semibold">Update</span> — 신규 업데이트 덱</span>
                   </div>
                 )}
               </td>

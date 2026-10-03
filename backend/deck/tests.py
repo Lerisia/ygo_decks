@@ -407,29 +407,23 @@ class DeckEngineFlagTest(TestCase):
 
 
 class RecommendationDeckPoolTest(TestCase):
-    """특이점 2026-10-03: 엔진 덱도 성향 테스트 추천에 나오고(9/4의 엔진 제외는 해제), 업데이트 예정 덱은 아직 쓸 수 없어 추천에서 뺀다."""
+    """성향 테스트 추천 범위: 엔진 덱(특이점 10/3, 9/4의 엔진 제외 해제)과 신규 업데이트 덱(10/3 오후, 처음엔 뺐다가 다시 넣음) 모두 나온다."""
 
     def setUp(self):
         self.client = APIClient()
         self.engine = _create_deck(name="엔진", strength=0, difficulty=0, deck_type=0, art_style=0, is_engine=True)
-        self.upcoming = _create_deck(name="예정", strength=0, difficulty=0, deck_type=0, art_style=0, is_upcoming=True)
+        self.new = _create_deck(name="신규", strength=0, difficulty=0, deck_type=0, art_style=0, is_upcoming=True)
 
-    def test_step_counts_engine_but_not_upcoming(self):
-        data = self.client.get("/api/deck/recommend/step").json()
-        self.assertEqual(data["candidate_count"], 1)
-        self.assertTrue(data["resolved"])
+    def test_step_counts_engine_and_new_update_decks(self):
+        self.assertEqual(self.client.get("/api/deck/recommend/step").json()["candidate_count"], 2)
 
-    def test_result_can_be_engine_never_upcoming(self):
-        for _ in range(5):
+    def test_result_can_be_either(self):
+        seen = set()
+        for _ in range(30):
             resp = self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
             self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.json()["name"], "엔진")
-
-    def test_empty_key_random_pick_skips_upcoming(self):
-        for _ in range(5):
-            resp = self.client.get("/api/deck/result", {"key": "empty"})
-            self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.json()["name"], "엔진")
+            seen.add(resp.json()["name"])
+        self.assertEqual(seen, {"엔진", "신규"})
 
 
 class PlayVideoUrlTest(TestCase):
@@ -869,7 +863,7 @@ class CreateDeckTest(TestCase):
 
 
 class DeckUpcomingFlagTest(TestCase):
-    """특이점 2026-10-03: 인게임 공지만 나오고 아직 출시되지 않은 덱을 '업데이트 예정'(파란 U)으로 표시하고 거를 수 있게 한다."""
+    """특이점 2026-10-03: 새로 업데이트된 덱을 '신규 업데이트'(파란 U)로 표시하고 거를 수 있게 한다 (처음 이름은 '업데이트 예정')."""
 
     def setUp(self):
         self.client = APIClient()
@@ -897,7 +891,7 @@ class DeckUpcomingFlagTest(TestCase):
         self.assertEqual(self.client.put(url, {"is_upcoming": False}, format="json").status_code, 200)
         self.upcoming.refresh_from_db()
         self.assertFalse(self.upcoming.is_upcoming)
-        self.assertIn("업데이트 예정 예 → 아니요", LogEntry.objects.get(object_id=str(self.upcoming.id)).change_message)
+        self.assertIn("신규 업데이트 예 → 아니요", LogEntry.objects.get(object_id=str(self.upcoming.id)).change_message)
         self.assertEqual(self.client.put(url, {"is_upcoming": "yes"}, format="json").status_code, 400)
 
     def test_new_deck_can_be_marked_upcoming(self):
@@ -909,57 +903,3 @@ class DeckUpcomingFlagTest(TestCase):
         self.assertTrue(Deck.objects.get(name="신규예정").is_upcoming)
         self.assertTrue(res.json()["deck"]["is_upcoming"])
 
-
-class DeckUpcomingUntilTest(TestCase):
-    """특이점 2026-10-03: 업데이트 예정 마크에 자동 해제 시각을 둔다. 시각이 지나면 크론을 기다리지 않고 바로 일반 덱으로 보인다."""
-
-    def setUp(self):
-        from datetime import timedelta
-        from django.utils import timezone
-        self.client = APIClient()
-        now = timezone.now()
-        self.expired = _create_deck(name="출시됨", strength=0, difficulty=0, deck_type=0, art_style=0,
-                                    is_upcoming=True, upcoming_until=now - timedelta(minutes=1))
-        self.pending = _create_deck(name="곧출시", strength=0, difficulty=0, deck_type=0, art_style=0,
-                                    is_upcoming=True, upcoming_until=now + timedelta(days=2))
-        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
-        self.staff.is_staff = True
-        self.staff.save()
-
-    def test_expired_mark_no_longer_shows(self):
-        decks = {d["name"]: d for d in self.client.get("/api/deck/").json()["decks"]}
-        self.assertFalse(decks["출시됨"]["is_upcoming"])
-        self.assertTrue(decks["곧출시"]["is_upcoming"])
-        self.assertFalse(self.client.get(f"/api/deck/{self.expired.id}/").json()["is_upcoming"])
-        self.assertIsNotNone(self.client.get(f"/api/deck/{self.pending.id}/").json()["upcoming_until"])
-
-    def test_expired_mark_is_recommended_again(self):
-        for _ in range(5):
-            resp = self.client.get("/api/deck/result", {"key": "strength=0|difficulty=0|deck_type=0|art_style=0"})
-            self.assertEqual(resp.json()["name"], "출시됨")
-
-    def test_staff_sets_and_clears_release_time(self):
-        from django.contrib.admin.models import LogEntry
-        self.client.force_authenticate(user=self.staff)
-        deck = _create_deck(name="새예정")
-        url = f"/api/deck/{deck.id}/edit/"
-        res = self.client.put(url, {"is_upcoming": True, "upcoming_until": "2026-10-06T18:00:00+09:00"}, format="json")
-        self.assertEqual(res.status_code, 200, res.content)
-        deck.refresh_from_db()
-        self.assertTrue(deck.is_upcoming)
-        self.assertEqual(deck.upcoming_until.isoformat(), "2026-10-06T09:00:00+00:00")
-        self.assertIn("자동 해제 - → 10/6 18:00", LogEntry.objects.filter(object_id=str(deck.id)).first().change_message)
-        self.assertTrue(self.client.get(url).json()["values"]["upcoming_until"].startswith("2026-10-06T18:00"))
-        # turning the mark off drops the release time too
-        self.client.put(url, {"is_upcoming": False}, format="json")
-        deck.refresh_from_db()
-        self.assertEqual((deck.is_upcoming, deck.upcoming_until), (False, None))
-        self.assertEqual(self.client.put(url, {"upcoming_until": "다음 주"}, format="json").status_code, 400)
-
-    def test_expire_command_clears_old_marks(self):
-        from django.core.management import call_command
-        call_command("expire_upcoming", verbosity=0)
-        self.expired.refresh_from_db()
-        self.pending.refresh_from_db()
-        self.assertEqual((self.expired.is_upcoming, self.expired.upcoming_until), (False, None))
-        self.assertTrue(self.pending.is_upcoming)
