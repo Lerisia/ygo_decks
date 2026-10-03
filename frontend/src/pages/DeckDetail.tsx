@@ -328,7 +328,7 @@ export default function DeckDetail() {
             {deck.wiki_content ? (
               <>
                 {/* 저장된 마크다운을 HTML로 변환 + 렌더링 */}
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/60 shadow-sm px-4 py-4 sm:px-6 sm:py-5">
+                <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/50 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-800/50 dark:to-gray-800/30 shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-4 py-4 sm:px-6 sm:py-5">
                   <div
                     className="text-left markdown-content leading-relaxed"
                     dangerouslySetInnerHTML={{
