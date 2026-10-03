@@ -3,7 +3,8 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE
+from PIL import Image as PILImage
 from django.db import transaction
 from .models import Deck, AestheticTag, PerformanceTag, SummoningMethod, DeckAlias, STRENGTH_BAND_TO_TIERS, STRENGTH_TIER_TO_BANDS
 from .youtube import serialize_featured
@@ -331,6 +332,9 @@ EDIT_TAG_FIELDS = (
 
 def _deck_edit_values(deck):
     return {
+        "name": deck.name,
+        "aliases": list(deck.aliases.order_by("id").values_list("name", flat=True)),
+        "description": deck.description or "",
         **{field: getattr(deck, field) for field, _, _ in EDIT_CHOICE_FIELDS},
         "is_engine": deck.is_engine,
         "summoning_methods": sorted(deck.summoning_methods.values_list("method", flat=True)),
@@ -342,6 +346,76 @@ def _deck_edit_values(deck):
 
 def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _validate_deck_identity(data, deck=None):
+    """Name / aliases / short description. Returns ({field: value}, error or None)."""
+    updates = {}
+    others = Deck.objects.exclude(id=deck.id) if deck else Deck.objects.all()
+    if "name" in data:
+        name = data["name"].strip() if isinstance(data["name"], str) else ""
+        if not name or len(name) > 50:
+            return None, "덱 이름은 1~50자로 입력해 주세요."
+        if others.filter(name__iexact=name).exists():
+            return None, f"'{name}' 덱이 이미 있습니다."
+        updates["name"] = name
+    if "aliases" in data:
+        aliases = data["aliases"]
+        if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
+            return None, "별칭 값이 올바르지 않습니다."
+        aliases = list(dict.fromkeys(a.strip() for a in aliases if a.strip()))
+        if any(len(a) > 100 for a in aliases):
+            return None, "별칭은 100자 이하로 입력해 주세요."
+        taken = DeckAlias.objects.filter(name__in=aliases)
+        if deck:
+            taken = taken.exclude(deck=deck)
+        if taken.exists():
+            return None, f"별칭 '{taken.first().name}'은 이미 다른 덱이 쓰고 있습니다."
+        updates["aliases"] = aliases
+    if "description" in data:
+        if data["description"] is not None and not isinstance(data["description"], str):
+            return None, "짧은 설명 값이 올바르지 않습니다."
+        updates["description"] = (data["description"] or "").strip()
+    return updates, None
+
+
+def _apply_deck_updates(deck, updates):
+    """Write validated updates; the deck must already be saved (M2M and aliases need its id)."""
+    for field, value in updates.items():
+        if field == "aliases":
+            deck.aliases.all().delete()
+            DeckAlias.objects.bulk_create([DeckAlias(deck=deck, name=a) for a in value])
+        elif field in dict(EDIT_TAG_FIELDS):
+            getattr(deck, field).set(value)
+        else:
+            setattr(deck, field, value)
+    deck.save()
+
+
+MAX_COVER_BYTES = 10 * 1024 * 1024
+
+
+def _validate_cover(f):
+    if f.size > MAX_COVER_BYTES:
+        return "대표 이미지는 10MB 이하로 올려 주세요."
+    try:
+        with PILImage.open(f) as im:
+            im.verify()
+    except Exception:
+        return "이미지 파일을 읽을 수 없습니다."
+    f.seek(0)
+    return None
+
+
+def _edit_options():
+    return {
+        **{field: [{"value": v, "label": l} for v, l in choices.choices] for field, _, choices in EDIT_CHOICE_FIELDS},
+        "summoning_methods": [
+            {"value": m.method, "label": m.get_method_display()} for m in SummoningMethod.objects.order_by("method")
+        ],
+        "performance_tags": list(PerformanceTag.objects.order_by("id").values_list("name", flat=True)),
+        "aesthetic_tags": list(AestheticTag.objects.order_by("id").values_list("name", flat=True)),
+    }
 
 
 def _validate_deck_edit(data):
@@ -379,6 +453,8 @@ def _validate_deck_edit(data):
             objs = list(sources[field](vals))
             if len(objs) != len(vals):
                 return None, f"{label}에 없는 항목이 있습니다."
+            if field == "summoning_methods" and not objs:
+                return None, "소환법을 하나 이상 골라 주세요."
             updates[field] = objs
     return updates, None
 
@@ -395,6 +471,12 @@ def _describe_deck_changes(before, after):
         return "?" if v == 11 else str(v)
 
     parts = []
+    if before["name"] != after["name"]:
+        parts.append(f"이름 {before['name']} → {after['name']}")
+    if before["aliases"] != after["aliases"]:
+        parts.append(f"별칭 {show(before['aliases'])} → {show(after['aliases'])}")
+    if before["description"] != after["description"]:
+        parts.append("짧은 설명 수정")
     for field, label, choices in EDIT_CHOICE_FIELDS:
         if before[field] != after[field]:
             parts.append(f"{label} {choices(before[field]).label} → {choices(after[field]).label}")
@@ -418,29 +500,17 @@ def _describe_deck_changes(before, after):
 def edit_deck_info(request, deck_id):
     deck = get_object_or_404(Deck, id=deck_id)
     if request.method == "GET":
-        return Response({
-            "values": _deck_edit_values(deck),
-            "options": {
-                **{field: [{"value": v, "label": l} for v, l in choices.choices] for field, _, choices in EDIT_CHOICE_FIELDS},
-                "summoning_methods": [
-                    {"value": m.method, "label": m.get_method_display()} for m in SummoningMethod.objects.order_by("method")
-                ],
-                "performance_tags": list(PerformanceTag.objects.order_by("id").values_list("name", flat=True)),
-                "aesthetic_tags": list(AestheticTag.objects.order_by("id").values_list("name", flat=True)),
-            },
-        })
+        return Response({"values": _deck_edit_values(deck), "options": _edit_options()})
 
-    updates, error = _validate_deck_edit(request.data if isinstance(request.data, dict) else {})
+    data = request.data if isinstance(request.data, dict) else {}
+    updates, error = _validate_deck_edit(data)
+    if not error:
+        identity, error = _validate_deck_identity(data, deck)
     if error:
         return Response({"error": error}, status=400)
     before = _deck_edit_values(deck)
     with transaction.atomic():
-        for field, value in updates.items():
-            if field in dict(EDIT_TAG_FIELDS):
-                getattr(deck, field).set(value)
-            else:
-                setattr(deck, field, value)
-        deck.save()
+        _apply_deck_updates(deck, {**updates, **identity})
         summary = _describe_deck_changes(before, _deck_edit_values(deck))
         if summary:
             LogEntry.objects.log_actions(
@@ -450,6 +520,74 @@ def edit_deck_info(request, deck_id):
                 change_message=f"덱 문서에서 수정: {summary}",
             )
     return Response({"deck": serialize_deck_detail(deck), "changed": summary})
+
+
+NEW_DECK_REQUIRED = ("name", "strength", "difficulty", "deck_type", "art_style", "summoning_methods")
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
+def create_deck(request):
+    """특이점 2026-10-03: 운영진이 도감에서 바로 새 덱을 추가한다. 본문은 multipart의 `data`(JSON)와 선택 `cover_image`."""
+    if request.method == "GET":
+        values = {"name": "", "aliases": [], "description": "", "strength": None, "difficulty": None, "deck_type": None,
+                  "art_style": None, "is_engine": False, "summoning_methods": [], "performance_tags": [], "aesthetic_tags": [],
+                  "stats": {key: None for key, _, _ in EDIT_STAT_FIELDS}}
+        return Response({"values": values, "options": _edit_options()})
+
+    try:
+        data = json.loads(request.data.get("data") or "{}") if "data" in request.data else dict(request.data)
+    except (TypeError, ValueError):
+        return Response({"error": "입력값을 읽을 수 없습니다."}, status=400)
+    if not isinstance(data, dict):
+        return Response({"error": "입력값을 읽을 수 없습니다."}, status=400)
+    missing = [f for f in NEW_DECK_REQUIRED if data.get(f) in (None, "", [])]
+    if missing:
+        labels = {"name": "덱 이름", "summoning_methods": "소환법", **{f: l for f, l, _ in EDIT_CHOICE_FIELDS}}
+        return Response({"error": f"{labels[missing[0]]}을(를) 정해 주세요."}, status=400)
+    updates, error = _validate_deck_edit(data)
+    if not error:
+        identity, error = _validate_deck_identity(data)
+    cover = request.FILES.get("cover_image")
+    if not error and cover:
+        error = _validate_cover(cover)
+    if error:
+        return Response({"error": error}, status=400)
+
+    fields = {**updates, **identity}
+    with transaction.atomic():
+        deck = Deck(**{f: fields.pop(f) for f in ("name", "strength", "difficulty", "deck_type", "art_style")})
+        if cover:
+            deck.cover_image = cover
+        deck.save()
+        _apply_deck_updates(deck, fields)
+        LogEntry.objects.log_actions(
+            user_id=request.user.id,
+            queryset=Deck.objects.filter(id=deck.id),
+            action_flag=ADDITION,
+            change_message="도감에서 새 덱 추가",
+        )
+    return Response({"deck": serialize_deck_detail(deck)}, status=201)
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def replace_deck_cover(request, deck_id):
+    deck = get_object_or_404(Deck, id=deck_id)
+    cover = request.FILES.get("cover_image")
+    error = "대표 이미지를 골라 주세요." if not cover else _validate_cover(cover)
+    if error:
+        return Response({"error": error}, status=400)
+    old = deck.cover_image.name if deck.cover_image else ""
+    deck.cover_image = cover
+    deck.save()
+    LogEntry.objects.log_actions(
+        user_id=request.user.id,
+        queryset=Deck.objects.filter(id=deck.id),
+        action_flag=CHANGE,
+        change_message=f"덱 문서에서 대표 이미지 교체 (이전: {old or '없음'})",
+    )
+    return Response({"deck": serialize_deck_detail(deck)})
 
 def serialize_note(n):
     return {

@@ -122,13 +122,17 @@ export const getDeckNotes = async (deckId: number): Promise<{ deck_id: number; n
   return response.json();
 };
 
-// 운영자 전용 덱 정보·스탯 수정 (특이점 2026-10-03)
+// 운영자 전용 덱 정보·스탯 수정 (특이점 2026-10-03), 새 덱 추가·이름·별칭·대표 이미지도 같은 창에서
 export type DeckEditOption = { value: number; label: string };
 export type DeckEditValues = {
-  strength: number;
-  difficulty: number;
-  deck_type: number;
-  art_style: number;
+  name: string;
+  aliases: string[];
+  description: string;
+  // null only while a new deck's choice hasn't been picked yet
+  strength: number | null;
+  difficulty: number | null;
+  deck_type: number | null;
+  art_style: number | null;
   is_engine: boolean;
   summoning_methods: number[];
   performance_tags: string[];
@@ -147,19 +151,42 @@ export type DeckEditInfo = {
     aesthetic_tags: string[];
   };
 };
+export type SavedDeck = { id: number } & Record<string, unknown>;
 
-const editRequest = async <T>(deckId: number, init?: RequestInit): Promise<T> => {
+const staffRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = localStorage.getItem("access_token");
-  const res = await fetch(`/api/deck/${deckId}/edit/`, {
+  const isForm = init?.body instanceof FormData;
+  const res = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || body.detail || `HTTP ${res.status}`);
   return body as T;
 };
 
-export const getDeckEditInfo = (deckId: number) => editRequest<DeckEditInfo>(deckId);
+export const getDeckEditInfo = (deckId: number) => staffRequest<DeckEditInfo>(`/api/deck/${deckId}/edit/`);
 
 export const saveDeckEditInfo = (deckId: number, values: DeckEditValues) =>
-  editRequest<{ deck: unknown; changed: string }>(deckId, { method: "PUT", body: JSON.stringify(values) });
+  staffRequest<{ deck: SavedDeck; changed: string }>(`/api/deck/${deckId}/edit/`, {
+    method: "PUT",
+    body: JSON.stringify(values),
+  });
+
+export const getNewDeckInfo = () => staffRequest<DeckEditInfo>("/api/deck/create/");
+
+export const createDeck = (values: DeckEditValues, cover: File | null) => {
+  const form = new FormData();
+  form.append("data", JSON.stringify(values));
+  if (cover) form.append("cover_image", cover);
+  return staffRequest<{ deck: SavedDeck }>("/api/deck/create/", { method: "POST", body: form });
+};
+
+export const replaceDeckCover = (deckId: number, cover: File) => {
+  const form = new FormData();
+  form.append("cover_image", cover);
+  return staffRequest<{ deck: SavedDeck }>(`/api/deck/${deckId}/cover/`, { method: "POST", body: form });
+};

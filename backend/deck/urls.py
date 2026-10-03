@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import get_deck_result, get_all_decks, get_deck_data, get_tags, update_wiki_content, recommend_step, get_deck_videos, get_deck_notes, get_deck_hyeol, edit_deck_info
+from .views import get_deck_result, get_all_decks, get_deck_data, get_tags, update_wiki_content, recommend_step, get_deck_videos, get_deck_notes, get_deck_hyeol, edit_deck_info, create_deck, replace_deck_cover
 
 urlpatterns = [
     path("deck/result", get_deck_result),
@@ -12,4 +12,6 @@ urlpatterns = [
     path("tags/", get_tags, name="get-tags"),
     path("deck/<int:deck_id>/update_wiki/", update_wiki_content, name="update_wiki_content"),
     path("deck/<int:deck_id>/edit/", edit_deck_info, name="edit-deck-info"),
+    path("deck/<int:deck_id>/cover/", replace_deck_cover, name="replace-deck-cover"),
+    path("deck/create/", create_deck, name="create-deck"),
 ]

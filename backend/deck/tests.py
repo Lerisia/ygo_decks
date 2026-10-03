@@ -748,3 +748,119 @@ class EditDeckInfoTest(TestCase):
         self.assertIn(self.client.put(self.url, data={"strength": 0}, format="json").status_code, (401, 403))
         self.deck.refresh_from_db()
         self.assertEqual(self.deck.strength, 1)
+
+
+class CreateDeckTest(TestCase):
+    """특이점 2026-10-03: 운영진이 관리자 페이지가 아니라 도감에서 바로 새 덱을 추가하고, 이름·별칭·대표 이미지도 고친다."""
+
+    def setUp(self):
+        from django.contrib.admin.models import LogEntry  # noqa: F401 (ensures app is loaded)
+        self.media = tempfile.mkdtemp()
+        self.override = override_settings(MEDIA_ROOT=self.media)
+        self.override.enable()
+        self.client = APIClient()
+        self.fusion = SummoningMethod.objects.create(id=1, method=1)
+        self.link = SummoningMethod.objects.create(id=6, method=6)
+        PerformanceTag.objects.create(name="원턴킬")
+        AestheticTag.objects.create(name="드래곤")
+        self.existing = _create_deck(name="기존덱")
+        DeckAlias.objects.create(deck=self.existing, name="기존별칭")
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+        self.client.force_authenticate(user=self.staff)
+
+    def tearDown(self):
+        self.override.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+
+    def _payload(self, **over):
+        data = {
+            "name": "새덱", "aliases": ["새 별칭", "뉴덱"], "description": "짧은 설명.",
+            "strength": 3, "difficulty": 1, "deck_type": 0, "art_style": 2, "is_engine": False,
+            "summoning_methods": [6], "performance_tags": ["원턴킬"], "aesthetic_tags": ["드래곤"],
+            "stats": {"consistency": 5, "breakthrough": 4, "interruption": 6, "recovery": 3, "deck_space": 11},
+        }
+        data.update(over)
+        return data
+
+    def _post(self, data, cover=None):
+        body = {"data": _json.dumps(data, ensure_ascii=False)}
+        if cover is not None:
+            body["cover_image"] = cover
+        return self.client.post("/api/deck/create/", body, format="multipart")
+
+    def test_options_for_a_new_deck(self):
+        body = self.client.get("/api/deck/create/").json()
+        self.assertIn({"value": 6, "label": "링크"}, body["options"]["summoning_methods"])
+        self.assertEqual(body["options"]["performance_tags"], ["원턴킬"])
+        self.assertEqual(body["values"]["name"], "")
+        self.assertEqual(body["values"]["aliases"], [])
+
+    def test_staff_creates_deck_with_cover(self):
+        from django.contrib.admin.models import LogEntry, ADDITION
+        res = self._post(self._payload(), cover=_png((900, 900)))
+        self.assertEqual(res.status_code, 201, res.content)
+        deck = Deck.objects.get(name="새덱")
+        self.assertEqual(res.json()["deck"]["id"], deck.id)
+        self.assertEqual((deck.strength, deck.difficulty, deck.deck_type, deck.art_style), (3, 1, 0, 2))
+        self.assertEqual(list(deck.summoning_methods.values_list("method", flat=True)), [6])
+        self.assertEqual(sorted(deck.aliases.values_list("name", flat=True)), ["뉴덱", "새 별칭"])
+        self.assertEqual((deck.stat_interruption, deck.stat_deck_space), (6, 11))
+        self.assertEqual(deck.description, "짧은 설명.")
+        self.assertTrue(deck.cover_image_list.path.startswith(self.media))
+        with PILImage.open(deck.cover_image_list.path) as im:
+            self.assertEqual(im.size, (480, 480))
+        self.assertTrue(LogEntry.objects.filter(object_id=str(deck.id), action_flag=ADDITION, user=self.staff).exists())
+        names = [d["name"] for d in Client().get("/api/deck/").json()["decks"]]
+        self.assertIn("새덱", names)
+
+    def test_cover_is_optional(self):
+        self.assertEqual(self._post(self._payload(name="이미지없는덱")).status_code, 201)
+
+    def test_invalid_input_creates_nothing(self):
+        cases = [
+            self._payload(name=""),
+            self._payload(name="기존덱"),
+            self._payload(aliases=["기존별칭"]),
+            self._payload(strength=None),
+            self._payload(summoning_methods=[]),
+            self._payload(stats={"consistency": 12}),
+        ]
+        for data in cases:
+            self.assertEqual(self._post(data).status_code, 400, data)
+        bad_image = SimpleUploadedFile("cover.png", b"not an image", content_type="image/png")
+        self.assertEqual(self._post(self._payload(name="그림오류"), cover=bad_image).status_code, 400)
+        self.assertEqual(Deck.objects.count(), 1)
+
+    def test_non_staff_cannot_create(self):
+        user = User.objects.create_user(email="user@test.com", username="user", password="pass1234")
+        self.client.force_authenticate(user=user)
+        self.assertEqual(self._post(self._payload()).status_code, 403)
+        self.client.force_authenticate(user=None)
+        self.assertIn(self._post(self._payload()).status_code, (401, 403))
+        self.assertEqual(Deck.objects.count(), 1)
+
+    def test_edit_name_aliases_and_short_description(self):
+        url = f"/api/deck/{self.existing.id}/edit/"
+        values = self.client.get(url).json()["values"]
+        self.assertEqual((values["name"], values["aliases"]), ("기존덱", ["기존별칭"]))
+        res = self.client.put(url, {"name": "고친덱", "aliases": ["새별칭"], "description": "고친 설명"}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.existing.refresh_from_db()
+        self.assertEqual(self.existing.name, "고친덱")
+        self.assertEqual(list(self.existing.aliases.values_list("name", flat=True)), ["새별칭"])
+        self.assertEqual(self.existing.description, "고친 설명")
+        other = _create_deck(name="다른덱")
+        self.assertEqual(self.client.put(f"/api/deck/{other.id}/edit/", {"name": "고친덱"}, format="json").status_code, 400)
+
+    def test_replace_cover(self):
+        url = f"/api/deck/{self.existing.id}/cover/"
+        res = self.client.post(url, {"cover_image": _png((600, 600))}, format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.existing.refresh_from_db()
+        self.assertTrue(self.existing.cover_image.path.startswith(self.media))
+        self.assertTrue(self.existing.cover_image_list)
+        self.assertEqual(res.json()["deck"]["cover_image"], self.existing.cover_image.url)
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.post(url, {"cover_image": _png((600, 600))}, format="multipart").status_code, (401, 403))

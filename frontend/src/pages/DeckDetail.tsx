@@ -262,9 +262,10 @@ export default function DeckDetail() {
         <DeckInfoEditModal
           deckId={deck.id}
           deckName={deck.name}
+          coverUrl={deck.cover_image}
           onClose={() => setEditingInfo(false)}
           onSaved={(updated) => {
-            setDeck(updated as Deck);
+            setDeck(updated as unknown as Deck);
             setEditingInfo(false);
             // the deck list stays mounted behind this page; let it pick up the new power/tags
             window.dispatchEvent(new Event("deck-info-changed"));

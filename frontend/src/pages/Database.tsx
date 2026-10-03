@@ -3,6 +3,8 @@ import { Input } from "@/components/ui/input";
 import EngineBadge from "@/components/EngineBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
+import DeckInfoEditModal from "@/components/DeckInfoEditModal";
+import { isAuthenticated, isAdmin } from "@/api/accountApi";
 
 interface Deck {
   id: number;
@@ -94,6 +96,12 @@ export default function DatabasePage() {
       return !on;
     });
   const navigate = useNavigate();
+  // 운영진은 도감에서 바로 새 덱을 추가한다 (특이점 2026-10-03)
+  const [staff, setStaff] = useState(false);
+  const [addingDeck, setAddingDeck] = useState(false);
+  useEffect(() => {
+    if (isAuthenticated()) isAdmin().then(setStaff).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 300);
@@ -250,7 +258,26 @@ export default function DatabasePage() {
             <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${powerBorder ? "translate-x-4" : ""}`} />
           </span>
         </button>
+        {staff && (
+          <button
+            type="button"
+            onClick={() => setAddingDeck(true)}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+          >
+            ➕ 덱 추가
+          </button>
+        )}
       </div>
+      {addingDeck && (
+        <DeckInfoEditModal
+          onClose={() => setAddingDeck(false)}
+          onSaved={(deck) => {
+            setAddingDeck(false);
+            window.dispatchEvent(new Event("deck-info-changed"));
+            navigate(`/database/${deck.id}`);
+          }}
+        />
+      )}
       {powerBorder && (
         <div className="-mt-2 mb-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
           {POWER_COLORS.map((p) => (
