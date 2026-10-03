@@ -58,6 +58,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
 import Tracker from "./pages/Tracker";
+import NoticePopup from "./components/NoticePopup";
 
 function App() {
   const { pathname } = useLocation();
@@ -76,6 +77,7 @@ function App() {
     <div>
       {!drawingMode && <TrackerBanner />}
       {!drawingMode && <Navbar />}
+      <NoticePopup disabled={drawingMode || inMultiplayerRoom} />
       {keepDeckList && (
         <div hidden={!onDeckList}>
           <DatabasePage />
