@@ -57,7 +57,7 @@ export default function DeckDetail() {
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [showVideos, setShowVideos] = useState(false);
-  const [descOpen, setDescOpen] = useState(false); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 기본 접힘
+  const [descOpen, setDescOpen] = useState(true); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 접을 수 있되 기본은 펼침
 
   const mdeOptions = useMemo(() => {
     return {
