@@ -40,6 +40,10 @@ interface Deck {
   stats?: DeckStats;
 }
 
+// 덱 설명 타일 — 설명이 없을 때의 안내도 같은 타일에 담는다
+const DESC_TILE =
+  "rounded-xl border border-gray-200/60 dark:border-gray-700/50 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-800/50 dark:to-gray-800/30 shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-4 py-4 sm:px-6 sm:py-5";
+
 // Showdown 설정 - 테이블, 자동 링크, 할 일 목록 등을 지원
 const converter = new Showdown.Converter({
   tables: true,
@@ -352,7 +356,7 @@ export default function DeckDetail() {
             {deck.wiki_content ? (
               <>
                 {/* 저장된 마크다운을 HTML로 변환 + 렌더링 */}
-                <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/50 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-800/50 dark:to-gray-800/30 shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-4 py-4 sm:px-6 sm:py-5">
+                <div className={DESC_TILE}>
                   <div
                     className="text-left markdown-content leading-relaxed"
                     dangerouslySetInnerHTML={{
@@ -366,9 +370,9 @@ export default function DeckDetail() {
               </>
             ) : (
               <>
-                <p className="text-center text-gray-800 dark:text-gray-200">
-                  아직 이 덱에 대한 설명이 없습니다.
-                </p>
+                <div className={DESC_TILE}>
+                  <p className="text-center text-gray-500 dark:text-gray-400">아직 이 덱에 대한 설명이 없습니다.</p>
+                </div>
               </>
             )}
 
