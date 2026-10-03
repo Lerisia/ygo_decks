@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDeckNotes, DeckNote } from "@/api/deckApi";
+import { isStaleNote, STALE_YEARS } from "@/utils/noteAge";
 
 const SOURCE_STYLE: Record<string, string> = {
   postype: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
@@ -13,6 +14,13 @@ const SOURCE_STYLE: Record<string, string> = {
 
 const formatDate = (iso: string | null) => (iso ? `${iso.slice(0, 4)}.${iso.slice(5, 7)}` : null);
 
+// 특이점 2026-10-03: 작성한 지 2년이 넘은 노트는 테두리 색과 표시로 구분해 지금 환경과 다를 수 있음을 알린다.
+const STALE_HINT = `작성된 지 ${STALE_YEARS}년이 넘은 노트라 지금 환경과 다를 수 있습니다`;
+const cardTone = (stale: boolean) =>
+  stale
+    ? "border-amber-300 dark:border-amber-700/70 bg-amber-50/60 dark:bg-amber-900/10"
+    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
+
 /** Consecutive parts of one series (the API keeps them together) become one entry. */
 type Entry = { key: string; notes: DeckNote[] };
 const groupSeries = (notes: DeckNote[]): Entry[] => {
@@ -25,9 +33,17 @@ const groupSeries = (notes: DeckNote[]): Entry[] => {
   return out;
 };
 
-function NoteMeta({ n, extra }: { n: DeckNote; extra?: string }) {
+function NoteMeta({ n, extra, stale }: { n: DeckNote; extra?: string; stale?: boolean }) {
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+      {stale && (
+        <span
+          title={STALE_HINT}
+          className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 text-[11px] font-semibold"
+        >
+          ⏳ {STALE_YEARS}년 지난 노트
+        </span>
+      )}
       <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${SOURCE_STYLE[n.source] ?? SOURCE_STYLE.other}`}>{n.source_label}</span>
       {n.game !== "md" && <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-[11px]">{n.game_label}</span>}
       {n.author && <span>{n.author}</span>}
@@ -39,11 +55,13 @@ function NoteMeta({ n, extra }: { n: DeckNote; extra?: string }) {
 
 function SeriesCard({ notes }: { notes: DeckNote[] }) {
   const head = notes[0];
+  // A series counts as old only when every part is.
+  const stale = notes.every((n) => isStaleNote(n.published_at));
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5">
+    <div className={`rounded-lg border ${cardTone(stale)} px-3 py-2.5`} title={stale ? STALE_HINT : undefined}>
       <p className="font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2">{head.series}</p>
       {head.summary && <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{head.summary}</p>}
-      <NoteMeta n={head} extra={`전 ${notes.length}편`} />
+      <NoteMeta n={head} extra={`전 ${notes.length}편`} stale={stale} />
       <div className="mt-2 flex flex-wrap gap-1.5">
         {notes.map((n, i) => (
           <a
@@ -105,7 +123,8 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
               href={n.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition"
+              title={isStaleNote(n.published_at) ? STALE_HINT : undefined}
+              className={`block rounded-lg border ${cardTone(isStaleNote(n.published_at))} px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition`}
             >
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
@@ -118,7 +137,7 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
                     )}
                   </p>
                   {n.summary && <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{n.summary}</p>}
-                  <NoteMeta n={n} />
+                  <NoteMeta n={n} stale={isStaleNote(n.published_at)} />
                 </div>
                 <span className="shrink-0 text-gray-400 text-sm">↗</span>
               </div>
