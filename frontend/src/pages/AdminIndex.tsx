@@ -2,6 +2,12 @@ import { Link, useNavigate } from "react-router-dom";
 
 const tiles = [
   {
+    to: "/changelog",
+    icon: "📢",
+    label: "공지 작성",
+    description: "업데이트·새 덱 추가 공지 쓰기/수정/예약",
+  },
+  {
     to: "/manage/analytics",
     icon: "📈",
     label: "사이트 통계",

@@ -56,3 +56,73 @@ class ChangelogApiTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get(reverse("changelog-list")).status_code, 200)
         self.assertEqual(self.client.get(reverse("changelog-latest")).status_code, 200)
+
+
+class ChangelogStaffWriteTests(TestCase):
+    """특이점 2026-10-03: 운영진이 관리자 페이지가 아니라 사이트에서 바로 공지를 쓰고 고치고 지운다."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from user.models import User
+
+        self.client = APIClient()
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+        self.user = User.objects.create_user(email="user@test.com", username="user", password="pass1234")
+        self.entry = ChangelogEntry.objects.create(title="[10/2] 기존", body="본문", published_at=timezone.now() - timedelta(days=1))
+
+    def test_staff_creates_entry_published_now_by_default(self):
+        self.client.force_authenticate(self.staff)
+        res = self.client.post(reverse("changelog-list"), {"title": "[10/3] 새 공지", "body": "- 기능 추가"}, format="json")
+        self.assertEqual(res.status_code, 201)
+        entry = ChangelogEntry.objects.get(title="[10/3] 새 공지")
+        self.assertLessEqual(abs((entry.published_at - timezone.now()).total_seconds()), 5)
+        self.assertEqual(self.client.get(reverse("changelog-latest")).json()["entry"]["title"], "[10/3] 새 공지")
+
+    def test_staff_can_schedule_and_sees_scheduled_entries(self):
+        self.client.force_authenticate(self.staff)
+        when = (timezone.now() + timedelta(days=2)).isoformat()
+        res = self.client.post(reverse("changelog-list"), {"title": "예약 공지", "body": "곧", "published_at": when}, format="json")
+        self.assertEqual(res.status_code, 201)
+        staff_view = {e["title"]: e for e in self.client.get(reverse("changelog-list")).json()}
+        self.assertTrue(staff_view["예약 공지"]["scheduled"])
+        self.assertFalse(staff_view["[10/2] 기존"]["scheduled"])
+        self.client.force_authenticate(None)
+        self.assertNotIn("예약 공지", [e["title"] for e in self.client.get(reverse("changelog-list")).json()])
+
+    def test_staff_updates_and_deletes_entry(self):
+        self.client.force_authenticate(self.staff)
+        url = reverse("changelog-detail", args=[self.entry.id])
+        res = self.client.put(url, {"title": "[10/2] 고친 제목", "body": "고친 본문"}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.entry.refresh_from_db()
+        self.assertEqual((self.entry.title, self.entry.body), ("[10/2] 고친 제목", "고친 본문"))
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertFalse(ChangelogEntry.objects.filter(id=self.entry.id).exists())
+
+    def test_writes_are_recorded_in_admin_history(self):
+        from django.contrib.admin.models import LogEntry
+
+        self.client.force_authenticate(self.staff)
+        self.client.post(reverse("changelog-list"), {"title": "기록 공지", "body": "x"}, format="json")
+        self.client.delete(reverse("changelog-detail", args=[self.entry.id]))
+        self.assertEqual(LogEntry.objects.filter(user=self.staff).count(), 2)
+
+    def test_title_and_body_are_required(self):
+        self.client.force_authenticate(self.staff)
+        for bad in ({"title": "", "body": "x"}, {"title": "제목", "body": "  "}, {"title": "x" * 201, "body": "x"},
+                    {"title": "제목", "body": "x", "published_at": "내일"}):
+            self.assertEqual(self.client.post(reverse("changelog-list"), bad, format="json").status_code, 400, bad)
+        self.assertEqual(ChangelogEntry.objects.count(), 1)
+
+    def test_non_staff_cannot_write(self):
+        url = reverse("changelog-detail", args=[self.entry.id])
+        for who in (self.user, None):
+            self.client.force_authenticate(who)
+            self.assertIn(self.client.post(reverse("changelog-list"), {"title": "t", "body": "b"}, format="json").status_code, (401, 403))
+            self.assertIn(self.client.put(url, {"title": "t", "body": "b"}, format="json").status_code, (401, 403))
+            self.assertIn(self.client.delete(url).status_code, (401, 403))
+        self.assertEqual(ChangelogEntry.objects.count(), 1)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.title, "[10/2] 기존")
