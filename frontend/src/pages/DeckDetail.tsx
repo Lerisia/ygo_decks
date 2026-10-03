@@ -46,6 +46,10 @@ interface Deck {
 const DESC_TILE =
   "rounded-xl border border-gray-200/60 dark:border-gray-700/50 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-800/50 dark:to-gray-800/30 shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-4 py-4 sm:px-6 sm:py-5";
 
+// 덱 설명 제보(기여하기 → 구글 폼) — 특이점 2026-10-03: 일반 이용자에게는 숨김. 다시 쓰게 되면 true로 바꾸면 된다.
+// 운영진의 "설명 수정하기"는 이 값과 상관없이 보인다.
+const SHOW_DESCRIPTION_REPORT = false;
+
 // Showdown 설정 - 테이블, 자동 링크, 할 일 목록 등을 지원
 const converter = new Showdown.Converter({
   tables: true,
@@ -373,9 +377,11 @@ export default function DeckDetail() {
                     }}
                   />
                 </div>
-                <p className="text-center text-gray-800 dark:text-gray-200 mt-4">
-                  틀린 내용이나 추가할 내용이 있나요?
-                </p>
+                {SHOW_DESCRIPTION_REPORT && (
+                  <p className="text-center text-gray-800 dark:text-gray-200 mt-4">
+                    틀린 내용이나 추가할 내용이 있나요?
+                  </p>
+                )}
               </>
             ) : (
               <>
@@ -386,6 +392,7 @@ export default function DeckDetail() {
             )}
 
             {/* 기여(관리자/로그인) 섹션 */}
+            {(isAdminUser || SHOW_DESCRIPTION_REPORT) && (
             <div className="mt-6 flex justify-center">
               {isAdminUser ? (
                 <button
@@ -409,6 +416,7 @@ export default function DeckDetail() {
                 </p>
               )}
             </div>
+            )}
           </>
         )}
         </div>
