@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getDeckNotes, DeckNote } from "@/api/deckApi";
 import { isStaleNote, STALE_YEARS } from "@/utils/noteAge";
 
@@ -20,6 +20,9 @@ const cardTone = (stale: boolean) =>
   stale
     ? "border-amber-300 dark:border-amber-700/70 bg-amber-50/60 dark:bg-amber-900/10"
     : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
+
+// 특이점 2026-10-05: 노트가 많으면 펼쳤을 때 위 5개(시리즈는 1개로 셈)만 보이고 나머지는 "더 보기"로.
+const PREVIEW_COUNT = 5;
 
 /** Consecutive parts of one series (the API keeps them together) become one entry. */
 type Entry = { key: string; notes: DeckNote[] };
@@ -84,9 +87,12 @@ function SeriesCard({ notes }: { notes: DeckNote[] }) {
 export default function DeckNotesSection({ deckId }: { deckId: number }) {
   const [notes, setNotes] = useState<DeckNote[] | null>(null);
   const [open, setOpen] = useState(false); // 특이점 요청(2026-09-13): 기본 접힘
+  const [showAll, setShowAll] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let alive = true;
+    setShowAll(false);
     getDeckNotes(deckId)
       .then((res) => alive && setNotes(res.notes))
       .catch(() => alive && setNotes([]));
@@ -97,9 +103,20 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
 
   if (!notes || notes.length === 0) return null;
   const entries = groupSeries(notes);
+  const hidden = entries.length - PREVIEW_COUNT;
+  const shown = showAll || hidden <= 0 ? entries : entries.slice(0, PREVIEW_COUNT);
+
+  const toggleAll = () => {
+    if (showAll) {
+      // The list shrinks above the button, so bring the section back into view instead of leaving the reader far below it.
+      const top = sectionRef.current?.getBoundingClientRect().top ?? 0;
+      if (top < 0) sectionRef.current?.scrollIntoView({ block: "start" });
+    }
+    setShowAll((v) => !v);
+  };
 
   return (
-    <section className="mb-5 overflow-hidden">
+    <section ref={sectionRef} className="mb-5 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -114,7 +131,7 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
       </button>
       {open && (
       <ul className="mt-2 space-y-2">
-        {entries.map(({ key, notes: group }) => {
+        {shown.map(({ key, notes: group }) => {
           const n = group[0];
           if (group.length > 1) return <li key={key}><SeriesCard notes={group} /></li>;
           return (
@@ -145,6 +162,18 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
           </li>
           );
         })}
+        {hidden > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={toggleAll}
+              aria-expanded={showAll}
+              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-transparent px-3 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition"
+            >
+              {showAll ? "접기 ▴" : `나머지 ${hidden}개 더 보기 ▾`}
+            </button>
+          </li>
+        )}
       </ul>
       )}
     </section>
