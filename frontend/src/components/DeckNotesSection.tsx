@@ -21,8 +21,10 @@ const cardTone = (stale: boolean) =>
     ? "border-amber-300 dark:border-amber-700/70 bg-amber-50/60 dark:bg-amber-900/10"
     : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
 
-// 특이점 2026-10-05: 노트가 많으면 펼쳤을 때 위 5개(시리즈는 1개로 셈)만 보이고 나머지는 "더 보기"로.
-const PREVIEW_COUNT = 5;
+// 특이점 2026-10-05: 노트가 많으면 펼쳤을 때 위 몇 개(시리즈는 1개로 셈)만 보이고 나머지는 "더 보기"로 — PC 5개, 모바일 3개.
+// PC 기준은 덱 문서가 PC 배치로 바뀌는 lg. CSS로만 가려서 첫 화면에서 개수가 바뀌며 흔들리지 않게 한다.
+const PC_PREVIEW = 5;
+const MOBILE_PREVIEW = 3;
 
 /** Consecutive parts of one series (the API keeps them together) become one entry. */
 type Entry = { key: string; notes: DeckNote[] };
@@ -103,8 +105,10 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
 
   if (!notes || notes.length === 0) return null;
   const entries = groupSeries(notes);
-  const hidden = entries.length - PREVIEW_COUNT;
-  const shown = showAll || hidden <= 0 ? entries : entries.slice(0, PREVIEW_COUNT);
+  const hiddenPc = entries.length - PC_PREVIEW;
+  const hiddenMobile = entries.length - MOBILE_PREVIEW;
+  const shown = showAll ? entries : entries.slice(0, PC_PREVIEW);
+  const itemClass = (i: number) => (!showAll && i >= MOBILE_PREVIEW ? "hidden lg:block" : undefined);
 
   const toggleAll = () => {
     if (showAll) {
@@ -131,11 +135,11 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
       </button>
       {open && (
       <ul className="mt-2 space-y-2">
-        {shown.map(({ key, notes: group }) => {
+        {shown.map(({ key, notes: group }, i) => {
           const n = group[0];
-          if (group.length > 1) return <li key={key}><SeriesCard notes={group} /></li>;
+          if (group.length > 1) return <li key={key} className={itemClass(i)}><SeriesCard notes={group} /></li>;
           return (
-          <li key={key}>
+          <li key={key} className={itemClass(i)}>
             <a
               href={n.url}
               target="_blank"
@@ -162,15 +166,22 @@ export default function DeckNotesSection({ deckId }: { deckId: number }) {
           </li>
           );
         })}
-        {hidden > 0 && (
-          <li>
+        {hiddenMobile > 0 && (
+          <li className={hiddenPc > 0 ? undefined : "lg:hidden"}>
             <button
               type="button"
               onClick={toggleAll}
               aria-expanded={showAll}
               className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-transparent px-3 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition"
             >
-              {showAll ? "접기 ▴" : `나머지 ${hidden}개 더 보기 ▾`}
+              {showAll ? (
+                "접기 ▴"
+              ) : (
+                <>
+                  나머지 <span className="lg:hidden">{hiddenMobile}</span>
+                  <span className="hidden lg:inline">{hiddenPc}</span>개 더 보기 ▾
+                </>
+              )}
             </button>
           </li>
         )}
