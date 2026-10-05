@@ -30,9 +30,22 @@ export default function AdminCardIcons() {
   const [searchResults, setSearchResults] = useState<CardSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchMode, setSearchMode] = useState<"card" | "custom">("card");
-  const [customPage, setCustomPage] = useState(1);
-  const [customTotalPages, setCustomTotalPages] = useState(1);
-  const [customTotal, setCustomTotal] = useState(0);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchTotalPages, setSearchTotalPages] = useState(1);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  // The pager sits under the results; turning a page brings the new page's top into view once it has loaded
+  // (scrolling before that would land wrong when a short last page shrinks the list).
+  const scrollOnResults = useRef(false);
+  const turnPage = (to: number) => {
+    scrollOnResults.current = true;
+    setSearchPage(to);
+  };
+  useEffect(() => {
+    if (!scrollOnResults.current) return;
+    scrollOnResults.current = false;
+    searchBoxRef.current?.scrollIntoView({ block: "start" });
+  }, [searchResults]);
 
   const [selectedCard, setSelectedCard] = useState<CardSearchResult | null>(null);
   const [selectedSourceType, setSelectedSourceType] = useState<"card" | "custom">("card");
@@ -92,9 +105,10 @@ export default function AdminCardIcons() {
     } catch {}
   };
 
-  // Debounced search. Custom-tab pages 20 at a time (newest first); empty
-  // query just pages through the whole pool. Card-tab still needs ≥1 char
-  // (pool is huge).
+  // Debounced search, paged on both tabs: cards 30 a page in name order (an
+  // archetype like 젬나이트 runs past one page), custom illusts 20 a page newest
+  // first. An empty query pages through every custom illust; the card tab
+  // still needs ≥1 char (pool is huge).
   useEffect(() => {
     const q = query.trim();
     if (!q && searchMode === "card") { setSearchResults([]); setSearching(false); return; }
@@ -102,15 +116,17 @@ export default function AdminCardIcons() {
     const id = setTimeout(async () => {
       try {
         if (searchMode === "card") {
-          const data = await searchCards(q);
+          const data = await searchCards(q, searchPage);
           setSearchResults(data.results);
+          setSearchTotalPages(data.total_pages);
+          setSearchTotal(data.total);
         } else {
-          const data = await listCustomIllusts(q || undefined, customPage);
+          const data = await listCustomIllusts(q || undefined, searchPage);
           setSearchResults(
             data.results.map((r) => ({ id: r.id, card_id: "", name: r.name, image_url: r.image_url }))
           );
-          setCustomTotalPages(data.total_pages);
-          setCustomTotal(data.total);
+          setSearchTotalPages(data.total_pages);
+          setSearchTotal(data.total);
         }
       } catch (e: any) {
         setError(e.message || "검색 실패");
@@ -119,10 +135,10 @@ export default function AdminCardIcons() {
       }
     }, 300);
     return () => clearTimeout(id);
-  }, [query, searchMode, customPage]);
+  }, [query, searchMode, searchPage]);
 
   // Reset to page 1 on query or mode change so the user doesn't land on a stale page.
-  useEffect(() => { setCustomPage(1); }, [query, searchMode]);
+  useEffect(() => { setSearchPage(1); }, [query, searchMode]);
 
   const handleSelectCard = (c: CardSearchResult) => {
     setSelectedCard(c);
@@ -367,7 +383,7 @@ export default function AdminCardIcons() {
 
       {/* Card search */}
       {!selectedCard && (
-        <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-6">
+        <div ref={searchBoxRef} className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-6 scroll-mt-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold">{searchMode === "card" ? "카드 검색" : "커스텀 일러스트"}</h2>
             <div className="flex gap-1 text-xs">
@@ -399,18 +415,23 @@ export default function AdminCardIcons() {
           {searchMode === "custom" && (
             <CustomIllustUploader onUploaded={() => {
               // Jump back to page 1 so the freshly uploaded illust is visible.
-              if (customPage !== 1) { setCustomPage(1); return; }
+              if (searchPage !== 1) { setSearchPage(1); return; }
               listCustomIllusts(query.trim() || undefined, 1).then((d) => {
                 setSearchResults(
                   d.results.map((r) => ({ id: r.id, card_id: "", name: r.name, image_url: r.image_url }))
                 );
-                setCustomTotalPages(d.total_pages);
-                setCustomTotal(d.total);
+                setSearchTotalPages(d.total_pages);
+                setSearchTotal(d.total);
               });
             }} />
           )}
 
           {searching && <p className="text-sm text-gray-500">검색 중...</p>}
+          {!searching && searchResults.length > 0 && searchMode === "card" && (
+            <p className="text-xs text-gray-500 mb-2">
+              검색 결과 {searchTotal}개{searchTotalPages > 1 && ` · ${searchPage} / ${searchTotalPages}쪽`}
+            </p>
+          )}
           {searchResults.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {searchResults.map((c) => (
@@ -437,14 +458,14 @@ export default function AdminCardIcons() {
                           await deleteCustomIllust(c.id);
                           // Refetch the current page so it back-fills from the
                           // next page rather than leaving a hole.
-                          const d = await listCustomIllusts(query.trim() || undefined, customPage);
+                          const d = await listCustomIllusts(query.trim() || undefined, searchPage);
                           setSearchResults(
                             d.results.map((r) => ({ id: r.id, card_id: "", name: r.name, image_url: r.image_url }))
                           );
-                          setCustomTotalPages(d.total_pages);
-                          setCustomTotal(d.total);
+                          setSearchTotalPages(d.total_pages);
+                          setSearchTotal(d.total);
                           // If this was the last page and it's now empty, step back.
-                          if (d.results.length === 0 && customPage > 1) setCustomPage(customPage - 1);
+                          if (d.results.length === 0 && searchPage > 1) setSearchPage(searchPage - 1);
                         } catch (err: any) {
                           setError(err?.message || "삭제 실패");
                         }
@@ -459,24 +480,24 @@ export default function AdminCardIcons() {
               ))}
             </div>
           )}
-          {searchMode === "custom" && customTotalPages > 1 && (
+          {searchTotalPages > 1 && (
             <div className="mt-3 flex items-center justify-center gap-3 text-sm">
               <button
                 type="button"
-                onClick={() => setCustomPage((p) => Math.max(1, p - 1))}
-                disabled={customPage <= 1 || searching}
+                onClick={() => turnPage(Math.max(1, searchPage - 1))}
+                disabled={searchPage <= 1 || searching}
                 className="px-3 py-1 rounded-lg bg-blue-600 text-white disabled:bg-gray-500 disabled:cursor-not-allowed"
               >
                 이전
               </button>
               <span className="text-gray-600 dark:text-gray-300">
-                {customPage} / {customTotalPages}
-                <span className="text-xs text-gray-500 ml-2">(전체 {customTotal}개)</span>
+                {searchPage} / {searchTotalPages}
+                <span className="text-xs text-gray-500 ml-2">(전체 {searchTotal}개)</span>
               </span>
               <button
                 type="button"
-                onClick={() => setCustomPage((p) => Math.min(customTotalPages, p + 1))}
-                disabled={customPage >= customTotalPages || searching}
+                onClick={() => turnPage(Math.min(searchTotalPages, searchPage + 1))}
+                disabled={searchPage >= searchTotalPages || searching}
                 className="px-3 py-1 rounded-lg bg-blue-600 text-white disabled:bg-gray-500 disabled:cursor-not-allowed"
               >
                 다음

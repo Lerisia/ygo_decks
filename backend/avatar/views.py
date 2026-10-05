@@ -657,11 +657,18 @@ def list_themes(request):
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 def search_cards(request):
+    """Cards with an illustration whose name matches, 30 a page in name order (an archetype can run past one page)."""
+    PAGE_SIZE = 30
     q = (request.GET.get("q") or "").strip()
+    try:
+        page = max(1, int(request.GET.get("page") or 1))
+    except (ValueError, TypeError):
+        page = 1
     qs = Card.objects.filter(card_illust__isnull=False).exclude(card_illust="")
     if q:
         qs = qs.filter(korean_name__icontains=q)
-    qs = qs.order_by("korean_name")[:30]
+    total = qs.count()
+    qs = qs.order_by("korean_name", "id")[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
     results = [
         {
             "id": c.id,
@@ -671,7 +678,13 @@ def search_cards(request):
         }
         for c in qs
     ]
-    return Response({"results": results})
+    return Response({
+        "results": results,
+        "page": page,
+        "page_size": PAGE_SIZE,
+        "total": total,
+        "total_pages": max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE),
+    })
 
 
 @api_view(["GET"])

@@ -131,3 +131,29 @@ class BorderUploadTest(TestCase):
         UserBorderUnlock.objects.create(user=self.member, border=b)
         row = next(x for x in self.c.get("/api/avatar/borders/admin/").data["borders"] if x["id"] == b.id)
         self.assertEqual((row["owners"], row["uploaded"]), (1, True))
+
+
+class CardSearchPagingTest(TestCase):
+    def setUp(self):
+        from card.models import Card
+        self.admin = User.objects.create_user(email="admin@example.com", username="운영자", password="x", is_staff=True)
+        self.c = APIClient(); self.c.force_authenticate(self.admin)
+        for i in range(65):
+            Card.objects.create(card_id=f"gk{i}", konami_id=str(i), name=f"Gem-Knight {i}",
+                                korean_name=f"젬나이트 {i:02d}", card_illust=f"card_illusts/gk{i}.jpg")
+        Card.objects.create(card_id="no-art", konami_id="x", name="No art", korean_name="젬나이트 일러 없음")
+
+    def search(self, **params):
+        return self.c.get("/api/avatar/card-icons/search-cards/", params).data
+
+    def test_every_match_can_be_reached_page_by_page(self):
+        first = self.search(q="젬나이트")
+        self.assertEqual((first["total"], first["total_pages"], first["page"], len(first["results"])), (65, 3, 1, 30))
+        names = []
+        for page in (1, 2, 3):
+            names += [r["name"] for r in self.search(q="젬나이트", page=page)["results"]]
+        self.assertEqual(names, [f"젬나이트 {i:02d}" for i in range(65)])   # in order, none twice, none missing
+
+    def test_a_page_past_the_end_is_empty_and_a_bad_page_is_the_first(self):
+        self.assertEqual(self.search(q="젬나이트", page=9)["results"], [])
+        self.assertEqual(self.search(q="젬나이트", page="abc")["page"], 1)

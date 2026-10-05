@@ -85,8 +85,16 @@ export type CardIcon = {
 export const listThemes = () =>
   request<{ themes: string[] }>("/card-icons/themes/");
 
-export const searchCards = (q: string) =>
-  request<{ results: CardSearchResult[] }>(`/card-icons/search-cards/?q=${encodeURIComponent(q)}`);
+export type CardSearchResponse = {
+  results: CardSearchResult[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
+export const searchCards = (q: string, page: number = 1) =>
+  request<CardSearchResponse>(`/card-icons/search-cards/?q=${encodeURIComponent(q)}&page=${page}`);
 
 export type CustomIllustListResponse = {
   results: CustomIllustResult[];
