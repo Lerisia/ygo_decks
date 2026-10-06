@@ -374,6 +374,9 @@ const RecordGroupDetailPage = () => {
   };
   const [summary, setSummary] = useState<SheetSummary | null>(null);
   const [summaryLoaded, setSummaryLoaded] = useState(false);
+  // Deleting asks inside the row: the browser's confirm() can be switched off ("block dialogs") and then fails silently.
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<{ id: number; message: string } | null>(null);
   const [pending, setPending] = useState<TrackerPendingMatch[]>([]);
   const [activePendingId, setActivePendingId] = useState<number | null>(null);
   const [extraDeck, setExtraDeck] = useState<DeckData | null>(null);
@@ -581,12 +584,16 @@ const RecordGroupDetailPage = () => {
   const prioritizedOptions = [unknownOption, ...recentOptions, ...otherOptions];
 
   const handleDelete = async (matchId: number) => {
+    setDeleteError(null);
     try {
       await deleteMatchRecord(matchId);
+      setDeletingId(null);
       await loadMatches();
       loadSummary();
     } catch (error) {
       console.error("삭제 실패:", error);
+      const msg = String((error as Error)?.message ?? "");
+      setDeleteError({ id: matchId, message: msg.includes("404") ? "이 기록을 지울 권한이 없습니다." : "지우지 못했습니다. 잠시 뒤 다시 해 주세요." });
     }
   };
 
@@ -1260,18 +1267,29 @@ const RecordGroupDetailPage = () => {
                     {climbed && <span className="font-semibold text-green-700 dark:text-green-400">↑</span>}
                   </span>
                   {canWrite && (
-                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
-                      <button onClick={() => setEditingMatch(match)} title="수정" aria-label="수정"
-                        className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white">
-                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                      </button>
-                      <button onClick={() => { if (confirm("이 기록을 삭제할까요?")) handleDelete(match.id); }} title="삭제" aria-label="삭제"
-                        className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600">
-                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
-                      </button>
-                    </div>
+                    <KebabMenu
+                      label="기록 메뉴"
+                      className="-mr-1"
+                      items={[
+                        { label: "수정", onSelect: () => setEditingMatch(match) },
+                        { label: "삭제", onSelect: () => { setDeleteError(null); setDeletingId(match.id); }, danger: true },
+                      ]}
+                    />
                   )}
                 </div>
+
+                {deletingId === match.id && (
+                  <div className="col-span-full mt-2 ml-2 flex flex-wrap items-center gap-2 rounded-lg bg-white/80 dark:bg-gray-900/60 px-2.5 py-2">
+                    <span className="text-sm font-medium mr-auto">이 기록을 지울까요?</span>
+                    <button type="button" onClick={() => handleDelete(match.id)} className="h-9 px-4 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+                      지우기
+                    </button>
+                    <button type="button" onClick={() => { setDeletingId(null); setDeleteError(null); }} className="h-9 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-800">
+                      취소
+                    </button>
+                    {deleteError?.id === match.id && <p className="basis-full text-xs text-red-600 dark:text-red-400">{deleteError.message}</p>}
+                  </div>
+                )}
 
                 {match.notes && (
                   <div className="col-start-2 col-span-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words pt-1">
