@@ -24,7 +24,7 @@ export default function PcRecorder() {
         <span className="text-xs font-bold tracking-wide text-amber-700 dark:text-amber-400">Windows PC 프로그램 · 무료</span>
         <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">YGO Decks 레코더</h1>
         <p className="text-gray-600 dark:text-gray-300">
-          마스터 듀얼을 하면 듀얼이 끝날 때마다 전적이 저절로 쌓입니다. 손으로 적을 필요가 없습니다.
+          마스터 듀얼을 하면 듀얼이 끝날 때마다 전적이 자동으로 기록됩니다. 손으로 적을 필요가 없습니다.
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400 min-h-[20px]">
           {stats && (
