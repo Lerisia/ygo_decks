@@ -12,6 +12,9 @@ from rest_framework.response import Response
 from .models import InquiryComment, InquiryPost
 
 PAGE_SIZE = 20
+# Lists and locked pages never show a real title: someone could put abuse in it (특이점 2026-10-07).
+# The real title appears only on the post itself, for its author and staff.
+HIDDEN_TITLE = "문의사항"
 BOARDS = dict(InquiryPost.BOARD_CHOICES)
 # Enough for anyone with a real problem, too little for a flood.
 LIMITS = ((timedelta(minutes=10), 5), (timedelta(days=1), 30))
@@ -34,7 +37,7 @@ def _post_out(post, user, full=False):
         "id": post.id,
         "board": post.board,
         "board_label": BOARDS.get(post.board, post.board),
-        "title": post.title,
+        "title": post.title if full and can_view else HIDDEN_TITLE,
         "is_private": post.is_private,
         "answered": post.answered_at is not None,
         "comment_count": getattr(post, "n_comments", None),

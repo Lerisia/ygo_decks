@@ -74,7 +74,7 @@ function WriteForm({ board, onCancel }: { board: InquiryBoard; onCancel: () => v
         />
         <span>
           🔒 <b>비공개로 쓰기</b> <span className="text-xs text-gray-500 dark:text-gray-400">(항상 켜짐)</span>
-          <span className="block text-xs text-gray-500 dark:text-gray-400">문의 글은 모두 비공개로 올라가요. 내용은 나와 운영진만 볼 수 있고, 제목만 목록에 보입니다.</span>
+          <span className="block text-xs text-gray-500 dark:text-gray-400">문의 글은 모두 비공개로 올라가요. 제목과 내용은 나와 운영진만 볼 수 있고, 목록에는 '문의사항'으로 보입니다.</span>
         </span>
       </label>
       <label className="flex items-start gap-2 text-sm cursor-pointer">

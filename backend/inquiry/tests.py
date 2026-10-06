@@ -55,7 +55,7 @@ class InquiryBoardTest(TestCase):
         locked = self._as(self.other).get(f"/api/inquiry/{pid}/")
         self.assertEqual(locked.status_code, 403)
         self.assertNotIn("body", locked.json())
-        self.assertEqual(locked.json()["title"], "로그인이 안 돼요")
+        self.assertEqual(locked.json()["title"], "문의사항")
         self.assertEqual(self._as(None).get(f"/api/inquiry/{pid}/").status_code, 403)
         self.assertEqual(self._as(self.author).get(f"/api/inquiry/{pid}/").json()["body"], "비밀번호를 바꾼 뒤로 로그인이 안 됩니다.")
         self.assertIn("body", self._as(self.staff).get(f"/api/inquiry/{pid}/").json())
@@ -63,6 +63,16 @@ class InquiryBoardTest(TestCase):
         row = self._as(self.other).get("/api/inquiry/?board=site").json()["results"][0]
         self.assertTrue(row["is_private"])
         self.assertFalse(row["can_view"])
+
+    def test_titles_show_only_on_the_post_for_its_author_and_staff(self):
+        pid = self._write().json()["id"]
+        for who in (None, self.other, self.author, self.staff):
+            rows = self._as(who).get("/api/inquiry/?board=site").json()["results"]
+            self.assertEqual([r["title"] for r in rows], ["문의사항"])
+            self.assertNotIn("로그인이 안 돼요", str(rows))
+        self.assertEqual(self._as(self.author).get(f"/api/inquiry/{pid}/").json()["title"], "로그인이 안 돼요")
+        self.assertEqual(self._as(self.staff).get(f"/api/inquiry/{pid}/").json()["title"], "로그인이 안 돼요")
+        self.assertEqual(self._as(self.other).get(f"/api/inquiry/{pid}/").json()["title"], "문의사항")
 
     def test_posts_are_always_private(self):
         pid = self._write(is_private=False).json()["id"]
