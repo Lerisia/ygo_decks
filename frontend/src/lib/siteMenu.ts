@@ -79,7 +79,7 @@ export const ME_ITEMS: MenuItem[] = [
   { label: "마이페이지", to: "/mypage", auth: true },
   { label: "포인트 내역", to: "/mypage/points", auth: true },
   { label: "아이콘·테두리", to: "/mypage/avatar", auth: true },
-  { label: "업데이트 내역", to: "/changelog" },
+  { label: "공지사항", to: "/changelog" },
   { label: "이용약관", to: "/terms" },
 ];
 

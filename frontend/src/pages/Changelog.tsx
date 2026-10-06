@@ -60,7 +60,7 @@ export default function Changelog() {
   return (
     <div className="min-h-screen px-4 sm:px-6 py-6 max-w-2xl mx-auto text-gray-900 dark:text-white">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">업데이트 내역</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">공지사항</h1>
         <div className="flex items-center gap-3">
           {admin && editing !== "new" && (
             <button
@@ -92,7 +92,7 @@ export default function Changelog() {
       {entries === null && !error ? (
         <p className="text-center text-gray-500 py-8">로딩 중...</p>
       ) : entries && entries.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">아직 업데이트 내역이 없습니다.</p>
+        <p className="text-center text-gray-500 py-8">아직 공지가 없습니다.</p>
       ) : (
         <div className="space-y-5">
           {entries?.map((e) =>

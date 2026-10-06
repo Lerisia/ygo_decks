@@ -4,6 +4,7 @@ import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { CONTACT_URL, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
+import DeckPickerModal from "@/components/DeckPickerModal";
 
 // Home (redesign 2026-10): two pillars, 덱 도감 then 레코더; the rest as small tiles; 문의·후원 at the bottom.
 
@@ -32,7 +33,7 @@ function Info() {
   const [dismissed, setDismissed] = useState(false);
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
-  const [query, setQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     getLatestChangelog()
@@ -51,23 +52,12 @@ function Info() {
     setDismissed(true);
   };
 
-  // The deck book keeps its search in sessionStorage; start it with this word and no other filter.
-  const search = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    try {
-      sessionStorage.setItem("deck_filters", JSON.stringify(q ? { searchQuery: q } : {}));
-    } catch {
-      /* storage blocked: the book opens unfiltered */
-    }
-    navigate("/database");
-  };
-
   const decks = popular?.decks ?? [];
 
   return (
     <div className="min-h-screen px-4 py-5 md:py-8 max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex flex-col gap-4 md:gap-5 text-gray-900 dark:text-white">
       <h1 className="sr-only">YGO Decks · 유희왕 마스터 듀얼 덱 도감과 전적 기록</h1>
+      <DeckPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(id) => navigate(`/database/${id}`)} />
 
       <div className="grid gap-4 md:gap-5 lg:grid-cols-[2fr_1fr]">
         {/* Pillar 1: the deck book */}
@@ -91,18 +81,16 @@ function Info() {
               {popular ? <span className="tabular-nums">{popular.total || ""}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
               개, 한곳에서
             </h2>
-            <form onSubmit={search} className="flex gap-2" role="search">
-              <input
-                id="home-deck-search"
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="덱 이름으로 찾기"
-                aria-label="덱 이름으로 찾기"
-                className="flex-1 min-w-0 border rounded-lg px-3 py-2 bg-white text-black dark:bg-gray-900 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button type="submit" className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">찾기</button>
-            </form>
+            {/* Opens a picker of real decks: choosing one goes straight to its page, so no search can miss. */}
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            >
+              <span aria-hidden="true">🔍</span>
+              <span className="flex-1">덱 이름으로 찾기</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">목록에서 고르기</span>
+            </button>
             <div className="flex flex-wrap items-center gap-1.5 text-sm min-h-[30px]">
               <span className="text-gray-500 dark:text-gray-400 mr-1">많이 보는 덱</span>
               {decks.slice(0, 5).map((d, i) => (
