@@ -117,12 +117,20 @@ def add_match_to_record_group(request, record_group_id):
 
     data = request.data
 
-    # Two tracker instances (or a retry) saving the same duel: hand back the record that already exists.
-    if data.get("tracker_did"):
-        from tracker.models import TrackerGame
-        dup = TrackerGame.objects.filter(user=user, did=str(data.get("tracker_did")).strip(), match__isnull=False, match__is_deleted=False).first()
-        if dup:
-            return Response({"match_id": dup.match_id, "points_added": 0, "duplicate": True}, status=status.HTTP_200_OK)
+    # The same duel saved twice — the recorder saving again, or 확인 대기 filled in for a duel already in a sheet:
+    # hand back the record that exists. 201 like a fresh save, because the recorder counts anything else as a
+    # failure and parks the duel as 확인 대기 (3Bini 2026-10-07).
+    if data.get("tracker_did") or data.get("tracker_pending_id"):
+        from tracker.models import TrackerPendingMatch
+        from tracker.services import saved_match_id, settle_if_saved
+        existing = saved_match_id(user, data.get("tracker_did"))
+        if not existing and data.get("tracker_pending_id"):
+            pend = TrackerPendingMatch.objects.filter(user=user, id=data.get("tracker_pending_id")).first()
+            if pend:
+                existing = saved_match_id(user, pend.did)
+                settle_if_saved(pend)
+        if existing:
+            return Response({"match_id": existing, "points_added": 0, "duplicate": True}, status=status.HTTP_201_CREATED)
 
     opponent_deck = data.get("opponent_deck")
     if opponent_deck == "null" or opponent_deck == "" or opponent_deck is None:

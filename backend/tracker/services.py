@@ -29,6 +29,33 @@ def build_payload(user, data):
     return payload
 
 
+def saved_match_id(user, did):
+    """The live sheet record already saved for this duel, if any."""
+    from .models import TrackerGame
+    did = str(did or "").strip()
+    if not did:
+        return None
+    return (TrackerGame.objects.filter(user=user, did=did, match__isnull=False, match__is_deleted=False)
+            .values_list("match_id", flat=True).first())
+
+
+def settle_if_saved(obj):
+    """A parked duel that already sits in a sheet is not waiting for anyone, so it leaves 확인 대기 (3Bini 2026-10-07:
+    the recorder parked duels it had just saved). Returns True when it was settled."""
+    if obj.status != "pending":
+        return False
+    match_id = saved_match_id(obj.user, obj.did)
+    if not match_id:
+        return False
+    obj.status = "confirmed"
+    fields = ["status", "updated_at"]
+    if obj.match_id is None and not TrackerPendingMatch.objects.filter(match_id=match_id).exclude(id=obj.id).exists():
+        obj.match_id = match_id
+        fields.append("match")
+    obj.save(update_fields=fields)
+    return True
+
+
 def upsert_pending(user, data):
     did = str(data.get("did") or "").strip()
     if not did or not did.isdigit():
@@ -38,6 +65,7 @@ def upsert_pending(user, data):
     if not created and obj.status == "pending":
         obj.payload = payload
         obj.save(update_fields=["payload", "updated_at"])
+    settle_if_saved(obj)
     return obj, created
 
 

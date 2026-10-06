@@ -271,7 +271,8 @@ class TrackerGameArchiveTest(TestCase):
         }
         first = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", body, format="json")
         again = self.client.post(f"/api/record-groups/{self.group.id}/add-match/", body, format="json")
-        self.assertEqual(again.status_code, 200)
+        # 201 like a fresh save: the recorder treats anything else as a failure and parks the duel as 확인 대기
+        self.assertEqual(again.status_code, 201)
         self.assertEqual(again.json()["match_id"], first.json()["match_id"])
         self.assertTrue(again.json()["duplicate"])
         self.assertEqual(MatchRecord.objects.filter(record_group=self.group).count(), 1)
@@ -288,6 +289,71 @@ class TrackerGameArchiveTest(TestCase):
         # older builds send nothing → stays null rather than an empty list
         self.client.post("/api/tracker/games/", {**self.capture, "did": "7709189150693852099"}, format="json")
         self.assertIsNone(TrackerGame.objects.get(user=self.user, did="7709189150693852099").turn_times)
+
+
+class TrackerAlreadySavedPendingTest(TestCase):
+    """A duel that already sits in a sheet never waits in 확인 대기 (3Bini 2026-10-07: the recorder's second save of a
+    duel it had just saved got 200 'duplicate', counted as a failure and parked the duel on the site)."""
+
+    def setUp(self):
+        from tool.models import RecordGroup
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="p@test.com", username="parker", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck("야미")
+        self.group = RecordGroup.objects.create(user=self.user, name="테스트")
+        self.capture = {"did": "7709189150731584608", "game_mode": 3, "result": "lose", "coin_win": True, "first": True,
+                        "my_cards": [4007], "opp_cards": [], "ended_at": "2026-10-05T18:47:00"}
+        self.record = {"deck": self.deck.id, "opponent_deck": None, "first_or_second": "first", "result": "lose",
+                       "coin_toss_result": "win", "rank": "bronze3", "wins": 0, "tracker_did": self.capture["did"]}
+
+    def _save(self, **extra):
+        return self.client.post(f"/api/record-groups/{self.group.id}/add-match/", {**self.record, **extra}, format="json")
+
+    def _pending_ids(self):
+        return [p["id"] for p in self.client.get("/api/tracker/pending/").json()]
+
+    def test_parking_a_saved_duel_does_not_put_it_in_the_waiting_list(self):
+        from tracker.models import TrackerPendingMatch
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        saved = self._save().json()["match_id"]
+        res = self.client.post("/api/tracker/pending/", self.capture, format="json")
+        self.assertIn(res.status_code, (200, 201))
+        self.assertEqual(res.json()["status"], "confirmed")
+        self.assertEqual(self._pending_ids(), [])
+        self.assertEqual(TrackerPendingMatch.objects.get(user=self.user, did=self.capture["did"]).match_id, saved)
+
+    def test_waiting_list_drops_duels_saved_after_they_were_parked(self):
+        from tracker.models import TrackerPendingMatch
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        pid = self.client.post("/api/tracker/pending/", self.capture, format="json").json()["id"]
+        self.assertEqual(self._pending_ids(), [pid])
+        self._save()
+        self.assertEqual(self._pending_ids(), [])
+        self.assertEqual(TrackerPendingMatch.objects.get(id=pid).status, "confirmed")
+
+    def test_unsaved_duels_still_wait(self):
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        pid = self.client.post("/api/tracker/pending/", self.capture, format="json").json()["id"]
+        self.assertEqual(self._pending_ids(), [pid])
+        # a deleted record frees the duel again
+        from tool.models import MatchRecord
+        m = self._save().json()["match_id"]
+        MatchRecord.objects.filter(id=m).update(is_deleted=True)
+        self.assertEqual(self._pending_ids(), [pid])
+
+    def test_filling_the_form_from_a_saved_duel_does_not_make_a_second_record(self):
+        from tool.models import MatchRecord
+        from tracker.models import TrackerPendingMatch
+        self.client.post("/api/tracker/games/", self.capture, format="json")
+        pid = self.client.post("/api/tracker/pending/", self.capture, format="json").json()["id"]
+        saved = self._save().json()["match_id"]
+        res = self._save(tracker_did=None, tracker_pending_id=pid)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json()["match_id"], saved)
+        self.assertTrue(res.json()["duplicate"])
+        self.assertEqual(MatchRecord.objects.filter(record_group=self.group, is_deleted=False).count(), 1)
+        self.assertEqual(TrackerPendingMatch.objects.get(id=pid).status, "confirmed")
 
 
 class TrackerWinBonusTest(TestCase):

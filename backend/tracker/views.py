@@ -68,11 +68,11 @@ def pending_matches(request):
     """GET: this user's games waiting for confirmation. POST (tracker): upload/refresh one captured game."""
     touch_client(request.user, request.headers.get("X-Tracker-Version"))
     from .models import TrackerPendingMatch
-    from .services import serialize_pending, upsert_pending
+    from .services import serialize_pending, settle_if_saved, upsert_pending
 
     if request.method == "GET":
         qs = TrackerPendingMatch.objects.filter(user=request.user, status="pending")
-        return Response([serialize_pending(o) for o in qs])
+        return Response([serialize_pending(o) for o in qs if not settle_if_saved(o)])
     try:
         obj, created = upsert_pending(request.user, request.data)
     except ValueError as e:
