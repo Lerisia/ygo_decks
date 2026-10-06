@@ -9,7 +9,7 @@ User = get_user_model()
 
 
 class InquiryBoardTest(TestCase):
-    """문의 게시판 (특이점 2026-10-07): anonymous authors, private by default, staff-only answers, opt-in answer mail."""
+    """문의 게시판 (특이점 2026-10-07): anonymous authors, always private, staff-only answers, opt-in answer mail."""
 
     def setUp(self):
         self.author = User.objects.create_user(email="a@test.com", username="asker", password="pass1234")
@@ -64,9 +64,15 @@ class InquiryBoardTest(TestCase):
         self.assertTrue(row["is_private"])
         self.assertFalse(row["can_view"])
 
-    def test_public_post_opens_for_anyone(self):
+    def test_posts_are_always_private(self):
         pid = self._write(is_private=False).json()["id"]
-        self.assertEqual(self._as(None).get(f"/api/inquiry/{pid}/").status_code, 200)
+        self.assertTrue(InquiryPost.objects.get(id=pid).is_private)
+        self.assertEqual(self._as(None).get(f"/api/inquiry/{pid}/").status_code, 403)
+        self.assertEqual(self._as(self.other).get(f"/api/inquiry/{pid}/").status_code, 403)
+        # even a row stored as public (from before the rule) stays closed to others
+        InquiryPost.objects.filter(id=pid).update(is_private=False)
+        self.assertEqual(self._as(self.other).get(f"/api/inquiry/{pid}/").status_code, 403)
+        self.assertEqual(self._as(self.author).get(f"/api/inquiry/{pid}/").status_code, 200)
 
     def test_only_staff_can_answer_and_answers_mark_the_post(self):
         pid = self._write(is_private=False).json()["id"]
@@ -74,13 +80,13 @@ class InquiryBoardTest(TestCase):
         self.assertEqual(self._as(None).post(f"/api/inquiry/{pid}/comments/", {"body": "?"}, format="json").status_code, 401)
         res = self._as(self.staff).post(f"/api/inquiry/{pid}/comments/", {"body": "확인해 보겠습니다."}, format="json")
         self.assertEqual(res.status_code, 201)
-        detail = self._as(None).get(f"/api/inquiry/{pid}/").json()
+        detail = self._as(self.author).get(f"/api/inquiry/{pid}/").json()
         self.assertTrue(detail["answered"])
         self.assertEqual([c["body"] for c in detail["comments"]], ["확인해 보겠습니다."])
         self.assertNotIn("staffer", str(detail))
         # removing the only answer makes it unanswered again
         self._as(self.staff).delete(f"/api/inquiry/comments/{res.json()['id']}/")
-        self.assertFalse(self._as(None).get(f"/api/inquiry/{pid}/").json()["answered"])
+        self.assertFalse(self._as(self.author).get(f"/api/inquiry/{pid}/").json()["answered"])
 
     def test_answer_mail_goes_out_only_when_asked_for(self):
         quiet = self._write().json()["id"]

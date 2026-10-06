@@ -16,7 +16,6 @@ function WriteForm({ board, onCancel }: { board: InquiryBoard; onCancel: () => v
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [isPrivate, setIsPrivate] = useState(true);
   const [notify, setNotify] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +33,7 @@ function WriteForm({ board, onCancel }: { board: InquiryBoard; onCancel: () => v
     setBusy(true);
     setError("");
     try {
-      const post = await createInquiry({ board, title: title.trim(), body: body.trim(), is_private: isPrivate, notify_email: notify });
+      const post = await createInquiry({ board, title: title.trim(), body: body.trim(), is_private: true, notify_email: notify });
       navigate(`/inquiry/post/${post.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "글을 올리지 못했습니다.");
@@ -61,11 +60,21 @@ function WriteForm({ board, onCancel }: { board: InquiryBoard; onCancel: () => v
       />
       <div className="text-right text-xs text-gray-400 tabular-nums -mt-2">{body.length.toLocaleString()} / 5,000</div>
 
-      <label className="flex items-start gap-2 text-sm cursor-pointer">
-        <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600" />
+      {/* Always on: no one but the author and staff needs to read an inquiry (특이점 2026-10-07). */}
+      <label className="flex items-start gap-2 text-sm">
+        {/* Drawn checked in blue rather than greyed out (disabled reads as "off"); clicks do nothing. */}
+        <input
+          type="checkbox"
+          checked
+          readOnly
+          aria-disabled="true"
+          aria-label="비공개로 쓰기 (항상 켜짐)"
+          onClick={(e) => e.preventDefault()}
+          className="mt-0.5 w-4 h-4 accent-blue-600 cursor-default"
+        />
         <span>
-          🔒 <b>비공개로 쓰기</b>
-          <span className="block text-xs text-gray-500 dark:text-gray-400">내용은 나와 운영진만 볼 수 있어요. 제목은 목록에 보입니다.</span>
+          🔒 <b>비공개로 쓰기</b> <span className="text-xs text-gray-500 dark:text-gray-400">(항상 켜짐)</span>
+          <span className="block text-xs text-gray-500 dark:text-gray-400">문의 글은 모두 비공개로 올라가요. 내용은 나와 운영진만 볼 수 있고, 제목만 목록에 보입니다.</span>
         </span>
       </label>
       <label className="flex items-start gap-2 text-sm cursor-pointer">

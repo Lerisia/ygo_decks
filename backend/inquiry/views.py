@@ -22,7 +22,8 @@ def _is_staff(user):
 
 
 def _can_view(post, user):
-    return not post.is_private or _is_staff(user) or (user.is_authenticated and post.author_id == user.id)
+    # Every post is private (특이점 2026-10-07: no one else needs to read someone's inquiry), whatever is_private says.
+    return _is_staff(user) or (user.is_authenticated and post.author_id == user.id)
 
 
 def _post_out(post, user, full=False):
@@ -100,7 +101,7 @@ def posts(request):
             return _error("짧은 시간에 글을 너무 많이 썼습니다. 잠시 뒤에 다시 써 주세요.", 429)
     post = InquiryPost.objects.create(
         board=board, author=request.user, title=title, body=body,
-        is_private=bool(data.get("is_private", True)), notify_email=bool(data.get("notify_email", False)),
+        is_private=True, notify_email=bool(data.get("notify_email", False)),
     )
     return Response(_post_out(post, request.user, full=True), status=201)
 
