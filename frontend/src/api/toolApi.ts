@@ -210,8 +210,8 @@ export const getRecordGroupStatistics = async (recordGroupId: number, memberId?:
   return response.json();
 };
 
-export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number, memberId?: number | null, period?: StatsPeriod) => {
-  const qs = [deckId ? `deck_id=${deckId}` : "", memberId ? `member=${memberId}` : "", ...periodQuery(period)].filter(Boolean).join("&");
+export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number, memberId?: number | null, period?: StatsPeriod, byDeck = false) => {
+  const qs = [deckId ? `deck_id=${deckId}` : "", memberId ? `member=${memberId}` : "", ...periodQuery(period), byDeck ? "by_deck=1" : ""].filter(Boolean).join("&");
   const params = qs ? `?${qs}` : "";
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
@@ -279,8 +279,8 @@ export const getMetaDeckStats = async () => {
   return await response.json();
 };
 
-export const getUserStatisticsFull = async (deckId?: number, period?: StatsPeriod) => {
-  const qs = [deckId ? `deck_id=${deckId}` : "", ...periodQuery(period)].filter(Boolean).join("&");
+export const getUserStatisticsFull = async (deckId?: number, period?: StatsPeriod, byDeck = false) => {
+  const qs = [deckId ? `deck_id=${deckId}` : "", ...periodQuery(period), byDeck ? "by_deck=1" : ""].filter(Boolean).join("&");
   const params = qs ? `?${qs}` : "";
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};

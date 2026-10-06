@@ -270,6 +270,33 @@ class FullStatisticsTest(TestCase):
         self.assertEqual(len(custom_b), 1)
         self.assertEqual(custom_b[0]["total_games"], 1)
 
+    def test_by_deck_gives_each_of_my_decks_its_own_statistics(self):
+        # 덱별 상세 분석 (특이점 2026-10-07): two decks in one sheet, each analysed on its own
+        _create_match(self.group, self.deck1, self.opp, result="win", first_or_second="first")
+        _create_match(self.group, self.deck1, self.opp, result="win", first_or_second="second")
+        _create_match(self.group, self.deck1, None, result="lose")
+        _create_match(self.group, self.deck2, self.opp, result="lose", first_or_second="first")
+        _create_match(self.group, None, self.opp, result="win")  # 기타
+
+        data = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/", {"by_deck": "1"}).json()
+        self.assertEqual(data["basic"]["total_games"], 5)  # the whole sheet is still there
+        parts = data["by_deck"]
+        self.assertEqual([p["deck"]["name"] if p["deck"] else None for p in parts], ["덱A", "덱B", None])
+        a = parts[0]["stats"]
+        self.assertEqual(a["basic"]["total_games"], 3)
+        self.assertAlmostEqual(a["basic"]["overall_win_rate"], 200 / 3)
+        self.assertEqual(len(a["my_deck_stats"]), 1)
+        self.assertEqual(sum(o["count"] for o in a["opponent_deck_stats"]), 3)
+        b = parts[1]["stats"]
+        self.assertEqual(b["basic"]["total_games"], 1)
+        self.assertEqual(b["basic"]["overall_win_rate"], 0)
+        # the same numbers as asking for one deck alone
+        one = self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/", {"deck_id": self.deck1.id}).json()
+        self.assertEqual(one["basic"], a["basic"])
+        self.assertEqual(one["opponent_deck_stats"], a["opponent_deck_stats"])
+        # not asked for → not sent
+        self.assertNotIn("by_deck", self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/").json())
+
     def test_deck_id_filter(self):
         _create_match(self.group, self.deck1, self.opp, result="win")
         _create_match(self.group, self.deck1, self.opp, result="win")
@@ -584,6 +611,16 @@ class StatisticsQueryCountTest(TestCase):
             resp = self.client.get(f"/api/record-groups/{self.groups[0].id}/statistics/full/")
         self.assertEqual(resp.status_code, 200)
         self.assertLessEqual(len(ctx.captured_queries), self.MAX_QUERIES, "per-sheet stats issue N+1 queries")
+
+    def test_by_deck_adds_no_queries(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        for url in (f"/api/record-groups/{self.groups[0].id}/statistics/full/", "/api/record-groups/statistics/full/"):
+            with CaptureQueriesContext(connection) as ctx:
+                resp = self.client.get(url, {"by_deck": "1"})
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(len(resp.json()["by_deck"]), 4)
+            self.assertLessEqual(len(ctx.captured_queries), self.MAX_QUERIES, "by_deck stats issue N+1 queries")
 
     def test_aggregate_query_count(self):
         from django.db import connection

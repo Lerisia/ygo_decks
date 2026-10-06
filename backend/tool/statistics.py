@@ -58,11 +58,31 @@ def _is_unknown(row):
     return row["opponent_deck_id"] is None and row["opponent_deck_name"] is None
 
 
-def compute_full_statistics(matches):
-    """`matches` is a MatchRecord queryset (already filtered for is_deleted / deck_id)."""
+def compute_full_statistics(matches, by_deck=False):
+    """`matches` is a MatchRecord queryset (already filtered for is_deleted / deck_id).
+    `by_deck` adds the same statistics for each of my decks on its own (덱별 상세 분석, 특이점 2026-10-07),
+    most-played first, from the same rows — no extra queries."""
     # My deck '기타' (deck = null) stays in personal statistics as its own row; only the site meta stats drop it.
     rows = list(matches.order_by("id").values(*ROW_FIELDS))
+    deck_ids = {r["deck_id"] for r in rows if r["deck_id"] is not None} | \
+               {r["opponent_deck_id"] for r in rows if r["opponent_deck_id"] is not None}
+    decks = Deck.objects.in_bulk(deck_ids) if deck_ids else {}
+    serialized = {d.id: DeckShortSerializer(d).data for d in decks.values()}
 
+    out = _statistics_from_rows(rows, serialized)
+    if by_deck:
+        groups = {}
+        for row in rows:
+            groups.setdefault(row["deck_id"], []).append(row)
+        out["by_deck"] = sorted(
+            ({"deck": serialized.get(d) if d is not None else None, "stats": _statistics_from_rows(g, serialized)}
+             for d, g in groups.items()),
+            key=lambda e: -e["stats"]["basic"]["total_games"],
+        )
+    return out
+
+
+def _statistics_from_rows(rows, serialized):
     total = _acc()
     by_deck = {}          # deck_id -> acc (insertion order = first appearance)
     by_opp = {}           # opponent_deck_id (None = unknown) -> acc
@@ -77,10 +97,6 @@ def compute_full_statistics(matches):
         elif row["opponent_deck_id"] is not None or _is_unknown(row):
             _add(by_opp.setdefault(row["opponent_deck_id"], _acc()), row)
         _add(by_pair.setdefault((row["deck_id"], row["opponent_deck_id"]), _acc()), row)
-
-    deck_ids = {d for d in by_deck if d is not None} | {d for d in by_opp if d is not None}
-    decks = Deck.objects.in_bulk(deck_ids) if deck_ids else {}
-    serialized = {d.id: DeckShortSerializer(d).data for d in decks.values()}
 
     total_games = total["games"]
 

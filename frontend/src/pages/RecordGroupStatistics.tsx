@@ -45,6 +45,8 @@ interface StatisticsData {
   };
   my_deck_stats: DeckWinRateStatsItem[];
   opponent_deck_stats: DeckWinRateStatsItem[];
+  /** 덱별 상세 분석: the same statistics for each of my decks alone (기타 = deck null), most-played first. */
+  by_deck?: { deck: DeckInfo | null; stats: StatisticsData }[];
 }
 
 interface RankHistoryItem {
@@ -117,14 +119,147 @@ const Card = ({ title, aside, children, flush = false }: { title: string; aside?
   </section>
 );
 
+// 덱별 상세 분석 (특이점 2026-10-07): one sheet with several decks, each read on its own so their numbers don't mix.
+const BY_DECK_KEY = "stats_by_deck";
+
+/** 승률 · 듀얼 · 선공 비율, the first/second bars and the coin block for one set of statistics. */
+const Overview = ({ stats }: { stats: StatisticsData }) => {
+  const b = stats.basic;
+  const games = b.total_games;
+  // basic carries rates; the counts behind them come back exactly from rate × games
+  const count = (ratePct: number, of: number) => Math.round((ratePct * of) / 100);
+  const wins = count(b.overall_win_rate, games);
+  const firstGames = count(b.first_ratio, games);
+  const secondGames = games - firstGames;
+  const coinWinGames = count(b.coin_toss_win_rate, games);
+  const coinLoseGames = games - coinWinGames;
+  return (
+    <>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col">
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">승률</span>
+            <b className="text-2xl leading-tight">{pctText(b.overall_win_rate, 1)}</b>
+            <small className="text-xs text-gray-500 dark:text-gray-400">{wins}승 {games - wins}패</small>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">듀얼</span>
+            <b className="text-2xl leading-tight">{games}</b>
+            <small className="text-xs text-gray-500 dark:text-gray-400">선공 {firstGames} · 후공 {secondGames}</small>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">선공 비율</span>
+            <b className="text-2xl leading-tight">{pctText(b.first_ratio)}</b>
+            <small className="text-xs text-gray-500 dark:text-gray-400">{firstGames}번 선공</small>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+          <BarStat label="선공 승률" value={firstGames ? b.first_win_rate : null} sub={`${firstGames}판`} />
+          <BarStat label="후공 승률" value={secondGames ? b.second_win_rate : null} sub={`${secondGames}판`} />
+        </div>
+      </div>
+
+      <CoinSplit
+        winGames={coinWinGames}
+        winWins={count(b.coin_toss_win_win_rate, coinWinGames)}
+        loseGames={coinLoseGames}
+        loseWins={count(b.coin_toss_lose_win_rate, coinLoseGames)}
+      />
+    </>
+  );
+};
+
+const MyDecksCard = ({ stats }: { stats: StatisticsData }) => {
+  const myDecks = [...stats.my_deck_stats]
+    .map((s) => (s.deck ? s : { ...s, deck: { id: -1, name: "기타", cover_image_small: OTHER_DECK_IMAGE } as DeckInfo }))
+    .sort((a, c) => c.count - a.count);
+  return (
+    <Card title="내 덱" aside="판수 · 승률">
+      <div className="flex flex-col gap-2">
+        {myDecks.map((e) => (
+          <div key={e.deck.id} className="flex items-center gap-2 text-[13px]">
+            <img src={e.deck.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+            <span className="w-24 shrink-0 break-words leading-tight">{e.deck.name}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${e.ratio}%` }} />
+            </div>
+            <b className="w-10 text-right">{e.count}판</b>
+            <span className={`w-10 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+const OppDeckTable = ({ stats, sortKey, onSort }: { stats: StatisticsData; sortKey: SortKey; onSort: (k: SortKey) => void }) => {
+  const [showAll, setShowAll] = useState(false);
+  const sortValue = (e: DeckWinRateStatsItem) => (sortKey === "count" ? e.count : e[sortKey] ?? -1);
+  const oppDecks = [...stats.opponent_deck_stats]
+    .map((entry) => ({ ...entry, isUnknown: isUnknownDeck(entry), displayName: getOppDeckName(entry) }))
+    .sort((a, c) => {
+      if (a.isUnknown !== c.isUnknown && sortKey === "count") return a.isUnknown ? 1 : -1;
+      return sortValue(c) - sortValue(a) || c.count - a.count;
+    });
+  const shown = showAll ? oppDecks : oppDecks.slice(0, OPP_SHOWN);
+  const th = (key: SortKey, label: string, cls = "") => (
+    <th className={`px-2 py-1.5 text-right font-semibold ${cls}`}>
+      <button type="button" onClick={() => onSort(key)} className={`whitespace-nowrap ${sortKey === key ? "text-gray-900 dark:text-white" : ""}`}>
+        {label}{sortKey === key ? " ▾" : ""}
+      </button>
+    </th>
+  );
+  return (
+    <Card title="상대 덱별" aside={`${oppDecks.length}개 덱 · 제목을 누르면 정렬`} flush>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px]">
+          <thead className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/60 border-y border-gray-200 dark:border-gray-700">
+            <tr>
+              <th className="px-2 pl-3.5 py-1.5 text-left font-semibold">상대 덱</th>
+              {th("count", "판")}
+              {th("win_rate", "승률")}
+              {th("first_win_rate", "선공")}
+              {th("second_win_rate", "후공", "pr-3.5")}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((e, i) => (
+              <tr key={e.deck?.id ?? `${e.displayName}-${i}`} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
+                <td className="px-2 pl-3.5 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <img src={(!e.isUnknown && e.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                    <span className="break-words leading-tight">{e.displayName}</span>
+                  </div>
+                </td>
+                <td className="px-2 py-1.5 text-right">{e.count}<span className="block text-[10px] text-gray-400">{e.ratio.toFixed(0)}%</span></td>
+                <td className={`px-2 py-1.5 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</td>
+                <td className={`px-2 py-1.5 text-right text-xs ${rateTone(e.first_win_rate)}`}>{pctText(e.first_win_rate)}</td>
+                <td className={`px-2 pr-3.5 py-1.5 text-right text-xs ${rateTone(e.second_win_rate)}`}>{pctText(e.second_win_rate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {oppDecks.length > OPP_SHOWN && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+          {showAll ? "접기" : `나머지 ${oppDecks.length - OPP_SHOWN}개 덱 보기`}
+        </button>
+      )}
+    </Card>
+  );
+};
+
 const StatisticsPage = () => {
   const { recordGroupId } = useParams();
   const navigate = useNavigate();
   const [stats, setStats] = useState<StatisticsData | null>(null);
   const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
   const [curve, setCurve] = useState<"rank" | "score">("rank");
-  const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
-  const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
+  const [byDeck, setByDeckState] = useState(() => localStorage.getItem(BY_DECK_KEY) === "1");
+  const setByDeck = (on: boolean) => {
+    setByDeckState(on);
+    try { localStorage.setItem(BY_DECK_KEY, on ? "1" : "0"); } catch { /* storage off: the switch just won't stick */ }
+  };
   const [mySheets, setMySheets] = useState<{ id: number; name: string }[]>([]);
   const [contributors, setContributors] = useState<SheetContributor[]>([]);
   const [memberFilter, setMemberFilter] = useState<number | null>(null);
@@ -132,7 +267,6 @@ const StatisticsPage = () => {
   const [periodKey, setPeriodKey] = useState<PeriodKey>("all");
   const [range, setRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [sortKey, setSortKey] = useState<SortKey>("count");
-  const [showAllOpp, setShowAllOpp] = useState(false);
   const isAggregate = !recordGroupId;
 
   const period: StatsPeriod | undefined = useMemo(() => {
@@ -151,40 +285,32 @@ const StatisticsPage = () => {
   // Switching sheets (or to 전체) resets per-sheet state.
   useEffect(() => {
     setStats(null);
-    setSelectedDeckId(undefined);
-    setDeckFilterOptions([]);
   }, [recordGroupId]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (!recordGroupId) {
-          const statsRes = await getUserStatisticsFull(selectedDeckId, period);
+          const statsRes = await getUserStatisticsFull(undefined, period, byDeck);
           setStats(statsRes);
           setRankHistory([]);
-          if (statsRes.my_deck_stats?.length) {
-            setDeckFilterOptions((prev) => (prev.length ? prev : statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean)));
-          }
           return;
         }
         const [statsRes, rankRes] = await Promise.all([
-          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId, memberFilter, period),
+          getRecordGroupStatisticsFull(Number(recordGroupId), undefined, memberFilter, period, byDeck),
           getRecordGroupRankHistory(Number(recordGroupId), rankMember, period).catch(() => ({ matches: [], member: null })),
         ]);
         setStats(statsRes);
         setRankHistory(rankRes.matches || []);
         // the server decides whose curve to show when nobody is picked; follow it
         if (rankMember === null && rankRes.member?.id) setRankMember(rankRes.member.id);
-        if (statsRes.my_deck_stats?.length) {
-          setDeckFilterOptions((prev) => (prev.length ? prev : statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean)));
-        }
       } catch (err) {
         console.error("통계 데이터를 불러오지 못했습니다", err);
         if (!recordGroupId) navigate("/unauthorized");
       }
     };
     fetchData();
-  }, [recordGroupId, selectedDeckId, memberFilter, rankMember, period, navigate]);
+  }, [recordGroupId, byDeck, memberFilter, rankMember, period, navigate]);
 
   useEffect(() => {
     if (!recordGroupId) { setContributors([]); return; }
@@ -238,27 +364,10 @@ const StatisticsPage = () => {
     );
   }
 
-  const b = stats.basic;
-  const games = b.total_games;
-  // basic carries rates; the counts behind them come back exactly from rate × games
-  const count = (ratePct: number, of: number) => Math.round((ratePct * of) / 100);
-  const wins = count(b.overall_win_rate, games);
-  const firstGames = count(b.first_ratio, games);
-  const secondGames = games - firstGames;
-  const coinWinGames = count(b.coin_toss_win_rate, games);
-  const coinLoseGames = games - coinWinGames;
-
-  const myDecks = [...stats.my_deck_stats]
-    .map((s) => (s.deck ? s : { ...s, deck: { id: -1, name: "기타", cover_image_small: OTHER_DECK_IMAGE } as DeckInfo }))
-    .sort((a, c) => c.count - a.count);
-  const sortValue = (e: DeckWinRateStatsItem) => (sortKey === "count" ? e.count : e[sortKey] ?? -1);
-  const oppDecks = [...stats.opponent_deck_stats]
-    .map((entry) => ({ ...entry, isUnknown: isUnknownDeck(entry), displayName: getOppDeckName(entry) }))
-    .sort((a, c) => {
-      if (a.isUnknown !== c.isUnknown && sortKey === "count") return a.isUnknown ? 1 : -1;
-      return sortValue(c) - sortValue(a) || c.count - a.count;
-    });
-  const oppShown = showAllOpp ? oppDecks : oppDecks.slice(0, OPP_SHOWN);
+  const games = stats.basic.total_games;
+  const deckParts = byDeck ? stats.by_deck : undefined;
+  // The switch is offered once a sheet holds two or more decks (기타 counts), and stays while it is on.
+  const showDeckSwitch = stats.my_deck_stats.length > 1 || byDeck;
 
   const curveData = curve === "rank" ? rankData : scoreData;
   const yDomain: [number, number] = (() => {
@@ -294,13 +403,6 @@ const StatisticsPage = () => {
       </div>
     );
   };
-  const th = (key: SortKey, label: string, cls = "") => (
-    <th className={`px-2 py-1.5 text-right font-semibold ${cls}`}>
-      <button type="button" onClick={() => setSortKey(key)} className={`whitespace-nowrap ${sortKey === key ? "text-gray-900 dark:text-white" : ""}`}>
-        {label}{sortKey === key ? " ▾" : ""}
-      </button>
-    </th>
-  );
 
   return (
     <div className="min-h-screen px-4 py-6 max-w-screen-sm mx-auto flex flex-col gap-5 tabular-nums">
@@ -327,58 +429,115 @@ const StatisticsPage = () => {
               className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100" />
           </div>
         )}
-        {deckFilterOptions.length > 1 && (
-          <div className="flex items-center gap-2">
-            <label htmlFor="stats-deck" className="text-sm text-gray-500 dark:text-gray-400 shrink-0">내 덱</label>
-            <select
-              id="stats-deck"
-              value={selectedDeckId ?? ""}
-              onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100"
+        {showDeckSwitch && (
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 cursor-pointer">
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">덱별 상세 분석</span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400">여러 덱을 한 시트에 기록했다면, 덱마다 통계를 따로 봅니다</span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={byDeck}
+              aria-label="덱별 상세 분석"
+              onClick={() => setByDeck(!byDeck)}
+              className={`relative shrink-0 w-11 h-6 rounded-full p-0 border-0 transition ${byDeck ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"}`}
             >
-              <option value="">전체</option>
-              {deckFilterOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${byDeck ? "translate-x-5" : ""}`} />
+            </button>
+          </label>
         )}
         <PersonChips value={memberFilter} onPick={setMemberFilter} withAll />
       </div>
 
       {games === 0 ? (
         <p className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">이 기간에 기록한 듀얼이 없습니다.</p>
+      ) : byDeck ? (
+        <>
+          {deckParts ? (
+            <>
+              <div className="flex flex-wrap gap-1.5" aria-label="덱 바로 가기">
+                {deckParts.map((part, i) => (
+                  <button
+                    key={part.deck?.id ?? "other"}
+                    type="button"
+                    onClick={() => document.getElementById(`deck-part-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full text-[13px] bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    <img src={part.deck?.cover_image_small || OTHER_DECK_IMAGE} alt="" className="w-5 h-5 rounded-full object-cover" />
+                    {part.deck?.name ?? "기타"}
+                    <span className="text-gray-500 dark:text-gray-400">{part.stats.basic.total_games}</span>
+                  </button>
+                ))}
+              </div>
+              {deckParts.map((part, i) => (
+                <section key={part.deck?.id ?? "other"} id={`deck-part-${i}`} className="scroll-mt-24 flex flex-col gap-4 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5">
+                  <header className="flex items-center gap-2.5">
+                    <img src={part.deck?.cover_image_small || OTHER_DECK_IMAGE} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-bold leading-tight break-words">{part.deck?.name ?? "기타"}</h2>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {part.stats.basic.total_games}판 · {isAggregate ? "전체 듀얼의" : "이 시트 듀얼의"} {(() => { const share = (part.stats.basic.total_games / games) * 100; return pctText(share, share < 10 ? 1 : 0); })()}
+                      </p>
+                    </div>
+                  </header>
+                  <Overview stats={part.stats} />
+                  <OppDeckTable stats={part.stats} sortKey={sortKey} onSort={setSortKey} />
+                </section>
+              ))}
+            </>
+          ) : (
+            <div className="flex flex-col gap-3" aria-busy>
+              <div className="h-7 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
+              <div className="h-[320px] rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            </div>
+          )}
+          {!isAggregate && (rankData.length > 0 || scoreData.length > 0) && (
+            <Card
+              title={curve === "rank" ? "랭크 변화 · 모든 덱" : "점수 변화 · 모든 덱"}
+              aside={curve === "rank" && firstRank && lastRank ? (
+                <span className="inline-flex items-center gap-1">
+                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_LABELS[lastRank]}
+                </span>
+              ) : `${curveData.length}판`}
+            >
+              <PersonChips value={rankMember} onPick={(id) => id !== null && setRankMember(id)} withAll={false} />
+              {rankData.length > 0 && scoreData.length > 0 && (
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setCurve("rank")} className={chip(curve === "rank")}>랭크</button>
+                  <button type="button" onClick={() => setCurve("score")} className={chip(curve === "score")}>점수</button>
+                </div>
+              )}
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart data={curveData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#e5e7eb" strokeOpacity={0.7} />
+                  <XAxis dataKey="index" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={24} />
+                  <YAxis
+                    domain={yDomain}
+                    ticks={rankTicks}
+                    allowDecimals={curve !== "rank"}
+                    tickFormatter={(v: number) => (curve === "rank" ? RANK_LABELS[RANK_ORDER[v]] || "" : String(v))}
+                    tick={curve === "rank" ? <RankTick /> : { fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={curve === "rank" ? 64 : 42}
+                  />
+                  <Tooltip
+                    formatter={(_: number, __: string, props: { payload?: { label?: string } }) => [props.payload?.label ?? "", curve === "rank" ? "랭크" : "점수"]}
+                    labelFormatter={(v: number) => `${v}번째 듀얼`}
+                    contentStyle={{ fontSize: "0.8rem" }}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="#2563eb" fillOpacity={0.1} dot={false} activeDot={{ r: 4 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">가로는 듀얼 순서{curve === "rank" ? ", 세로는 랭크 (칸 사이는 승수)" : ""}</p>
+            </Card>
+          )}
+
+        </>
       ) : (
         <>
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="flex flex-col">
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">승률</span>
-                <b className="text-2xl leading-tight">{pctText(b.overall_win_rate, 1)}</b>
-                <small className="text-xs text-gray-500 dark:text-gray-400">{wins}승 {games - wins}패</small>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">듀얼</span>
-                <b className="text-2xl leading-tight">{games}</b>
-                <small className="text-xs text-gray-500 dark:text-gray-400">선공 {firstGames} · 후공 {secondGames}</small>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">선공 비율</span>
-                <b className="text-2xl leading-tight">{pctText(b.first_ratio)}</b>
-                <small className="text-xs text-gray-500 dark:text-gray-400">{firstGames}번 선공</small>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
-              <BarStat label="선공 승률" value={firstGames ? b.first_win_rate : null} sub={`${firstGames}판`} />
-              <BarStat label="후공 승률" value={secondGames ? b.second_win_rate : null} sub={`${secondGames}판`} />
-            </div>
-          </div>
-
-          <CoinSplit
-            winGames={coinWinGames}
-            winWins={count(b.coin_toss_win_win_rate, coinWinGames)}
-            loseGames={coinLoseGames}
-            loseWins={count(b.coin_toss_lose_win_rate, coinLoseGames)}
-          />
-
+          <Overview stats={stats} />
           {!isAggregate && (rankData.length > 0 || scoreData.length > 0) && (
             <Card
               title={curve === "rank" ? "랭크 변화" : "점수 변화"}
@@ -421,58 +580,8 @@ const StatisticsPage = () => {
             </Card>
           )}
 
-          <Card title="내 덱" aside="판수 · 승률">
-            <div className="flex flex-col gap-2">
-              {myDecks.map((e) => (
-                <div key={e.deck.id} className="flex items-center gap-2 text-[13px]">
-                  <img src={e.deck.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
-                  <span className="w-24 shrink-0 break-words leading-tight">{e.deck.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${e.ratio}%` }} />
-                  </div>
-                  <b className="w-10 text-right">{e.count}판</b>
-                  <span className={`w-10 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card title="상대 덱별" aside={`${oppDecks.length}개 덱 · 제목을 누르면 정렬`} flush>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/60 border-y border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-2 pl-3.5 py-1.5 text-left font-semibold">상대 덱</th>
-                    {th("count", "판")}
-                    {th("win_rate", "승률")}
-                    {th("first_win_rate", "선공")}
-                    {th("second_win_rate", "후공", "pr-3.5")}
-                  </tr>
-                </thead>
-                <tbody>
-                  {oppShown.map((e, i) => (
-                    <tr key={e.deck?.id ?? `${e.displayName}-${i}`} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
-                      <td className="px-2 pl-3.5 py-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <img src={(!e.isUnknown && e.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
-                          <span className="break-words leading-tight">{e.displayName}</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 text-right">{e.count}<span className="block text-[10px] text-gray-400">{e.ratio.toFixed(0)}%</span></td>
-                      <td className={`px-2 py-1.5 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</td>
-                      <td className={`px-2 py-1.5 text-right text-xs ${rateTone(e.first_win_rate)}`}>{pctText(e.first_win_rate)}</td>
-                      <td className={`px-2 pr-3.5 py-1.5 text-right text-xs ${rateTone(e.second_win_rate)}`}>{pctText(e.second_win_rate)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {oppDecks.length > OPP_SHOWN && (
-              <button type="button" onClick={() => setShowAllOpp((v) => !v)} className="py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                {showAllOpp ? "접기" : `나머지 ${oppDecks.length - OPP_SHOWN}개 덱 보기`}
-              </button>
-            )}
-          </Card>
+          <MyDecksCard stats={stats} />
+          <OppDeckTable stats={stats} sortKey={sortKey} onSort={setSortKey} />
         </>
       )}
     </div>

@@ -297,7 +297,7 @@ def get_record_group_statistics_full(request, record_group_id):
     matches = filter_period(matches, request.GET)
 
     data = {"record_group_name": record_group.name}
-    data.update(compute_full_statistics(matches))
+    data.update(compute_full_statistics(matches, by_deck=request.GET.get("by_deck") == "1"))
     return Response(data, status=status.HTTP_200_OK)
 
 
@@ -329,7 +329,7 @@ def get_user_statistics_full(request):
     matches = filter_period(matches, request.GET)
 
     data = {"record_groups": group_list, "group_count": len(group_list)}
-    data.update(compute_full_statistics(matches))
+    data.update(compute_full_statistics(matches, by_deck=request.GET.get("by_deck") == "1"))
     return Response(data, status=status.HTTP_200_OK)
 
 from django.core.paginator import Paginator
