@@ -32,6 +32,9 @@ const POWER_COLORS: { label: string; color: string }[] = [
   { label: "최하위권", color: "#4b5563" },
 ];
 const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map((p) => [p.label, p.color]));
+// The list runs strongest first — 최상위권, then 상위권, … — and by name within each tier (특이점 2026-10-06).
+const POWER_RANK: Record<string, number> = Object.fromEntries(POWER_COLORS.map((p, i) => [p.label, i]));
+const powerRank = (strength: string) => POWER_RANK[strength] ?? POWER_COLORS.length;
 // 3px ring in the deck power colour plus a faint glow of the same colour outside it (drawn outside the box, so no layout shift).
 const powerRing = (color: string): CSSProperties => ({ boxShadow: `0 0 0 3px ${color}, 0 0 9px 2px ${color}99` });
 
@@ -208,7 +211,8 @@ export default function DatabasePage() {
       filtered = filtered.filter((deck) => deck.summoning_methods.includes(selectedSummoningMethod));
     }
 
-    return filtered;
+    // filter() always returns a fresh array, and the sort is stable, so the API's name order holds within a tier.
+    return filtered.sort((a, b) => powerRank(a.strength) - powerRank(b.strength));
   }, [searchQuery,
     selectedPerformanceTags,
     selectedAestheticTags,
