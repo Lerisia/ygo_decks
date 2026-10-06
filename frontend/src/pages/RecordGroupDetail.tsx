@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord, deleteRecordGroup, getRecordGroupStatistics,
          updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility, type SheetSummary } from "@/api/toolApi";
-import { ResultChips, BarStat, CoinSplit, KebabMenu, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
+import { ResultChips, BarStat, CoinSplit, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
 import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
@@ -786,6 +786,7 @@ const RecordGroupDetailPage = () => {
     : latest.score_type === "duelist_cup" ? "듀얼리스트 컵"
     : null;
   // Recorded rank/wins are where a duel started, so "now" is one step on from the latest duel.
+  const nowRank = latest?.rank ? getNextRankState(latest.rank, latest.wins ?? null, latest.result).rank : null;
   const nowLabel = (() => {
     if (!latest) return null;
     if (latest.rank) {
@@ -881,9 +882,12 @@ const RecordGroupDetailPage = () => {
         <div className="mb-5 flex flex-col gap-4">
           <section className="rounded-xl border border-gray-200 dark:border-gray-700 px-3.5 py-3 flex flex-col gap-2.5">
             <div className="flex justify-between items-center gap-2">
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{mixedPeople ? "그룹 전체" : latest?.rank ? "지금" : "마지막 기록"}</span>
-                <b className="text-lg leading-tight">{mixedPeople ? `${totals.games}판` : nowLabel ?? `${totals.games}판`}</b>
+              <div className="flex items-center gap-2.5 min-w-0">
+                {!mixedPeople && <RankIcon rank={nowRank} className="w-11 h-11" />}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{mixedPeople ? "그룹 전체" : latest?.rank ? "지금" : "마지막 기록"}</span>
+                  <b className="text-lg leading-tight">{mixedPeople ? `${totals.games}판` : nowLabel ?? `${totals.games}판`}</b>
+                </div>
               </div>
               {!mixedPeople && summary.streak && summary.streak.count >= 2 && (
                 <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
@@ -1250,9 +1254,10 @@ const RecordGroupDetailPage = () => {
 
                 <div className="flex flex-col items-end gap-0.5 text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap tabular-nums">
                   <span>{timeLabel(match.created_at)}</span>
-                  <span>
+                  <span className="inline-flex items-center gap-1">
+                    <RankIcon rank={match.rank} className="w-4 h-4" />
                     {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
-                    {climbed && <span className="ml-1 font-semibold text-green-700 dark:text-green-400">↑</span>}
+                    {climbed && <span className="font-semibold text-green-700 dark:text-green-400">↑</span>}
                   </span>
                   {canWrite && (
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
@@ -1276,7 +1281,7 @@ const RecordGroupDetailPage = () => {
               </div>
               {promoted && (
                 <div className="flex items-center gap-2 pl-3 py-1 text-[11px] font-medium text-green-700 dark:text-green-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  <RankIcon rank={match.rank} className="w-5 h-5" />
                   {TIER_LABEL[tierOf(match.rank!)] ?? match.rank} 승급
                 </div>
               )}

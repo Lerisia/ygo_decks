@@ -164,3 +164,11 @@ export function getValidWinOptions(rank: string): number[] {
   }
   return [];
 }
+
+// Master Duel rank emblems (one per tier, from RogerMorhan's extracted game assets on DeviantArt, 2026-10-06).
+export const RANK_TIERS = ["rookie", "bronze", "silver", "gold", "platinum", "diamond", "master"] as const;
+export function rankIconSrc(rank: string | null | undefined): string | null {
+  if (!rank) return null;
+  const tier = rank.replace(/\d+$/, "");
+  return (RANK_TIERS as readonly string[]).includes(tier) ? `/images/ranks/${tier}.webp` : null;
+}

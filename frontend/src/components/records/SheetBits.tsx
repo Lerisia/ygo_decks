@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SheetSummary } from "@/api/toolApi";
+import { rankIconSrc } from "@/utils/rankUtils";
 
 // Pieces shared by the sheet list, the sheet page and its statistics (redesign 2026-10-06).
 
@@ -147,4 +148,10 @@ export function confirmSheetDelete(name: string): boolean {
     return false;
   }
   return true;
+}
+
+/** The tier's emblem from the game, sized by the caller. */
+export function RankIcon({ rank, className = "w-4 h-4" }: { rank: string | null | undefined; className?: string }) {
+  const src = rankIconSrc(rank);
+  return src ? <img src={src} alt="" className={`${className} object-contain shrink-0`} /> : null;
 }

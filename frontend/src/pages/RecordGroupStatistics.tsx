@@ -6,7 +6,8 @@ import {
   type SheetContributor, type StatsPeriod,
 } from "@/api/toolApi";
 import { OTHER_DECK_IMAGE, UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
-import { BarStat, CoinSplit, pctText, rateTone } from "@/components/records/SheetBits";
+import { BarStat, CoinSplit, RankIcon, pctText, rateTone } from "@/components/records/SheetBits";
+import { rankIconSrc } from "@/utils/rankUtils";
 
 interface DeckInfo {
   id: number;
@@ -78,6 +79,19 @@ const rankToNumeric = (rank: string, wins: number | null): number => {
   const idx = RANK_ORDER.indexOf(rank);
   if (idx === -1) return 0;
   return idx + (wins ?? 0) / 8;
+};
+
+// Rank axis label with the tier's emblem in front.
+const RankTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value?: number } }) => {
+  const rank = RANK_ORDER[payload?.value ?? -1];
+  if (!rank) return null;
+  const icon = rankIconSrc(rank);
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      {icon && <image href={icon} x={-60} y={-8} width={16} height={16} />}
+      <text x={-2} y={0} dy={3.5} fontSize={10} textAnchor="end" className="fill-gray-500 dark:fill-gray-400">{RANK_LABELS[rank]}</text>
+    </g>
+  );
 };
 
 const isUnknownDeck = (entry: { deck: DeckInfo | null; custom_name?: string | null }) => !entry.deck && !entry.custom_name;
@@ -368,7 +382,11 @@ const StatisticsPage = () => {
           {!isAggregate && (rankData.length > 0 || scoreData.length > 0) && (
             <Card
               title={curve === "rank" ? "랭크 변화" : "점수 변화"}
-              aside={curve === "rank" && firstRank && lastRank ? `${RANK_LABELS[firstRank]} → ${RANK_LABELS[lastRank]}` : `${curveData.length}판`}
+              aside={curve === "rank" && firstRank && lastRank ? (
+                <span className="inline-flex items-center gap-1">
+                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_LABELS[lastRank]}
+                </span>
+              ) : `${curveData.length}판`}
             >
               <PersonChips value={rankMember} onPick={(id) => id !== null && setRankMember(id)} withAll={false} />
               {rankData.length > 0 && scoreData.length > 0 && (
@@ -386,10 +404,10 @@ const StatisticsPage = () => {
                     ticks={rankTicks}
                     allowDecimals={curve !== "rank"}
                     tickFormatter={(v: number) => (curve === "rank" ? RANK_LABELS[RANK_ORDER[v]] || "" : String(v))}
-                    tick={{ fontSize: 10 }}
+                    tick={curve === "rank" ? <RankTick /> : { fontSize: 10 }}
                     tickLine={false}
                     axisLine={false}
-                    width={curve === "rank" ? 54 : 42}
+                    width={curve === "rank" ? 64 : 42}
                   />
                   <Tooltip
                     formatter={(_: number, __: string, props: { payload?: { label?: string } }) => [props.payload?.label ?? "", curve === "rank" ? "랭크" : "점수"]}

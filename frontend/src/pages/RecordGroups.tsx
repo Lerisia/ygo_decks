@@ -13,7 +13,8 @@ import {
   MetaDeckStat,
   type SheetSummary,
 } from "@/api/toolApi";
-import { ResultChips, KebabMenu, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
+import { ResultChips, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
+import { getNextRankState, getRankLabel } from "@/utils/rankUtils";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
@@ -435,6 +436,9 @@ const RecordGroups = () => {
               const t = group.summary?.totals;
               const games = t?.games ?? group.totalGames;
               const wins = t?.wins ?? Math.round(group.totalGames * group.overallWinRate / 100);
+              // a solo sheet's climb: where the latest duel left it
+              const last = group.kind !== "shared" ? group.summary?.latest : null;
+              const nowRank = last?.rank ? getNextRankState(last.rank, last.wins ?? null, last.result) : null;
               return (
                 <div
                   key={group.id}
@@ -466,9 +470,17 @@ const RecordGroups = () => {
                       ]}
                     />
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <b className="text-2xl leading-none">{pctText(rate(wins, games), 1)}</b>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">{wins}승 {games - wins}패</span>
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="flex items-baseline gap-2">
+                      <b className="text-2xl leading-none">{pctText(rate(wins, games), 1)}</b>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{wins}승 {games - wins}패</span>
+                    </div>
+                    {nowRank && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">
+                        <RankIcon rank={nowRank.rank} className="w-6 h-6" />
+                        {getRankLabel(nowRank.rank)}
+                      </span>
+                    )}
                   </div>
                   {group.summary && group.summary.recent.length > 0 && <ResultChips recent={group.summary.recent} small slots={10} />}
                   {t && games > 0 && (
