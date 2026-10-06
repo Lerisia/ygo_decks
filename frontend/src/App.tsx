@@ -56,6 +56,9 @@ import DuchMindWordPackDetail from "./pages/DuchMindWordPackDetail";
 import MyAvatar from "./pages/MyAvatar";
 import IconShop from "./pages/IconShop";
 import Changelog from "./pages/Changelog";
+import InquiryHome from "./pages/InquiryHome";
+import InquiryBoardPage from "./pages/InquiryBoardPage";
+import InquiryPostPage from "./pages/InquiryPostPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
@@ -152,6 +155,9 @@ function App() {
           <Route path="/recorder" element={<Tracker />} />
           <Route path="/tracker" element={<Navigate to="/recorder" replace />} />
           <Route path="/changelog" element={<Changelog />} />
+          <Route path="/inquiry" element={<InquiryHome />} />
+          <Route path="/inquiry/post/:id" element={<InquiryPostPage />} />
+          <Route path="/inquiry/:board" element={<InquiryBoardPage />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
       {!inMultiplayerRoom && !drawingMode && <Footer />}

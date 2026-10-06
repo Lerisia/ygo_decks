@@ -2,6 +2,12 @@ import { Link, useNavigate } from "react-router-dom";
 
 const tiles = [
   {
+    to: "/inquiry",
+    icon: "📮",
+    label: "문의 게시판",
+    description: "덱 제보·사이트 문의 확인하고 답변 달기",
+  },
+  {
     to: "/changelog",
     icon: "📢",
     label: "공지 작성",

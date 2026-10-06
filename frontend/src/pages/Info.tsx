@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
-import { CONTACT_URL, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
+import { CONTACT_PATH, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
 import DeckPickerModal from "@/components/DeckPickerModal";
 
 // Home (redesign 2026-10): two pillars, 덱 도감 then 레코더; the rest as small tiles; 문의·후원 at the bottom.
@@ -190,12 +190,12 @@ function Info() {
       <section aria-labelledby="home-support" className="rounded-2xl p-4 md:p-6 bg-gray-100 dark:bg-gray-800/60 flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
         <div className="flex-1">
           <h2 id="home-support" className="text-base md:text-lg font-extrabold">YGO Decks는 작은 팀이 만들고 운영합니다</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">버그나 제안은 오픈채팅으로 알려 주세요. 서버비는 후원으로 함께해 주시면 큰 힘이 됩니다.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">버그나 제안은 문의 게시판에 남겨 주세요. 서버비는 후원으로 함께해 주시면 큰 힘이 됩니다.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 md:w-80">
-          <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" className="py-3 text-center rounded-lg font-semibold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 transition">
+          <Link to={CONTACT_PATH} className="py-3 text-center rounded-lg font-semibold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 transition">
             💬 문의하기
-          </a>
+          </Link>
           <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="py-3 text-center rounded-lg font-semibold bg-rose-600 hover:bg-rose-700 text-white transition">
             ☕ 후원하기
           </a>

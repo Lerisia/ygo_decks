@@ -4,7 +4,7 @@ import { isAuthenticated, getUserInfo, claimDailyBonus, isAdmin } from "../api/a
 import { getMyAvatar } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
-import { ALL_MENU_PATH, CONTACT_URL, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
+import { ALL_MENU_PATH, CONTACT_PATH, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
 import logo from "/images/logo_big.webp";
 
 // 문의, 후원 and 공지 sit at the top right of every page (redesign 2026-10).
@@ -13,15 +13,13 @@ function SupportLinks({ compact }: { compact?: boolean }) {
   const size = compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
   return (
     <>
-      <a
-        href={CONTACT_URL}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        to={CONTACT_PATH}
         className={`${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
-        title="문의 (카카오톡 오픈채팅)"
+        title="문의 게시판"
       >
         💬<span className={compact ? "" : "hidden md:inline"}>문의</span>
-      </a>
+      </Link>
       <a
         href={DONATE_URL}
         target="_blank"

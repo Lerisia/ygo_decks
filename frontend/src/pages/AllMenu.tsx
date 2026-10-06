@@ -4,7 +4,7 @@ import { getUserInfo, isAdmin, isAuthenticated, logout } from "@/api/accountApi"
 import { getMyAvatar, type Border, type PublicCardIcon } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
-import { CONTACT_URL, DONATE_URL, ME_ITEMS, MENU_GROUPS, itemHref, type MenuItem } from "@/lib/siteMenu";
+import { CONTACT_PATH, DONATE_URL, ME_ITEMS, MENU_GROUPS, itemHref, type MenuItem } from "@/lib/siteMenu";
 
 function readDark() {
   return document.documentElement.classList.contains("dark");
@@ -57,10 +57,10 @@ export default function AllMenu() {
       <h1 className="text-2xl md:text-3xl font-bold">전체</h1>
 
       <div className="grid grid-cols-2 gap-2">
-        <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer"
+        <Link to={CONTACT_PATH}
            className="py-3 text-center rounded-xl font-semibold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 transition">
           💬 문의하기
-        </a>
+        </Link>
         <a href={DONATE_URL} target="_blank" rel="noopener noreferrer"
            className="py-3 text-center rounded-xl font-semibold bg-rose-600 hover:bg-rose-700 text-white transition">
           ☕ 후원하기

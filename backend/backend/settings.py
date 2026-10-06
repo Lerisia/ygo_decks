@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'solo',
     'changelog',
     'tracker',
+    'inquiry',
 ]
 
 MIDDLEWARE = [

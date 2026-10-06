@@ -1,6 +1,8 @@
 // One menu for the whole site: the PC dropdowns, the phone's bottom tabs and the 전체 page all read it,
 // so a feature is added in one place. (Redesign 2026-10: 도감 · 도구 · 전적 · 놀이터 · 전체)
 
+// 문의 buttons open the site's own inquiry boards (특이점 2026-10-07); the open chat link is kept for reference.
+export const CONTACT_PATH = "/inquiry";
 export const CONTACT_URL = "https://open.kakao.com/o/sDIT5F2c";
 export const DONATE_URL = "https://www.buymeacoffee.com/elyss";
 export const RECORDER_DOWNLOAD_URL = "/media/recorder/YGODecksRecorder.exe";
