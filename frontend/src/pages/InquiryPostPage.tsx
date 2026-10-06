@@ -106,7 +106,13 @@ export default function InquiryPostPage() {
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           <span>익명{post.mine ? " (내 글)" : ""}</span>
           <span>{formatInquiryDate(post.created_at)}</span>
-          <span className={post.answered ? "text-green-600 dark:text-green-400 font-semibold" : ""}>{post.answered ? "답변 완료" : "답변 대기"}</span>
+          <span
+            className={`px-2 py-0.5 rounded-full font-semibold ${
+              post.answered ? "bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900" : "border border-gray-300 dark:border-gray-600"
+            }`}
+          >
+            {post.answered ? "✓ 답변 완료" : "답변 대기"}
+          </span>
           {post.author_name && <span className="text-amber-700 dark:text-amber-400">작성자 {post.author_name} (운영진에게만 보임)</span>}
           {post.notify_email != null && <span>{post.notify_email ? "✉️ 답변 메일 알림 켬" : "메일 알림 끔"}</span>}
           {(post.mine || staff) && post.can_view && (

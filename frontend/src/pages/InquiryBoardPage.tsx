@@ -198,7 +198,16 @@ export default function InquiryBoardPage() {
             ))
           : data?.results.map((p) => (
               <li key={p.id}>
-                <Link to={`/inquiry/post/${p.id}`} className="block py-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition px-1">
+                {/* Answered posts stand out in dark grey: a bar on the left, a faint wash and a solid badge (특이점 2026-10-07).
+                    Every row keeps the 4px bar slot so nothing shifts when an answer arrives. */}
+                <Link
+                  to={`/inquiry/post/${p.id}`}
+                  className={`block py-3 pl-2.5 pr-1 border-l-4 transition ${
+                    p.answered
+                      ? "border-gray-800 dark:border-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/70 dark:hover:bg-gray-700/70"
+                      : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                  }`}
+                >
                   <div className="flex items-start gap-2">
                     <span
                       className={`min-w-0 flex-1 font-semibold leading-snug ${p.can_view ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
@@ -210,11 +219,11 @@ export default function InquiryBoardPage() {
                     <span
                       className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
                         p.answered
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                          : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+                          ? "bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900"
+                          : "border border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400"
                       }`}
                     >
-                      {p.answered ? "답변 완료" : "답변 대기"}
+                      {p.answered ? "✓ 답변 완료" : "답변 대기"}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
