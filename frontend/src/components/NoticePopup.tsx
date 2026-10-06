@@ -65,7 +65,7 @@ export default function NoticePopup({ disabled = false }: { disabled?: boolean }
       role="status"
       aria-live="polite"
       onTransitionEnd={() => !visible && setShown(null)}
-      className={`fixed right-3 top-16 sm:top-20 z-40 w-[min(20rem,calc(100vw-1.5rem))] transition-all duration-500 ${
+      className={`fixed right-3 top-16 sm:top-24 z-40 w-[min(20rem,calc(100vw-1.5rem))] transition-all duration-500 ${
         visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
       }`}
     >

@@ -84,7 +84,11 @@ function App() {
   return (
     <div>
       {!drawingMode && <TrackerBanner />}
-      {!drawingMode && <Navbar />}
+      {!drawingMode && (
+        <div className="site-header-bleed">
+          <Navbar />
+        </div>
+      )}
       <NoticePopup disabled={drawingMode || inMultiplayerRoom} />
       {keepDeckList && (
         <div hidden={!onDeckList}>
