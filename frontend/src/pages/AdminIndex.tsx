@@ -48,7 +48,7 @@ const tiles = [
 export default function AdminIndex() {
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-2xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline px-2 sm:px-0"

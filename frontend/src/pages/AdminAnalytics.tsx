@@ -40,7 +40,7 @@ export default function AdminAnalytics() {
     : null;
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-3xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto">
       <button onClick={() => navigate("/manage")} className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline px-2 sm:px-0">← 관리</button>
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-3 py-4 sm:p-5">
         <div className="flex items-center justify-between mb-4 gap-2">

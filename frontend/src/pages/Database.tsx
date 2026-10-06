@@ -233,7 +233,7 @@ export default function DatabasePage() {
   };
 
   return (
-    <div className="h-auto min-h-screen px-0 sm:px-4 text-center p-4">
+    <div className="h-auto min-h-screen px-4 py-4 text-center">
       <DatabaseTrackerPromo />
 
       {/* Search decks */}

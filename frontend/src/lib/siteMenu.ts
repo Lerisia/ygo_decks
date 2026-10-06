@@ -29,11 +29,10 @@ export const MENU_GROUPS: MenuGroup[] = [
     label: "도감",
     icon: "📚",
     to: "/database",
-    paths: ["/database", "/recommend", "/question", "/questions", "/result", "/statistics", "/no-results"],
+    paths: ["/database", "/recommend", "/question", "/questions", "/result", "/no-results"],
     items: [
       { label: "덱 목록", to: "/database", desc: "덱별 티어·운영법·전적" },
       { label: "덱 성향 테스트", to: "/recommend", desc: "질문에 답하면 맞는 덱을 추천" },
-      { label: "메타 통계", to: "/statistics", desc: "지금 많이 쓰는 덱" },
     ],
   },
   {
@@ -54,9 +53,9 @@ export const MENU_GROUPS: MenuGroup[] = [
     to: "/records",
     paths: ["/records", "/record-groups", "/recorder", "/tracker", "/mypage/mydecks"],
     items: [
-      { label: "전적 시트", to: "/records", desc: "내 전적과 승률" },
+      { label: "전적 시트", to: "/records", desc: "메타 통계와 내 전적" },
       { label: "레코더", to: "/recorder", desc: "PC에서 전적 자동 기록" },
-      { label: "전적 통계", to: "/record-groups/statistics", desc: "시트를 모아 본 통계", auth: true },
+      { label: "내 전적 통계", to: "/record-groups/statistics", desc: "내 시트를 모아 본 통계", auth: true },
       { label: "보유 덱", to: "/mypage/mydecks", desc: "가진 덱 관리", auth: true },
     ],
   },

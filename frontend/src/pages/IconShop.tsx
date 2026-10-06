@@ -213,7 +213,7 @@ export default function IconShop() {
   const ownedCount = useMemo(() => icons.filter((i) => i.owned).length, [icons]);
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-6xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-6xl mx-auto">
       <div className="flex items-baseline justify-between mb-1">
         <h1 className="text-2xl font-bold">상점</h1>
         {loggedIn && points !== null && (

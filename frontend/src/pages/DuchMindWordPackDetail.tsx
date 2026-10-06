@@ -131,7 +131,7 @@ export default function DuchMindWordPackDetail() {
 
   if (!pack) {
     return (
-      <div className="min-h-screen px-0 sm:px-4 py-6 max-w-4xl mx-auto">
+      <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
         <p className="text-center text-gray-500">로딩 중...</p>
       </div>
     );

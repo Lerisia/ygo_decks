@@ -57,7 +57,7 @@ export default function DuchMindWordPacks() {
   };
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-3xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto">
       <button
         onClick={() => navigate(-1)}
         className="text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2"

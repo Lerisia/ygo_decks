@@ -4,6 +4,7 @@ import { useTracker } from "@/context/TrackerContext";
 import { getUserRecordGroups, getRecordGroupMatches } from "@/api/toolApi";
 import { getUserDecks, isAuthenticated } from "@/api/accountApi";
 import { RANK_OPTIONS, getValidWinOptions, getRankLabel } from "@/utils/rankUtils";
+import PcRecorder from "./PcRecorder";
 
 type RecordGroup = { id: number; name: string };
 type Deck = { id: number; name: string };
@@ -66,10 +67,12 @@ export default function Tracker() {
   };
 
   const selectedDeckName = myDecks.find((d) => d.id === t.selectedDeck)?.name || "선택";
+  // The Android app is shelved (2026-10): on the web this address is the PC recorder's page.
+  if (!isNative) return <PcRecorder />;
   const winOptions = getValidWinOptions(t.currentRank);
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-lg mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-bold text-center mb-2">듀얼 레코더</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 text-sm">
         마스터 듀얼을 플레이하면 자동으로 전적이 기록됩니다.

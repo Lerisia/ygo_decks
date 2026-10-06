@@ -103,7 +103,7 @@ function Navbar() {
   return (
     <header className="bg-transparent text-black dark:text-white">
       {/* Phone: logo, 문의·후원, me */}
-      <div className={`sm:hidden ${inMultiplayerRoom ? "hidden" : "flex"} items-center justify-between gap-2 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-sm px-3`}>
+      <div className={`sm:hidden ${inMultiplayerRoom ? "hidden" : "flex"} items-center justify-between gap-2 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-sm px-4`}>
         <Link to="/" className="shrink-0" aria-label="홈">{logoImg("h-10")}</Link>
         <div className="flex items-center gap-1.5 min-w-0">
           <SupportLinks compact />
@@ -117,7 +117,7 @@ function Navbar() {
         </div>
       </div>
       {isLoggedIn && userInfo && !inMultiplayerRoom && (
-        <div className="sm:hidden flex items-center justify-between px-3 h-8 text-xs bg-gray-50 dark:bg-gray-900/60 border-b border-gray-100 dark:border-gray-800">
+        <div className="sm:hidden flex items-center justify-between px-4 h-8 text-xs bg-gray-50 dark:bg-gray-900/60 border-b border-gray-100 dark:border-gray-800">
           <span className="truncate"><span className="font-semibold">{userInfo.username}</span>님</span>
           {pointsLink}
         </div>

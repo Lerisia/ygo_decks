@@ -101,7 +101,7 @@ const Mypage = () => {
   const inputClass = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
-    <div className="h-auto min-h-screen px-0 sm:px-4 py-6">
+    <div className="h-auto min-h-screen px-4 py-6">
       <div className="w-full max-w-md mx-auto space-y-3">
         <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 flex items-center gap-4">
           <button

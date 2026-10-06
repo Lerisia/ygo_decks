@@ -9,10 +9,10 @@ function Tools() {
   const tools = MENU_GROUPS.find((g) => g.key === "tools")?.items ?? [];
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
+    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
       <h1 className="text-2xl md:text-4xl font-bold text-center mb-2">도구</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">덱을 고르고 정리할 때 쓰는 도구</p>
-      <div className="grid grid-cols-2 gap-4 md:gap-6 px-4 sm:px-0">
+      <div className="grid grid-cols-2 gap-4 md:gap-6">
         {tools.map((t) => (
           <button
             key={t.to}

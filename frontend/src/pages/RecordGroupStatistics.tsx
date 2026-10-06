@@ -323,7 +323,7 @@ const StatisticsPage = () => {
     `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-4xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-2 mb-4">
         <button
           onClick={() => navigate(isAggregate ? "/records" : `/record-groups/${recordGroupId}`)}

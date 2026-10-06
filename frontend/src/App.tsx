@@ -13,7 +13,6 @@ import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import Info from "./pages/Info";
 import Unauthorized from "./pages/Unauthorized";
-import DeckStatistics from "./pages/Statistics";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Mypage from "./pages/Mypage";
@@ -92,7 +91,8 @@ function App() {
           <Route path="/result" element={<ResultPage />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
-          <Route path="/statistics" element={<DeckStatistics />} />
+          {/* The test's answer statistics were retired (2026-10); old links land on the test. */}
+          <Route path="/statistics" element={<Navigate to="/recommend" replace />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/mypage" element={<Mypage />} />

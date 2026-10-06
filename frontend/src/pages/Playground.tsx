@@ -15,7 +15,7 @@ function Playground() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
+    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
       <h1 className="text-2xl md:text-4xl font-bold text-center mb-2">놀이터</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">다양한 미니게임을 즐겨보세요!</p>
 

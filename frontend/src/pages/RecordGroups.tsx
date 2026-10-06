@@ -266,7 +266,7 @@ const RecordGroups = () => {
   }, [isLoggedIn]);
 
   return (
-    <div className="px-0 sm:px-6 py-6 min-h-screen">
+    <div className="px-4 sm:px-6 py-6 min-h-screen">
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-2xl md:text-3xl font-bold">시트 관리</h1>
         {isLoggedIn && (

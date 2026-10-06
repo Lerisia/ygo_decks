@@ -753,7 +753,7 @@ const RecordGroupDetailPage = () => {
   }));
 
   return (
-    <div className="px-0 sm:px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
+    <div className="px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
       {myRole && myRole !== "public" && (
         <button
           onClick={() => navigate("/records")}

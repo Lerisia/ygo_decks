@@ -323,7 +323,7 @@ export default function SoloTwenty() {
   const confirmedGroups = useMemo(() => new Set<string>(), []);
 
   return (
-    <div className="min-h-screen px-3 sm:px-4 py-4 md:py-8 max-w-2xl mx-auto">
+    <div className="min-h-screen px-4 py-4 md:py-8 max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/solo")}
         className="mb-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"

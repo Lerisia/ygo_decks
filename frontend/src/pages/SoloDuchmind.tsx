@@ -304,7 +304,7 @@ export default function SoloDuchmind() {
 
   return (
     <div className="min-h-svh bg-gray-50 dark:bg-gray-900 pb-20">
-      <div className="max-w-5xl mx-auto px-3 py-4">
+      <div className="max-w-5xl mx-auto px-4 py-4">
         <button
           onClick={() => navigate("/playground")}
           className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"

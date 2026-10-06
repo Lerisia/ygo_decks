@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 function Recommend() {
   return (
-    <div className="min-h-screen flex flex-col items-center px-2 sm:px-4 pt-4">
+    <div className="min-h-screen flex flex-col items-center px-4 pt-4">
       <div className="relative mb-6 w-full max-w-2xl">
         <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto rounded-lg" />
         <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 mx-auto object-cover rounded-lg" />
@@ -19,11 +19,6 @@ function Recommend() {
         <Link to="/questions">
           <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-lg">
             시작하기
-          </button>
-        </Link>
-        <Link to="/statistics">
-          <button className="w-full py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-            통계 보기
           </button>
         </Link>
       </div>

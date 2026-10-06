@@ -10,11 +10,11 @@ import { CONTACT_URL, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
 const COLLAGE = 6;   // phone shows the first 4
 
 const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
-  { to: "/statistics", title: "메타 통계", desc: "지금 많이 쓰는 덱" },
-  { to: "/records", title: "전적 시트", desc: "내 전적과 승률" },
+  { to: "/records", title: "전적 시트", desc: "메타 통계·내 전적" },
   { to: "/playground", title: "놀이터", desc: "퀴즈·미니게임" },
   { to: "/tier-list-maker", title: "티어표 만들기", desc: "만들고 이미지로" },
   { to: "/deck-scanner", title: "AI 덱 스캔", desc: "사진으로 덱 알아보기" },
+  { to: "/icon-shop", title: "아이콘 샵", desc: "포인트로 아이콘 사기" },
   { title: "대회", desc: "준비 중", soon: true },
 ];
 
@@ -138,7 +138,7 @@ function Info() {
             )}
           </p>
           <ul className="text-sm text-gray-700 dark:text-gray-300 flex flex-col gap-1 list-disc pl-5">
-            <li>판이 끝나면 전적 시트에 자동으로 저장</li>
+            <li>듀얼이 끝나면 전적 시트에 자동으로 저장</li>
             <li>상대가 보여 준 카드로 상대 덱을 판독</li>
             <li>듀얼 중에 그 덱 상대 내 전적을 보여 줌</li>
           </ul>

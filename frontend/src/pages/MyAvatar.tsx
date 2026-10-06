@@ -129,7 +129,7 @@ export default function MyAvatar() {
   };
 
   return (
-    <div className="min-h-screen px-0 sm:px-4 py-6 max-w-3xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto">
       <button
         onClick={() => navigate("/mypage")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"

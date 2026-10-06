@@ -113,7 +113,7 @@ export default function DeckDetail() {
   if (!deck) return <p className="text-center">Deck not found</p>;
 
   return (
-    <div className="h-auto min-h-screen w-full mx-auto max-w-4xl">
+    <div className="h-auto min-h-screen w-full mx-auto max-w-4xl px-4">
       {/* 
         1) 모바일(기본)에서는 테이블이 먼저, 이어서 본문.
         2) PC(큰 화면)에서는 테이블이 float-right로 뜨며,
