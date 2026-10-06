@@ -952,7 +952,7 @@ const RecordGroupDetailPage = () => {
           >
             ＋ 기록 추가
           </button>
-          <p className="mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400">레코더를 쓰면 듀얼이 끝날 때마다 여기에 저절로 쌓입니다.</p>
+          <p className="mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400">레코더를 쓰면 듀얼이 끝날 때마다 자동으로 기록됩니다.</p>
         </div>
       )}
       {canWrite && showRegisterForm && <div id="record-form" className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
