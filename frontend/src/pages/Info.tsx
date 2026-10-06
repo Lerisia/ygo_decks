@@ -79,7 +79,8 @@ function Info() {
           </div>
           <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
             <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-blue-400">덱 도감</span>
-            <h2 id="home-dex" className="text-xl md:text-3xl font-extrabold tracking-tight">
+            {/* 17px on phones keeps the line whole down to 360px-wide screens (특이점 2026-10-07). */}
+            <h2 id="home-dex" className="text-[17px] leading-6 sm:text-2xl md:text-3xl font-extrabold tracking-tight">
               마스터 듀얼의{" "}
               {popular ? <span className="tabular-nums">{popular.total || ""}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
               개의 덱을, 한 곳에서.
