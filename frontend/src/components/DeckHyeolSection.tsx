@@ -51,7 +51,7 @@ export default function DeckHyeolSection({ deckId }: { deckId: number }) {
                   return (
                     <li key={o.t} className="flex flex-col items-center text-center min-w-0">
                       <div className={`w-full aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ${lv.ring}`}>
-                        {o.image && <img src={o.image} alt={o.name} loading="lazy" className="w-full h-full object-cover" />}
+                        {o.image && <img loading="lazy" src={o.image} alt={o.name} className="w-full h-full object-cover" />}
                       </div>
                       <span className={`mt-1.5 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-bold leading-tight ${lv.badge}`}>{o.label}</span>
                       <span className="mt-1 text-[10px] sm:text-xs leading-tight text-gray-700 dark:text-gray-300 break-keep">{o.name}</span>

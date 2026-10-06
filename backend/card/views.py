@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
+from .search_thumbs import thumb_url as search_thumb_url
 from .models import UploadRecord, CardDetection, Card
 from rest_framework.parsers import MultiPartParser
 from rest_framework import permissions
@@ -219,7 +220,7 @@ def classify_deck_image(request):
     })
 
 
-_CARD_SEARCH_INDEX = None  # list of (id, name, name_normalized, image_url)
+_CARD_SEARCH_INDEX = None  # list of (id, name, name_normalized, image_url, thumb_url)
 _CARD_SEARCH_INDEX_AT = 0
 _CARD_SEARCH_TTL = 300  # 5 minutes
 
@@ -253,7 +254,7 @@ def _get_card_search_index():
             url = c.card_illust.url if c.card_illust else None
         except Exception:
             url = None
-        index.append((c.id, name, _normalize_for_search(name), url))
+        index.append((c.id, name, _normalize_for_search(name), url, search_thumb_url(c.card_illust.name) if url else None))
     _CARD_SEARCH_INDEX = index
     _CARD_SEARCH_INDEX_AT = _t.time()
     return _CARD_SEARCH_INDEX
@@ -279,10 +280,10 @@ def search_cards_by_name(request):
     # canonical card tends to have the shortest name containing the
     # query (e.g. "드래곤" itself before "...드래곤..." archetype cards).
     exact, prefix, substr = [], [], []
-    for cid, name, name_norm, url in index:
+    for cid, name, name_norm, url, thumb in index:
         if q_norm not in name_norm:
             continue
-        item = {"id": cid, "name": name, "image_url": url}
+        item = {"id": cid, "name": name, "image_url": url, "thumb_url": thumb}
         if name_norm == q_norm:
             exact.append(item)
         elif name_norm.startswith(q_norm):

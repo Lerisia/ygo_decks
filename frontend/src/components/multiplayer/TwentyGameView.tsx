@@ -872,7 +872,7 @@ function DrawerCardPicker({ onChoose }: { onChoose: (cardId: number, name: strin
             className="text-center p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-200 dark:border-gray-700 self-start"
           >
             {c.image_url ? (
-              <img src={c.image_url} alt={c.name} className="w-full aspect-square object-contain rounded bg-gray-100 dark:bg-gray-900" loading="lazy" />
+              <img loading="lazy" src={c.image_url} alt={c.name} className="w-full aspect-square object-contain rounded bg-gray-100 dark:bg-gray-900" />
             ) : (
               <div className="w-full aspect-square rounded bg-gray-100 dark:bg-gray-900" />
             )}
@@ -926,7 +926,7 @@ function CardGuessModal({ onClose, onPick }: { onClose: () => void; onPick: (c: 
               className="text-center p-1 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-gray-700"
             >
               {c.image_url ? (
-                <img src={c.image_url} alt={c.name} className="w-full aspect-square object-contain rounded bg-gray-100 dark:bg-gray-900" loading="lazy" />
+                <img loading="lazy" src={c.image_url} alt={c.name} className="w-full aspect-square object-contain rounded bg-gray-100 dark:bg-gray-900" />
               ) : (
                 <div className="w-full aspect-square rounded bg-gray-100 dark:bg-gray-900" />
               )}

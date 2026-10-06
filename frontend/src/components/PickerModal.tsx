@@ -31,6 +31,9 @@ interface PickerModalProps {
 }
 
 const PAGE = 60;
+// Pictures already drawn stay in the page (hidden while filtered out), up to this many, so typing or searching again
+// shows them at once instead of building and decoding each picture anew (엘리스 2026-10-06).
+const KEEP_MAX = 400;
 
 /** One-shot retry for images that occasionally come back broken (transient media-cache miss). */
 function onImgErrorRetry(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -58,13 +61,17 @@ export default function PickerModal({
   const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const inputRef = useRef<HTMLInputElement>(null);
+  const keptRef = useRef(new Map<PickerItem["key"], PickerItem>());
 
   // A new result set starts from the top page again.
   useEffect(() => { setVisibleCount(PAGE); }, [items]);
 
   // Lock page scroll while the modal is up.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      keptRef.current = new Map();
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
@@ -86,6 +93,14 @@ export default function PickerModal({
   };
   const pick = (it: PickerItem) => { onPick(it); onClose(); };
   const shown = items.slice(0, visibleCount);
+  const position = new Map(shown.map((it, i) => [it.key, i]));
+  const kept = keptRef.current;
+  for (const it of shown) kept.set(it.key, it);
+  for (const key of kept.keys()) {
+    if (kept.size <= KEEP_MAX) break;
+    if (!position.has(key)) kept.delete(key);
+  }
+  const drawn = [...kept.values()];
   const viewBtn = (v: View, label: string, glyph: string) => (
     <button
       type="button"
@@ -100,7 +115,7 @@ export default function PickerModal({
   );
   const thumb = (it: PickerItem, cls: string) =>
     it.image ? (
-      <img src={it.image} alt="" className={`${cls} ${imageFit === "cover" ? "object-cover" : "object-contain"} rounded bg-gray-100 dark:bg-gray-900`} loading="lazy" onError={onImgErrorRetry} />
+      <img loading="lazy" src={it.image} alt="" className={`${cls} ${imageFit === "cover" ? "object-cover" : "object-contain"} rounded bg-gray-100 dark:bg-gray-900`} onError={onImgErrorRetry} />
     ) : (
       <div className={`${cls} rounded bg-gray-100 dark:bg-gray-900`} />
     );
@@ -164,17 +179,17 @@ export default function PickerModal({
           {status === "empty" && <p className="text-xs text-gray-400 text-center py-3">{emptyText}</p>}
           {view === "grid" ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {shown.map((it) => (
-                <button key={it.key} type="button" onClick={() => pick(it)} className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition" title={it.name}>
+              {drawn.map((it) => (
+                <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition" title={it.name}>
                   {thumb(it, "w-full aspect-square")}
                   <p className="text-[10px] sm:text-xs mt-0.5 break-words leading-tight">{it.name}</p>
                 </button>
               ))}
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-              {shown.map((it) => (
-                <li key={it.key}>
+            <ul className="flex flex-col">
+              {drawn.map((it) => (
+                <li key={it.key} hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} className="border-b last:border-b-0 border-gray-100 dark:border-gray-700">
                   <button type="button" onClick={() => pick(it)} className="w-full flex items-center gap-3 px-1 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition">
                     {thumb(it, "w-10 h-10 shrink-0")}
                     <span className="min-w-0 flex-1 text-sm break-words">{it.name}</span>

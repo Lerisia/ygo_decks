@@ -44,20 +44,13 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/admin/, /^\/api/, /^\/ws/],
         // Always go to the network for API + WebSocket — never cache
-        // gameplay-critical responses.
+        // gameplay-critical responses. /media is left to the browser cache (nginx: expires max); the worker's own
+        // copy re-fetched every picture in the background on each view (2026-10-06).
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
               url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws/"),
             handler: "NetworkOnly",
-          },
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith("/media/"),
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "media-cache",
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-            },
           },
         ],
       },

@@ -7,7 +7,7 @@ import PickerModal, { type PickerStatus } from "./PickerModal";
  *  must always behave the same in multi and solo. It draws through the
  *  site-wide PickerModal (grid / list). */
 
-export type CardSearchResult = { id: number; name: string; image_url: string | null };
+export type CardSearchResult = { id: number; name: string; image_url: string | null; thumb_url?: string | null };
 
 interface CardSearchModalProps {
   open: boolean;
@@ -81,7 +81,7 @@ export default function CardSearchModal({
 
   // Stable between renders: the game screens around this re-render often, and a new array would send the
   // picker back to its first page while someone is scrolling.
-  const items = useMemo(() => results.map((c) => ({ key: c.id, name: c.name, image: c.image_url })), [results]);
+  const items = useMemo(() => results.map((c) => ({ key: c.id, name: c.name, image: c.thumb_url || c.image_url })), [results]);
   const status: PickerStatus = loading ? "loading" : results.length ? "ready" : hasSearched ? "empty" : "idle";
 
   return (

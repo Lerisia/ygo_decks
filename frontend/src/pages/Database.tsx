@@ -440,12 +440,12 @@ export default function DatabasePage() {
           <div key={deck.id} className="text-center cursor-pointer" onClick={() => navigate(`/database/${deck.id}`)}>
             <div className="relative">
               <img
+                loading="lazy"
+                decoding="async"
                 src={deck.cover_image || "/default_cover.png"}
                 srcSet={deck.cover_image && deck.cover_image_phone ? `${deck.cover_image_phone} 320w, ${deck.cover_image} 480w` : undefined}
                 sizes={COVER_SIZES}
                 alt={deck.name}
-                loading="lazy"
-                decoding="async"
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />

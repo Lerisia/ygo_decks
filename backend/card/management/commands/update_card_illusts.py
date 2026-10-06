@@ -16,6 +16,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from card.models import Card
+from card.search_thumbs import make_thumb as make_search_thumb
 
 
 YGOPRODECK_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
@@ -75,6 +76,7 @@ class Command(BaseCommand):
                                     except Exception:
                                         pass
                                 db_card.card_illust.save(f"{new_id}_illust.jpg", ContentFile(r.content), save=True)
+                                make_search_thumb(db_card)
                                 self.stdout.write(self.style.SUCCESS(f"  ✓ illust {new_id} {db_card.name}"))
                             else:
                                 errors += 1
