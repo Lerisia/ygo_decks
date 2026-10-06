@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList } from "recharts";
-import { getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups, getSheetContributors, type SheetContributor } from "@/api/toolApi";
+import { Tooltip, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
+import {
+  getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups, getSheetContributors,
+  type SheetContributor, type StatsPeriod,
+} from "@/api/toolApi";
 import { OTHER_DECK_IMAGE, UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
+import { BarStat, CoinSplit, pctText, rateTone } from "@/components/records/SheetBits";
 
 interface DeckInfo {
   id: number;
@@ -16,7 +20,6 @@ interface DeckWinRateStatsItem {
   count: number;
   ratio: number;
   total_games: number;
-  total_wins: number;
   win_rate: number;
   first_ratio: number;
   first_win_rate: number | null;
@@ -31,7 +34,6 @@ interface StatisticsData {
   group_count?: number;
   basic: {
     total_games: number;
-    total_wins: number;
     overall_win_rate: number;
     first_ratio: number;
     coin_toss_win_rate: number;
@@ -78,57 +80,27 @@ const rankToNumeric = (rank: string, wins: number | null): number => {
   return idx + (wins ?? 0) / 8;
 };
 
-const isUnknownDeck = (entry: { deck: DeckInfo | null; custom_name?: string | null }) =>
-  !entry.deck && !entry.custom_name;
+const isUnknownDeck = (entry: { deck: DeckInfo | null; custom_name?: string | null }) => !entry.deck && !entry.custom_name;
+const getOppDeckName = (entry: { deck: DeckInfo | null; custom_name?: string | null }) => entry.deck?.name || entry.custom_name || "모름/기타";
 
-const getOppDeckName = (entry: { deck: DeckInfo | null; custom_name?: string | null }) =>
-  entry.deck?.name || entry.custom_name || "모름/기타";
-
-const StatCard = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 md:p-4 text-center">
-    <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-    <p className="text-lg md:text-xl font-bold">{value}</p>
-  </div>
-);
-
-
-const OppDeckTick = ({ x, y, payload, entries }: {
-  x?: number; y?: number; payload?: { value?: string };
-  entries: { deck: DeckInfo | null; isUnknown: boolean; displayName: string }[];
-}) => {
-  const name = payload?.value ?? "";
-  const entry = entries.find((e) => e.displayName === name);
-  const img = (entry && !entry.isUnknown && entry.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE;
-  const shown = name.length > 7 ? `${name.slice(0, 7)}…` : name;
-  return (
-    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
-      <image href={img} x={-106} y={-10} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
-      <text x={-80} y={0} dy={4} fontSize={12} textAnchor="start" className="fill-gray-700 dark:fill-gray-200">
-        <title>{name}</title>
-        {shown}
-      </text>
-    </g>
-  );
-};
-
-// Solid slice colors for the my-deck pie (deck banners were too washed out to tell apart)
-const PIE_COLORS = [
-  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899",
-  "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#f43f5e",
+type PeriodKey = "all" | "7d" | "today" | "range";
+const PERIODS: { key: PeriodKey; label: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "7d", label: "최근 7일" },
+  { key: "today", label: "오늘" },
+  { key: "range", label: "날짜 고르기" },
 ];
-const pieColor = (index: number) => PIE_COLORS[index % PIE_COLORS.length];
+type SortKey = "count" | "win_rate" | "first_win_rate" | "second_win_rate";
+const OPP_SHOWN = 12;
 
-const DeckRow = ({ image, name, color, children }: { image: string | null; name: string; color?: string; children: React.ReactNode }) => (
-  <tr>
-    <td className="px-2 py-1.5">
-      <div className="flex items-center gap-2">
-        {color && <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />}
-        <img src={image || UNKNOWN_DECK_IMAGE} alt={name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-        <span className="truncate">{name}</span>
-      </div>
-    </td>
+const Card = ({ title, aside, children, flush = false }: { title: string; aside?: React.ReactNode; children: React.ReactNode; flush?: boolean }) => (
+  <section className={`rounded-xl border border-gray-200 dark:border-gray-700 ${flush ? "" : "px-3.5 py-3"} flex flex-col gap-2.5`}>
+    <div className={`flex justify-between items-baseline gap-2 ${flush ? "px-3.5 pt-3" : ""}`}>
+      <h2 className="font-bold text-[15px]">{title}</h2>
+      {aside && <span className="text-xs text-gray-500 dark:text-gray-400 text-right">{aside}</span>}
+    </div>
     {children}
-  </tr>
+  </section>
 );
 
 const StatisticsPage = () => {
@@ -136,16 +108,24 @@ const StatisticsPage = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<StatisticsData | null>(null);
   const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"basic" | "deck" | "rankChange">("basic");
-  const [rankSubTab, setRankSubTab] = useState<"rank" | "score">("rank");
+  const [curve, setCurve] = useState<"rank" | "score">("rank");
   const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
-  const [showWinLoss, setShowWinLoss] = useState(true);
   const [deckFilterOptions, setDeckFilterOptions] = useState<DeckInfo[]>([]);
   const [mySheets, setMySheets] = useState<{ id: number; name: string }[]>([]);
   const [contributors, setContributors] = useState<SheetContributor[]>([]);
   const [memberFilter, setMemberFilter] = useState<number | null>(null);
   const [rankMember, setRankMember] = useState<number | null>(null);
+  const [periodKey, setPeriodKey] = useState<PeriodKey>("all");
+  const [range, setRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [sortKey, setSortKey] = useState<SortKey>("count");
+  const [showAllOpp, setShowAllOpp] = useState(false);
   const isAggregate = !recordGroupId;
+
+  const period: StatsPeriod | undefined = useMemo(() => {
+    if (periodKey === "7d" || periodKey === "today") return { period: periodKey };
+    if (periodKey === "range" && (range.from || range.to)) return { date_from: range.from || undefined, date_to: range.to || undefined };
+    return undefined;
+  }, [periodKey, range]);
 
   useEffect(() => {
     if (!localStorage.getItem("access_token")) return;
@@ -159,31 +139,30 @@ const StatisticsPage = () => {
     setStats(null);
     setSelectedDeckId(undefined);
     setDeckFilterOptions([]);
-    setActiveTab((t) => (t === "rankChange" && !recordGroupId ? "basic" : t));
   }, [recordGroupId]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (!recordGroupId) {
-          const statsRes = await getUserStatisticsFull(selectedDeckId);
+          const statsRes = await getUserStatisticsFull(selectedDeckId, period);
           setStats(statsRes);
           setRankHistory([]);
-          if (deckFilterOptions.length === 0 && statsRes.my_deck_stats) {
-            setDeckFilterOptions(statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean));
+          if (statsRes.my_deck_stats?.length) {
+            setDeckFilterOptions((prev) => (prev.length ? prev : statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean)));
           }
           return;
         }
         const [statsRes, rankRes] = await Promise.all([
-          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId, memberFilter),
-          getRecordGroupRankHistory(Number(recordGroupId), rankMember).catch(() => ({ matches: [], member: null })),
+          getRecordGroupStatisticsFull(Number(recordGroupId), selectedDeckId, memberFilter, period),
+          getRecordGroupRankHistory(Number(recordGroupId), rankMember, period).catch(() => ({ matches: [], member: null })),
         ]);
         setStats(statsRes);
         setRankHistory(rankRes.matches || []);
         // the server decides whose curve to show when nobody is picked; follow it
         if (rankMember === null && rankRes.member?.id) setRankMember(rankRes.member.id);
-        if (deckFilterOptions.length === 0 && statsRes.my_deck_stats) {
-          setDeckFilterOptions(statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean));
+        if (statsRes.my_deck_stats?.length) {
+          setDeckFilterOptions((prev) => (prev.length ? prev : statsRes.my_deck_stats.map((s: DeckWinRateStatsItem) => s.deck).filter(Boolean)));
         }
       } catch (err) {
         console.error("통계 데이터를 불러오지 못했습니다", err);
@@ -191,7 +170,7 @@ const StatisticsPage = () => {
       }
     };
     fetchData();
-  }, [recordGroupId, selectedDeckId, memberFilter, rankMember, navigate]);
+  }, [recordGroupId, selectedDeckId, memberFilter, rankMember, period, navigate]);
 
   useEffect(() => {
     if (!recordGroupId) { setContributors([]); return; }
@@ -200,497 +179,283 @@ const StatisticsPage = () => {
       .catch(() => setContributors([]));
   }, [recordGroupId]);
 
-  if (!stats) return <div className="p-6">로딩 중...</div>;
+  const rankData = rankHistory.filter((m) => m.rank).map((m, i) => ({
+    index: i + 1,
+    value: rankToNumeric(m.rank!, m.wins),
+    label: `${RANK_LABELS[m.rank!] || m.rank}${m.wins != null ? ` · ${m.wins}승` : ""}`,
+  }));
+  const scoreData = rankHistory.filter((m) => m.score != null).map((m, i) => ({ index: i + 1, value: m.score!, label: `${m.score}점` }));
+  useEffect(() => {
+    if (curve === "rank" && rankData.length === 0 && scoreData.length > 0) setCurve("score");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankHistory]);
 
-  const totalWins = Math.round(stats.basic.total_games * stats.basic.overall_win_rate / 100);
-  const totalLosses = stats.basic.total_games - totalWins;
+  const backTo = isAggregate ? "/records" : `/record-groups/${recordGroupId}`;
+  const header = (
+    <div className="flex items-center justify-between gap-2">
+      <button onClick={() => navigate(backTo)} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 truncate">
+        ← {isAggregate ? "시트 목록" : stats?.record_group_name ?? "시트"}
+      </button>
+      {mySheets.length > 0 && (isAggregate || mySheets.some((g) => g.id === Number(recordGroupId))) && (
+        <select
+          value={isAggregate ? "all" : recordGroupId}
+          onChange={(e) => navigate(e.target.value === "all" ? "/record-groups/statistics" : `/record-groups/${e.target.value}/statistics`)}
+          className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100 max-w-[55%]"
+        >
+          <option value="all">전체 (모든 시트)</option>
+          {mySheets.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
 
-  // My deck '기타' comes back as deck = null; give it a stand-in so the chart and tables can key/label it.
+  if (!stats) {
+    return (
+      <div className="min-h-screen px-4 py-6 max-w-screen-sm mx-auto flex flex-col gap-5" aria-busy>
+        {header}
+        <div className="h-8 w-24 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <div className="h-8 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <div className="h-[72px] rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <div className="h-[150px] rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <div className="h-[260px] rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+      </div>
+    );
+  }
+
+  const b = stats.basic;
+  const games = b.total_games;
+  // basic carries rates; the counts behind them come back exactly from rate × games
+  const count = (ratePct: number, of: number) => Math.round((ratePct * of) / 100);
+  const wins = count(b.overall_win_rate, games);
+  const firstGames = count(b.first_ratio, games);
+  const secondGames = games - firstGames;
+  const coinWinGames = count(b.coin_toss_win_rate, games);
+  const coinLoseGames = games - coinWinGames;
+
   const myDecks = [...stats.my_deck_stats]
     .map((s) => (s.deck ? s : { ...s, deck: { id: -1, name: "기타", cover_image_small: OTHER_DECK_IMAGE } as DeckInfo }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, c) => c.count - a.count);
+  const sortValue = (e: DeckWinRateStatsItem) => (sortKey === "count" ? e.count : e[sortKey] ?? -1);
   const oppDecks = [...stats.opponent_deck_stats]
-    .map((entry) => ({
-      ...entry,
-      isUnknown: isUnknownDeck(entry),
-      displayName: getOppDeckName(entry),
-    }))
-    .sort((a, b) => {
-      if (a.isUnknown && !b.isUnknown) return 1;
-      if (!a.isUnknown && b.isUnknown) return -1;
-      return b.count - a.count;
+    .map((entry) => ({ ...entry, isUnknown: isUnknownDeck(entry), displayName: getOppDeckName(entry) }))
+    .sort((a, c) => {
+      if (a.isUnknown !== c.isUnknown && sortKey === "count") return a.isUnknown ? 1 : -1;
+      return sortValue(c) - sortValue(a) || c.count - a.count;
     });
+  const oppShown = showAllOpp ? oppDecks : oppDecks.slice(0, OPP_SHOWN);
 
-  const oppChartDecks = [...oppDecks].sort((a, b) => b.count - a.count).map((e) => {
-    const winCount = Math.round((e.count * e.win_rate) / 100);
-    const winRatio = (e.ratio * e.win_rate) / 100;
-    return { ...e, winCount, loseCount: e.count - winCount, winRatio, loseRatio: e.ratio - winRatio };
-  });
-
-  const rankData = rankHistory
-    .filter((m) => m.rank)
-    .map((m) => ({
-      index: m.index,
-      value: rankToNumeric(m.rank!, m.wins),
-      result: m.result,
-      label: `${RANK_LABELS[m.rank!] || m.rank}${m.wins != null ? ` / ${m.wins}승` : ""}`,
-    }));
-
-  const scoreData = rankHistory
-    .filter((m) => m.score != null)
-    .map((m) => ({
-      index: m.index,
-      value: m.score!,
-      result: m.result,
-      label: `${m.score}점`,
-    }));
-
-  const niceStep = (range: number) => {
-    if (range <= 20) return 5;
-    if (range <= 100) return 10;
-    if (range <= 500) return 50;
-    return 100;
-  };
-
-  const xTicks = (data: { index: number }[]) => {
-    if (data.length === 0) return undefined;
-    const max = Math.max(...data.map((d) => d.index));
-    const step = niceStep(max);
-    const ticks: number[] = [];
-    for (let v = 0; v <= max; v += step) ticks.push(v);
-    if (ticks[ticks.length - 1] < max) ticks.push(Math.ceil(max / step) * step);
-    return ticks;
-  };
-
-  const scoreTicks = (() => {
-    if (scoreData.length === 0) return { ticks: [], domain: [0, 100] as [number, number] };
-    const values = scoreData.map((d) => d.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-    const step = range <= 300 ? 50 : range <= 500 ? 100 : range <= 5000 ? 500 : 1000;
-    const lo = Math.floor(min / step) * step;
-    const hi = Math.ceil(max / step) * step;
-    const ticks: number[] = [];
-    for (let v = lo; v <= hi; v += step) ticks.push(v);
-    return { ticks, domain: [lo, hi] as [number, number] };
+  const curveData = curve === "rank" ? rankData : scoreData;
+  const yDomain: [number, number] = (() => {
+    if (curveData.length === 0) return [0, 1];
+    const vals = curveData.map((d) => d.value);
+    if (curve === "rank") return [Math.max(0, Math.floor(Math.min(...vals))), Math.min(RANK_ORDER.length - 1, Math.ceil(Math.max(...vals)) + 0)];
+    const lo = Math.min(...vals), hi = Math.max(...vals), pad = Math.max(10, (hi - lo) * 0.1);
+    return [Math.floor((lo - pad) / 10) * 10, Math.ceil((hi + pad) / 10) * 10];
   })();
+  const rankTicks = curve === "rank" ? Array.from({ length: yDomain[1] - yDomain[0] + 1 }, (_, i) => yDomain[0] + i) : undefined;
+  const firstRank = rankHistory.find((m) => m.rank)?.rank;
+  const lastRank = [...rankHistory].reverse().find((m) => m.rank)?.rank;
 
-  // Y축에 표시할 랭크 틱 계산
-  const rankTicks = (() => {
-    if (rankData.length === 0) return [];
-    const values = rankData.map((d) => d.value);
-    const minVal = Math.floor(Math.min(...values));
-    const maxVal = Math.ceil(Math.max(...values));
-    const ticks: number[] = [];
-    for (let i = Math.max(0, minVal - 1); i <= Math.min(RANK_ORDER.length - 1, maxVal + 1); i++) {
-      ticks.push(i);
-    }
-    return ticks;
-  })();
-
-  const tabClass = (tab: string) =>
-    `px-4 py-2 font-semibold md:text-lg ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500 dark:text-gray-400"}`;
-
+  const chip = (on: boolean) =>
+    `px-3 py-1.5 rounded-full text-[13px] border whitespace-nowrap transition ${
+      on ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white" : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+    }`;
   const PersonChips = ({ value, onPick, withAll }: { value: number | null; onPick: (id: number | null) => void; withAll: boolean }) => {
     if (contributors.length < 2) return null;
-    const chip = (on: boolean) =>
+    const pchip = (on: boolean) =>
       `px-2.5 py-1 rounded-full text-sm border flex items-center gap-1.5 ${
         on ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
       }`;
     return (
-      <div className="flex flex-wrap gap-2 mb-4">
-        {withAll && (
-          <button type="button" onClick={() => onPick(null)} className={chip(value === null)}>
-            전체
-          </button>
-        )}
+      <div className="flex flex-wrap gap-2">
+        {withAll && <button type="button" onClick={() => onPick(null)} className={pchip(value === null)}>전체</button>}
         {contributors.map((c) => (
-          <button key={c.user!.id} type="button" onClick={() => onPick(c.user!.id)} className={chip(value === c.user!.id)}>
-            {c.user!.icon ? (
-              <img src={c.user!.icon} alt="" className="w-5 h-5 rounded-full object-cover" />
-            ) : (
-              <span className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
-            )}
+          <button key={c.user!.id} type="button" onClick={() => onPick(c.user!.id)} className={pchip(value === c.user!.id)}>
+            {c.user!.icon ? <img src={c.user!.icon} alt="" className="w-5 h-5 rounded-full object-cover" /> : <span className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />}
             {c.user!.username}
           </button>
         ))}
       </div>
     );
   };
-
-  const subTabClass = (tab: string) =>
-    `px-3 py-1.5 text-sm rounded-full ${rankSubTab === tab ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`;
+  const th = (key: SortKey, label: string, cls = "") => (
+    <th className={`px-2 py-1.5 text-right font-semibold ${cls}`}>
+      <button type="button" onClick={() => setSortKey(key)} className={`whitespace-nowrap ${sortKey === key ? "text-gray-900 dark:text-white" : ""}`}>
+        {label}{sortKey === key ? " ▾" : ""}
+      </button>
+    </th>
+  );
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <button
-          onClick={() => navigate(isAggregate ? "/records" : `/record-groups/${recordGroupId}`)}
-          className="text-lg font-semibold hover:text-blue-600 truncate"
-        >
-          ← {isAggregate ? "전체 통계" : stats.record_group_name}
-        </button>
-        {mySheets.length > 0 && (isAggregate || mySheets.some((g) => g.id === Number(recordGroupId))) && (
-          <select
-            value={isAggregate ? "all" : recordGroupId}
-            onChange={(e) =>
-              navigate(e.target.value === "all" ? "/record-groups/statistics" : `/record-groups/${e.target.value}/statistics`)
-            }
-            className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100 max-w-[45%]"
-          >
-            <option value="all">전체 (모든 시트)</option>
-            {mySheets.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
-        )}
+    <div className="min-h-screen px-4 py-6 max-w-screen-sm mx-auto flex flex-col gap-5 tabular-nums">
+      {header}
+      <div>
+        <h1 className="text-2xl font-bold">{isAggregate ? "내 전적 통계" : "통계"}</h1>
+        {isAggregate && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">시트 {stats.group_count ?? 0}개에서 내가 기록한 듀얼</p>}
       </div>
 
-      <div className="flex justify-center gap-4 mb-4 border-b dark:border-gray-700 pb-2">
-        <button onClick={() => setActiveTab("basic")} className={tabClass("basic")}>요약</button>
-        <button onClick={() => setActiveTab("deck")} className={tabClass("deck")}>상대별 통계</button>
-        {!isAggregate && (
-          <button onClick={() => setActiveTab("rankChange")} className={tabClass("rankChange")}>랭크 변화</button>
-        )}
-      </div>
-
-      {deckFilterOptions.length > 1 && (
-        <div className="flex items-center gap-2 mb-6">
-          <label className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">내 덱</label>
-          <select
-            value={selectedDeckId ?? ""}
-            onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
-            className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100"
-          >
-            <option value="">전체</option>
-            {deckFilterOptions.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5" role="tablist" aria-label="기간">
+          {PERIODS.map((p) => (
+            <button key={p.key} type="button" role="tab" aria-selected={periodKey === p.key} onClick={() => setPeriodKey(p.key)} className={chip(periodKey === p.key)}>
+              {p.label}
+            </button>
+          ))}
         </div>
-      )}
-
-      {activeTab !== "rankChange" && (
+        {periodKey === "range" && (
+          <div className="flex items-center gap-2 text-sm">
+            <input type="date" aria-label="시작 날짜" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100" />
+            <span className="text-gray-400">~</span>
+            <input type="date" aria-label="끝 날짜" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+        )}
+        {deckFilterOptions.length > 1 && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="stats-deck" className="text-sm text-gray-500 dark:text-gray-400 shrink-0">내 덱</label>
+            <select
+              id="stats-deck"
+              value={selectedDeckId ?? ""}
+              onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="">전체</option>
+              {deckFilterOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+        )}
         <PersonChips value={memberFilter} onPick={setMemberFilter} withAll />
-      )}
+      </div>
 
-      {activeTab === "basic" && (
-        <div className="space-y-8">
-          {/* 전적 요약 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">전적</h2>
-            <div className="grid grid-cols-4 gap-2 sm:gap-3">
-              <StatCard label="총 게임" value={stats.basic.total_games} />
-              <StatCard label="승률" value={`${stats.basic.overall_win_rate.toFixed(1)}%`} />
-              <StatCard label="승리" value={totalWins} />
-              <StatCard label="패배" value={totalLosses} />
+      {games === 0 ? (
+        <p className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">이 기간에 기록한 듀얼이 없습니다.</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">승률</span>
+                <b className="text-2xl leading-tight">{pctText(b.overall_win_rate, 1)}</b>
+                <small className="text-xs text-gray-500 dark:text-gray-400">{wins}승 {games - wins}패</small>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">듀얼</span>
+                <b className="text-2xl leading-tight">{games}</b>
+                <small className="text-xs text-gray-500 dark:text-gray-400">선공 {firstGames} · 후공 {secondGames}</small>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">선공 비율</span>
+                <b className="text-2xl leading-tight">{pctText(b.first_ratio)}</b>
+                <small className="text-xs text-gray-500 dark:text-gray-400">{firstGames}번 선공</small>
+              </div>
             </div>
-          </section>
-
-          {/* 선후공 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">선후공</h2>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <StatCard label="선공 비율" value={`${stats.basic.first_ratio.toFixed(1)}%`} />
-              <StatCard label="선공 승률" value={`${stats.basic.first_win_rate.toFixed(1)}%`} />
-              <StatCard label="후공 승률" value={`${stats.basic.second_win_rate.toFixed(1)}%`} />
+            <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+              <BarStat label="선공 승률" value={firstGames ? b.first_win_rate : null} sub={`${firstGames}판`} />
+              <BarStat label="후공 승률" value={secondGames ? b.second_win_rate : null} sub={`${secondGames}판`} />
             </div>
-          </section>
+          </div>
 
-          {/* 코인토스 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">코인토스</h2>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <StatCard label="코인 승률" value={`${stats.basic.coin_toss_win_rate.toFixed(1)}%`} />
-              <StatCard label="앞면 시 승률" value={`${stats.basic.coin_toss_win_win_rate.toFixed(1)}%`} />
-              <StatCard label="뒷면 시 승률" value={`${stats.basic.coin_toss_lose_win_rate.toFixed(1)}%`} />
-            </div>
-          </section>
+          <CoinSplit
+            winGames={coinWinGames}
+            winWins={count(b.coin_toss_win_win_rate, coinWinGames)}
+            loseGames={coinLoseGames}
+            loseWins={count(b.coin_toss_lose_win_rate, coinLoseGames)}
+          />
 
-          {/* 내 덱 사용 비율 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱 사용 비율</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart style={{ overflow: 'visible' }}>
-                  <Pie data={myDecks} dataKey="ratio" nameKey="deck.name" cx="50%" cy="50%" outerRadius={110} label={false} stroke="#ffffff" strokeWidth={1.5}>
-                    {myDecks.map((entry, index) => (
-                      <Cell key={entry.deck.id} fill={pieColor(index)} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} contentStyle={{ fontSize: '0.875rem' }} />
-                </PieChart>
+          {!isAggregate && (rankData.length > 0 || scoreData.length > 0) && (
+            <Card
+              title={curve === "rank" ? "랭크 변화" : "점수 변화"}
+              aside={curve === "rank" && firstRank && lastRank ? `${RANK_LABELS[firstRank]} → ${RANK_LABELS[lastRank]}` : `${curveData.length}판`}
+            >
+              <PersonChips value={rankMember} onPick={(id) => id !== null && setRankMember(id)} withAll={false} />
+              {rankData.length > 0 && scoreData.length > 0 && (
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setCurve("rank")} className={chip(curve === "rank")}>랭크</button>
+                  <button type="button" onClick={() => setCurve("score")} className={chip(curve === "score")}>점수</button>
+                </div>
+              )}
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart data={curveData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#e5e7eb" strokeOpacity={0.7} />
+                  <XAxis dataKey="index" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={24} />
+                  <YAxis
+                    domain={yDomain}
+                    ticks={rankTicks}
+                    allowDecimals={curve !== "rank"}
+                    tickFormatter={(v: number) => (curve === "rank" ? RANK_LABELS[RANK_ORDER[v]] || "" : String(v))}
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={curve === "rank" ? 54 : 42}
+                  />
+                  <Tooltip
+                    formatter={(_: number, __: string, props: { payload?: { label?: string } }) => [props.payload?.label ?? "", curve === "rank" ? "랭크" : "점수"]}
+                    labelFormatter={(v: number) => `${v}번째 듀얼`}
+                    contentStyle={{ fontSize: "0.8rem" }}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="#2563eb" fillOpacity={0.1} dot={false} activeDot={{ r: 4 }} />
+                </AreaChart>
               </ResponsiveContainer>
-              <table className="w-full table-fixed text-sm">
-                <thead>
-                  <tr className="border-b dark:border-gray-700">
-                    <th className="text-left px-2 pb-2 w-[70%]">덱</th>
-                    <th className="text-right px-2 pb-2 w-[30%]">비율</th>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">가로는 듀얼 순서{curve === "rank" ? ", 세로는 랭크 (칸 사이는 승수)" : ""}</p>
+            </Card>
+          )}
+
+          <Card title="내 덱" aside="판수 · 승률">
+            <div className="flex flex-col gap-2">
+              {myDecks.map((e) => (
+                <div key={e.deck.id} className="flex items-center gap-2 text-[13px]">
+                  <img src={e.deck.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                  <span className="w-24 shrink-0 break-words leading-tight">{e.deck.name}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${e.ratio}%` }} />
+                  </div>
+                  <b className="w-10 text-right">{e.count}판</b>
+                  <span className={`w-10 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="상대 덱별" aside={`${oppDecks.length}개 덱 · 제목을 누르면 정렬`} flush>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/60 border-y border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <th className="px-2 pl-3.5 py-1.5 text-left font-semibold">상대 덱</th>
+                    {th("count", "판")}
+                    {th("win_rate", "승률")}
+                    {th("first_win_rate", "선공")}
+                    {th("second_win_rate", "후공", "pr-3.5")}
                   </tr>
                 </thead>
                 <tbody>
-                  {myDecks.map((entry, index) => (
-                    <DeckRow key={entry.deck.id} image={entry.deck.cover_image_small} name={entry.deck.name} color={pieColor(index)}>
-                      <td className="text-right px-2 py-1.5">{entry.ratio.toFixed(1)}%</td>
-                    </DeckRow>
+                  {oppShown.map((e, i) => (
+                    <tr key={e.deck?.id ?? `${e.displayName}-${i}`} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
+                      <td className="px-2 pl-3.5 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <img src={(!e.isUnknown && e.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                          <span className="break-words leading-tight">{e.displayName}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right">{e.count}<span className="block text-[10px] text-gray-400">{e.ratio.toFixed(0)}%</span></td>
+                      <td className={`px-2 py-1.5 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</td>
+                      <td className={`px-2 py-1.5 text-right text-xs ${rateTone(e.first_win_rate)}`}>{pctText(e.first_win_rate)}</td>
+                      <td className={`px-2 pr-3.5 py-1.5 text-right text-xs ${rateTone(e.second_win_rate)}`}>{pctText(e.second_win_rate)}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </section>
-
-          {/* 상대 덱 비율 */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">상대 덱 비율</h2>
-              <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showWinLoss}
-                  onChange={(e) => setShowWinLoss(e.target.checked)}
-                  className="accent-blue-600"
-                />
-                승패 비율 표시
-                {showWinLoss && (
-                  <span className="flex items-center gap-1 ml-1 text-xs">
-                    <span className="inline-block w-3 h-3 rounded-sm bg-[#2563eb]" />승
-                    <span className="inline-block w-3 h-3 rounded-sm bg-[#dc2626]" />패
-                  </span>
-                )}
-              </label>
-            </div>
-            <div>
-              <ResponsiveContainer width="100%" height={Math.max(160, oppChartDecks.length * 34 + 16)}>
-                <BarChart data={oppChartDecks} layout="vertical" margin={{ top: 8, right: 48, left: 0, bottom: 8 }}>
-                  <XAxis type="number" hide />
-                  <YAxis
-                    type="category"
-                    dataKey="displayName"
-                    width={124}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={<OppDeckTick entries={oppChartDecks} />}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name, item) => {
-                      const payload = (item as { payload?: { count?: number; winCount?: number; loseCount?: number } })?.payload;
-                      if (name === "승리") return [`${value.toFixed(1)}% (${payload?.winCount ?? 0}승)`, name];
-                      if (name === "패배") return [`${value.toFixed(1)}% (${payload?.loseCount ?? 0}패)`, name];
-                      return [`${value.toFixed(1)}% (${payload?.count ?? 0}게임)`, "비율"];
-                    }}
-                    contentStyle={{ fontSize: '0.875rem' }}
-                  />
-                  {showWinLoss ? (
-                    <>
-                      <Bar dataKey="winRatio" name="승리" stackId="wl" fill="#2563eb" barSize={20} />
-                      <Bar dataKey="loseRatio" name="패배" stackId="wl" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20}>
-                        <LabelList
-                          dataKey="ratio"
-                          position="right"
-                          formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
-                          className="fill-gray-600 dark:fill-gray-300"
-                          style={{ fontSize: 12 }}
-                        />
-                      </Bar>
-                    </>
-                  ) : (
-                    <Bar dataKey="ratio" fill="#2563eb" radius={[0, 4, 4, 0]} barSize={20}>
-                      <LabelList
-                        dataKey="ratio"
-                        position="right"
-                        formatter={(v: unknown) => `${Number(v).toFixed(1)}%`}
-                        className="fill-gray-600 dark:fill-gray-300"
-                        style={{ fontSize: 12 }}
-                      />
-                    </Bar>
-                  )}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          {/* 내 덱 별 승률 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">내 덱별 승률</h2>
-            <table className="w-full table-fixed text-sm">
-              <thead>
-                <tr className="border-b dark:border-gray-700">
-                  <th className="text-left px-2 pb-2 w-[60%]">덱</th>
-                  <th className="text-right px-2 pb-2 w-[20%]">횟수</th>
-                  <th className="text-right px-2 pb-2 w-[20%]">승률</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myDecks.map((entry) => (
-                  <DeckRow key={entry.deck.id} image={entry.deck.cover_image_small} name={entry.deck.name}>
-                    <td className="text-right px-2 py-1.5">{entry.total_games}</td>
-                    <td className="text-right px-2 py-1.5">{entry.win_rate.toFixed(1)}%</td>
-                  </DeckRow>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          {/* 상대 덱 별 승률 */}
-          <section>
-            <h2 className="text-sm md:text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱별 승률</h2>
-            <table className="w-full table-fixed text-sm">
-              <thead>
-                <tr className="border-b dark:border-gray-700">
-                  <th className="text-left px-2 pb-2 w-[60%]">덱</th>
-                  <th className="text-right px-2 pb-2 w-[20%]">횟수</th>
-                  <th className="text-right px-2 pb-2 w-[20%]">승률</th>
-                </tr>
-              </thead>
-              <tbody>
-                {oppDecks.map((entry, i) => (
-                  <DeckRow
-                    key={entry.deck?.id ?? `unknown-${i}`}
-                    image={isUnknownDeck(entry) ? null : entry.deck?.cover_image_small}
-                    name={getOppDeckName(entry)}
-                  >
-                    <td className="text-right px-2 py-1.5">{entry.total_games}</td>
-                    <td className="text-right px-2 py-1.5">{entry.win_rate.toFixed(1)}%</td>
-                  </DeckRow>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        </div>
-      )}
-
-      {activeTab === "deck" && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">상대 덱별 세부 통계</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm table-fixed">
-              <thead>
-                <tr className="border-b dark:border-gray-700">
-                  <th className="text-left px-2 pb-2 w-[20%] sm:w-[15%]">덱</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">등장</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">사용률</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">승률</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">선공률</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">선공 승</th>
-                  <th className="text-right px-2 pb-2 w-[13%] sm:w-[12%]">후공 승</th>
-                </tr>
-              </thead>
-              <tbody>
-                {oppDecks.map((entry, i) => (
-                  <tr key={entry.deck?.id ?? `unknown-${i}`}>
-                    <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <img
-                          src={(!isUnknownDeck(entry) && entry.deck?.cover_image_small) || UNKNOWN_DECK_IMAGE}
-                          alt={getOppDeckName(entry)}
-                          className="w-5 h-5 rounded object-cover flex-shrink-0"
-                        />
-                        <span className="hidden sm:inline truncate">{getOppDeckName(entry)}</span>
-                      </div>
-                    </td>
-                    <td className="text-right px-2 py-1.5">{entry.count}</td>
-                    <td className="text-right px-2 py-1.5">{entry.ratio.toFixed(0)}%</td>
-                    <td className="text-right px-2 py-1.5">{entry.win_rate.toFixed(0)}%</td>
-                    <td className="text-right px-2 py-1.5">{entry.first_ratio != null ? `${entry.first_ratio.toFixed(0)}%` : "-"}</td>
-                    <td className="text-right px-2 py-1.5">{entry.first_win_rate != null ? `${entry.first_win_rate.toFixed(0)}%` : "-"}</td>
-                    <td className="text-right px-2 py-1.5">{entry.second_win_rate != null ? `${entry.second_win_rate.toFixed(0)}%` : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "rankChange" && (
-        <div className="space-y-4">
-          {/* a rank curve is one person's climb; merging several makes a meaningless line */}
-          <PersonChips value={rankMember} onPick={(id) => id !== null && setRankMember(id)} withAll={false} />
-          <div className="flex gap-2">
-            <button onClick={() => setRankSubTab("rank")} className={subTabClass("rank")}>랭크</button>
-            <button onClick={() => setRankSubTab("score")} className={subTabClass("score")}>점수</button>
-          </div>
-
-          {rankSubTab === "rank" && (
-            rankData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={rankData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="index"
-                    ticks={xTicks(rankData)}
-                    tick={{ fontSize: 12 }}
-                    label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
-                  />
-                  <YAxis
-                    domain={[Math.max(0, Math.floor(Math.min(...rankData.map(d => d.value))) - 1), Math.min(RANK_ORDER.length - 1, Math.ceil(Math.max(...rankData.map(d => d.value))) + 1)]}
-                    ticks={rankTicks}
-                    tickFormatter={(v: number) => RANK_LABELS[RANK_ORDER[v]] || ""}
-                    tick={{ fontSize: 11 }}
-                    width={70}
-                  />
-                  <Tooltip
-                    formatter={(_: number, __: string, props: any) => [props.payload.label, "랭크"]}
-                    labelFormatter={(v: number) => `${v}번째 게임`}
-                    contentStyle={{ fontSize: "0.875rem" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 5, strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-16">
-                랭크 데이터가 없습니다.
-              </div>
-            )
-          )}
-
-          {rankSubTab === "score" && (
-            scoreData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={scoreData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="index"
-                    ticks={xTicks(scoreData)}
-                    tick={{ fontSize: 12 }}
-                    label={{ value: "게임 수", position: "insideBottomRight", offset: -5, fontSize: 12 }}
-                  />
-                  <YAxis
-                    domain={scoreTicks.domain}
-                    ticks={scoreTicks.ticks}
-                    tick={{ fontSize: 12 }}
-                    width={50}
-                  />
-                  <Tooltip
-                    formatter={(_: number, __: string, props: any) => [props.payload.label, "점수"]}
-                    labelFormatter={(v: number) => `${v}번째 게임`}
-                    contentStyle={{ fontSize: "0.875rem" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 5, strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-16">
-                점수 데이터가 없습니다.
-              </div>
-            )
-          )}
-        </div>
+            {oppDecks.length > OPP_SHOWN && (
+              <button type="button" onClick={() => setShowAllOpp((v) => !v)} className="py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                {showAllOpp ? "접기" : `나머지 ${oppDecks.length - OPP_SHOWN}개 덱 보기`}
+              </button>
+            )}
+          </Card>
+        </>
       )}
     </div>
   );

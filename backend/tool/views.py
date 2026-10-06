@@ -265,10 +265,12 @@ def get_record_group_statistics(request, record_group_id):
         "first_win_rate": first_win_rate,
         "second_win_rate": second_win_rate,
         "first_ratio": first_ratio,
+        "summary": sheet_summary(matches),
     })
 
 from .serializers import DeckShortSerializer
 from .statistics import compute_full_statistics
+from .summary import filter_period, sheet_summary
 
 @api_view(['GET'])
 def get_record_group_statistics_full(request, record_group_id):
@@ -284,6 +286,7 @@ def get_record_group_statistics_full(request, record_group_id):
     deck_id = request.GET.get("deck_id")
     if deck_id:
         matches = matches.filter(deck_id=deck_id)
+    matches = filter_period(matches, request.GET)
 
     data = {"record_group_name": record_group.name}
     data.update(compute_full_statistics(matches))
@@ -315,6 +318,7 @@ def get_user_statistics_full(request):
     deck_id = request.GET.get("deck_id")
     if deck_id:
         matches = matches.filter(deck_id=deck_id)
+    matches = filter_period(matches, request.GET)
 
     data = {"record_groups": group_list, "group_count": len(group_list)}
     data.update(compute_full_statistics(matches))
@@ -496,8 +500,7 @@ def get_record_group_rank_history(request, record_group_id):
         whose = record_group.user_id
 
     matches = (
-        record_group.matches
-        .filter(is_deleted=False, recorded_by_id=whose)
+        filter_period(record_group.matches.filter(is_deleted=False, recorded_by_id=whose), request.GET)
         .filter(Q(rank__isnull=False) | Q(score__isnull=False))
         .order_by("id")
         .values("rank", "wins", "score", "result")

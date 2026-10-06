@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord,
-         updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility } from "@/api/toolApi";
+import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord, deleteRecordGroup, getRecordGroupStatistics,
+         updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility, type SheetSummary } from "@/api/toolApi";
+import { ResultChips, BarStat, CoinSplit, KebabMenu, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
 import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
@@ -363,7 +364,16 @@ const RecordGroupDetailPage = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
-  const [showRegisterForm, setShowRegisterForm] = useState(true);
+  // The form starts folded so the sheet's state shows first; whoever opens it keeps it open next time.
+  const [showRegisterForm, setShowRegisterForm] = useState(() => {
+    try { return localStorage.getItem("record_form_open") === "1"; } catch { return false; }
+  });
+  const toggleRegisterForm = (open: boolean) => {
+    setShowRegisterForm(open);
+    try { localStorage.setItem("record_form_open", open ? "1" : "0"); } catch { /* private mode */ }
+  };
+  const [summary, setSummary] = useState<SheetSummary | null>(null);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [pending, setPending] = useState<TrackerPendingMatch[]>([]);
   const [activePendingId, setActivePendingId] = useState<number | null>(null);
   const [extraDeck, setExtraDeck] = useState<DeckData | null>(null);
@@ -400,6 +410,17 @@ const RecordGroupDetailPage = () => {
     } catch {}
   };
 
+  const loadSummary = async () => {
+    try {
+      const res = await getRecordGroupStatistics(Number(recordGroupId), memberFilter);
+      setSummary(res.summary ?? null);
+    } catch {
+      /* the sheet still works without its summary */
+    } finally {
+      setSummaryLoaded(true);
+    }
+  };
+
   const loadPending = async () => {
     try {
       setPending(await getTrackerPending());
@@ -412,6 +433,8 @@ const RecordGroupDetailPage = () => {
     loadUserDecks();
     loadLastMatch();
     loadPending();
+    loadSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, memberFilter]);
 
   // Games deferred from the tracker overlay show up without a reload.
@@ -428,6 +451,7 @@ const RecordGroupDetailPage = () => {
       if (document.visibilityState !== "visible" || editingMatch) return;
       loadMatches();
       loadLastMatch();
+      loadSummary();
     }, 15000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,6 +482,7 @@ const RecordGroupDetailPage = () => {
     }));
     setActivePendingId(p.id);
     setShowRegisterForm(true);
+    document.getElementById("record-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const discardPending = async (id: number) => {
@@ -559,6 +584,7 @@ const RecordGroupDetailPage = () => {
     try {
       await deleteMatchRecord(matchId);
       await loadMatches();
+      loadSummary();
     } catch (error) {
       console.error("삭제 실패:", error);
     }
@@ -657,6 +683,7 @@ const RecordGroupDetailPage = () => {
       setNewMatch((prev) => ({ ...prev, opponent_deck: "", opponent_deck_name: "", notes: "" }));
       await loadMatches();
       await loadLastMatch();
+      loadSummary();
     } catch (error) {
       console.error("기록 추가 실패:", error);
     }
@@ -752,60 +779,87 @@ const RecordGroupDetailPage = () => {
     label: r.label,
   }));
 
+  const latest = summary?.latest ?? null;
+  const modeTag = !latest ? null
+    : latest.rank ? "랭크전"
+    : latest.score_type === "rating" ? "레이팅"
+    : latest.score_type === "duelist_cup" ? "듀얼리스트 컵"
+    : null;
+  // Recorded rank/wins are where a duel started, so "now" is one step on from the latest duel.
+  const nowLabel = (() => {
+    if (!latest) return null;
+    if (latest.rank) {
+      const next = getNextRankState(latest.rank, latest.wins ?? null, latest.result);
+      const label = RANK_OPTIONS.find((r) => r.value === next.rank)?.label ?? next.rank;
+      return next.wins != null ? `${label} · ${next.wins}승` : label;
+    }
+    if (latest.score != null) return `${latest.score.toLocaleString()}점`;
+    return null;
+  })();
+  const totals = summary?.totals;
+  // On a group sheet the latest duel may be anyone's: a rank or a streak only means something for one person.
+  const mixedPeople = sheetKind === "shared" && !memberFilter;
+  const recentWins = summary ? summary.recent.filter((c) => c.r === "win").length : 0;
+
+  const toggleVisibility = async () => {
+    const next = !isPublic;
+    await updateRecordGroupVisibility(Number(recordGroupId), next);
+    setIsPublic(next);
+  };
+  const copyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/record-groups/${recordGroupId}`);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+  const deleteSheet = () => {
+    if (!confirmSheetDelete(recordGroupName)) return;
+    deleteRecordGroup(Number(recordGroupId))
+      .then(() => navigate("/records"))
+      .catch((err) => alert("삭제 실패: " + err.message));
+  };
+
   return (
-    <div className="px-4 py-4 min-h-screen max-w-screen-sm mx-auto">
+    <div className="px-4 py-4 min-h-screen max-w-screen-sm mx-auto flex flex-col">
       {myRole && myRole !== "public" && (
         <button
           onClick={() => navigate("/records")}
-          className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2"
+          className="self-start text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2"
         >
           ← 시트 목록
         </button>
       )}
-      <div className="flex items-center justify-between mb-4 gap-2">
-        <h1 className="text-2xl font-bold flex items-center gap-1 min-w-0">
-          <span className="truncate">{recordGroupName}</span>
-          <button onClick={handleEditName} className="shrink-0 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white">
-            ✏️
-          </button>
-        </h1>
-        <a
-          href={`/record-groups/${recordGroupId}/statistics`}
-          className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg font-semibold hover:bg-blue-700 transition"
-        >
-          통계
-        </a>
-      </div>
-      {isOwner && (
-        <div className="flex items-center gap-3 mb-4 text-sm">
-          <button
-            onClick={async () => {
-              const next = !isPublic;
-              await updateRecordGroupVisibility(Number(recordGroupId), next);
-              setIsPublic(next);
-            }}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-              isPublic
-                ? "bg-green-500 text-white hover:bg-green-600"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-            }`}
-          >
-            {isPublic ? "공개 중" : "비공개"}
-          </button>
-          {isPublic && (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/record-groups/${recordGroupId}`);
-                setCopiedLink(true);
-                setTimeout(() => setCopiedLink(false), 2000);
-              }}
-              className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg font-semibold hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
-            >
-              {copiedLink ? "복사됨!" : "링크 복사"}
-            </button>
-          )}
+      <div className="flex items-start justify-between mb-4 gap-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold break-words">{recordGroupName}</h1>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] font-semibold">
+            {modeTag && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">{modeTag}</span>}
+            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{sheetKind === "shared" ? "그룹 시트" : "개인 시트"}</span>
+            {isOwner && (
+              <span className={`px-2 py-0.5 rounded-full ${isPublic ? "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
+                {isPublic ? "공개" : "비공개"}
+              </span>
+            )}
+            {copiedLink && <span className="text-green-600 dark:text-green-400 font-medium">링크를 복사했습니다</span>}
+          </div>
         </div>
-      )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <a
+            href={`/record-groups/${recordGroupId}/statistics`}
+            className="px-3 py-1.5 border border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 text-sm rounded-lg font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
+          >
+            통계
+          </a>
+          <KebabMenu
+            label="시트 메뉴"
+            items={[
+              { label: "이름 바꾸기", onSelect: handleEditName, hidden: !isOwner },
+              { label: isPublic ? "비공개로 바꾸기" : "공개로 바꾸기", onSelect: toggleVisibility, hidden: !isOwner },
+              { label: "공개 링크 복사", onSelect: copyLink, hidden: !isPublic },
+              { label: "시트 삭제", onSelect: deleteSheet, danger: true, hidden: !isOwner },
+            ]}
+          />
+        </div>
+      </div>
       {canWrite && <PcTrackerBanner dismissible />}
       {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
@@ -818,16 +872,88 @@ const RecordGroupDetailPage = () => {
           onLeft={() => navigate("/records")}
         />
       )}
-      {canWrite && <div className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
+      {!summaryLoaded ? (
+        <div className="mb-5 flex flex-col gap-3" aria-hidden>
+          <div className="h-[190px] rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          <div className="h-[118px] rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        </div>
+      ) : summary && totals && totals.games > 0 ? (
+        <div className="mb-5 flex flex-col gap-4">
+          <section className="rounded-xl border border-gray-200 dark:border-gray-700 px-3.5 py-3 flex flex-col gap-2.5">
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{mixedPeople ? "그룹 전체" : latest?.rank ? "지금" : "마지막 기록"}</span>
+                <b className="text-lg leading-tight">{mixedPeople ? `${totals.games}판` : nowLabel ?? `${totals.games}판`}</b>
+              </div>
+              {!mixedPeople && summary.streak && summary.streak.count >= 2 && (
+                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
+                  summary.streak.result === "win" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300"
+                }`}>
+                  {summary.streak.count}연{summary.streak.result === "win" ? "승" : "패"} 중
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between items-baseline text-[11px] text-gray-500 dark:text-gray-400">
+              <span className="font-medium">최근 {summary.recent.length}판</span>
+              <span className="tabular-nums">{recentWins}승 {summary.recent.length - recentWins}패 · 오른쪽이 최근</span>
+            </div>
+            <ResultChips recent={summary.recent} />
+            {summary.last_day && (
+              <div className="text-[13px] pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400 mr-1">마지막 기록일</span>
+                {dayLabel(summary.last_day.date)}{" "}
+                <b className="tabular-nums">{summary.last_day.wins}승 {summary.last_day.count - summary.last_day.wins}패</b>
+              </div>
+            )}
+          </section>
+
+          <div className="grid grid-cols-3 gap-2 tabular-nums">
+            <div className="flex flex-col">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">승률</span>
+              <b className="text-2xl leading-tight">{pctText(rate(totals.wins, totals.games), 1)}</b>
+              <small className="text-xs text-gray-500 dark:text-gray-400">{totals.wins}승 {totals.games - totals.wins}패</small>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">듀얼</span>
+              <b className="text-2xl leading-tight">{totals.games}</b>
+              <small className="text-xs text-gray-500 dark:text-gray-400">{memberFilter ? "고른 사람 기록" : "이 시트 전체"}</small>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">선공 비율</span>
+              <b className="text-2xl leading-tight">{pctText(rate(totals.first, totals.games))}</b>
+              <small className="text-xs text-gray-500 dark:text-gray-400">{totals.first}번 선공</small>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+            <BarStat label="선공 승률" value={rate(totals.first_wins, totals.first)} sub={`${totals.first_wins}승 ${totals.first - totals.first_wins}패`} />
+            <BarStat label="후공 승률" value={rate(totals.second_wins, totals.second)} sub={`${totals.second_wins}승 ${totals.second - totals.second_wins}패`} />
+          </div>
+          <CoinSplit winGames={totals.coin_win} winWins={totals.coin_win_wins} loseGames={totals.coin_lose} loseWins={totals.coin_lose_wins} />
+        </div>
+      ) : null}
+
+      {canWrite && !showRegisterForm && (
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => toggleRegisterForm(true)}
+            className="w-full py-3 rounded-xl border-[1.5px] border-dashed border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+          >
+            ＋ 기록 추가
+          </button>
+          <p className="mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400">레코더를 쓰면 듀얼이 끝날 때마다 여기에 저절로 쌓입니다.</p>
+        </div>
+      )}
+      {canWrite && showRegisterForm && <div id="record-form" className="mb-6 max-w-2xl w-full mx-auto bg-gray-50 dark:bg-gray-800 border-y sm:border border-gray-200 dark:border-gray-700 sm:rounded-xl sm:shadow px-3 py-2 sm:px-4 sm:py-3">
         <button
           type="button"
-          onClick={() => setShowRegisterForm((v) => !v)}
+          onClick={() => toggleRegisterForm(false)}
           className="w-full flex items-center justify-between py-1 text-left font-semibold text-lg"
         >
           <span>기록 등록</span>
-          <span className="text-gray-400 text-sm">{showRegisterForm ? "접기 ▲" : "펼치기 ▼"}</span>
+          <span className="text-gray-400 text-sm">접기 ▲</span>
         </button>
-        {showRegisterForm && <div className="mt-2 pb-1">
+        {<div className="mt-2 pb-1">
         <div className="flex flex-col gap-2">
           <Select<OptionType>
             options={deckOptions}
@@ -1057,7 +1183,7 @@ const RecordGroupDetailPage = () => {
         </select>
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 tabular-nums">
+      <div className="tabular-nums">
         {matches.map((match, i) => {
           const isWin = match.result === "win";
           const dayKey = localDayKey(match.created_at);
@@ -1073,37 +1199,45 @@ const RecordGroupDetailPage = () => {
           return (
             <div key={match.id}>
               {showDay && (
-                <div className="flex items-baseline gap-2 pt-4 pb-1.5 text-xs text-gray-400 dark:text-gray-500">
-                  <span className="font-semibold text-gray-500 dark:text-gray-400">{dayLabel(dayKey)}</span>
-                  {tally && <span className="ml-auto">{tally.count}전 {tally.wins}승 {tally.count - tally.wins}패</span>}
+                <div className="flex items-baseline gap-2 pt-3 pb-1.5 text-[13px]">
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{dayLabel(dayKey)}</span>
+                  {tally && <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{tally.wins}승 {tally.count - tally.wins}패</span>}
                 </div>
               )}
               <div
-                className={`group relative grid items-center gap-x-2 sm:gap-x-2.5 px-2 pr-1 border-l-[3px] mb-px
-                  grid-cols-[1fr_auto_28px] sm:grid-cols-[1fr_96px_28px_44px_48px] py-2 sm:py-0 sm:min-h-[58px]
-                  ${isWin ? "border-l-blue-500 bg-blue-50/70 dark:bg-blue-950/40" : "border-l-red-400 bg-red-50/80 dark:bg-red-950/30"}`}
+                className={`group grid grid-cols-[46px_minmax(0,1fr)_auto] items-center gap-x-2 py-2 pr-2 mb-1.5 rounded-lg border-l-4
+                  ${isWin ? "border-l-blue-600 bg-blue-50 dark:bg-blue-950/40" : "border-l-red-500 bg-red-50 dark:bg-red-950/30"}`}
               >
-                <div className="flex items-center gap-2 min-w-0 col-span-2 sm:col-span-1">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {!match.deck ? (
-                      <img src={OTHER_DECK_IMAGE} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
-                    ) : match.deck.cover_image_small ? (
-                      <img src={match.deck.cover_image_small} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
-                    ) : (
-                      <div className="w-9 h-9 rounded bg-gray-200 dark:bg-gray-700 shrink-0" />
+                <div className="flex flex-col items-center leading-tight">
+                  <b className={`text-[15px] ${isWin ? "text-blue-600 dark:text-blue-400" : "text-red-500 dark:text-red-400"}`}>{isWin ? "승" : "패"}</b>
+                  <span className="inline-flex items-center gap-0.5 mt-0.5 text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                    {match.coin_toss_result && (
+                      <img
+                        src={match.coin_toss_result === "win" ? COIN_FRONT : COIN_BACK}
+                        alt={match.coin_toss_result === "win" ? "코인 이김" : "코인 짐"}
+                        title={match.coin_toss_result === "win" ? "코인 이김 (앞면)" : "코인 짐 (뒷면)"}
+                        className="w-4 h-4"
+                      />
                     )}
-                    <span className="truncate text-[15px] font-medium">{match.deck?.name ?? "기타"}</span>
-                  </div>
-                  <span className="text-xs text-gray-400 shrink-0">vs</span>
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <img src={match.opponent_deck?.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
-                    <span className="truncate text-[15px]">{oppName}</span>
-                  </div>
+                    {match.first_or_second === "first" ? "선" : "후"}
+                  </span>
                 </div>
 
-                <div className="flex sm:flex-col gap-x-2 gap-y-0.5 text-[13px] leading-tight text-gray-500 dark:text-gray-400 row-start-2 sm:row-start-auto">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 text-[13px] leading-tight">
+                    <img
+                      src={!match.deck ? OTHER_DECK_IMAGE : match.deck.cover_image_small || UNKNOWN_DECK_IMAGE}
+                      alt=""
+                      className="w-6 h-6 rounded object-cover shrink-0"
+                    />
+                    <span className="min-w-0 break-words">{match.deck?.name ?? "기타"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0 text-[13px] leading-tight font-semibold">
+                    <img src={match.opponent_deck?.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                    <span className="min-w-0 break-words">{oppName}</span>
+                  </div>
                   {sheetKind === "shared" && match.recorded_by && (
-                    <span className="flex items-center gap-1 sm:hidden">
+                    <span className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
                       {match.recorded_by.icon ? (
                         <img src={match.recorded_by.icon} alt="" className={`w-4 h-4 rounded-full object-cover ${match.recorded_by.border ? "ring-2 ring-blue-400" : ""}`} />
                       ) : (
@@ -1112,33 +1246,16 @@ const RecordGroupDetailPage = () => {
                       {match.recorded_by.username}
                     </span>
                   )}
-                  <span className={match.first_or_second === "first" ? "font-semibold text-gray-900 dark:text-gray-100" : "font-medium"}>
-                    {match.first_or_second === "first" ? "선공" : "후공"}
-                  </span>
+                </div>
+
+                <div className="flex flex-col items-end gap-0.5 text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap tabular-nums">
+                  <span>{timeLabel(match.created_at)}</span>
                   <span>
                     {getRankOrScoreDisplay(match.rank, match.wins, match.score)}
                     {climbed && <span className="ml-1 font-semibold text-green-700 dark:text-green-400">↑</span>}
                   </span>
-                </div>
-
-                <div className="flex justify-center row-start-1 col-start-3 sm:row-start-auto sm:col-start-auto">
-                  {match.coin_toss_result && (
-                    <img
-                      src={match.coin_toss_result === "win" ? "/images/coin_front.webp" : "/images/coin_back.webp"}
-                      alt={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
-                      title={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
-                      className="w-6 h-6 object-contain"
-                    />
-                  )}
-                </div>
-
-                <div className="text-xs text-gray-400 dark:text-gray-500 text-right row-start-2 col-start-2 sm:row-start-auto sm:col-start-auto">
-                  {timeLabel(match.created_at)}
-                </div>
-
-                <div className="flex justify-end gap-0.5 row-start-2 col-start-3 sm:row-start-auto sm:col-start-auto opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                   {canWrite && (
-                    <>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                       <button onClick={() => setEditingMatch(match)} title="수정" aria-label="수정"
                         className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white">
                         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
@@ -1147,23 +1264,12 @@ const RecordGroupDetailPage = () => {
                         className="w-6 h-6 grid place-items-center rounded text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600">
                         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
 
-                {sheetKind === "shared" && match.recorded_by && (
-                  <div className="hidden sm:flex absolute right-[132px] top-1 items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 pointer-events-none">
-                    {match.recorded_by.icon ? (
-                      <img src={match.recorded_by.icon} alt="" className={`w-3.5 h-3.5 rounded-full object-cover ${match.recorded_by.border ? "ring-1 ring-blue-400" : ""}`} />
-                    ) : (
-                      <span className="w-3.5 h-3.5 rounded-full bg-gray-300 dark:bg-gray-600" />
-                    )}
-                    {match.recorded_by.username}
-                  </div>
-                )}
-
                 {match.notes && (
-                  <div className="col-span-full text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words pb-1.5 sm:pb-2 sm:-mt-2">
+                  <div className="col-start-2 col-span-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words pt-1">
                     {match.notes}
                   </div>
                 )}
@@ -1208,6 +1314,7 @@ const RecordGroupDetailPage = () => {
           onClose={() => setEditingMatch(null)}
           onUpdated={() => {
             loadMatches();
+            loadSummary();
             setEditingMatch(null);
           }}
         />

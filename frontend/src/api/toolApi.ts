@@ -178,13 +178,28 @@ export const deleteMatchRecord = async (matchId: number) => {
   }
 };
 
-export const getRecordGroupStatistics = async (recordGroupId: number) => {
+// The sheet page's header: where the sheet stands right now (2026-10-06 redesign).
+export type SheetSummary = {
+  totals: {
+    games: number; wins: number; first: number; first_wins: number; second: number; second_wins: number;
+    coin_win: number; coin_win_wins: number; coin_lose: number; coin_lose_wins: number;
+  };
+  recent: { r: "win" | "lose"; fs: "first" | "second"; coin: "win" | "lose" | null }[];
+  streak: { result: "win" | "lose"; count: number } | null;
+  last_day: { date: string; count: number; wins: number } | null;
+  latest: { result: "win" | "lose"; rank: string | null; wins: number | null; score: number | null; score_type: string | null } | null;
+};
+
+// Narrows the full statistics and the rank curve: today, the last 7 days, or a range of local days.
+export type StatsPeriod = { period?: "today" | "7d"; date_from?: string; date_to?: string };
+const periodQuery = (p?: StatsPeriod) =>
+  p ? Object.entries(p).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`) : [];
+
+export const getRecordGroupStatistics = async (recordGroupId: number, memberId?: number | null) => {
   const token = localStorage.getItem("access_token");
-  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/statistics/`, {
+  const response = await fetch(`${API_BASE_URL}/record-groups/${recordGroupId}/statistics/${memberId ? `?member=${memberId}` : ""}`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "include",
   });
 
@@ -195,8 +210,8 @@ export const getRecordGroupStatistics = async (recordGroupId: number) => {
   return response.json();
 };
 
-export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number, memberId?: number | null) => {
-  const qs = [deckId ? `deck_id=${deckId}` : "", memberId ? `member=${memberId}` : ""].filter(Boolean).join("&");
+export const getRecordGroupStatisticsFull = async (recordGroupId: number, deckId?: number, memberId?: number | null, period?: StatsPeriod) => {
+  const qs = [deckId ? `deck_id=${deckId}` : "", memberId ? `member=${memberId}` : "", ...periodQuery(period)].filter(Boolean).join("&");
   const params = qs ? `?${qs}` : "";
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
@@ -264,8 +279,9 @@ export const getMetaDeckStats = async () => {
   return await response.json();
 };
 
-export const getUserStatisticsFull = async (deckId?: number) => {
-  const params = deckId ? `?deck_id=${deckId}` : "";
+export const getUserStatisticsFull = async (deckId?: number, period?: StatsPeriod) => {
+  const qs = [deckId ? `deck_id=${deckId}` : "", ...periodQuery(period)].filter(Boolean).join("&");
+  const params = qs ? `?${qs}` : "";
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -280,11 +296,12 @@ export const getUserStatisticsFull = async (deckId?: number) => {
   return response.json();
 };
 
-export const getRecordGroupRankHistory = async (recordGroupId: number, memberId?: number | null) => {
+export const getRecordGroupRankHistory = async (recordGroupId: number, memberId?: number | null, period?: StatsPeriod) => {
   const token = localStorage.getItem("access_token");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const qs = [memberId ? `member=${memberId}` : "", ...periodQuery(period)].filter(Boolean).join("&");
   const response = await fetch(
-    `${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/${memberId ? `?member=${memberId}` : ""}`,
+    `${API_BASE_URL}/record-groups/${recordGroupId}/rank-history/${qs ? `?${qs}` : ""}`,
     { headers },
   );
 

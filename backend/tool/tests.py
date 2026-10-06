@@ -1000,3 +1000,106 @@ class MetaDeckStatsTopThirtyTest(TestCase):
         pct = [d["appearance_percent"] for d in decks]
         self.assertEqual(pct, sorted(pct, reverse=True))
         self.assertIn("cover_image_small", decks[0])
+
+
+from datetime import timedelta as _td
+from django.utils import timezone as _tz
+
+
+class SheetSummaryTest(TestCase):
+    """Sheet page header (2026-10-06 redesign): recent results, streak, last day, coin split, where the climb stands."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="s@test.com", username="summ", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck(name="내덱")
+        self.group = RecordGroup.objects.create(user=self.user, name="등반")
+
+    def _m(self, when, **kw):
+        m = _create_match(self.group, self.deck, **kw)
+        MatchRecord.objects.filter(id=m.id).update(created_at=when)
+        return m
+
+    def summary(self, **params):
+        return self.client.get(f"/api/record-groups/{self.group.id}/statistics/", params).json()["summary"]
+
+    def test_recent_streak_last_day_and_coin(self):
+        now = _tz.now()
+        yesterday = now - _td(days=1)
+        self._m(yesterday, result="lose", coin_toss_result="lose", first_or_second="second")
+        for i in range(25):
+            self._m(yesterday + _td(minutes=i + 1), result="win" if i % 2 else "lose", coin_toss_result="win")
+        self._m(now - _td(minutes=3), result="win", coin_toss_result="lose", first_or_second="second", rank="gold3", wins=1)
+        self._m(now - _td(minutes=2), result="win", coin_toss_result="win", rank="gold3", wins=2)
+        s = self.summary()
+        self.assertEqual(len(s["recent"]), 20)
+        self.assertEqual(s["recent"][-1], {"r": "win", "fs": "first", "coin": "win"})
+        self.assertEqual(s["recent"][-2], {"r": "win", "fs": "second", "coin": "lose"})
+        # oldest first: the last 20 of 28 (the 9th duel, a win)
+        self.assertEqual(s["recent"][0]["r"], "win")
+        self.assertEqual(s["streak"], {"result": "win", "count": 2})
+        self.assertEqual(s["last_day"]["count"], 2)
+        self.assertEqual(s["last_day"]["wins"], 2)
+        self.assertEqual(s["last_day"]["date"], _tz.localtime(now - _td(minutes=2)).date().isoformat())
+        self.assertEqual(s["latest"]["rank"], "gold3")
+        self.assertEqual(s["latest"]["wins"], 2)
+        self.assertEqual(s["latest"]["result"], "win")
+        t = s["totals"]
+        self.assertEqual((t["games"], t["wins"]), (28, 14))
+        self.assertEqual((t["coin_win"], t["coin_win_wins"], t["coin_lose"], t["coin_lose_wins"]), (26, 13, 2, 1))
+        self.assertEqual((t["second"], t["second_wins"]), (2, 1))
+
+    def test_empty_sheet(self):
+        s = self.summary()
+        self.assertEqual(s["recent"], [])
+        self.assertIsNone(s["streak"])
+        self.assertIsNone(s["last_day"])
+        self.assertIsNone(s["latest"])
+        self.assertEqual(s["totals"]["games"], 0)
+
+    def test_deleted_and_member_filter(self):
+        other = User.objects.create_user(email="o@test.com", username="other", password="pass1234")
+        now = _tz.now()
+        self._m(now - _td(minutes=5), result="win")
+        gone = self._m(now - _td(minutes=4), result="lose")
+        MatchRecord.objects.filter(id=gone.id).update(is_deleted=True)
+        theirs = self._m(now - _td(minutes=3), result="lose")
+        MatchRecord.objects.filter(id=theirs.id).update(recorded_by=other)
+        self.assertEqual(self.summary()["totals"]["games"], 2)
+        mine = self.summary(member=self.user.id)
+        self.assertEqual(mine["totals"]["games"], 1)
+        self.assertEqual(mine["streak"], {"result": "win", "count": 1})
+
+
+class StatisticsPeriodTest(TestCase):
+    """Stats can be narrowed to today, the last 7 days, or a date range."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="p@test.com", username="per", password="pass1234")
+        self.client.force_authenticate(user=self.user)
+        self.deck = _create_deck(name="내덱")
+        self.group = RecordGroup.objects.create(user=self.user, name="기간")
+        now = _tz.now()
+        for days_ago, result in ((0, "win"), (3, "lose"), (3, "lose"), (20, "win")):
+            m = _create_match(self.group, self.deck, result=result, rank="gold3", wins=0)
+            if days_ago:
+                MatchRecord.objects.filter(id=m.id).update(created_at=now - _td(days=days_ago))
+
+    def full(self, **params):
+        return self.client.get(f"/api/record-groups/{self.group.id}/statistics/full/", params).json()["basic"]["total_games"]
+
+    def test_periods(self):
+        self.assertEqual(self.full(), 4)
+        self.assertEqual(self.full(period="today"), 1)
+        self.assertEqual(self.full(period="7d"), 3)
+        day = (_tz.localtime(_tz.now()) - _td(days=3)).date().isoformat()
+        self.assertEqual(self.full(date_from=day, date_to=day), 2)
+        self.assertEqual(self.full(period="junk"), 4)
+
+    def test_rank_history_and_aggregate_follow_the_period(self):
+        r = self.client.get(f"/api/record-groups/{self.group.id}/rank-history/", {"period": "7d"}).json()
+        self.assertEqual(len(r["matches"]), 3)
+        agg = self.client.get("/api/record-groups/statistics/full/", {"period": "today"}).json()
+        self.assertEqual(agg["basic"]["total_games"], 1)
