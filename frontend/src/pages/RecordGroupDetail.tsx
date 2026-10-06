@@ -34,7 +34,7 @@ const dayLabel = (key: string) => {
 };
 const timeLabel = (iso: string) => {
   const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
 const customSelectStyles = {
@@ -1292,9 +1292,9 @@ const RecordGroupDetailPage = () => {
                 )}
 
                 {match.notes && (
-                  <div className="col-start-2 col-span-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-words pt-1">
-                    {match.notes}
-                  </div>
+                  <p className="col-start-2 col-span-2 mt-1.5 px-2.5 py-1.5 rounded-md bg-white/80 dark:bg-gray-900/50 text-[13px] leading-snug text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                    <span aria-hidden className="mr-1">📝</span>{match.notes}
+                  </p>
                 )}
               </div>
               {promoted && (
