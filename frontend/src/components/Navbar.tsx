@@ -7,12 +7,19 @@ import PLogo from "@/components/PLogo";
 import { ALL_MENU_PATH, CONTACT_PATH, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
 import logo from "/images/logo_big.webp";
 
-// 문의, 후원 and 공지 sit at the top right of every page (redesign 2026-10).
+// 공지, 문의 and 후원 sit at the top right of every page (redesign 2026-10; this order 특이점 2026-10-07).
 function SupportLinks({ compact }: { compact?: boolean }) {
   const pill = "inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap transition";
   const size = compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
   return (
     <>
+      <Link
+        to="/changelog"
+        className={`${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
+        title="공지사항"
+      >
+        📢<span className={compact ? "" : "hidden md:inline"}>공지</span>
+      </Link>
       <Link
         to={CONTACT_PATH}
         className={`${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
@@ -29,13 +36,6 @@ function SupportLinks({ compact }: { compact?: boolean }) {
       >
         ☕<span className={compact ? "" : "hidden md:inline"}>후원</span>
       </a>
-      <Link
-        to="/changelog"
-        className={`${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
-        title="공지사항"
-      >
-        📢<span className={compact ? "" : "hidden md:inline"}>공지</span>
-      </Link>
     </>
   );
 }
