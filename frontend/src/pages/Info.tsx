@@ -72,7 +72,10 @@ function Info() {
                 <div key={i} className={`${cls} ${popular ? "" : "animate-pulse"} bg-gray-200 dark:bg-gray-700`} />
               );
             })}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/70 to-white dark:via-gray-800/70 dark:to-gray-800" />
+            {/* On fractional-scale screens (Galaxy Fold: 2.2x, 2.625x) the pictures paint one device pixel past this box, which
+                showed as a thin coloured line under the fade (특이점 2026-10-07). The fade is solid for its last tenth and runs
+                4px past the pictures, so that row is always covered. */}
+            <div className="absolute inset-x-0 top-0 -bottom-1 bg-gradient-to-b from-transparent via-white/70 to-white to-90% dark:via-gray-800/70 dark:to-gray-800" />
           </div>
           <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
             <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-blue-400">덱 도감</span>
