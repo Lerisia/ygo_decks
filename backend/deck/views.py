@@ -177,6 +177,7 @@ def get_deck_result(request):
         "id": deck.id,
         "name": deck.name,
         "cover_image": deck.cover_image.url if deck.cover_image else None,
+        "cover_image_detail": _detail_cover_url(deck),
         "strength": deck.get_strength_display(),
         "difficulty": deck.get_difficulty_display(),
         "deck_type": deck.get_deck_type_display(),
@@ -201,6 +202,15 @@ def _list_cover_url(deck):
     return cover.url if cover else None
 
 
+def _phone_cover_url(deck):
+    return deck.cover_image_phone.url if deck.cover_image_phone else _list_cover_url(deck)
+
+
+def _detail_cover_url(deck):
+    cover = deck.cover_image_detail or deck.cover_image
+    return cover.url if cover else None
+
+
 @api_view(["GET"])
 def get_popular_decks(request):
     """The home page's deck pillar: the most-viewed released decks that have a cover, and how many the book holds."""
@@ -212,7 +222,7 @@ def get_popular_decks(request):
     picks = []
     for deck in released.exclude(cover_image="").exclude(cover_image__isnull=True).order_by("-num_views", "id")[:limit]:
         url = _list_cover_url(deck) or deck.cover_image.url
-        picks.append({"id": deck.id, "name": deck.name, "cover_image": url})
+        picks.append({"id": deck.id, "name": deck.name, "cover_image": url, "cover_image_phone": _phone_cover_url(deck) or url})
     return Response({"total": released.count(), "decks": picks})
 
 
@@ -237,6 +247,7 @@ def get_all_decks(request):
             "performance_tags": [performance_tag.name for performance_tag in deck.performance_tags.all()],
             "aesthetic_tags": [aesthetic_tag.name for aesthetic_tag in deck.aesthetic_tags.all()],
             "cover_image": _list_cover_url(deck),
+            "cover_image_phone": _phone_cover_url(deck),
         }
         for deck in decks
     ]
@@ -257,6 +268,7 @@ def serialize_deck_detail(deck):
         "name": deck.name,
         "cover_image": deck.cover_image.url if deck.cover_image else None,
         "cover_image_small": deck.cover_image_small.url if deck.cover_image_small else None,
+        "cover_image_detail": _detail_cover_url(deck),
         "strength": deck.get_strength_display(),
         "difficulty": deck.get_difficulty_display(),
         "deck_type": deck.get_deck_type_display(),

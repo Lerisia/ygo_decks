@@ -67,7 +67,7 @@ function Info() {
               const d = decks[i];
               const cls = `${i >= 4 ? "hidden md:block" : ""} w-full h-full`;
               return d ? (
-                <img key={d.id} src={d.cover_image} alt="" className={`${cls} object-cover`} />
+                <img key={d.id} src={d.cover_image_phone || d.cover_image} alt="" className={`${cls} object-cover`} />
               ) : (
                 <div key={i} className={`${cls} ${popular ? "" : "animate-pulse"} bg-gray-200 dark:bg-gray-700`} />
               );
@@ -99,7 +99,7 @@ function Info() {
                   to={`/database/${d.id}`}
                   className={`${i >= 3 ? "hidden md:inline-flex" : "inline-flex"} items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold transition`}
                 >
-                  <img src={d.cover_image} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  <img src={d.cover_image_phone || d.cover_image} alt="" className="w-6 h-6 rounded-full object-cover" />
                   {d.name}
                 </Link>
               ))}

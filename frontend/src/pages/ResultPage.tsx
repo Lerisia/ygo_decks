@@ -100,7 +100,7 @@ function ResultPage() {
 
       {result?.cover_image && (
         <img
-          src={result.cover_image}
+          src={result.cover_image_detail || result.cover_image}
           alt={result.name}
           className="mt-4 rounded-xl shadow-lg w-full max-w-md mx-auto object-contain"
         />

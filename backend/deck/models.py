@@ -3,6 +3,28 @@ from django.db import models
 from PIL import Image
 import os
 
+
+def _write_atomically(rel, write):
+    """Write a media file under a temporary name and swap it in, so a phone loading it never gets half a picture."""
+    path = os.path.join(settings.MEDIA_ROOT, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        with open(tmp, "wb") as f:
+            write(f)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def _save_webp(img, rel, size, quality):
+    """Scaled down to fit size×size (never up)."""
+    im = img.convert("RGB")
+    if max(im.size) > size:
+        im.thumbnail((size, size), Image.LANCZOS)
+    _write_atomically(rel, lambda f: im.save(f, "WEBP", quality=quality, method=6))
+
 class SummoningMethod(models.Model):
     id = models.IntegerField(primary_key=True)
     class SummonType(models.IntegerChoices):
@@ -94,6 +116,10 @@ class Deck(models.Model):
     cover_image_small = models.ImageField(upload_to='deck_covers/small/', blank=True, null=True)
     # Deck database list: up to 480px (a 224px-wide card on a 2x screen), scaled down from the original, never up.
     cover_image_list = models.ImageField(upload_to='deck_covers/list/', blank=True, null=True)
+    # Phones' list tiles (~100px on a 3x screen): up to 320px, under half the bytes of the 480px one (2026-10-06).
+    cover_image_phone = models.ImageField(upload_to='deck_covers/phone/', blank=True, null=True)
+    # Deck page and test result: up to 960px webp in place of the original upload, which can be a 3MB PNG.
+    cover_image_detail = models.ImageField(upload_to='deck_covers/detail/', blank=True, null=True)
 
     strength = models.IntegerField(choices=_Strength.choices)
     difficulty = models.IntegerField(choices=_Difficulty.choices)
@@ -131,34 +157,66 @@ class Deck(models.Model):
     def __str__(self):
         return self.name
     
+    COVER_VERSIONS = ("cover_image_small", "cover_image_list", "cover_image_phone", "cover_image_detail")
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        # Counting a view (update_fields=["num_views"]) used to re-encode every cover version on each test result.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "cover_image" not in update_fields:
+            return
+        if self.cover_image and self.cover_versions_stale():
+            self.make_cover_versions()
 
-        if self.cover_image:
-            base = os.path.basename(self.cover_image.name)
-            small_img_relative_path = f"deck_covers/small/{base}"
-            small_img_path = os.path.join(settings.MEDIA_ROOT, small_img_relative_path)
+    def _cover_version_names(self):
+        base = os.path.basename(self.cover_image.name)
+        stem = f"{self.pk}_{os.path.splitext(base)[0]}"
+        return {
+            "cover_image_small": f"deck_covers/small/{base}",
+            "cover_image_list": f"deck_covers/list/{stem}.webp",
+            "cover_image_phone": f"deck_covers/phone/{stem}.webp",
+            "cover_image_detail": f"deck_covers/detail/{stem}.webp",
+        }
 
-            os.makedirs(os.path.dirname(small_img_path), exist_ok=True)
-            img = Image.open(self.cover_image.path)
-            img.resize((200, 200)).save(small_img_path)
+    def cover_versions_stale(self):
+        """A version is missing, made from another cover, or older than the cover file."""
+        try:
+            source_mtime = os.path.getmtime(self.cover_image.path)
+        except OSError:
+            return False
+        for field, name in self._cover_version_names().items():
+            current = getattr(self, field)
+            if not current or current.name != name:
+                return True
+            try:
+                if os.path.getmtime(current.path) < source_mtime:
+                    return True
+            except OSError:
+                return True
+        return False
 
-            # Save auto-created small cover image
-            self.cover_image_small.name = small_img_relative_path
-            self.cover_image_list.name = self.make_list_cover(img, self.pk, base)
-            super().save(update_fields=["cover_image_small", "cover_image_list"])
+    def make_cover_versions(self):
+        names = self._cover_version_names()
+        with Image.open(self.cover_image.path) as img:
+            img.load()
+            small = img.resize((200, 200))
+            small_format = Image.registered_extensions().get(os.path.splitext(names["cover_image_small"])[1].lower(), "PNG")
+            if small_format == "JPEG" and small.mode not in ("RGB", "L"):
+                small = small.convert("RGB")
+            _write_atomically(names["cover_image_small"], lambda f: small.save(f, small_format))
+            self.make_list_cover(img, self.pk, os.path.basename(self.cover_image.name))
+            _save_webp(img, names["cover_image_phone"], 320, quality=80)
+            _save_webp(img, names["cover_image_detail"], 960, quality=82)
+        for field, name in names.items():
+            getattr(self, field).name = name
+        super().save(update_fields=list(names))
 
     @staticmethod
     def make_list_cover(img, deck_id, base, size=480):
         rel = f"deck_covers/list/{deck_id}_{os.path.splitext(base)[0]}.webp"
-        path = os.path.join(settings.MEDIA_ROOT, rel)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        im = img.convert("RGB")
-        if max(im.size) > size:
-            im.thumbnail((size, size), Image.LANCZOS)
-        im.save(path, "WEBP", quality=85, method=6)
+        _save_webp(img, rel, size, quality=85)
         return rel
-    
+
     def increment_views(self):
         self.num_views += 1
         self.save(update_fields=['num_views'])

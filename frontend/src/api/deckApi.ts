@@ -11,6 +11,7 @@ export type DeckData = {
   name: string;
   cover_image?: string;
   cover_image_small?: string;
+  cover_image_detail?: string | null;
   strength: string;
   difficulty: string;
   deck_type: string;
@@ -192,7 +193,7 @@ export const replaceDeckCover = (deckId: number, cover: File) => {
   return staffRequest<{ deck: SavedDeck }>(`/api/deck/${deckId}/cover/`, { method: "POST", body: form });
 };
 
-export type PopularDeck = { id: number; name: string; cover_image: string };
+export type PopularDeck = { id: number; name: string; cover_image: string; cover_image_phone?: string };
 
 /** The most-viewed decks with a cover, and how many decks the book holds (home page). */
 export const getPopularDecks = async (limit = 6): Promise<{ total: number; decks: PopularDeck[] }> => {

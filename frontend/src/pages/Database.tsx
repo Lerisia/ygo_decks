@@ -11,6 +11,7 @@ interface Deck {
   id: number;
   name: string;
   cover_image: string | null;
+  cover_image_phone?: string | null;
   strength: string;
   difficulty: string;
   deck_type: string;
@@ -35,6 +36,9 @@ const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map(
 // The list runs strongest first — 최상위권, then 상위권, … — and by name within each tier (특이점 2026-10-06).
 const POWER_RANK: Record<string, number> = Object.fromEntries(POWER_COLORS.map((p, i) => [p.label, i]));
 const powerRank = (strength: string) => POWER_RANK[strength] ?? POWER_COLORS.length;
+// How wide a tile is drawn (3 / 4 / 5 columns inside the page gutters), so a phone picks the 320px cover over the 480px one.
+const COVER_SIZES =
+  "(min-width: 1280px) 224px, (min-width: 1024px) calc((100vw - 160px) / 5), (min-width: 768px) calc((100vw - 144px) / 4), calc((100vw - 84px) / 3)";
 // 3px ring in the deck power colour plus a faint glow of the same colour outside it (drawn outside the box, so no layout shift).
 const powerRing = (color: string): CSSProperties => ({ boxShadow: `0 0 0 3px ${color}, 0 0 9px 2px ${color}99` });
 
@@ -437,8 +441,11 @@ export default function DatabasePage() {
             <div className="relative">
               <img
                 src={deck.cover_image || "/default_cover.png"}
+                srcSet={deck.cover_image && deck.cover_image_phone ? `${deck.cover_image_phone} 320w, ${deck.cover_image} 480w` : undefined}
+                sizes={COVER_SIZES}
                 alt={deck.name}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />

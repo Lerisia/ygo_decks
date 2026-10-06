@@ -10,7 +10,7 @@ const NotFound: React.FC = () => {
       </p>
 
       <img
-        src="/images/Eldlich.png"
+        src="/images/Eldlich.webp"
         alt="eldlich"
         className="mt-6 mx-auto w-48 sm:w-56 md:w-64 lg:w-72 max-w-full"
       />

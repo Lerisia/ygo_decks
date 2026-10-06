@@ -531,6 +531,7 @@ class UntaggedDeckSaveTest(TestCase):
 
 
 import io
+import os
 import shutil
 import tempfile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -578,6 +579,84 @@ class ListCoverImageTest(TestCase):
         deck = _create_deck(cover_image=_png((800, 800)))
         data = Client().get(f"/api/deck/{deck.id}/").json()
         self.assertEqual(data["cover_image"], deck.cover_image.url)
+
+
+class CoverVersionsTest(TestCase):
+    """Phones get a 320px list cover and deck pages a 960px webp instead of the multi-megabyte original (2026-10-06),
+    and the versions are only rebuilt when the cover itself changes."""
+
+    def setUp(self):
+        self.media = tempfile.mkdtemp()
+        self.override = override_settings(MEDIA_ROOT=self.media)
+        self.override.enable()
+
+    def tearDown(self):
+        self.override.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+
+    def _size(self, field):
+        with PILImage.open(field.path) as im:
+            return im.format, im.size
+
+    def test_save_makes_phone_and_detail_webp(self):
+        deck = _create_deck(cover_image=_png((2000, 1500)))
+        self.assertEqual(self._size(deck.cover_image_phone), ("WEBP", (320, 240)))
+        self.assertEqual(self._size(deck.cover_image_detail), ("WEBP", (960, 720)))
+        self.assertTrue(deck.cover_image_phone.path.startswith(self.media))
+        self.assertTrue(deck.cover_image_detail.path.startswith(self.media))
+
+    def test_small_original_is_not_upscaled(self):
+        deck = _create_deck(cover_image=_png((300, 300)))
+        self.assertEqual(self._size(deck.cover_image_phone), ("WEBP", (300, 300)))
+        self.assertEqual(self._size(deck.cover_image_detail), ("WEBP", (300, 300)))
+
+    def test_counting_a_view_does_not_rebuild_covers(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        paths = [deck.cover_image_small.path, deck.cover_image_list.path, deck.cover_image_phone.path, deck.cover_image_detail.path]
+        os.utime(deck.cover_image.path, (500_000, 500_000))
+        for p in paths:
+            os.utime(p, (1_000_000, 1_000_000))
+        deck.num_views += 1
+        deck.save(update_fields=["num_views"])
+        deck.name = "이름만 바꿈"
+        deck.save()
+        self.assertEqual([os.path.getmtime(p) for p in paths], [1_000_000] * 4)
+
+    def test_new_cover_rebuilds_versions(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        deck.cover_image = _png((640, 480))
+        deck.save()
+        self.assertEqual(self._size(deck.cover_image_detail), ("WEBP", (640, 480)))
+        self.assertEqual(self._size(deck.cover_image_phone), ("WEBP", (320, 240)))
+
+    def test_missing_version_is_rebuilt_on_save(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        os.remove(deck.cover_image_detail.path)
+        deck.save()
+        self.assertTrue(os.path.exists(deck.cover_image_detail.path))
+
+    def test_apis_serve_the_versions(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        row = Client().get("/api/deck/").json()["decks"][0]
+        self.assertEqual(row["cover_image"], deck.cover_image_list.url)
+        self.assertEqual(row["cover_image_phone"], deck.cover_image_phone.url)
+        data = Client().get(f"/api/deck/{deck.id}/").json()
+        self.assertEqual(data["cover_image_detail"], deck.cover_image_detail.url)
+        popular = Client().get("/api/deck/popular/?limit=1").json()["decks"][0]
+        self.assertEqual(popular["cover_image_phone"], deck.cover_image_phone.url)
+
+    def test_result_serves_detail_cover(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        data = Client().get("/api/deck/result", {"key": "strength=0"}).json()
+        self.assertEqual(data["cover_image_detail"], deck.cover_image_detail.url)
+
+    def test_deck_without_versions_falls_back(self):
+        deck = _create_deck(cover_image=_png((800, 800)))
+        Deck.objects.filter(id=deck.id).update(cover_image_phone=None, cover_image_detail=None)
+        row = Client().get("/api/deck/").json()["decks"][0]
+        self.assertEqual(row["cover_image_phone"], deck.cover_image_list.url)
+        data = Client().get(f"/api/deck/{deck.id}/").json()
+        self.assertEqual(data["cover_image_detail"], deck.cover_image.url)
 
 
 import json
@@ -930,7 +1009,7 @@ class PopularDecksTest(TestCase):
         body = self.client.get("/api/deck/popular/?limit=3").json()
         self.assertEqual([d["name"] for d in body["decks"]], ["덱4", "덱1", "덱2"])
         self.assertTrue(all(d["cover_image"] for d in body["decks"]))
-        self.assertEqual(set(body["decks"][0]), {"id", "name", "cover_image"})
+        self.assertEqual(set(body["decks"][0]), {"id", "name", "cover_image", "cover_image_phone"})
 
     def test_total_counts_the_book_without_upcoming_decks(self):
         self.assertEqual(self.client.get("/api/deck/popular/").json()["total"], 6)

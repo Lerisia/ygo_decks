@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import PickerModal, { type PickerItem } from "./PickerModal";
 import { matchesDeckQuery } from "@/utils/hangul";
 
-type DeckRow = { id: number; name: string; aliases?: string[]; strength?: string; is_upcoming?: boolean; cover_image?: string | null };
+type DeckRow = { id: number; name: string; aliases?: string[]; strength?: string; is_upcoming?: boolean; cover_image?: string | null; cover_image_phone?: string | null };
 
 // The deck list is the same for everyone and rarely changes: fetched once per visit.
 let cached: DeckRow[] | null = null;
@@ -30,7 +30,7 @@ export default function DeckPickerModal({ open, onClose, onPick }: { open: boole
     () =>
       (decks ?? [])
         .filter((d) => matchesDeckQuery(query, d.name, d.aliases ?? []))
-        .map((d) => ({ key: d.id, name: d.name, image: d.cover_image, sub: d.is_upcoming ? "출시 예정" : d.strength })),
+        .map((d) => ({ key: d.id, name: d.name, image: d.cover_image_phone || d.cover_image, sub: d.is_upcoming ? "출시 예정" : d.strength })),
     [decks, query],
   );
 

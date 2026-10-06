@@ -26,6 +26,7 @@ interface Deck {
   id: number;
   name: string;
   cover_image: string | null;
+  cover_image_detail?: string | null;
   strength: string;
   difficulty: string;
   deck_type: string;
@@ -148,7 +149,7 @@ export default function DeckDetail() {
               <tr className="border-b">
                 <td className="p-2 text-center" colSpan={2}>
                   <img
-                    src={deck.cover_image}
+                    src={deck.cover_image_detail || deck.cover_image}
                     alt={deck.name}
                     className="w-full max-w-sm mx-auto rounded-lg shadow-md"
                   />

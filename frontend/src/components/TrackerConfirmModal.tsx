@@ -11,9 +11,12 @@ export default function TrackerConfirmModal() {
   const [opponentSearch, setOpponentSearch] = useState("");
   const [selectedOpponent, setSelectedOpponent] = useState<number | null>(null);
 
+  // Only when there is a duel to confirm: mounted on every page, it used to fetch the whole deck list on each visit.
+  const needDecks = !!t.pendingSave && allDecks.length === 0;
   useEffect(() => {
+    if (!needDecks) return;
     getAllDecks().then((data) => { if (data.decks) setAllDecks(data.decks); }).catch(() => {});
-  }, []);
+  }, [needDecks]);
 
   if (!t.pendingSave) return null;
 

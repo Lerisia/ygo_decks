@@ -1124,7 +1124,7 @@ const RecordGroupDetailPage = () => {
                 <div className="flex justify-center row-start-1 col-start-3 sm:row-start-auto sm:col-start-auto">
                   {match.coin_toss_result && (
                     <img
-                      src={match.coin_toss_result === "win" ? "/images/coin_front.png" : "/images/coin_back.png"}
+                      src={match.coin_toss_result === "win" ? "/images/coin_front.webp" : "/images/coin_back.webp"}
                       alt={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
                       title={match.coin_toss_result === "win" ? "앞면" : "뒷면"}
                       className="w-6 h-6 object-contain"

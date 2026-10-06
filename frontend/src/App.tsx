@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './App.css'
 import Navbar from "./components/Navbar";
@@ -69,7 +70,13 @@ function App() {
   // The deck database stays mounted (just hidden) while a deck page is open, so Back shows the same list with
   // its pictures already drawn instead of rebuilding it (엘리스 2026-10-02).
   const onDeckList = pathname === "/database";
-  const keepDeckList = onDeckList || pathname.startsWith("/database/");
+  const inDeckBook = onDeckList || pathname.startsWith("/database/");
+  // Only a list that was already on screen is kept: one first built inside the hidden box makes the browser fetch
+  // every thumbnail at once (a deck page opened from Google pulled all 221, 2026-10-06).
+  const [listOpened, setListOpened] = useState(onDeckList);
+  if (onDeckList && !listOpened) setListOpened(true);
+  if (!inDeckBook && listOpened) setListOpened(false);
+  const keepDeckList = onDeckList || (listOpened && inDeckBook);
   // While a player is actively drawing (DuchMind turn / Solo draw page),
   // all site chrome is hidden so nothing overlaps the canvas.
   const drawingMode = useDrawingMode();

@@ -4,8 +4,11 @@ function Recommend() {
   return (
     <div className="min-h-screen flex flex-col items-center px-4 pt-4">
       <div className="relative mb-6 w-full max-w-2xl">
-        <img src="/images/recommend_illust_small.png" alt="Small" className="block mx-auto sm:hidden w-full h-auto rounded-lg" />
-        <img src="/images/recommend_illust.png" alt="Large" className="hidden sm:block w-3/4 mx-auto object-cover rounded-lg" />
+        {/* One picture per screen size: with two <img>s the hidden one was downloaded too (6MB on a phone). */}
+        <picture>
+          <source media="(min-width: 640px)" srcSet="/images/recommend_illust.webp" />
+          <img src="/images/recommend_illust_small.webp" alt="" className="block mx-auto w-full sm:w-3/4 aspect-square sm:aspect-[3/2] object-cover rounded-lg" />
+        </picture>
       </div>
 
       <h1 className="text-2xl sm:text-3xl font-bold text-center break-keep">
