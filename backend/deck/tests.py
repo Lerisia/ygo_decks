@@ -911,3 +911,30 @@ class DeckUpcomingFlagTest(TestCase):
         self.assertTrue(Deck.objects.get(name="신규예정").is_upcoming)
         self.assertTrue(res.json()["deck"]["is_upcoming"])
 
+
+
+class PopularDecksTest(TestCase):
+    """The home page's deck pillar: the most-viewed decks with a cover, and how many decks the book holds."""
+
+    def setUp(self):
+        self.client = Client()
+        # Covers are set with update(): Deck.save() would open the image files to make thumbnails.
+        for i, views in enumerate([5, 50, 20, 0, 90]):
+            d = _create_deck(name=f"덱{i}", num_views=views)
+            Deck.objects.filter(id=d.id).update(cover_image=f"deck_covers/{i}.png")
+        _create_deck(name="표지 없음", num_views=999)
+        up = _create_deck(name="출시 예정", num_views=500, is_upcoming=True)
+        Deck.objects.filter(id=up.id).update(cover_image="deck_covers/up.png")
+
+    def test_most_viewed_first_with_covers_only(self):
+        body = self.client.get("/api/deck/popular/?limit=3").json()
+        self.assertEqual([d["name"] for d in body["decks"]], ["덱4", "덱1", "덱2"])
+        self.assertTrue(all(d["cover_image"] for d in body["decks"]))
+        self.assertEqual(set(body["decks"][0]), {"id", "name", "cover_image"})
+
+    def test_total_counts_the_book_without_upcoming_decks(self):
+        self.assertEqual(self.client.get("/api/deck/popular/").json()["total"], 6)
+
+    def test_limit_is_bounded(self):
+        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=999").json()["decks"]), 5)
+        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=x").json()["decks"]), 5)

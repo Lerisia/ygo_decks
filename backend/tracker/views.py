@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from .inference import card_names, infer_decks, infer_opponent
 from .services import touch_client
 from . import version as ver
+from .models import TrackerGame
 
 
 @api_view(["POST"])
@@ -162,6 +163,19 @@ def test_log(request):
     with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
         json.dump(request.data, f, ensure_ascii=False)
     return Response({"ok": True}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_stats(request):
+    """The home page's recorder pillar: how many people have recorded how many games (kept 10 minutes)."""
+    from django.core.cache import cache
+    stats = cache.get("tracker_public_stats")
+    if stats is None:
+        games = TrackerGame.objects.all()
+        stats = {"users": games.values("user").distinct().count(), "games": games.count(), "version": ver.LATEST}
+        cache.set("tracker_public_stats", stats, 600)
+    return Response(stats)
 
 
 @api_view(["GET"])

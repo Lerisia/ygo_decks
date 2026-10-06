@@ -36,6 +36,8 @@ import TournamentDetailPage from "./pages/TournamentDetail";
 import DeckScanner from "./pages/DeckScanner";
 import CardQuiz from "./pages/CardQuiz";
 import Playground from "./pages/Playground";
+import AllMenu from "./pages/AllMenu";
+import Tools from "./pages/Tools";
 import Solo from "./pages/Solo";
 import SoloDuchmind from "./pages/SoloDuchmind";
 import SoloDraw from "./pages/SoloDraw";
@@ -110,6 +112,8 @@ function App() {
           <Route path="/deck-scanner" element={<DeckScanner />} />
           <Route path="/card-detector" element={<DeckScanner />} />
           <Route path="/playground" element={<Playground />} />
+          <Route path="/all" element={<AllMenu />} />
+          <Route path="/tools" element={<Tools />} />
           <Route path="/solo" element={<Solo />} />
           <Route path="/solo-duchmind" element={<SoloDuchmind />} />
           <Route path="/solo-duchmind/draw" element={<SoloDraw />} />

@@ -1021,3 +1021,24 @@ class TrackerUnsureOpponentTest(TestCase):
         payload = build_payload(self.user, {"my_cards": [4007], "opp_cards": [22533, 14851]})
         self.assertIsNone(payload["suggested_opp_deck"])
         self.assertEqual(payload["opp_candidates"], [])
+
+
+class RecorderPublicStatsTest(TestCase):
+    """The home page's recorder pillar: how many people have recorded how many games."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_counts_people_and_games(self):
+        from django.utils import timezone
+        from tracker.models import TrackerGame
+        from tracker import version as ver
+        a = User.objects.create_user(email="a@x.com", username="a", password="x")
+        b = User.objects.create_user(email="b@x.com", username="b", password="x")
+        User.objects.create_user(email="c@x.com", username="c", password="x")
+        now = timezone.now()
+        for i, u in enumerate([a, a, a, b]):
+            TrackerGame.objects.create(user=u, did=str(i), game_mode=3, result="win", ended_at=now)
+        body = APIClient().get("/api/tracker/public-stats/").json()
+        self.assertEqual((body["users"], body["games"], body["version"]), (2, 4, ver.LATEST))

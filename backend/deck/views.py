@@ -202,6 +202,21 @@ def _list_cover_url(deck):
 
 
 @api_view(["GET"])
+def get_popular_decks(request):
+    """The home page's deck pillar: the most-viewed released decks that have a cover, and how many the book holds."""
+    try:
+        limit = min(max(int(request.GET.get("limit") or 8), 1), 24)
+    except (TypeError, ValueError):
+        limit = 8
+    released = Deck.objects.filter(is_upcoming=False)
+    picks = []
+    for deck in released.exclude(cover_image="").exclude(cover_image__isnull=True).order_by("-num_views", "id")[:limit]:
+        url = _list_cover_url(deck) or deck.cover_image.url
+        picks.append({"id": deck.id, "name": deck.name, "cover_image": url})
+    return Response({"total": released.count(), "decks": picks})
+
+
+@api_view(["GET"])
 def get_all_decks(request):
     decks = Deck.objects.all().prefetch_related(
         "summoning_methods", "performance_tags", "aesthetic_tags", "aliases"

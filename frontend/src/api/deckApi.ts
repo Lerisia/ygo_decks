@@ -191,3 +191,12 @@ export const replaceDeckCover = (deckId: number, cover: File) => {
   form.append("cover_image", cover);
   return staffRequest<{ deck: SavedDeck }>(`/api/deck/${deckId}/cover/`, { method: "POST", body: form });
 };
+
+export type PopularDeck = { id: number; name: string; cover_image: string };
+
+/** The most-viewed decks with a cover, and how many decks the book holds (home page). */
+export const getPopularDecks = async (limit = 6): Promise<{ total: number; decks: PopularDeck[] }> => {
+  const response = await fetch(`/api/deck/popular/?limit=${limit}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+};
