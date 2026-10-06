@@ -213,17 +213,18 @@ def _detail_cover_url(deck):
 
 @api_view(["GET"])
 def get_popular_decks(request):
-    """The home page's deck pillar: the most-viewed released decks that have a cover, and how many the book holds."""
+    """The home page's deck pillar: the most-viewed decks that have a cover, and how many the book holds.
+    신규 업데이트 덱 (is_upcoming) are already out, so they count like any other (특이점 2026-10-07)."""
     try:
         limit = min(max(int(request.GET.get("limit") or 8), 1), 24)
     except (TypeError, ValueError):
         limit = 8
-    released = Deck.objects.filter(is_upcoming=False)
+    decks = Deck.objects.all()
     picks = []
-    for deck in released.exclude(cover_image="").exclude(cover_image__isnull=True).order_by("-num_views", "id")[:limit]:
+    for deck in decks.exclude(cover_image="").exclude(cover_image__isnull=True).order_by("-num_views", "id")[:limit]:
         url = _list_cover_url(deck) or deck.cover_image.url
         picks.append({"id": deck.id, "name": deck.name, "cover_image": url, "cover_image_phone": _phone_cover_url(deck) or url})
-    return Response({"total": released.count(), "decks": picks})
+    return Response({"total": decks.count(), "decks": picks})
 
 
 @api_view(["GET"])

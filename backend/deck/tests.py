@@ -1002,18 +1002,19 @@ class PopularDecksTest(TestCase):
             d = _create_deck(name=f"덱{i}", num_views=views)
             Deck.objects.filter(id=d.id).update(cover_image=f"deck_covers/{i}.png")
         _create_deck(name="표지 없음", num_views=999)
-        up = _create_deck(name="출시 예정", num_views=500, is_upcoming=True)
+        up = _create_deck(name="신규 업데이트", num_views=500, is_upcoming=True)
         Deck.objects.filter(id=up.id).update(cover_image="deck_covers/up.png")
 
     def test_most_viewed_first_with_covers_only(self):
         body = self.client.get("/api/deck/popular/?limit=3").json()
-        self.assertEqual([d["name"] for d in body["decks"]], ["덱4", "덱1", "덱2"])
+        # 신규 업데이트 덱 are out already (특이점 2026-10-07), so they take part like any other deck
+        self.assertEqual([d["name"] for d in body["decks"]], ["신규 업데이트", "덱4", "덱1"])
         self.assertTrue(all(d["cover_image"] for d in body["decks"]))
         self.assertEqual(set(body["decks"][0]), {"id", "name", "cover_image", "cover_image_phone"})
 
-    def test_total_counts_the_book_without_upcoming_decks(self):
-        self.assertEqual(self.client.get("/api/deck/popular/").json()["total"], 6)
+    def test_total_counts_every_deck_in_the_book(self):
+        self.assertEqual(self.client.get("/api/deck/popular/").json()["total"], 7)
 
     def test_limit_is_bounded(self):
-        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=999").json()["decks"]), 5)
-        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=x").json()["decks"]), 5)
+        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=999").json()["decks"]), 6)
+        self.assertEqual(len(self.client.get("/api/deck/popular/?limit=x").json()["decks"]), 6)
