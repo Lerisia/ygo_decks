@@ -128,7 +128,7 @@ export default function InquiryBoardPage() {
   const other: InquiryBoard = board === "deck" ? "site" : "deck";
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-6 max-w-2xl mx-auto text-gray-900 dark:text-white">
+    <div className="min-h-screen px-4 sm:px-6 py-6 w-full lg:w-[88%] mx-auto text-gray-900 dark:text-white">
       <Link to="/inquiry" className="text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">← 문의하기</Link>
       <div className="mt-2 flex items-start justify-between gap-3">
         <div className="min-w-0">

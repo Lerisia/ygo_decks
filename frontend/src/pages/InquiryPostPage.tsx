@@ -72,7 +72,7 @@ export default function InquiryPostPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen px-4 py-10 max-w-2xl mx-auto text-center text-gray-600 dark:text-gray-300">
+      <div className="min-h-screen px-4 py-10 w-full lg:w-[88%] mx-auto text-center text-gray-600 dark:text-gray-300">
         <p>{error}</p>
         <Link to="/inquiry" className="mt-4 inline-block text-blue-600 dark:text-blue-400">← 문의하기</Link>
       </div>
@@ -81,7 +81,7 @@ export default function InquiryPostPage() {
 
   if (!post) {
     return (
-      <div className="min-h-screen px-4 sm:px-6 py-6 max-w-2xl mx-auto">
+      <div className="min-h-screen px-4 sm:px-6 py-6 w-full lg:w-[88%] mx-auto">
         <div className="h-4 w-32 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
         <div className="mt-4 h-7 w-3/4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
         <div className="mt-2 h-4 w-40 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
@@ -93,7 +93,7 @@ export default function InquiryPostPage() {
   const info = BOARD_INFO[post.board];
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-6 max-w-2xl mx-auto text-gray-900 dark:text-white">
+    <div className="min-h-screen px-4 sm:px-6 py-6 w-full lg:w-[88%] mx-auto text-gray-900 dark:text-white">
       <Link to={`/inquiry/${post.board}`} className="text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">
         ← {info.icon} {info.title}
       </Link>

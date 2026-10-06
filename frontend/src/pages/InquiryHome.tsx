@@ -6,7 +6,8 @@ const BOARDS: InquiryBoard[] = ["deck", "site"];
 
 export default function InquiryHome() {
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-6 max-w-2xl mx-auto text-gray-900 dark:text-white">
+    <div className="min-h-screen px-4 sm:px-6 py-6 w-full lg:w-[88%] mx-auto text-gray-900 dark:text-white">
+      {/* Board pages take about 88% of the site's width on PC (특이점 2026-10-07: max-w-2xl looked too narrow). */}
       <h1 className="text-2xl md:text-3xl font-bold">문의하기</h1>
       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
         제보와 문의는 게시판에 남겨 주세요. 운영진이 확인하고 답변을 달아 드립니다.
