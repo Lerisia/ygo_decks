@@ -488,6 +488,9 @@ def recent_meta_deck_stats(request):
     return Response({
         "total_matches": total_matches,
         "meta_decks": results,
+        # where counting starts: a week ago, or the last reset (e.g. a balance update) when that is more recent
+        "since": time_threshold.isoformat(),
+        "since_reset": reset_time > one_week_ago,
     }, status=status.HTTP_200_OK)
 
 @api_view(["GET"])
