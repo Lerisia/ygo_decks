@@ -434,12 +434,47 @@ class TrackerVersionTest(TestCase):
                          HTTP_X_TRACKER_VERSION="0.0.1")
         body = self.client.get("/api/tracker/client-status/").json()
         self.assertEqual(body["version"], "0.0.1")
-        self.assertTrue(body["outdated"])
+        # a released build that is merely behind gets a gentle 'new version' note, not the beta warning
+        self.assertFalse(body["outdated"])
+        self.assertTrue(body["update_available"])
         self.client.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
                          HTTP_X_TRACKER_VERSION=ver.LATEST)
         body = self.client.get("/api/tracker/client-status/").json()
         self.assertEqual(body["version"], ver.LATEST)
         self.assertFalse(body["outdated"])
+        self.assertFalse(body["update_available"])
+
+    def test_beta_warning_only_while_a_beta_is_still_in_use(self):
+        """이거게임아님 2026-10-07: a beta last seen weeks ago kept a warning up that could not be closed."""
+        from datetime import timedelta
+        from django.utils import timezone
+        from tracker.models import TrackerClient
+        TrackerClient.objects.create(user=self.user, version="0.6.2")
+        self.assertTrue(self.client.get("/api/tracker/client-status/").json()["outdated"])
+        TrackerClient.objects.filter(user=self.user).update(last_seen=timezone.now() - timedelta(days=10))
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertFalse(body["outdated"])
+        self.assertFalse(body["update_available"])
+
+    def test_refused_beta_call_brings_the_warning_back(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from rest_framework_simplejwt.tokens import AccessToken
+        from tracker.models import TrackerClient
+        TrackerClient.objects.create(user=self.user, version="0.6.2")
+        TrackerClient.objects.filter(user=self.user).update(last_seen=timezone.now() - timedelta(days=10))
+        app = APIClient()   # the recorder signs in with a real token, which the gate reads
+        res = app.post("/api/tracker/infer/", {"my_cards": [], "opp_cards": []}, format="json",
+                       HTTP_X_TRACKER_VERSION="0.6.2", HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.user)}")
+        self.assertEqual(res.status_code, 426)
+        self.assertTrue(self.client.get("/api/tracker/client-status/").json()["outdated"])
+
+    def test_test_builds_are_not_nagged(self):
+        from tracker.models import TrackerClient
+        TrackerClient.objects.create(user=self.user, version="1.0.0-test")
+        body = self.client.get("/api/tracker/client-status/").json()
+        self.assertFalse(body["outdated"])
+        self.assertFalse(body["update_available"])
 
     def test_site_calls_without_the_header_do_not_clear_a_known_version(self):
         from tracker import version as ver

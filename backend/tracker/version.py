@@ -24,3 +24,7 @@ def parse(v):
 def is_outdated(v, target=LATEST):
     p = parse(v)
     return not p or p < parse(target)
+
+
+def is_test_build(v):
+    return "-test" in str(v or "")

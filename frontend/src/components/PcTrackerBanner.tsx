@@ -17,6 +17,7 @@ export default function PcTrackerBanner({ dismissible = false }: { dismissible?:
   }, []);
 
   const outdated = !!status?.outdated;
+  const updatable = !outdated && !!status?.update_available;
   if (hidden && !outdated) return null;   // an out-of-date recorder is worth showing even if dismissed
   return (
     <div className={`hidden sm:block mb-4 max-w-2xl w-full mx-auto border rounded-xl px-4 py-3 ${outdated ? "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-800" : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"}`}>
@@ -26,12 +27,16 @@ export default function PcTrackerBanner({ dismissible = false }: { dismissible?:
             PC 마스터듀얼 레코더{" "}
             {outdated
               ? <span className="text-xs font-normal text-amber-700 dark:text-amber-300">베타 버전 사용 중 — 정식 버전으로 교체해 주세요</span>
-              : <span className="text-xs font-normal text-blue-600 dark:text-blue-300">정식 출시</span>}
+              : updatable
+                ? <span className="text-xs font-normal text-blue-600 dark:text-blue-300">새 버전 {status?.latest} 나옴</span>
+                : <span className="text-xs font-normal text-blue-600 dark:text-blue-300">정식 출시</span>}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-300">
             {outdated
               ? `쓰고 계신 버전(${status?.version ?? "베타"})은 베타 버전이라 더 이상 기록되지 않습니다. 정식 버전 ${status?.latest}로 교체해 주세요.`
-              : "랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용."}
+              : updatable
+                ? `쓰고 계신 버전은 ${status?.version}입니다. 새 버전 ${status?.latest}을 받아 바꾸면 최신 기능을 쓸 수 있어요.`
+                : "랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용."}
           </div>
           <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">
             레코더로 '승리'를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다!!
@@ -49,7 +54,7 @@ export default function PcTrackerBanner({ dismissible = false }: { dismissible?:
             href={DOWNLOAD_URL}
             className={`px-3 py-1.5 text-sm text-white rounded-lg font-semibold transition ${outdated ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`}
           >
-            {outdated ? "정식 버전 받기" : "다운로드"}
+            {outdated ? "정식 버전 받기" : updatable ? "새 버전 받기" : "다운로드"}
           </a>
           {dismissible && !outdated && (
             <button

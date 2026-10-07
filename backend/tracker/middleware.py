@@ -18,7 +18,11 @@ class TrackerVersionGate:
     def __call__(self, request):
         v = request.headers.get("X-Tracker-Version")
         if (v is not None and request.path.startswith("/api/") and not request.path.startswith(OPEN_PATHS)
-                and ver.is_outdated(v, ver.MIN_SUPPORTED) and _user_id(request) not in ver.GATE_EXEMPT_USER_IDS):
+                and ver.is_outdated(v, ver.MIN_SUPPORTED)):
+            uid = _user_id(request)
+            if uid in ver.GATE_EXEMPT_USER_IDS:
+                return self.get_response(request)
+            _note_refused(uid, v)
             return JsonResponse({"error": "새 버전으로 업데이트해 주세요. 이 버전은 더 이상 쓸 수 없습니다.", "min_supported": ver.MIN_SUPPORTED,
                                  "url": ver.DOWNLOAD_URL}, status=426)
         return self.get_response(request)
@@ -31,3 +35,14 @@ def _user_id(request):
         return found[0].id if found else None
     except Exception:
         return None
+
+
+def _note_refused(user_id, version):
+    """A refused beta still counts as in use, so the site keeps telling its owner to replace it."""
+    if not user_id:
+        return
+    try:
+        from .models import TrackerClient
+        TrackerClient.objects.update_or_create(user_id=user_id, defaults={"version": str(version).strip()[:20]})
+    except Exception:
+        pass

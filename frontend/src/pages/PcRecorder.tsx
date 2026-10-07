@@ -17,6 +17,7 @@ export default function PcRecorder() {
   }, [loggedIn]);
 
   const outdated = !!status?.outdated;
+  const updatable = !outdated && !!status?.update_available;
 
   return (
     <div className="min-h-screen px-4 py-6 md:py-10 max-w-2xl mx-auto flex flex-col gap-6 text-gray-900 dark:text-white">
@@ -37,6 +38,11 @@ export default function PcRecorder() {
       {outdated && (
         <div className="rounded-xl px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 text-sm">
           쓰고 계신 버전({status?.version ?? "베타"})은 더 이상 기록되지 않습니다. 아래에서 정식 버전 {status?.latest}을 받아 바꿔 주세요.
+        </div>
+      )}
+      {updatable && (
+        <div className="rounded-xl px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm">
+          새 버전 {status?.latest}이 나왔어요. 쓰고 계신 버전은 {status?.version}입니다.
         </div>
       )}
 

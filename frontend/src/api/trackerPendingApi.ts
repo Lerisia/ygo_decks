@@ -56,7 +56,10 @@ export const discardTrackerPending = async (id: number) => {
 export type TrackerClientStatus = {
   version: string | null;
   latest: string;
+  /** A beta that is still in use: its duels are refused. */
   outdated: boolean;
+  /** A released build behind the latest one. */
+  update_available?: boolean;
   used_tracker: boolean;
   url: string;
   last_seen: string | null;

@@ -16,6 +16,9 @@ from . import version as ver
 from .models import TrackerGame
 
 
+BETA_WARN_DAYS = 7
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def tracker_infer(request):
@@ -188,16 +191,27 @@ def version_info(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def client_status(request):
-    """Whether this user's tracker build is out of date (the site warns old builds that can't warn themselves)."""
+    """Whether this user's recorder needs replacing. The site warns builds that can't warn themselves.
+
+    `outdated`: a beta (below MIN_SUPPORTED) whose duels are refused — only while that beta is still in use, i.e.
+    seen in the last BETA_WARN_DAYS (refused calls count, see TrackerVersionGate). A beta left behind weeks ago
+    kept a warning up that could not be closed (이거게임아님 2026-10-07).
+    `update_available`: a released build behind LATEST; test builds are left alone."""
+    from datetime import timedelta
+    from django.utils import timezone
     from .models import TrackerClient, TrackerGame, TrackerPendingMatch
     c = TrackerClient.objects.filter(user=request.user).first()
-    used = bool(c) or TrackerGame.objects.filter(user=request.user).exists() \
-        or TrackerPendingMatch.objects.filter(user=request.user).exists()
+    last_game = TrackerGame.objects.filter(user=request.user).order_by("-created_at").values_list("created_at", flat=True).first()
+    used = bool(c) or bool(last_game) or TrackerPendingMatch.objects.filter(user=request.user).exists()
     v = (c.version if c else "") or None
+    seen = max([t for t in (c.last_seen if c else None, last_game) if t], default=None)
+    recent = bool(seen and seen >= timezone.now() - timedelta(days=BETA_WARN_DAYS))
+    beta = used and ver.is_outdated(v, ver.MIN_SUPPORTED)
     return Response({
         "version": v,
         "latest": ver.LATEST,
-        "outdated": bool(used and ver.is_outdated(v)),
+        "outdated": bool(beta and recent),
+        "update_available": bool(used and not beta and not ver.is_test_build(v) and ver.is_outdated(v)),
         "used_tracker": used,
         "url": ver.DOWNLOAD_URL,
         "last_seen": c.last_seen if c else None,
