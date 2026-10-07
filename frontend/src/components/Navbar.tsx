@@ -6,10 +6,13 @@ import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
 import { ALL_MENU_PATH, CONTACT_PATH, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
 import logo from "/images/logo_big.webp";
+import { startInquiryAlerts, stopInquiryAlerts, useInquiryAlerts } from "@/lib/inquiryAlerts";
 
 // 공지, 문의 and 후원 sit at the top right of every page (redesign 2026-10; this order 특이점 2026-10-07).
 function SupportLinks({ compact }: { compact?: boolean }) {
   const pill = "inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap transition";
+  // Staff only (the store stays empty for everyone else): unanswered inquiries as a red count on 문의.
+  const waiting = useInquiryAlerts()?.unanswered ?? 0;
   const size = compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
   return (
     <>
@@ -22,10 +25,15 @@ function SupportLinks({ compact }: { compact?: boolean }) {
       </Link>
       <Link
         to={CONTACT_PATH}
-        className={`${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
-        title="문의 게시판"
+        className={`relative ${pill} ${size} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500`}
+        title={waiting > 0 ? `문의 게시판 · 답변 대기 ${waiting}건` : "문의 게시판"}
       >
         💬<span className={compact ? "" : "hidden md:inline"}>문의</span>
+        {waiting > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-[18px] text-center tabular-nums">
+            {waiting > 9 ? "9+" : waiting}
+          </span>
+        )}
       </Link>
       <a
         href={DONATE_URL}
@@ -72,6 +80,12 @@ function Navbar() {
     isAdmin().then((flag) => { if (!cancelled) setIsAdminUser(!!flag); }).catch(() => { if (!cancelled) setIsAdminUser(false); });
     return () => { cancelled = true; };
   }, [isLoggedIn]);
+
+  // Staff watch the inquiry board from any page (badge on 문의 + a popup for each new inquiry).
+  useEffect(() => {
+    if (isLoggedIn && isAdminUser) startInquiryAlerts();
+    else stopInquiryAlerts();
+  }, [isLoggedIn, isAdminUser]);
 
   // Refetch points balance when something elsewhere awards points.
   useEffect(() => {

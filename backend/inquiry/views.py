@@ -181,3 +181,21 @@ def delete_comment(request, pk):
         post.answered_at = None
         post.save(update_fields=["answered_at"])
     return Response(status=204)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def alerts(request):
+    """Staff only: what the site's 문의 badge and new-inquiry popup show (특이점 2026-10-07)."""
+    if not _is_staff(request.user):
+        return _error("운영진만 볼 수 있습니다.", 403 if request.user.is_authenticated else 401)
+    waiting = InquiryPost.objects.filter(is_deleted=False, answered_at__isnull=True)
+    latest = InquiryPost.objects.filter(is_deleted=False).order_by("-id").first()
+    return Response({
+        "unanswered": waiting.count(),
+        "by_board": {b: waiting.filter(board=b).count() for b in BOARDS},
+        "latest": latest and {
+            "id": latest.id, "board": latest.board, "board_label": BOARDS.get(latest.board, latest.board),
+            "created_at": latest.created_at, "answered": latest.answered_at is not None,
+        },
+    })

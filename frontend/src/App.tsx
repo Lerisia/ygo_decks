@@ -64,6 +64,7 @@ import ResetPassword from "./pages/ResetPassword";
 import EmailVerified from "./pages/EmailVerified";
 import Tracker from "./pages/Tracker";
 import NoticePopup from "./components/NoticePopup";
+import StaffInquiryAlert from "./components/StaffInquiryAlert";
 
 function App() {
   const { pathname } = useLocation();
@@ -93,6 +94,7 @@ function App() {
         </div>
       )}
       <NoticePopup disabled={drawingMode || inMultiplayerRoom} />
+      <StaffInquiryAlert disabled={drawingMode || inMultiplayerRoom} />
       {keepDeckList && (
         <div hidden={!onDeckList}>
           <DatabasePage />

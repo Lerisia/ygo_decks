@@ -11,6 +11,7 @@ import {
   getInquiry,
   type InquiryPost,
 } from "@/api/inquiryApi";
+import { refreshInquiryAlerts } from "@/lib/inquiryAlerts";
 
 export default function InquiryPostPage() {
   const { id } = useParams();
@@ -40,6 +41,7 @@ export default function InquiryPostPage() {
     if (!post || !window.confirm("이 글을 지울까요?")) return;
     try {
       await deleteInquiry(post.id);
+      refreshInquiryAlerts();
       navigate(`/inquiry/${post.board}`);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "지우지 못했습니다.");
@@ -51,6 +53,7 @@ export default function InquiryPostPage() {
     setBusy(true);
     try {
       await answerInquiry(post.id, answer.trim());
+      refreshInquiryAlerts();
       setAnswer("");
       load();
     } catch (e) {
@@ -64,6 +67,7 @@ export default function InquiryPostPage() {
     if (!window.confirm("이 답변을 지울까요?")) return;
     try {
       await deleteInquiryAnswer(commentId);
+      refreshInquiryAlerts();
       load();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "지우지 못했습니다.");

@@ -124,3 +124,18 @@ class InquiryBoardTest(TestCase):
         self.assertEqual(self._write().status_code, 429)
         self.assertEqual(InquiryPost.objects.count(), 5)
         self.assertEqual(InquiryComment.objects.count(), 0)
+
+    def test_staff_alerts_count_unanswered_posts_and_point_at_the_newest(self):
+        self.assertEqual(self._as(None).get("/api/inquiry/alerts/").status_code, 401)
+        self.assertEqual(self._as(self.author).get("/api/inquiry/alerts/").status_code, 403)
+        empty = self._as(self.staff).get("/api/inquiry/alerts/").json()
+        self.assertEqual((empty["unanswered"], empty["latest"]), (0, None))
+        first = self._write().json()["id"]
+        newest = self._write(board="deck").json()["id"]
+        res = self._as(self.staff).get("/api/inquiry/alerts/").json()
+        self.assertEqual(res["unanswered"], 2)
+        self.assertEqual(res["by_board"], {"deck": 1, "site": 1})
+        self.assertEqual((res["latest"]["id"], res["latest"]["board"], res["latest"]["answered"]), (newest, "deck", False))
+        self.assertNotIn("title", res["latest"])
+        self._as(self.staff).post(f"/api/inquiry/{first}/comments/", {"body": "답변"}, format="json")
+        self.assertEqual(self._as(self.staff).get("/api/inquiry/alerts/").json()["unanswered"], 1)
