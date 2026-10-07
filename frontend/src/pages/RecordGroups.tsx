@@ -14,7 +14,7 @@ import {
   type SheetSummary,
 } from "@/api/toolApi";
 import { ResultChips, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
-import { getNextRankState, getRankLabel } from "@/utils/rankUtils";
+import { getRankLabel } from "@/utils/rankUtils";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
@@ -436,9 +436,9 @@ const RecordGroups = () => {
               const t = group.summary?.totals;
               const games = t?.games ?? group.totalGames;
               const wins = t?.wins ?? Math.round(group.totalGames * group.overallWinRate / 100);
-              // a solo sheet's climb: where the latest duel left it
+              // a solo sheet's current rank: the one recorded on its latest duel
               const last = group.kind !== "shared" ? group.summary?.latest : null;
-              const nowRank = last?.rank ? getNextRankState(last.rank, last.wins ?? null, last.result) : null;
+              const nowRank = last?.rank ? { rank: last.rank } : null;
               return (
                 <div
                   key={group.id}

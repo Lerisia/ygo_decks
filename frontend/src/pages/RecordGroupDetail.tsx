@@ -792,14 +792,13 @@ const RecordGroupDetailPage = () => {
     : latest.score_type === "rating" ? "레이팅"
     : latest.score_type === "duelist_cup" ? "듀얼리스트 컵"
     : null;
-  // Recorded rank/wins are where a duel started, so "now" is one step on from the latest duel.
-  const nowRank = latest?.rank ? getNextRankState(latest.rank, latest.wins ?? null, latest.result).rank : null;
+  // The rank recorded on the latest duel is the current rank (엘리스 2026-10-07: not that rank stepped on by its result).
+  const nowRank = latest?.rank ?? null;
   const nowLabel = (() => {
     if (!latest) return null;
     if (latest.rank) {
-      const next = getNextRankState(latest.rank, latest.wins ?? null, latest.result);
-      const label = RANK_OPTIONS.find((r) => r.value === next.rank)?.label ?? next.rank;
-      return next.wins != null ? `${label} · ${next.wins}승` : label;
+      const label = RANK_OPTIONS.find((r) => r.value === latest.rank)?.label ?? latest.rank;
+      return latest.wins != null ? `${label} · ${latest.wins}승` : label;
     }
     if (latest.score != null) return `${latest.score.toLocaleString()}점`;
     return null;
