@@ -37,6 +37,7 @@ const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map(
 // tier (특이점 2026-10-06); off, it is plain name order.
 const POWER_RANK: Record<string, number> = Object.fromEntries(POWER_COLORS.map((p, i) => [p.label, i]));
 const powerRank = (strength: string) => POWER_RANK[strength] ?? POWER_COLORS.length;
+const POWER_SWITCH_KEY = "deck_power_switch";
 // How wide a tile is drawn (3 / 4 / 5 columns inside the page gutters), so a phone picks the 320px cover over the 480px one.
 const COVER_SIZES =
   "(min-width: 1280px) 224px, (min-width: 1024px) calc((100vw - 160px) / 5), (min-width: 768px) calc((100vw - 144px) / 4), calc((100vw - 84px) / 3)";
@@ -99,11 +100,23 @@ export default function DatabasePage() {
     ),
   );
   const [showScrollTop, setShowScrollTop] = useState(false);
-  // 덱 파워별 테두리 색 (특이점 2026-10-02) — 기본 켬, 켜고 끈 상태는 이 브라우저에 저장
-  const [powerBorder, setPowerBorder] = useState(() => localStorage.getItem("deck_power_border") !== "off");
+  // 덱 파워 switch (colour rings, power order, colour key). Off unless this browser turned it on (특이점 2026-10-09);
+  // a new key, so choices saved while it defaulted to on (10/2~10/8) don't carry over and everyone starts off.
+  const [powerBorder, setPowerBorder] = useState(() => {
+    try {
+      localStorage.removeItem("deck_power_border");
+      return localStorage.getItem(POWER_SWITCH_KEY) === "on";
+    } catch {
+      return false;
+    }
+  });
   const togglePowerBorder = () =>
     setPowerBorder((on) => {
-      localStorage.setItem("deck_power_border", on ? "off" : "on");
+      try {
+        localStorage.setItem(POWER_SWITCH_KEY, on ? "off" : "on");
+      } catch {
+        /* private mode: the choice lasts while the page is open */
+      }
       return !on;
     });
   const navigate = useNavigate();
