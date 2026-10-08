@@ -34,6 +34,12 @@ function Info() {
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Desktop opens the deck search out in place; phones keep the modal (특이점 2026-10-08).
+  const [searchInline, setSearchInline] = useState(false);
+  const openSearch = () => {
+    if (window.matchMedia("(min-width: 768px)").matches) setSearchInline(true);
+    else setPickerOpen(true);
+  };
 
   useEffect(() => {
     getLatestChangelog()
@@ -86,15 +92,20 @@ function Info() {
               개의 덱을, 한 곳에서.
             </h2>
             {/* Opens a picker of real decks: choosing one goes straight to its page, so no search can miss. */}
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            >
-              <span aria-hidden="true">🔍</span>
-              <span className="flex-1">덱 이름으로 찾기</span>
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">목록에서 고르기</span>
-            </button>
+            {searchInline ? (
+              <div className="rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 p-3">
+                <DeckPickerModal inline open onClose={() => setSearchInline(false)} onPick={(id) => navigate(`/database/${id}`)} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openSearch}
+                className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              >
+                <span aria-hidden="true">🔍</span>
+                <span className="flex-1">덱 이름으로 찾기</span>
+              </button>
+            )}
             <div className="flex flex-wrap items-center gap-1.5 text-sm min-h-[30px]">
               <span className="text-gray-500 dark:text-gray-400 mr-1">많이 보는 덱</span>
               {decks.slice(0, 5).map((d, i) => (
@@ -119,7 +130,8 @@ function Info() {
         </section>
 
         {/* Pillar 2: the recorder */}
-        <section aria-labelledby="home-rec" className="rounded-2xl p-5 md:p-6 flex flex-col gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+        {/* Windows-only, so phones skip the download pitch (특이점 2026-10-08). */}
+        <section aria-labelledby="home-rec" className="hidden sm:flex rounded-2xl p-5 md:p-6 flex-col gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
           <span className="text-xs font-bold tracking-wide text-amber-700 dark:text-amber-400">YGO Decks 레코더 · PC</span>
           <h2 id="home-rec" className="text-xl md:text-2xl font-extrabold tracking-tight">게임만 하세요. 전적은 저절로 쌓입니다</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 min-h-[20px]">
@@ -138,22 +150,15 @@ function Info() {
             <a
               href={RECORDER_DOWNLOAD_URL}
               download
-              className="hidden sm:block flex-1 text-center py-3 rounded-lg font-extrabold bg-amber-400 hover:bg-amber-500 text-amber-950 transition"
+              className="block flex-1 text-center py-3 rounded-lg font-extrabold bg-amber-400 hover:bg-amber-500 text-amber-950 transition"
             >
               Windows용 내려받기
             </a>
-            <Link
-              to="/recorder"
-              className="sm:hidden flex-1 text-center py-3 rounded-lg font-extrabold bg-amber-400 hover:bg-amber-500 text-amber-950 transition"
-            >
-              레코더 알아보기
-            </Link>
             <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
               무료{rec ? ` · ${rec.version}` : ""}
-              <Link to="/recorder" className="hidden sm:inline ml-2 underline">자세히</Link>
+              <Link to="/recorder" className="ml-2 underline">자세히</Link>
             </span>
           </div>
-          <p className="sm:hidden text-xs text-gray-500 dark:text-gray-400">Windows PC용 프로그램이라 PC에서 받아 주세요.</p>
         </section>
       </div>
 
@@ -169,7 +174,7 @@ function Info() {
       <section aria-labelledby="home-more">
         <div className="flex items-baseline justify-between mb-2">
           <h2 id="home-more" className="text-base md:text-lg font-bold">더 둘러보기</h2>
-          <Link to="/all" className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600">전체 메뉴 →</Link>
+          <Link to="/all" className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600">더보기 →</Link>
         </div>
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
           {tiles.map((t) =>

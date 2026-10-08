@@ -142,7 +142,7 @@ function Navbar() {
         </div>
       )}
 
-      {/* PC / tablet: logo, the four groups with their menus, 전체, then 문의·후원 and me */}
+      {/* PC / tablet: logo, the four groups with their menus, 더보기, then 공지·문의·후원 and me */}
       <div className={`${inMultiplayerRoom ? "hidden" : "hidden sm:flex"} justify-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800`}>
         <div className="w-full max-w-6xl px-4 h-20 flex items-center gap-4 lg:gap-8">
           <Link to="/" className="shrink-0 hover:opacity-80 transition" aria-label="홈">{logoImg("h-14")}</Link>
@@ -189,7 +189,7 @@ function Navbar() {
                 location.pathname === ALL_MENU_PATH ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
-              전체
+              더보기
             </Link>
           </nav>
           <div className="flex items-center gap-2 shrink-0 text-sm">

@@ -81,6 +81,10 @@ export const ME_ITEMS: MenuItem[] = [
   { label: "마이페이지", to: "/mypage", auth: true },
   { label: "포인트 내역", to: "/mypage/points", auth: true },
   { label: "아이콘·테두리", to: "/mypage/avatar", auth: true },
+];
+
+// 더보기 page's 기타 section, under the 화면 밝기 switch (특이점 2026-10-08).
+export const ETC_ITEMS: MenuItem[] = [
   { label: "공지사항", to: "/changelog" },
   { label: "이용약관", to: "/terms" },
 ];

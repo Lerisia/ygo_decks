@@ -4,7 +4,7 @@ import { getUserInfo, isAdmin, isAuthenticated, logout } from "@/api/accountApi"
 import { getMyAvatar, type Border, type PublicCardIcon } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
-import { CONTACT_PATH, DONATE_URL, ME_ITEMS, MENU_GROUPS, itemHref, type MenuItem } from "@/lib/siteMenu";
+import { CONTACT_PATH, DONATE_URL, ETC_ITEMS, ME_ITEMS, MENU_GROUPS, itemHref, type MenuItem } from "@/lib/siteMenu";
 
 function readDark() {
   return document.documentElement.classList.contains("dark");
@@ -33,7 +33,7 @@ function Row({ item, loggedIn }: { item: MenuItem; loggedIn: boolean }) {
   return <Link to={itemHref(item, loggedIn)} className={`${cls} hover:bg-gray-50 dark:hover:bg-gray-700/50`}>{inner}</Link>;
 }
 
-/** 전체: every part of the site in one place, with 문의·후원 first. */
+/** 더보기 (was 전체 until 2026-10-08): every part of the site in one place, with 문의·후원 first. */
 export default function AllMenu() {
   const loggedIn = isAuthenticated();
   const [me, setMe] = useState<{ username: string; points: number } | null>(null);
@@ -54,7 +54,7 @@ export default function AllMenu() {
 
   return (
     <div className="min-h-screen px-4 py-6 max-w-lg md:max-w-2xl mx-auto flex flex-col gap-6">
-      <h1 className="text-2xl md:text-3xl font-bold">전체</h1>
+      <h1 className="text-2xl md:text-3xl font-bold">더보기</h1>
 
       <div className="grid grid-cols-2 gap-2">
         <Link to={CONTACT_PATH}
@@ -108,21 +108,29 @@ export default function AllMenu() {
         </div>
       </section>
 
-      <section aria-labelledby="all-theme" className="flex items-center justify-between gap-3">
-        <h2 id="all-theme" className="text-sm font-semibold text-gray-500 dark:text-gray-400">화면 밝기</h2>
-        <div className="inline-flex p-1 rounded-lg bg-gray-100 dark:bg-gray-800" role="group" aria-label="화면 밝기">
-          {[{ label: "낮", value: false }, { label: "밤", value: true }].map((o) => (
+      <section aria-labelledby="all-etc">
+        <h2 id="all-etc" className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">⚙️ 기타</h2>
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span id="all-theme" className="font-medium">화면 밝기</span>
             <button
-              key={o.label}
               type="button"
-              aria-pressed={dark === o.value}
-              onClick={() => chooseTheme(o.value)}
-              className={`px-4 py-1.5 rounded-md text-sm font-semibold transition ${
-                dark === o.value ? "bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"
-              }`}
+              role="switch"
+              aria-checked={dark}
+              aria-labelledby="all-theme"
+              onClick={() => chooseTheme(!dark)}
+              className="flex items-center gap-2 p-0 bg-transparent border-0"
             >
-              {o.label}
+              <span className="text-sm text-gray-500 dark:text-gray-400">{dark ? "🌙 어둡게" : "☀️ 밝게"}</span>
+              <span className={`relative inline-flex w-11 h-6 rounded-full transition-colors ${dark ? "bg-blue-600" : "bg-gray-300"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${dark ? "translate-x-5" : ""}`} />
+              </span>
             </button>
+          </div>
+          {ETC_ITEMS.map((it) => (
+            <div key={it.label} className="border-t border-gray-100 dark:border-gray-700">
+              <Row item={it} loggedIn={loggedIn} />
+            </div>
           ))}
         </div>
       </section>

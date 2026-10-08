@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import PickerModal, { type PickerItem } from "./PickerModal";
+import PickerModal, { PickerPanel, type PickerItem } from "./PickerModal";
 import { matchesDeckQuery } from "@/utils/hangul";
 
 type DeckRow = { id: number; name: string; aliases?: string[]; strength?: string; cover_image?: string | null; cover_image_phone?: string | null };
@@ -9,7 +9,9 @@ let cached: DeckRow[] | null = null;
 
 /** Pick one deck from the whole deck book (name, alias or 초성), as pictures or a list.
  *  Only real decks can be picked, so nobody lands on a search for a deck that does not exist. */
-export default function DeckPickerModal({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (deckId: number) => void }) {
+export default function DeckPickerModal({
+  open, onClose, onPick, inline = false,
+}: { open: boolean; onClose: () => void; onPick: (deckId: number) => void; inline?: boolean }) {
   const [decks, setDecks] = useState<DeckRow[] | null>(cached);
   const [query, setQuery] = useState("");
 
@@ -35,20 +37,20 @@ export default function DeckPickerModal({ open, onClose, onPick }: { open: boole
     [decks, query],
   );
 
-  return (
-    <PickerModal
-      open={open}
-      onClose={onClose}
-      title="📚 덱 찾기"
-      placeholder="덱 이름·별명·초성"
-      query={query}
-      onQueryChange={setQuery}
-      items={items}
-      status={decks === null ? "loading" : items.length ? "ready" : "empty"}
-      emptyText="그런 이름의 덱이 없습니다."
-      onPick={(it) => onPick(Number(it.key))}
-      viewKey="deck"
-      imageFit="cover"
-    />
-  );
+  const panel = {
+    onClose,
+    title: "📚 덱 찾기",
+    placeholder: "덱 이름·별명·초성",
+    query,
+    onQueryChange: setQuery,
+    items,
+    status: (decks === null ? "loading" : items.length ? "ready" : "empty") as "loading" | "ready" | "empty",
+    emptyText: "그런 이름의 덱이 없습니다.",
+    onPick: (it: PickerItem) => onPick(Number(it.key)),
+    viewKey: "deck",
+    imageFit: "cover" as const,
+  };
+  // Inline: drawn where the caller puts it (the home page on desktop opens the search out in place).
+  if (inline) return open ? <PickerPanel {...panel} variant="inline" /> : null;
+  return <PickerModal open={open} {...panel} />;
 }

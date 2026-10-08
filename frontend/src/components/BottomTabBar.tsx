@@ -29,7 +29,7 @@ function BottomTabBar() {
         ))}
         <Link to={ALL_MENU_PATH} className={tabClass(inAll)} aria-current={inAll ? "page" : undefined}>
           <span className="text-xl">☰</span>
-          <span className="mt-1">전체</span>
+          <span className="mt-1">더보기</span>
         </Link>
       </nav>
     </div>

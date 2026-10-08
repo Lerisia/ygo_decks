@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-/** One modal for picking a thing from a picture list: decks, cards, and whatever comes next.
+/** One picker for choosing a thing from a picture list: decks, cards, and whatever comes next.
  *  It shows the items it is given as a grid or a list (the viewer's choice, remembered per use),
  *  draws them a page at a time, and reports the one tapped. Searching stays with the caller:
  *  filter `items` as `query` changes, or pass `onSubmit` to search on Enter / the 검색 button. */
@@ -9,8 +9,7 @@ export type PickerItem = { key: string | number; name: string; image?: string | 
 export type PickerStatus = "idle" | "loading" | "empty" | "ready";
 type View = "grid" | "list";
 
-interface PickerModalProps {
-  open: boolean;
+interface PickerPanelProps {
   onClose: () => void;
   title: string;
   hint?: string;
@@ -28,6 +27,12 @@ interface PickerModalProps {
   viewKey: string;
   defaultView?: View;
   imageFit?: "contain" | "cover";
+  /** "inline": drawn in the page (wider grid, fixed height, no overlay); "modal": inside PickerModal. */
+  variant?: "modal" | "inline";
+}
+
+interface PickerModalProps extends PickerPanelProps {
+  open: boolean;
 }
 
 const PAGE = 60;
@@ -54,30 +59,46 @@ function readView(key: string, fallback: View): View {
   }
 }
 
-export default function PickerModal({
-  open, onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
-  idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView = "grid", imageFit = "contain",
-}: PickerModalProps) {
-  const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
-  const [visibleCount, setVisibleCount] = useState(PAGE);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const keptRef = useRef(new Map<PickerItem["key"], PickerItem>());
-
-  // A new result set starts from the top page again.
-  useEffect(() => { setVisibleCount(PAGE); }, [items]);
-
+export default function PickerModal({ open, ...panel }: PickerModalProps) {
   // Lock page scroll while the modal is up.
   useEffect(() => {
-    if (!open) {
-      keptRef.current = new Map();
-      return;
-    }
+    if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
   if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[55] flex items-center justify-center p-2 sm:p-4" onClick={panel.onClose}>
+      <div
+        className="bg-white dark:bg-gray-800 rounded-xl p-2 sm:p-4 w-[88vw] sm:w-full max-w-sm sm:max-w-md h-[70vh] sm:h-[min(85vh,680px)] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={panel.title}
+      >
+        <PickerPanel {...panel} variant="modal" />
+      </div>
+    </div>
+  );
+}
+
+/** The picker itself: header, search box and results. PickerModal puts it in a dialog; a page can also draw it
+ *  in place (the home page's deck search on desktop opens out like this, 특이점 2026-10-08). */
+export function PickerPanel({
+  onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
+  idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView = "grid", imageFit = "contain",
+  variant = "modal",
+}: PickerPanelProps) {
+  const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
+  const [visibleCount, setVisibleCount] = useState(PAGE);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const keptRef = useRef(new Map<PickerItem["key"], PickerItem>());
+  const inline = variant === "inline";
+
+  // A new result set starts from the top page again.
+  useEffect(() => { setVisibleCount(PAGE); }, [items]);
 
   const chooseView = (v: View) => {
     setView(v);
@@ -121,14 +142,10 @@ export default function PickerModal({
     );
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[55] flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-gray-800 rounded-xl p-2 sm:p-4 w-[88vw] sm:w-full max-w-sm sm:max-w-md h-[70vh] sm:h-[min(85vh,680px)] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
+    <div
+      className={inline ? "flex flex-col max-h-[440px]" : "contents"}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+    >
         <div className="flex items-center justify-between gap-2 mb-1">
           <div className="flex items-baseline gap-2 min-w-0">
             <h3 className="font-bold text-base shrink-0">{title}</h3>
@@ -165,7 +182,7 @@ export default function PickerModal({
           )}
         </div>
         <div
-          className="flex-1 overflow-y-auto overscroll-contain -mx-1 px-1"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1"
           onScroll={(e) => {
             // Reveal the next page when the viewer nears the bottom.
             const el = e.currentTarget;
@@ -178,7 +195,7 @@ export default function PickerModal({
           {status === "idle" && <p className="text-xs text-gray-400 text-center py-3">{idleText}</p>}
           {status === "empty" && <p className="text-xs text-gray-400 text-center py-3">{emptyText}</p>}
           {view === "grid" ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className={`grid gap-2 ${inline ? "grid-cols-5 lg:grid-cols-8" : "grid-cols-3 sm:grid-cols-4"}`}>
               {drawn.map((it) => (
                 <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition" title={it.name}>
                   {thumb(it, "w-full aspect-square")}
@@ -187,7 +204,7 @@ export default function PickerModal({
               ))}
             </div>
           ) : (
-            <ul className="flex flex-col">
+            <ul className={inline ? "grid grid-cols-2 lg:grid-cols-3 gap-x-4" : "flex flex-col"}>
               {drawn.map((it) => (
                 <li key={it.key} hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} className="border-b last:border-b-0 border-gray-100 dark:border-gray-700">
                   <button type="button" onClick={() => pick(it)} className="w-full flex items-center gap-3 px-1 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition">
@@ -205,7 +222,6 @@ export default function PickerModal({
             </button>
           )}
         </div>
-      </div>
     </div>
   );
 }

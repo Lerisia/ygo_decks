@@ -14,11 +14,9 @@ const readDismissed = () => {
 // Tracker promo for the deck database, the busiest page on the site.
 // Deliberately API-free: /database is open to logged-out visitors, and the
 // client-status endpoint (used by PcTrackerBanner) requires authentication.
-// Mobile gets a one-line strip that expands in place — the tracker is Windows-only,
-// so there is nothing to download there, only awareness to build.
+// Phones get nothing: the recorder is Windows-only (특이점 2026-10-08).
 export default function DatabaseTrackerPromo() {
   const [hidden, setHidden] = useState(readDismissed);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [howtoOpen, setHowtoOpen] = useState(false);
 
   if (hidden) return null;
@@ -34,41 +32,6 @@ export default function DatabaseTrackerPromo() {
 
   return (
     <>
-      {/* Mobile: one-line strip. No negative margin — the page gutter is not a
-          clean -mx-4 (px-0 and p-4 collide), and overshooting adds a scrollbar. */}
-      <div className="sm:hidden mb-4">
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-expanded={mobileOpen}
-          className="w-full px-4 py-2 bg-blue-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5"
-        >
-          <span>PC 레코더로 마스터듀얼 전적 자동 기록</span>
-          <span className="opacity-70">{mobileOpen ? "▲" : "▼"}</span>
-        </button>
-
-        {mobileOpen && (
-          <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 text-left text-sm text-gray-700 dark:text-gray-200 space-y-1.5">
-            <p>
-              랭크·레이팅 게임이 끝날 때마다 <b>결과·코인·선후공·랭크·덱</b>이 자동으로 기록됩니다.
-            </p>
-            <p className="text-blue-700 dark:text-blue-300 font-medium">
-              승리를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다.
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Windows 전용입니다. PC에서 ygodecks.com에 접속하면 내려받을 수 있습니다.
-            </p>
-            <button
-              type="button"
-              onClick={dismiss}
-              className="text-xs text-gray-500 dark:text-gray-400 underline underline-offset-2"
-            >
-              다시 보지 않기
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Desktop: full card with the download button */}
       <div className="hidden sm:block mb-4 max-w-2xl w-full mx-auto text-left border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
