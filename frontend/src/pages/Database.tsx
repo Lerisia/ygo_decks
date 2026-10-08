@@ -293,11 +293,13 @@ export default function DatabasePage() {
           }}
         />
       )}
-      {/* Colour key. Phones: three a row, 최상위·상위·중상위 over 중하위·하위·최하위 (특이점 2026-10-08); wider screens: one line. */}
+      {/* Colour key: one line wherever the six fit (they need 344px inside the page, i.e. screens from ~400px);
+          narrower phones get three a row, 최상위·상위·중상위 over 중하위·하위·최하위, never a lone sixth
+          (특이점 2026-10-08). Labels never break mid-word. */}
       {powerBorder && (
-        <div className="-mt-2 mb-4 w-fit mx-auto grid grid-cols-[repeat(3,auto)] gap-x-3 gap-y-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-3 text-xs text-gray-600 dark:text-gray-300">
+        <div className="-mt-2 mb-4 w-fit mx-auto grid grid-cols-[repeat(3,auto)] gap-x-3 gap-y-1 min-[400px]:flex min-[400px]:gap-x-2 sm:flex-wrap sm:justify-center sm:gap-x-3 text-xs text-gray-600 dark:text-gray-300">
           {POWER_COLORS.map((p) => (
-            <span key={p.label} className="inline-flex items-center gap-1">
+            <span key={p.label} className="inline-flex items-center gap-1 whitespace-nowrap">
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
               {p.label}
             </span>
