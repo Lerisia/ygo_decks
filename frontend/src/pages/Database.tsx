@@ -293,8 +293,9 @@ export default function DatabasePage() {
           }}
         />
       )}
+      {/* Colour key. Phones: three a row, 최상위·상위·중상위 over 중하위·하위·최하위 (특이점 2026-10-08); wider screens: one line. */}
       {powerBorder && (
-        <div className="-mt-2 mb-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+        <div className="-mt-2 mb-4 w-fit mx-auto grid grid-cols-3 gap-x-4 gap-y-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-3 text-xs text-gray-600 dark:text-gray-300">
           {POWER_COLORS.map((p) => (
             <span key={p.label} className="inline-flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
