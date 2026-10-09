@@ -469,12 +469,9 @@ export default function DatabasePage() {
                 className="w-full h-24 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 style={powerBorder && POWER_COLOR[deck.strength] ? powerRing(POWER_COLOR[deck.strength]) : undefined}
               />
-              {(deck.is_engine || deck.is_upcoming) && (
-                <div className="absolute top-1 left-1 flex gap-1">
-                  {deck.is_engine && <EngineBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
-                  {deck.is_upcoming && <UpdateBadge className="w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
-                </div>
-              )}
+              {/* E always top-left, U always top-right, so each mark keeps its own corner (특이점 2026-10-10). */}
+              {deck.is_engine && <EngineBadge className="absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
+              {deck.is_upcoming && <UpdateBadge className="absolute top-1 right-1 w-5 h-5 sm:w-6 sm:h-6 text-[11px] sm:text-xs" />}
             </div>
             <p className="mt-1 text-sm sm:text-base">{deck.name}</p>
           </div>
