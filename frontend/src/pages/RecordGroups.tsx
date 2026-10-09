@@ -39,6 +39,8 @@ type RecordGroupWithStats = RecordGroupBasic & {
 type Props = {
   data: MetaDeckStat[];
   deckCovers: Record<number, string>;
+  /** Show what the U mark means — only while a ranked deck carries it. */
+  showUpdateKey?: boolean;
 };
 
 // Win rate colour: blue from 55%, red from 45%, plain text only at exactly 50%, and a gradual blend in between
@@ -98,7 +100,7 @@ const avatarRings = (percents: number[], radius: number, avatarR: number) => {
   });
 };
 
-export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
+export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Props) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const [boxWidth, setBoxWidth] = useState(0);
   useEffect(() => {
@@ -217,7 +219,16 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
     // On PC the pie sits at the vertical middle of the 1~10위 list beside it (특이점 2026-10-10); the title is lifted out of
     // the flow and the equal top/bottom padding keeps it clear of the pie.
     <div className="w-full md:h-full md:relative md:flex md:flex-col md:justify-center md:py-9">
-      <h3 className="text-lg font-semibold mb-2 md:absolute md:top-0 md:left-0">사용률 차트</h3>
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:absolute md:top-0 md:left-0 md:right-0">
+        <h3 className="text-lg font-semibold">사용률 차트</h3>
+        {/* What the U mark on circles and rows means (특이점 2026-10-10). */}
+        {showUpdateKey && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <UpdateBadge className="w-4 h-4 text-[9px] shrink-0" />
+            최근 게임 업데이트로 새로 나온 덱
+          </span>
+        )}
+      </div>
       {/* On phones the pie also takes the card's side padding. */}
       <div ref={boxRef} className="-mx-2 sm:mx-0" style={{ height }}>
         {boxWidth > 0 && (
@@ -571,7 +582,7 @@ const RecordGroups = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
               <div>
-                <MetaDeckPieChart data={topMeta} deckCovers={deckCovers} />
+                <MetaDeckPieChart data={topMeta} deckCovers={deckCovers} showUpdateKey={metaStats.some((d) => d.is_upcoming)} />
               </div>
               <div className={`${showMoreMeta ? "" : "hidden md:block"} space-y-2`}>
                 {topMeta.map((deck, idx) => renderMetaRow(deck, idx))}
