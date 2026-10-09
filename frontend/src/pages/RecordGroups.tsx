@@ -237,7 +237,10 @@ const RecordGroups = () => {
       </div>
       <div className="text-right text-sm text-gray-600 dark:text-gray-400">
         <div>
-          사용률: <span className="font-semibold">{deck.appearance_percent}%</span>
+          사용률:{" "}
+          <span className={`font-semibold ${deck.appearance_percent >= 10 ? "text-blue-600" : ""}`}>
+            {deck.appearance_percent}%
+          </span>
         </div>
         <div>
           승률:{" "}
