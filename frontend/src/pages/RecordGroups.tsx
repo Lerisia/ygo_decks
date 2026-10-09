@@ -331,7 +331,7 @@ const RecordGroups = () => {
           </span>
         ) : (
           <span
-            className="w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0"
+            className={`w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0 ${idx < 10 ? "" : "bg-gray-200 dark:bg-gray-700"}`}
             style={idx < 10 ? { backgroundColor: `${RAINBOW[idx - 3]}38` } : undefined}
           >
             {idx + 1}
