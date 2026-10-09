@@ -531,15 +531,23 @@ const RecordGroups = () => {
         >
           <span className="flex flex-col min-w-0">
             <span className="text-[11px] text-gray-500 dark:text-gray-400">메타 통계 · {metaSince}</span>
-            <b className="text-[15px] truncate">
-              {top3.length ? `많이 쓰이는 덱 ${top3.map((d) => d.meta_deck_name).join(" · ")}` : "메타 덱 통계를 불러오는 중입니다"}
+            <b className="text-[14px] min-[375px]:text-[15px] truncate">
+              {/* Phones drop the lead-in so the three deck names fit (특이점 2026-10-10). */}
+              {top3.length ? (
+                <>
+                  <span className="hidden sm:inline">많이 쓰이는 덱 </span>
+                  {top3.map((d) => d.meta_deck_name).join(" · ")}
+                </>
+              ) : (
+                "메타 덱 통계를 불러오는 중입니다"
+              )}
             </b>
             <span className="text-xs text-gray-500 dark:text-gray-400">다이아 이상 · 레이팅 · 듀컵 {totalMatches ? `${totalMatches.toLocaleString()}판` : ""}</span>
           </span>
           <span className="flex">
             {top3.map((d, i) =>
               deckCovers[d.meta_deck_id] ? (
-                <img key={d.meta_deck_id} src={deckCovers[d.meta_deck_id]} alt="" className={`w-9 h-9 rounded-lg object-cover border-2 border-white dark:border-gray-900 ${i ? "-ml-3" : ""}`} />
+                <img key={d.meta_deck_id} src={deckCovers[d.meta_deck_id]} alt="" className={`w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-lg object-cover border-2 border-white dark:border-gray-900 ${i ? "-ml-3" : ""}`} />
               ) : null,
             )}
           </span>
