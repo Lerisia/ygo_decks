@@ -19,12 +19,6 @@ const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
   { title: "대회", desc: "준비 중", soon: true },
 ];
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 const DISMISSED_KEY = "dismissed_changelog_id";
 
 function Info() {
@@ -184,7 +178,7 @@ function Info() {
           }`}
         >
           <Link to="/changelog" className="flex-1 min-w-0 truncate hover:underline">
-            {latest.kind === "deck" ? "📦" : "📢"} <b>{latest.title}</b> <span className="text-gray-500">· {formatDate(latest.published_at)}</span>
+            {latest.kind === "deck" ? "📦" : "📢"} <b>{latest.title}</b>
           </Link>
           <button type="button" onClick={handleDismiss} aria-label="공지 닫기" className="shrink-0 w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-800/30">×</button>
         </div>
