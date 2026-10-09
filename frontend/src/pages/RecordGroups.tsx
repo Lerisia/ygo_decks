@@ -194,16 +194,16 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
         ) : (
           <circle cx={x} cy={y} r={avatarR} className="fill-gray-200 dark:fill-gray-700" />
         )}
-        {/* 신규 업데이트 덱: the deck book's blue U coin on the circle's top-left (특이점 2026-10-10) */}
+        {/* 신규 업데이트 덱: the deck book's blue U coin out on the circle's top-left edge, clear of the picture (특이점 2026-10-10) */}
         {entry.is_upcoming && (
           <g>
-            <circle cx={x - avatarR * 0.72} cy={y - avatarR * 0.72} r={avatarR * 0.5} fill="url(#meta-update-coin)" stroke="#fff" strokeWidth={1.5} />
+            <circle cx={x - avatarR * 0.95} cy={y - avatarR * 0.95} r={avatarR * 0.46} fill="url(#meta-update-coin)" stroke="#fff" strokeWidth={1.5} />
             <text
-              x={x - avatarR * 0.72}
-              y={y - avatarR * 0.72}
+              x={x - avatarR * 0.95}
+              y={y - avatarR * 0.95}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={avatarR * 0.58}
+              fontSize={avatarR * 0.54}
               fontWeight={900}
               fill="#fff"
             >
