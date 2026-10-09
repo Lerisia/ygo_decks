@@ -40,6 +40,16 @@ type Props = {
   deckCovers: Record<number, string>;
 };
 
+// Win rate colour: blue from 55%, red from 45%, plain text from 49% to 51%, and a gradual blend in between
+// (특이점 2026-10-10). The blend mixes into the surrounding text colour so it works in both themes.
+const winRateTint = (rate: number): { cls: string; mix?: string } => {
+  if (rate >= 55) return { cls: "text-blue-600" };
+  if (rate <= 45) return { cls: "text-red-500" };
+  if (rate > 51) return { cls: "", mix: `color-mix(in srgb, #2563eb ${Math.round(((rate - 51) / 4) * 100)}%, currentColor)` };
+  if (rate < 49) return { cls: "", mix: `color-mix(in srgb, #ef4444 ${Math.round(((49 - rate) / 4) * 100)}%, currentColor)` };
+  return { cls: "" };
+};
+
 // Slices are plain colours (metallic gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
 // picture sits in a small circle on the pie's edge, so ranks read at a glance (특이점 2026-10-10).
 // Metal: a darker base with one soft highlight band — enough to read as metal without a cheap shine.
@@ -335,58 +345,55 @@ const RecordGroups = () => {
   const topMeta = metaStats.slice(0, 10);
   const moreMeta = metaStats.slice(10, 30);
 
-  const renderMetaRow = (deck: MetaDeckStat, idx: number) => (
-    <div
-      key={deck.meta_deck_id}
-      className="flex items-center justify-between border-b pb-2"
-    >
-      <div className="flex items-center gap-2">
-        {/* Medals are big enough to read their numbers; 4–10 sit on a faint square in their pie slice's colour (특이점 2026-10-10). */}
-        {idx < 3 ? (
-          <span className="w-9 h-9 flex items-center justify-center text-[32px] leading-none shrink-0" aria-label={`${idx + 1}위`}>
-            {["🥇", "🥈", "🥉"][idx]}
-          </span>
-        ) : (
-          <span
-            className={`w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0 ${idx < 10 ? "" : "bg-gray-200 dark:bg-gray-700"}`}
-            style={idx < 10 ? { backgroundColor: `${RAINBOW[idx - 3]}38` } : undefined}
-          >
-            {idx + 1}
-          </span>
-        )}
-        {deckCovers[deck.meta_deck_id] && (
-          <img
-            src={deckCovers[deck.meta_deck_id]}
-            alt={deck.meta_deck_name}
-            className="w-10 h-10 rounded object-cover hidden sm:block"
-          />
-        )}
-        <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
-      </div>
-      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
-        <div>
-          사용률:{" "}
-          <span className={`font-semibold ${deck.appearance_percent >= 10 ? "text-blue-600" : ""}`}>
-            {deck.appearance_percent}%
-          </span>
+  const renderMetaRow = (deck: MetaDeckStat, idx: number) => {
+    const tint = winRateTint(deck.win_rate);
+    return (
+      <div
+        key={deck.meta_deck_id}
+        className="flex items-center justify-between border-b pb-2"
+      >
+        <div className="flex items-center gap-2">
+          {/* Medals are big enough to read their numbers; 4–10 sit on a faint square in their pie slice's colour (특이점 2026-10-10). */}
+          {idx < 3 ? (
+            <span className="w-9 h-9 flex items-center justify-center text-[32px] leading-none shrink-0" aria-label={`${idx + 1}위`}>
+              {["🥇", "🥈", "🥉"][idx]}
+            </span>
+          ) : (
+            <span
+              className={`w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0 ${idx < 10 ? "" : "bg-gray-200 dark:bg-gray-700"}`}
+              style={idx < 10 ? { backgroundColor: `${RAINBOW[idx - 3]}38` } : undefined}
+            >
+              {idx + 1}
+            </span>
+          )}
+          {deckCovers[deck.meta_deck_id] && (
+            <img
+              src={deckCovers[deck.meta_deck_id]}
+              alt={deck.meta_deck_name}
+              className="w-10 h-10 rounded object-cover hidden sm:block"
+            />
+          )}
+          <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
         </div>
-        <div>
-          승률:{" "}
-          <span
-            className={`font-semibold ${
-              deck.win_rate >= 55
-                ? "text-blue-600"
-                : deck.win_rate <= 45
-                ? "text-red-500"
-                : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            {deck.win_rate}%
-          </span>
+        <div className="text-right text-sm text-gray-600 dark:text-gray-400">
+          <div>
+            사용률:{" "}
+            <span className={`font-semibold ${deck.appearance_percent >= 10 ? "text-blue-600" : ""}`}>
+              {deck.appearance_percent}%
+            </span>
+          </div>
+          <div>
+            승률:{" "}
+            <span className="text-gray-700 dark:text-gray-300">
+              <span className={`font-semibold ${tint.cls}`} style={tint.mix ? { color: tint.mix } : undefined}>
+                {deck.win_rate}%
+              </span>
+            </span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
