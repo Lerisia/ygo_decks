@@ -225,7 +225,7 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
         {showUpdateKey && (
           <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <UpdateBadge className="w-4 h-4 text-[9px] shrink-0" />
-            최근 게임 업데이트로 새로 나오거나 업데이트된 덱
+            최근 게임 업데이트로 새로 등록되거나 업데이트된 덱
           </span>
         )}
       </div>
