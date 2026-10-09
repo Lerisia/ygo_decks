@@ -137,7 +137,16 @@ export default function Changelog() {
                   )}
                 </header>
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{e.body}</ReactMarkdown>
+                  {/* Links to our own pages move inside the app instead of reloading it. */}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ href, children }) =>
+                        href?.startsWith("/") ? <Link to={href}>{children}</Link> : <a href={href}>{children}</a>,
+                    }}
+                  >
+                    {e.body}
+                  </ReactMarkdown>
                 </div>
               </article>
             ),

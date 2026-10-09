@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import PcTrackerBanner from "@/components/PcTrackerBanner";
 import { getTrackerPending } from "@/api/trackerPendingApi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import {
   deleteRecordGroup,
@@ -252,7 +252,12 @@ const RecordGroups = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [metaStats, setMetaStats] = useState<MetaDeckStat[]>([]);
-  const [showMetaStats, setShowMetaStats] = useState(false);
+  // /records?meta=1 (linked from notices) opens the meta stats and scrolls to them (특이점 2026-10-10).
+  const [searchParams] = useSearchParams();
+  const metaLinked = searchParams.get("meta") === "1";
+  const [showMetaStats, setShowMetaStats] = useState(metaLinked);
+  const metaRef = useRef<HTMLDivElement>(null);
+  const metaScrolled = useRef(false);
   const [showMoreMeta, setShowMoreMeta] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
   const [totalMatches, setTotalMatches] = useState<number>(0);
@@ -341,6 +346,12 @@ const RecordGroups = () => {
     }
     setDeckCovers(coverMap);
   }, [metaStats]);
+
+  useEffect(() => {
+    if (!metaLinked || metaScrolled.current || metaStats.length === 0) return;
+    metaScrolled.current = true;
+    requestAnimationFrame(() => metaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [metaLinked, metaStats]);
 
   const topMeta = metaStats.slice(0, 10);
   const moreMeta = metaStats.slice(10, 30);
@@ -468,7 +479,7 @@ const RecordGroups = () => {
         </button>
       )}
 
-      <div>
+      <div ref={metaRef} className="scroll-mt-20">
         <button
           type="button"
           onClick={() => setShowMetaStats((prev) => !prev)}
