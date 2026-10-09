@@ -51,11 +51,14 @@ const PODIUM = [
 const PODIUM_OFFSETS = ["0%", "38%", "52%", "68%", "100%"];
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
 const OTHERS_COLOR = "#3a3a3d";
-const MAX_PIE_RADIUS = 150;
+// Up to 200px on PC (특이점 2026-10-10); narrower columns shrink it so the circles still fit.
+const MAX_PIE_RADIUS = 200;
 const MIN_PIE_RADIUS = 90;
-const AVATAR_R = 16;
 // Ring offsets beyond the pie's edge: on the edge, then one and two circles further out.
-const RING_OFFSETS = [4, 4 + AVATAR_R * 2 + 4, 4 + (AVATAR_R * 2 + 4) * 2];
+const ringOffsets = (avatarR: number) => {
+  const step = avatarR * 2 + 4;
+  return [4, 4 + step, 4 + step * 2];
+};
 const RAD = Math.PI / 180;
 // Ranks run counter-clockwise from 12 o'clock (특이점 2026-10-10).
 const START_ANGLE = 90;
@@ -64,17 +67,18 @@ const END_ANGLE = 450;
 const sliceColor = (rank: number) => (rank < 3 ? PODIUM[rank].solid : RAINBOW[rank - 3] ?? OTHERS_COLOR);
 
 // Thin neighbouring slices would stack their circles, so a circle that would touch an earlier one moves out a ring.
-const avatarRings = (percents: number[], radius: number) => {
+const avatarRings = (percents: number[], radius: number, avatarR: number) => {
+  const offsets = ringOffsets(avatarR);
   const total = percents.reduce((a, b) => a + b, 0) || 1;
   const placed: { x: number; y: number }[] = [];
   let cum = 0;
   return percents.map((p) => {
     const mid = (START_ANGLE + ((cum + p / 2) / total) * (END_ANGLE - START_ANGLE)) * RAD;
     cum += p;
-    for (let ring = 0; ring < RING_OFFSETS.length; ring++) {
-      const x = (radius + RING_OFFSETS[ring]) * Math.cos(mid);
-      const y = (radius + RING_OFFSETS[ring]) * Math.sin(mid);
-      if (ring === RING_OFFSETS.length - 1 || placed.every((q) => Math.hypot(q.x - x, q.y - y) >= AVATAR_R * 2 + 4)) {
+    for (let ring = 0; ring < offsets.length; ring++) {
+      const x = (radius + offsets[ring]) * Math.cos(mid);
+      const y = (radius + offsets[ring]) * Math.sin(mid);
+      if (ring === offsets.length - 1 || placed.every((q) => Math.hypot(q.x - x, q.y - y) >= avatarR * 2 + 4)) {
         placed.push({ x, y });
         return ring;
       }
@@ -93,6 +97,10 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Smaller circles on phones leave more of the width to the pie itself.
+  const avatarR = boxWidth && boxWidth < 520 ? 13 : 18;
+  const offsets = ringOffsets(avatarR);
 
   const top10 = data.slice(0, 10);
   const totalPercent = top10.reduce((sum, d) => sum + d.appearance_percent, 0);
@@ -114,8 +122,8 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
     },
   ];
   // As large as the column allows while the first ring of circles still fits beside it.
-  const radius = Math.max(MIN_PIE_RADIUS, Math.min(MAX_PIE_RADIUS, Math.floor(boxWidth / 2 - RING_OFFSETS[1] - AVATAR_R - 6)));
-  const rings = avatarRings(chartData.map((d) => d.appearance_percent), radius);
+  const radius = Math.max(MIN_PIE_RADIUS, Math.min(MAX_PIE_RADIUS, Math.floor(boxWidth / 2 - offsets[1] - avatarR - 6)));
+  const rings = avatarRings(chartData.map((d) => d.appearance_percent), radius, avatarR);
   // The box hugs the pie and its circles, so no empty band is left where no circle sits.
   let top = -radius;
   let bottom = radius;
@@ -126,20 +134,26 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
       const mid = (START_ANGLE + ((cum + d.appearance_percent / 2) / total) * (END_ANGLE - START_ANGLE)) * RAD;
       cum += d.appearance_percent;
       if (i >= top10.length) return;
-      const y = -(radius + RING_OFFSETS[rings[i]]) * Math.sin(mid);
-      top = Math.min(top, y - AVATAR_R - 4);
-      bottom = Math.max(bottom, y + AVATAR_R + 4);
+      const y = -(radius + offsets[rings[i]]) * Math.sin(mid);
+      top = Math.min(top, y - avatarR - 4);
+      bottom = Math.max(bottom, y + avatarR + 4);
     });
   }
+  // On PC the box is centred beside the list, so it stays symmetric about the pie's centre to put that centre mid-list.
+  if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+    const half = Math.max(-top, bottom);
+    top = -half;
+    bottom = half;
+  }
   const pad = 6;
-  const height = boxWidth ? Math.ceil(bottom - top) + pad * 2 : 2 * (MAX_PIE_RADIUS + RING_OFFSETS[1] + AVATAR_R + 8);
+  const height = boxWidth ? Math.ceil(bottom - top) + pad * 2 : 2 * (MAX_PIE_RADIUS + offsets[1] + avatarR + 8);
   const centreY = Math.round(pad - top);
 
   const renderAvatar = ({ cx, cy, midAngle, index }: { cx: number; cy: number; midAngle: number; index: number }) => {
     const entry = chartData[index];
     if (!entry || entry.id === -1) return null;
     const color = sliceColor(index);
-    const r = radius + RING_OFFSETS[rings[index]];
+    const r = radius + offsets[rings[index]];
     const x = cx + r * Math.cos(-midAngle * RAD);
     const y = cy + r * Math.sin(-midAngle * RAD);
     const edgeX = cx + radius * Math.cos(-midAngle * RAD);
@@ -148,32 +162,35 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
       <g key={`avatar-${entry.id}`}>
         <title>{`${index + 1}위 ${entry.label} · ${entry.appearance_percent}%`}</title>
         {rings[index] > 0 && <line x1={edgeX} y1={edgeY} x2={x} y2={y} stroke={color} strokeWidth={1.5} />}
-        <circle cx={x} cy={y} r={AVATAR_R + 4} className="fill-white dark:fill-gray-800" />
-        <circle cx={x} cy={y} r={AVATAR_R + 2} fill={index < 3 ? `url(#meta-podium-${index})` : color} />
+        <circle cx={x} cy={y} r={avatarR + 4} className="fill-white dark:fill-gray-800" />
+        <circle cx={x} cy={y} r={avatarR + 2} fill={index < 3 ? `url(#meta-podium-${index})` : color} />
         <clipPath id={`deck-avatar-${entry.id}`}>
-          <circle cx={x} cy={y} r={AVATAR_R} />
+          <circle cx={x} cy={y} r={avatarR} />
         </clipPath>
         {entry.cover ? (
           <image
             href={entry.cover}
-            x={x - AVATAR_R}
-            y={y - AVATAR_R}
-            width={AVATAR_R * 2}
-            height={AVATAR_R * 2}
+            x={x - avatarR}
+            y={y - avatarR}
+            width={avatarR * 2}
+            height={avatarR * 2}
             preserveAspectRatio="xMidYMid slice"
             clipPath={`url(#deck-avatar-${entry.id})`}
           />
         ) : (
-          <circle cx={x} cy={y} r={AVATAR_R} className="fill-gray-200 dark:fill-gray-700" />
+          <circle cx={x} cy={y} r={avatarR} className="fill-gray-200 dark:fill-gray-700" />
         )}
       </g>
     );
   };
 
   return (
-    <div className="w-full">
-      <h3 className="text-lg font-semibold mb-2">사용률 차트</h3>
-      <div ref={boxRef} style={{ height }}>
+    // On PC the pie sits at the vertical middle of the 1~10위 list beside it (특이점 2026-10-10); the title is lifted out of
+    // the flow and the equal top/bottom padding keeps it clear of the pie.
+    <div className="w-full md:h-full md:relative md:flex md:flex-col md:justify-center md:py-9">
+      <h3 className="text-lg font-semibold mb-2 md:absolute md:top-0 md:left-0">사용률 차트</h3>
+      {/* On phones the pie also takes the card's side padding. */}
+      <div ref={boxRef} className="-mx-2 sm:mx-0" style={{ height }}>
         {boxWidth > 0 && (
           <PieChart width={boxWidth} height={height} style={{ overflow: "visible" }}>
             <defs>
@@ -502,7 +519,7 @@ const RecordGroups = () => {
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
               <div>
                 <MetaDeckPieChart data={topMeta} deckCovers={deckCovers} />
               </div>
