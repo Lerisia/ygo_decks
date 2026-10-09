@@ -308,9 +308,19 @@ const RecordGroups = () => {
       className="flex items-center justify-between border-b pb-2"
     >
       <div className="flex items-center gap-2">
-        <span className="text-lg font-mono w-6 text-right">
-          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`}
-        </span>
+        {/* Medals are big enough to read their numbers; 4–10 sit on a faint square in their pie slice's colour (특이점 2026-10-10). */}
+        {idx < 3 ? (
+          <span className="w-9 h-9 flex items-center justify-center text-[32px] leading-none shrink-0" aria-label={`${idx + 1}위`}>
+            {["🥇", "🥈", "🥉"][idx]}
+          </span>
+        ) : (
+          <span
+            className="w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0"
+            style={idx < 10 ? { backgroundColor: `${RAINBOW[idx - 3]}38` } : undefined}
+          >
+            {idx + 1}
+          </span>
+        )}
         {deckCovers[deck.meta_deck_id] && (
           <img
             src={deckCovers[deck.meta_deck_id]}
