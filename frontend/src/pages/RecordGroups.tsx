@@ -116,8 +116,24 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
   // As large as the column allows while the first ring of circles still fits beside it.
   const radius = Math.max(MIN_PIE_RADIUS, Math.min(MAX_PIE_RADIUS, Math.floor(boxWidth / 2 - RING_OFFSETS[1] - AVATAR_R - 6)));
   const rings = avatarRings(chartData.map((d) => d.appearance_percent), radius);
-  const reach = radius + RING_OFFSETS[Math.max(0, ...rings.slice(0, top10.length))] + AVATAR_R + 8;
-  const height = boxWidth ? 2 * reach : 2 * (MAX_PIE_RADIUS + RING_OFFSETS[1] + AVATAR_R + 8);
+  // The box hugs the pie and its circles, so no empty band is left where no circle sits.
+  let top = -radius;
+  let bottom = radius;
+  {
+    const total = chartData.reduce((a, d) => a + d.appearance_percent, 0) || 1;
+    let cum = 0;
+    chartData.forEach((d, i) => {
+      const mid = (START_ANGLE + ((cum + d.appearance_percent / 2) / total) * (END_ANGLE - START_ANGLE)) * RAD;
+      cum += d.appearance_percent;
+      if (i >= top10.length) return;
+      const y = -(radius + RING_OFFSETS[rings[i]]) * Math.sin(mid);
+      top = Math.min(top, y - AVATAR_R - 4);
+      bottom = Math.max(bottom, y + AVATAR_R + 4);
+    });
+  }
+  const pad = 6;
+  const height = boxWidth ? Math.ceil(bottom - top) + pad * 2 : 2 * (MAX_PIE_RADIUS + RING_OFFSETS[1] + AVATAR_R + 8);
+  const centreY = Math.round(pad - top);
 
   const renderAvatar = ({ cx, cy, midAngle, index }: { cx: number; cy: number; midAngle: number; index: number }) => {
     const entry = chartData[index];
@@ -155,7 +171,7 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
   };
 
   return (
-    <div className="hidden md:block w-full">
+    <div className="w-full">
       <h3 className="text-lg font-semibold mb-2">사용률 차트</h3>
       <div ref={boxRef} style={{ height }}>
         {boxWidth > 0 && (
@@ -174,7 +190,7 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
               dataKey="appearance_percent"
               nameKey="label"
               cx="50%"
-              cy="50%"
+              cy={centreY}
               outerRadius={radius}
               startAngle={START_ANGLE}
               endAngle={END_ANGLE}
@@ -463,14 +479,15 @@ const RecordGroups = () => {
               <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
                 총 집계 게임 수: {totalMatches.toLocaleString()}
               </p>
-              {moreMeta.length > 0 && (
+              {/* Phones open on the pie alone and 더보기 brings the numbers; on PC it adds 11위 ~ 30위 (특이점 2026-10-10). */}
+              {topMeta.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowMoreMeta((v) => !v)}
-                  aria-label={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
+                  aria-label={showMoreMeta ? "순위 접기" : "순위 더보기"}
                   aria-expanded={showMoreMeta}
-                  title={showMoreMeta ? "11위 이하 숨기기" : "11위 ~ 30위 보기"}
-                  className="group flex items-center gap-1 rounded-full hover:border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                  title={showMoreMeta ? "순위 접기" : "순위 더보기"}
+                  className={`${moreMeta.length ? "" : "md:hidden"} group flex items-center gap-1 rounded-full hover:border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400`}
                 >
                   <span className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200">더보기</span>
                   <span
@@ -486,10 +503,10 @@ const RecordGroups = () => {
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="hidden md:block">
+              <div>
                 <MetaDeckPieChart data={topMeta} deckCovers={deckCovers} />
               </div>
-              <div className="space-y-2">
+              <div className={`${showMoreMeta ? "" : "hidden md:block"} space-y-2`}>
                 {topMeta.map((deck, idx) => renderMetaRow(deck, idx))}
               </div>
             </div>
