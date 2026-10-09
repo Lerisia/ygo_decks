@@ -3,13 +3,15 @@ const API_BASE = "/api";
 export type ChangelogEntry = {
   id: number;
   title: string;
+  /** "deck": the monthly deck-addition notice, shown in its own colour (특이점 2026-10-10). */
+  kind?: "update" | "deck";
   body: string;
   published_at: string;
   /** Only staff ever receive future entries; true when not yet shown to everyone. */
   scheduled?: boolean;
 };
 
-export type ChangelogDraft = { title: string; body: string; published_at?: string };
+export type ChangelogDraft = { title: string; kind?: "update" | "deck"; body: string; published_at?: string };
 
 async function request<T>(path: string, init?: RequestInit, withAuth = false): Promise<T> {
   const token = withAuth ? localStorage.getItem("access_token") : null;

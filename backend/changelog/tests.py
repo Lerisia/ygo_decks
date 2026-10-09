@@ -126,3 +126,36 @@ class ChangelogStaffWriteTests(TestCase):
         self.assertEqual(ChangelogEntry.objects.count(), 1)
         self.entry.refresh_from_db()
         self.assertEqual(self.entry.title, "[10/2] 기존")
+
+
+class ChangelogKindTests(TestCase):
+    """특이점 2026-10-10: 매달 하는 정기 덱 추가 공지는 평소 업데이트와 다른 색으로 보인다."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from user.models import User
+
+        self.client = APIClient()
+        self.staff = User.objects.create_user(email="staff@test.com", username="staff", password="pass1234")
+        self.staff.is_staff = True
+        self.staff.save()
+
+    def test_entries_are_updates_unless_marked(self):
+        ChangelogEntry.objects.create(title="업데이트", body="본문", published_at=timezone.now() - timedelta(hours=1))
+        self.assertEqual(self.client.get(reverse("changelog-list")).json()[0]["kind"], "update")
+
+    def test_staff_marks_a_deck_addition_and_keeps_it_on_edit(self):
+        self.client.force_authenticate(self.staff)
+        res = self.client.post(reverse("changelog-list"), {"title": "[11/1] 새로운 덱 추가 안내", "body": "- 덱", "kind": "deck"}, format="json")
+        self.assertEqual(res.status_code, 201)
+        entry = ChangelogEntry.objects.get(title="[11/1] 새로운 덱 추가 안내")
+        self.assertEqual(entry.kind, "deck")
+        self.client.put(reverse("changelog-detail", args=[entry.id]), {"title": "[11/1] 고친 제목", "body": "- 덱"}, format="json")
+        entry.refresh_from_db()
+        self.assertEqual(entry.kind, "deck")
+        self.assertEqual(self.client.get(reverse("changelog-latest")).json()["entry"]["kind"], "deck")
+
+    def test_unknown_kind_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        res = self.client.post(reverse("changelog-list"), {"title": "공지", "body": "본문", "kind": "event"}, format="json")
+        self.assertEqual(res.status_code, 400)

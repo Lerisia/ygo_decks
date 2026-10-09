@@ -11,8 +11,8 @@ const today = () => {
 };
 
 const TEMPLATES = [
-  { label: "업데이트 공지", title: () => `[${today()}] `, body: "- " },
-  { label: "새 덱 추가 안내", title: () => `[${today()}] 새로운 덱 추가 안내`, body: "이하 덱들의 추가 및 조정을 완료했습니다.\n- " },
+  { label: "업데이트 공지", title: () => `[${today()}] `, body: "- ", deck: false },
+  { label: "새 덱 추가 안내", title: () => `[${today()}] 새로운 덱 추가 안내`, body: "이하 덱들의 추가 및 조정을 완료했습니다.\n- ", deck: true },
 ];
 
 /** ISO time → value for <input type="datetime-local"> in the viewer's time zone. */
@@ -31,6 +31,7 @@ interface Props {
 export default function ChangelogEditor({ entry, onCancel, onSaved }: Props) {
   const [title, setTitle] = useState(entry?.title ?? `[${today()}] `);
   const [body, setBody] = useState(entry?.body ?? "");
+  const [deckNotice, setDeckNotice] = useState(entry?.kind === "deck");
   const [schedule, setSchedule] = useState(!!entry?.scheduled);
   const [when, setWhen] = useState(entry ? toLocalInput(entry.published_at) : "");
   const [preview, setPreview] = useState(false);
@@ -41,12 +42,13 @@ export default function ChangelogEditor({ entry, onCancel, onSaved }: Props) {
     if (body.trim() && !window.confirm("작성 중인 내용을 양식으로 바꿀까요?")) return;
     setTitle(t.title());
     setBody(t.body);
+    setDeckNotice(t.deck);
   };
 
   const save = async () => {
     if (!title.trim() || !body.trim()) return setError("제목과 본문을 입력해 주세요.");
     if (schedule && !when) return setError("예약 시각을 정해 주세요.");
-    const draft: ChangelogDraft = { title, body };
+    const draft: ChangelogDraft = { title, body, kind: deckNotice ? "deck" : "update" };
     if (schedule) draft.published_at = new Date(when).toISOString();
     else if (entry?.scheduled) draft.published_at = new Date().toISOString(); // 예약을 풀면 지금 게시
     setSaving(true);
@@ -113,6 +115,10 @@ export default function ChangelogEditor({ entry, onCancel, onSaved }: Props) {
       <p className="text-xs text-gray-500 dark:text-gray-400">
         마크다운 지원 · 기능 하나당 한 줄, 짧은 목록으로 · 늘 갱신되는 콘텐츠(강의노트 추가 등)는 공지하지 않음
       </p>
+      <label className="flex items-center gap-1.5 text-sm">
+        <input type="checkbox" checked={deckNotice} onChange={(e) => setDeckNotice(e.target.checked)} />
+        📦 정기 덱 추가 공지 <span className="text-xs text-gray-500 dark:text-gray-400">(초록색으로 표시)</span>
+      </label>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-1.5">
           <input type="radio" checked={!schedule} onChange={() => setSchedule(false)} />

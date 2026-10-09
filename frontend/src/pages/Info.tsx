@@ -176,9 +176,15 @@ function Info() {
       </div>
 
       {latest && !dismissed && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-sm">
+        <div
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm ${
+            latest.kind === "deck"
+              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
+              : "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/40"
+          }`}
+        >
           <Link to="/changelog" className="flex-1 min-w-0 truncate hover:underline">
-            📢 <b>{latest.title}</b> <span className="text-gray-500">· {formatDate(latest.published_at)}</span>
+            {latest.kind === "deck" ? "📦" : "📢"} <b>{latest.title}</b> <span className="text-gray-500">· {formatDate(latest.published_at)}</span>
           </Link>
           <button type="button" onClick={handleDismiss} aria-label="공지 닫기" className="shrink-0 w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-800/30">×</button>
         </div>

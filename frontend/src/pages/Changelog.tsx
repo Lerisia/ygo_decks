@@ -101,12 +101,24 @@ export default function Changelog() {
             ) : (
               <article
                 key={e.id}
-                className={`bg-blue-50 dark:bg-blue-900/20 border rounded-xl shadow-sm p-4 md:p-5 ${
-                  e.scheduled ? "border-amber-300 dark:border-amber-700/70 border-dashed" : "border-blue-100 dark:border-blue-800/40"
+                className={`border rounded-xl shadow-sm p-4 md:p-5 ${
+                  e.kind === "deck" ? "bg-emerald-50 dark:bg-emerald-900/20" : "bg-blue-50 dark:bg-blue-900/20"
+                } ${
+                  e.scheduled
+                    ? "border-amber-300 dark:border-amber-700/70 border-dashed"
+                    : e.kind === "deck"
+                    ? "border-emerald-200 dark:border-emerald-800/50"
+                    : "border-blue-100 dark:border-blue-800/40"
                 }`}
               >
                 <header className="mb-2 flex items-start gap-2">
                   <div className="min-w-0 flex-1">
+                    {/* Monthly deck additions read apart from site updates at a glance (특이점 2026-10-10). */}
+                    {e.kind === "deck" && (
+                      <span className="inline-block mb-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-[11px] font-semibold">
+                        📦 정기 덱 추가
+                      </span>
+                    )}
                     <h2 className="text-lg md:text-xl font-semibold">{e.title}</h2>
                     <time className="text-xs md:text-sm text-gray-500">
                       {formatDate(e.published_at)}

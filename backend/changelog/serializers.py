@@ -9,7 +9,7 @@ class ChangelogEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChangelogEntry
-        fields = ("id", "title", "body", "published_at", "scheduled")
+        fields = ("id", "title", "kind", "body", "published_at", "scheduled")
 
     def get_scheduled(self, obj):
         return obj.published_at > timezone.now()
@@ -20,7 +20,7 @@ class ChangelogWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChangelogEntry
-        fields = ("title", "body", "published_at")
+        fields = ("title", "kind", "body", "published_at")
 
     def validate_title(self, value):
         if not value.strip():
