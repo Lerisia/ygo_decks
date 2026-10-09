@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PcTrackerBanner from "@/components/PcTrackerBanner";
 import { getTrackerPending } from "@/api/trackerPendingApi";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import {
 } from "@/api/toolApi";
 import { ResultChips, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
 import { getRankLabel } from "@/utils/rankUtils";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
   id: number;
@@ -40,37 +40,41 @@ type Props = {
   deckCovers: Record<number, string>;
 };
 
-// Slices are plain colours (gold/silver/bronze, then rainbow for 4–10) and each deck's picture sits in a small circle on the
-// pie's edge, so ranks read at a glance instead of from pictures squeezed into slices (특이점 2026-10-10).
+// Slices are plain colours (metallic gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
+// picture sits in a small circle on the pie's edge, so ranks read at a glance (특이점 2026-10-10).
+// Metal: a darker base with one soft highlight band — enough to read as metal without a cheap shine.
 const PODIUM = [
-  { from: "#fbe38e", to: "#d4a72c", solid: "#e2b93b" },
-  { from: "#f1f3f5", to: "#a7adb7", solid: "#c0c5cc" },
-  { from: "#f1bd94", to: "#b8733f", solid: "#cd8a55" },
+  { stops: ["#b8860b", "#e3b84a", "#f8e2a0", "#d9a93a", "#a87a12"], solid: "#d4a72c" },
+  { stops: ["#8e949c", "#c9cdd3", "#f4f5f7", "#bfc3c9", "#858b94"], solid: "#b4b9c0" },
+  { stops: ["#8f5228", "#c9874f", "#efc09a", "#bd7a45", "#7f4620"], solid: "#c07a46" },
 ];
+const PODIUM_OFFSETS = ["0%", "38%", "52%", "68%", "100%"];
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
-const OTHERS_COLOR = "#cccccc";
-// Sized so the pie and its first ring of circles fit the half-width column on 768px screens.
-const PIE_RADIUS = 100;
-const AVATAR_R = 14;
-const AVATAR_RINGS = [PIE_RADIUS + 4, PIE_RADIUS + 34, PIE_RADIUS + 64];
+const OTHERS_COLOR = "#3a3a3d";
+const MAX_PIE_RADIUS = 150;
+const MIN_PIE_RADIUS = 90;
+const AVATAR_R = 16;
+// Ring offsets beyond the pie's edge: on the edge, then one and two circles further out.
+const RING_OFFSETS = [4, 4 + AVATAR_R * 2 + 4, 4 + (AVATAR_R * 2 + 4) * 2];
 const RAD = Math.PI / 180;
-// Ranks run clockwise from 3 o'clock (특이점 2026-10-10).
-const START_ANGLE = 0;
+// Ranks run counter-clockwise from 12 o'clock (특이점 2026-10-10).
+const START_ANGLE = 90;
+const END_ANGLE = 450;
 
 const sliceColor = (rank: number) => (rank < 3 ? PODIUM[rank].solid : RAINBOW[rank - 3] ?? OTHERS_COLOR);
 
 // Thin neighbouring slices would stack their circles, so a circle that would touch an earlier one moves out a ring.
-const avatarRings = (percents: number[]) => {
+const avatarRings = (percents: number[], radius: number) => {
   const total = percents.reduce((a, b) => a + b, 0) || 1;
   const placed: { x: number; y: number }[] = [];
   let cum = 0;
   return percents.map((p) => {
-    const mid = (START_ANGLE - ((cum + p / 2) / total) * 360) * RAD;
+    const mid = (START_ANGLE + ((cum + p / 2) / total) * (END_ANGLE - START_ANGLE)) * RAD;
     cum += p;
-    for (let ring = 0; ring < AVATAR_RINGS.length; ring++) {
-      const x = AVATAR_RINGS[ring] * Math.cos(mid);
-      const y = AVATAR_RINGS[ring] * Math.sin(mid);
-      if (ring === AVATAR_RINGS.length - 1 || placed.every((q) => Math.hypot(q.x - x, q.y - y) >= AVATAR_R * 2 + 4)) {
+    for (let ring = 0; ring < RING_OFFSETS.length; ring++) {
+      const x = (radius + RING_OFFSETS[ring]) * Math.cos(mid);
+      const y = (radius + RING_OFFSETS[ring]) * Math.sin(mid);
+      if (ring === RING_OFFSETS.length - 1 || placed.every((q) => Math.hypot(q.x - x, q.y - y) >= AVATAR_R * 2 + 4)) {
         placed.push({ x, y });
         return ring;
       }
@@ -80,6 +84,16 @@ const avatarRings = (percents: number[]) => {
 };
 
 export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setBoxWidth(Math.floor(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const top10 = data.slice(0, 10);
   const totalPercent = top10.reduce((sum, d) => sum + d.appearance_percent, 0);
   const othersPercent = Math.max(0, 100 - totalPercent);
@@ -99,23 +113,27 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
       cover: "",
     },
   ];
-  const rings = avatarRings(chartData.map((d) => d.appearance_percent));
+  // As large as the column allows while the first ring of circles still fits beside it.
+  const radius = Math.max(MIN_PIE_RADIUS, Math.min(MAX_PIE_RADIUS, Math.floor(boxWidth / 2 - RING_OFFSETS[1] - AVATAR_R - 6)));
+  const rings = avatarRings(chartData.map((d) => d.appearance_percent), radius);
+  const reach = radius + RING_OFFSETS[Math.max(0, ...rings.slice(0, top10.length))] + AVATAR_R + 8;
+  const height = boxWidth ? 2 * reach : 2 * (MAX_PIE_RADIUS + RING_OFFSETS[1] + AVATAR_R + 8);
 
   const renderAvatar = ({ cx, cy, midAngle, index }: { cx: number; cy: number; midAngle: number; index: number }) => {
     const entry = chartData[index];
     if (!entry || entry.id === -1) return null;
     const color = sliceColor(index);
-    const r = AVATAR_RINGS[rings[index]];
+    const r = radius + RING_OFFSETS[rings[index]];
     const x = cx + r * Math.cos(-midAngle * RAD);
     const y = cy + r * Math.sin(-midAngle * RAD);
-    const edgeX = cx + PIE_RADIUS * Math.cos(-midAngle * RAD);
-    const edgeY = cy + PIE_RADIUS * Math.sin(-midAngle * RAD);
+    const edgeX = cx + radius * Math.cos(-midAngle * RAD);
+    const edgeY = cy + radius * Math.sin(-midAngle * RAD);
     return (
       <g key={`avatar-${entry.id}`}>
         <title>{`${index + 1}위 ${entry.label} · ${entry.appearance_percent}%`}</title>
         {rings[index] > 0 && <line x1={edgeX} y1={edgeY} x2={x} y2={y} stroke={color} strokeWidth={1.5} />}
         <circle cx={x} cy={y} r={AVATAR_R + 4} className="fill-white dark:fill-gray-800" />
-        <circle cx={x} cy={y} r={AVATAR_R + 2} fill={color} />
+        <circle cx={x} cy={y} r={AVATAR_R + 2} fill={index < 3 ? `url(#meta-podium-${index})` : color} />
         <clipPath id={`deck-avatar-${entry.id}`}>
           <circle cx={x} cy={y} r={AVATAR_R} />
         </clipPath>
@@ -137,46 +155,49 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
   };
 
   return (
-    <div className="hidden md:block w-full max-w-md">
+    <div className="hidden md:block w-full">
       <h3 className="text-lg font-semibold mb-2">사용률 차트</h3>
-      <ResponsiveContainer width="100%" height={2 * (AVATAR_RINGS[AVATAR_RINGS.length - 1] + AVATAR_R + 6)}>
-        <PieChart style={{ overflow: "visible" }}>
-          <defs>
-            {PODIUM.map((c, i) => (
-              <linearGradient key={i} id={`meta-podium-${i}`} x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor={c.from} />
-                <stop offset="100%" stopColor={c.to} />
-              </linearGradient>
-            ))}
-          </defs>
-          <Pie
-            data={chartData}
-            dataKey="appearance_percent"
-            nameKey="label"
-            cx="50%"
-            cy="50%"
-            outerRadius={PIE_RADIUS}
-            startAngle={START_ANGLE}
-            endAngle={START_ANGLE - 360}
-            label={renderAvatar}
-            labelLine={false}
-            isAnimationActive={false}
-          >
-            {chartData.map((entry, i) => (
-              <Cell
-                key={entry.id}
-                fill={entry.id === -1 ? OTHERS_COLOR : i < 3 ? `url(#meta-podium-${i})` : sliceColor(i)}
-                strokeWidth={2}
-                className="stroke-white dark:stroke-gray-800"
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value: number) => `${value.toFixed(1)}%`}
-            contentStyle={{ fontSize: "0.875rem" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <div ref={boxRef} style={{ height }}>
+        {boxWidth > 0 && (
+          <PieChart width={boxWidth} height={height} style={{ overflow: "visible" }}>
+            <defs>
+              {PODIUM.map((c, i) => (
+                <linearGradient key={i} id={`meta-podium-${i}`} x1="0" y1="0" x2="1" y2="1">
+                  {c.stops.map((color, j) => (
+                    <stop key={j} offset={PODIUM_OFFSETS[j]} stopColor={color} />
+                  ))}
+                </linearGradient>
+              ))}
+            </defs>
+            <Pie
+              data={chartData}
+              dataKey="appearance_percent"
+              nameKey="label"
+              cx="50%"
+              cy="50%"
+              outerRadius={radius}
+              startAngle={START_ANGLE}
+              endAngle={END_ANGLE}
+              label={renderAvatar}
+              labelLine={false}
+              isAnimationActive={false}
+            >
+              {chartData.map((entry, i) => (
+                <Cell
+                  key={entry.id}
+                  fill={entry.id === -1 ? OTHERS_COLOR : i < 3 ? `url(#meta-podium-${i})` : sliceColor(i)}
+                  strokeWidth={2}
+                  className="stroke-white dark:stroke-gray-800"
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: number) => `${value.toFixed(1)}%`}
+              contentStyle={{ fontSize: "0.875rem" }}
+            />
+          </PieChart>
+        )}
+      </div>
     </div>
   );
 };
