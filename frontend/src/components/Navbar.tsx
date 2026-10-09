@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isAuthenticated, getUserInfo, claimDailyBonus, isAdmin } from "../api/accountApi";
 import { getMyAvatar } from "@/api/avatarApi";
@@ -51,6 +51,12 @@ function SupportLinks({ compact }: { compact?: boolean }) {
 function Navbar() {
   const isLoggedIn = isAuthenticated();
   const location = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+  // Moving to another page lets go of focus left on a menu link, so no menu stays open behind the new page.
+  useEffect(() => {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement && navRef.current?.contains(el)) el.blur();
+  }, [location.pathname]);
   const inMultiplayerRoom = location.pathname.startsWith("/multiplayer/rooms/");
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [userInfo, setUserInfo] = useState<{ username: string; points: number } | null>(null);
@@ -146,7 +152,7 @@ function Navbar() {
       <div className={`${inMultiplayerRoom ? "hidden" : "hidden sm:flex"} justify-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800`}>
         <div className="w-full max-w-6xl px-4 h-20 flex items-center gap-4 lg:gap-8">
           <Link to="/" className="shrink-0 hover:opacity-80 transition" aria-label="홈">{logoImg("h-14")}</Link>
-          <nav className="flex items-center gap-1 flex-1" aria-label="주 메뉴">
+          <nav ref={navRef} className="flex items-center gap-1 flex-1" aria-label="주 메뉴">
             {MENU_GROUPS.map((g) => (
               <div key={g.key} className="relative group">
                 <Link
@@ -158,8 +164,9 @@ function Navbar() {
                 >
                   {g.label}<span className="text-xs text-gray-400" aria-hidden="true">▾</span>
                 </Link>
-                {/* pt-2 bridges the gap so the menu stays open on the way down */}
-                <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover:block group-focus-within:block">
+                {/* pt-2 bridges the gap so the menu stays open on the way down. Keyboard focus opens it too, but a mouse click
+                    does not: a clicked link keeps focus after moving to its page and held the menu open (참혈 2026-10-10). */}
+                <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover:block group-has-[:focus-visible]:block">
                   <div className="w-64 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg">
                     {g.items.map((it) =>
                       it.soon ? (
