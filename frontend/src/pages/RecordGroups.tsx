@@ -218,14 +218,14 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
   return (
     // On PC the pie sits at the vertical middle of the 1~10위 list beside it (특이점 2026-10-10); the title is lifted out of
     // the flow and the equal top/bottom padding keeps it clear of the pie.
-    <div className="w-full md:h-full md:relative md:flex md:flex-col md:justify-center md:py-9">
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:absolute md:top-0 md:left-0 md:right-0">
+    <div className={`w-full md:h-full md:relative md:flex md:flex-col md:justify-center ${showUpdateKey ? "md:py-14" : "md:py-9"}`}>
+      <div className="mb-2 flex flex-col gap-1 md:absolute md:top-0 md:left-0 md:right-0">
         <h3 className="text-lg font-semibold">사용률 차트</h3>
-        {/* What the U mark on circles and rows means (특이점 2026-10-10). */}
+        {/* What the U mark on circles and rows means, right under the title (특이점 2026-10-10). */}
         {showUpdateKey && (
           <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <UpdateBadge className="w-4 h-4 text-[9px] shrink-0" />
-            최근 게임 업데이트로 새로 나온 덱
+            최근 게임 업데이트로 새로 나오거나 업데이트된 덱
           </span>
         )}
       </div>
