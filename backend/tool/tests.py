@@ -1038,6 +1038,14 @@ class MetaDeckStatsTopThirtyTest(TestCase):
         self.assertEqual(pct, sorted(pct, reverse=True))
         self.assertIn("cover_image_small", decks[0])
 
+    def test_marks_new_update_decks(self):
+        # 신규 업데이트 덱 carry the same U mark as in the deck book (특이점 2026-10-10)
+        self.opps[34].is_upcoming = True
+        self.opps[34].save(update_fields=["is_upcoming"])
+        decks = {d["meta_deck_name"]: d for d in self.client.get("/api/recent-meta-deck-stats/").json()["meta_decks"]}
+        self.assertTrue(decks["상대34"]["is_upcoming"])
+        self.assertFalse(decks["상대33"]["is_upcoming"])
+
 
 from datetime import timedelta as _td
 from django.utils import timezone as _tz

@@ -484,6 +484,7 @@ def recent_meta_deck_stats(request):
     for r in results:
         d = covers.get(r["meta_deck_id"])
         r["cover_image_small"] = d.cover_image_small.url if d and d.cover_image_small else None
+        r["is_upcoming"] = bool(d and d.is_upcoming)  # the deck book's U mark (특이점 2026-10-10)
 
     return Response({
         "total_matches": total_matches,

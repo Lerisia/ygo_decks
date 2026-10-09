@@ -15,6 +15,7 @@ import {
 } from "@/api/toolApi";
 import { ResultChips, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
 import { getRankLabel } from "@/utils/rankUtils";
+import UpdateBadge from "@/components/UpdateBadge";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 
 type RecordGroupBasic = {
@@ -129,6 +130,7 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
       appearance_percent: othersPercent,
       win_rate: 0,
       cover: "",
+      is_upcoming: false,
     },
   ];
   // As large as the column allows while the first ring of circles still fits beside it.
@@ -190,6 +192,23 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
         ) : (
           <circle cx={x} cy={y} r={avatarR} className="fill-gray-200 dark:fill-gray-700" />
         )}
+        {/* 신규 업데이트 덱: the deck book's blue U coin on the circle's top-left (특이점 2026-10-10) */}
+        {entry.is_upcoming && (
+          <g>
+            <circle cx={x - avatarR * 0.72} cy={y - avatarR * 0.72} r={avatarR * 0.5} fill="url(#meta-update-coin)" stroke="#fff" strokeWidth={1.5} />
+            <text
+              x={x - avatarR * 0.72}
+              y={y - avatarR * 0.72}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={avatarR * 0.58}
+              fontWeight={900}
+              fill="#fff"
+            >
+              U
+            </text>
+          </g>
+        )}
       </g>
     );
   };
@@ -204,6 +223,12 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
         {boxWidth > 0 && (
           <PieChart width={boxWidth} height={height} style={{ overflow: "visible" }}>
             <defs>
+              <radialGradient id="meta-update-coin" cx="32%" cy="28%" r="75%">
+                <stop offset="0%" stopColor="#7aa7ff" />
+                <stop offset="30%" stopColor="#1f5cff" />
+                <stop offset="64%" stopColor="#0b3fd6" />
+                <stop offset="100%" stopColor="#0a2a8f" />
+              </radialGradient>
               {PODIUM.map((c, i) => (
                 <linearGradient key={i} id={`meta-podium-${i}`} x1="0" y1="0" x2="1" y2="1">
                   {c.stops.map((color, j) => (
@@ -378,13 +403,20 @@ const RecordGroups = () => {
             </span>
           )}
           {deckCovers[deck.meta_deck_id] && (
-            <img
-              src={deckCovers[deck.meta_deck_id]}
-              alt={deck.meta_deck_name}
-              className="w-10 h-10 rounded object-cover hidden sm:block"
-            />
+            <div className="relative hidden sm:block shrink-0">
+              <img
+                src={deckCovers[deck.meta_deck_id]}
+                alt={deck.meta_deck_name}
+                className="w-10 h-10 rounded object-cover"
+              />
+              {deck.is_upcoming && <UpdateBadge className="absolute -top-1.5 -left-1.5 w-5 h-5 text-[10px]" />}
+            </div>
           )}
           <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
+          {/* Phones hide the cover, so the U mark sits after the name there. */}
+          {deck.is_upcoming && (
+            <UpdateBadge className={`w-5 h-5 text-[10px] shrink-0 ${deckCovers[deck.meta_deck_id] ? "sm:hidden" : ""}`} />
+          )}
         </div>
         <div className="text-right text-sm text-gray-600 dark:text-gray-400">
           <div>

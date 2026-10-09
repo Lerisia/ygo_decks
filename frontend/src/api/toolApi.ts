@@ -252,6 +252,7 @@ export type MetaDeckStat = {
   appearance_percent: number;
   win_rate: number;
   cover_image_small?: string | null;
+  is_upcoming?: boolean;
 };
 
 export type PlayerDeckStat = {
