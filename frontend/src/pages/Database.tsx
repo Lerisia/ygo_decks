@@ -5,7 +5,7 @@ import UpdateBadge from "@/components/UpdateBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
-import { isAuthenticated, isAdmin } from "@/api/accountApi";
+import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 
 interface Deck {
   id: number;
@@ -121,10 +121,10 @@ export default function DatabasePage() {
     });
   const navigate = useNavigate();
   // 운영진은 도감에서 바로 새 덱을 추가한다 (특이점 2026-10-03)
-  const [staff, setStaff] = useState(false);
+  const [staff, setStaff] = useState(false);  // staff or an editor: may add decks
   const [addingDeck, setAddingDeck] = useState(false);
   useEffect(() => {
-    if (isAuthenticated()) isAdmin().then(setStaff).catch(() => {});
+    if (isAuthenticated()) canEditDeckBook().then(setStaff).catch(() => {});
   }, []);
 
   useEffect(() => {

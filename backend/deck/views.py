@@ -11,7 +11,7 @@ from .youtube import serialize_featured
 from userstatistics.models import UserResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
+from .permissions import CanEditDeckBook
 from user.models import User
 
 def parse_answer_key(answer_key):
@@ -327,7 +327,7 @@ def get_tags(request):
     })
     
 @api_view(["PUT"])
-@permission_classes([IsAdminUser]) # Admin only
+@permission_classes([CanEditDeckBook])
 def update_wiki_content(request, deck_id):
     deck = get_object_or_404(Deck, id=deck_id)
     wiki_content = request.data.get("wiki_content", "")
@@ -529,7 +529,7 @@ def _describe_deck_changes(before, after):
 
 
 @api_view(["GET", "PUT"])
-@permission_classes([IsAdminUser])
+@permission_classes([CanEditDeckBook])
 def edit_deck_info(request, deck_id):
     deck = get_object_or_404(Deck, id=deck_id)
     if request.method == "GET":
@@ -559,7 +559,7 @@ NEW_DECK_REQUIRED = ("name", "strength", "difficulty", "deck_type", "art_style",
 
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAdminUser])
+@permission_classes([CanEditDeckBook])
 def create_deck(request):
     """특이점 2026-10-03: 운영진이 도감에서 바로 새 덱을 추가한다. 본문은 multipart의 `data`(JSON)와 선택 `cover_image`."""
     if request.method == "GET":
@@ -604,7 +604,7 @@ def create_deck(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdminUser])
+@permission_classes([CanEditDeckBook])
 def replace_deck_cover(request, deck_id):
     deck = get_object_or_404(Deck, id=deck_id)
     cover = request.FILES.get("cover_image")

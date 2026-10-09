@@ -1018,3 +1018,63 @@ class PopularDecksTest(TestCase):
     def test_limit_is_bounded(self):
         self.assertEqual(len(self.client.get("/api/deck/popular/?limit=999").json()["decks"]), 6)
         self.assertEqual(len(self.client.get("/api/deck/popular/?limit=x").json()["decks"]), 6)
+
+
+class EditorRoleTest(TestCase):
+    """Editors (User.is_editor, 2026-10-10) may edit the deck book and nothing else staff can do."""
+
+    def setUp(self):
+        self.media = tempfile.mkdtemp()
+        self.override = override_settings(MEDIA_ROOT=self.media)
+        self.override.enable()
+        self.client = APIClient()
+        SummoningMethod.objects.create(id=6, method=6)
+        PerformanceTag.objects.create(name="원턴킬")
+        AestheticTag.objects.create(name="드래곤")
+        self.deck = _create_deck(name="편집덱")
+        self.editor = User.objects.create_user(email="editor@test.com", username="editor", password="pass1234")
+        self.editor.is_editor = True
+        self.editor.save()
+        self.user = User.objects.create_user(email="plain@test.com", username="plain", password="pass1234")
+
+    def tearDown(self):
+        self.override.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+
+    def _edits(self):
+        info = {
+            "strength": 2, "difficulty": 1, "deck_type": 0, "art_style": 1, "is_engine": False,
+            "summoning_methods": [6], "performance_tags": ["원턴킬"], "aesthetic_tags": ["드래곤"],
+            "stats": {"consistency": 5, "breakthrough": 4, "interruption": 6, "recovery": 3, "deck_space": 2},
+        }
+        new = dict(info, name="새편집덱", aliases=[], description="설명.")
+        return [
+            self.client.put(f"/api/deck/{self.deck.id}/update_wiki/", {"wiki_content": "<p>고침</p>"}, format="json"),
+            self.client.get(f"/api/deck/{self.deck.id}/edit/"),
+            self.client.put(f"/api/deck/{self.deck.id}/edit/", info, format="json"),
+            self.client.post(f"/api/deck/{self.deck.id}/cover/", {"cover_image": _png((600, 600))}, format="multipart"),
+            self.client.post("/api/deck/create/", {"data": _json.dumps(new, ensure_ascii=False)}, format="multipart"),
+        ]
+
+    def test_editor_can_edit_the_deck_book(self):
+        self.client.force_authenticate(user=self.editor)
+        self.assertEqual([r.status_code for r in self._edits()], [200, 200, 200, 200, 201])
+        self.deck.refresh_from_db()
+        self.assertEqual(self.deck.wiki_content, "<p>고침</p>")
+        self.assertTrue(Deck.objects.filter(name="새편집덱").exists())
+
+    def test_plain_user_cannot(self):
+        self.client.force_authenticate(user=self.user)
+        self.assertEqual({r.status_code for r in self._edits()}, {403})
+
+    def test_editor_gets_nothing_else_staff_has(self):
+        self.client.force_authenticate(user=self.editor)
+        self.assertEqual(self.client.get("/api/analytics/summary/").status_code, 403)
+        me = self.client.get("/api/is_admin/").json()
+        self.assertEqual(me, {"is_admin": False, "can_edit_dex": True})
+
+    def test_staff_still_can(self):
+        staff = User.objects.create_user(email="s2@test.com", username="s2", password="pass1234", is_staff=True)
+        self.client.force_authenticate(user=staff)
+        self.assertEqual(self.client.get("/api/is_admin/").json(), {"is_admin": True, "can_edit_dex": True})
+        self.assertEqual(self.client.put(f"/api/deck/{self.deck.id}/update_wiki/", {"wiki_content": "x"}, format="json").status_code, 200)

@@ -230,6 +230,17 @@ export const updateUserSettings = async (useCustomLookup: boolean) => {
 };
 
 // Check if currently logged in user is admin
+// Staff or an editor (2026-10-10): may edit the deck book — descriptions, deck info, covers, new decks.
+export const canEditDeckBook = async (): Promise<boolean> => {
+    const response = await fetch("/api/is_admin/", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+    });
+    const data = await response.json();
+    return !!data.can_edit_dex;
+  };
+
 export const isAdmin = async () => {
     const response = await fetch("/api/is_admin/", {
       headers: {

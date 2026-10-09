@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { isAuthenticated, isAdmin } from "@/api/accountApi";
+import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
@@ -67,7 +67,8 @@ export default function DeckDetail() {
   const [editing, setEditing] = useState(false);
   const [wikiContent, setWikiContent] = useState("");
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
-  const [isAdminUser, setIsAdminUser] = useState(false);
+  // staff or an editor
+  const [canEdit, setCanEdit] = useState(false);
   const [showVideos, setShowVideos] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [descOpen, setDescOpen] = useState(true); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 접을 수 있되 기본은 펼침
@@ -89,7 +90,7 @@ export default function DeckDetail() {
       })
       .catch(() => setLoading(false));
     
-    isAdmin().then(setIsAdminUser);
+    canEditDeckBook().then(setCanEdit);
   }, [deckId]);
 
   const handleSave = async () => {
@@ -261,7 +262,7 @@ export default function DeckDetail() {
             </div>
           );
         })()}
-        {isAdminUser && (
+        {canEdit && (
           <button
             type="button"
             onClick={() => setEditingInfo(true)}
@@ -393,9 +394,9 @@ export default function DeckDetail() {
             )}
 
             {/* 기여(관리자/로그인) 섹션 */}
-            {(isAdminUser || SHOW_DESCRIPTION_REPORT) && (
+            {(canEdit || SHOW_DESCRIPTION_REPORT) && (
             <div className="mt-6 flex justify-center">
-              {isAdminUser ? (
+              {canEdit ? (
                 <button
                   onClick={() => setEditing(true)}
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg"

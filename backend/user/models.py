@@ -16,6 +16,8 @@ class User(AbstractUser):
     
     md_uid = models.CharField(max_length=9, blank=True, default="", verbose_name="마스터듀얼 UID")
     use_custom_lookup = models.BooleanField(default=False)
+    # Editor (2026-10-10): may edit the deck book (descriptions, deck info, covers, new decks) and nothing else staff can.
+    is_editor = models.BooleanField(default=False, verbose_name="에디터 (editor)", help_text="도감 편집만 할 수 있습니다. 다른 운영진 기능은 열리지 않습니다.")
     pending_deletion = models.BooleanField(default=False)
     deletion_requested_at = models.DateTimeField(null=True, blank=True)
     avatar_icon = models.ForeignKey(

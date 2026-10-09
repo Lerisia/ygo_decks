@@ -376,4 +376,5 @@ def confirm_password_reset(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def is_admin(request):
-    return Response({"is_admin": request.user.is_staff})
+    from deck.permissions import can_edit_deck_book
+    return Response({"is_admin": request.user.is_staff, "can_edit_dex": can_edit_deck_book(request.user)})
