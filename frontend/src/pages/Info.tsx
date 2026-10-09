@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
@@ -36,6 +36,16 @@ function Info() {
   const [pickerOpen, setPickerOpen] = useState(false);
   // Desktop opens the deck search out in place; phones keep the modal (특이점 2026-10-08).
   const [searchInline, setSearchInline] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  // The desktop search is a dropdown: a click anywhere outside it closes it.
+  useEffect(() => {
+    if (!searchInline) return;
+    const onDown = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchInline(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [searchInline]);
   const openSearch = () => {
     if (window.matchMedia("(min-width: 768px)").matches) setSearchInline(true);
     else setPickerOpen(true);
@@ -67,11 +77,12 @@ function Info() {
 
       <div className="grid gap-4 md:gap-5 lg:grid-cols-[2fr_1fr]">
         {/* Pillar 1: the deck book */}
-        <section aria-labelledby="home-dex" className="rounded-2xl overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        {/* Only the picture strip clips to the rounded corner, so the search dropdown can hang past the card. */}
+        <section aria-labelledby="home-dex" className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           {/* The pictures fade out through a mask rather than under a white overlay: on fractional-scale screens (Galaxy Fold:
               2.2x, 2.625x) an overlay left the pictures' edge pixels and the row past their bottom showing as thin coloured
               lines (특이점 2026-10-07, 10-09). A mask fades those pixels with everything else. */}
-          <div className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 h-28 md:h-40 bg-gray-200 dark:bg-gray-700">
+          <div className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 h-28 md:h-40 rounded-t-[15px] overflow-hidden bg-gray-200 dark:bg-gray-700">
             {Array.from({ length: COLLAGE }, (_, i) => {
               const d = decks[i];
               const cls = `${i >= 4 ? "hidden md:block" : ""} w-full h-full`;
@@ -90,21 +101,24 @@ function Info() {
               {popular ? <span className="tabular-nums">{popular.total || ""}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
               개의 덱을, 한 곳에서.
             </h2>
-            {/* Opens a picker of real decks: choosing one goes straight to its page, so no search can miss. */}
-            {searchInline ? (
-              <div className="rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 p-3">
-                <DeckPickerModal inline open onClose={() => setSearchInline(false)} onPick={(id) => navigate(`/database/${id}`)} />
-              </div>
-            ) : (
+            {/* Opens a picker of real decks: choosing one goes straight to its page, so no search can miss.
+                On desktop it drops down over the page from the search box instead of growing the card (참혈 2026-10-10). */}
+            <div ref={searchRef} className="relative">
               <button
                 type="button"
                 onClick={openSearch}
+                aria-expanded={searchInline}
                 className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               >
                 <span aria-hidden="true">🔍</span>
                 <span className="flex-1">덱 이름으로 찾기</span>
               </button>
-            )}
+              {searchInline && (
+                <div className="absolute inset-x-0 top-0 z-30 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 p-3 shadow-xl">
+                  <DeckPickerModal inline open onClose={() => setSearchInline(false)} onPick={(id) => navigate(`/database/${id}`)} />
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-1.5 text-sm min-h-[30px]">
               <span className="text-gray-500 dark:text-gray-400 mr-1">많이 보는 덱</span>
               {decks.slice(0, 5).map((d, i) => (
