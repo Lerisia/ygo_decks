@@ -68,7 +68,10 @@ function Info() {
       <div className="grid gap-4 md:gap-5 lg:grid-cols-[2fr_1fr]">
         {/* Pillar 1: the deck book */}
         <section aria-labelledby="home-dex" className="rounded-2xl overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-          <div className="relative grid grid-cols-4 md:grid-cols-6 h-28 md:h-40 bg-gray-200 dark:bg-gray-700">
+          {/* The pictures fade out through a mask rather than under a white overlay: on fractional-scale screens (Galaxy Fold:
+              2.2x, 2.625x) an overlay left the pictures' edge pixels and the row past their bottom showing as thin coloured
+              lines (특이점 2026-10-07, 10-09). A mask fades those pixels with everything else. */}
+          <div className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 h-28 md:h-40 bg-gray-200 dark:bg-gray-700">
             {Array.from({ length: COLLAGE }, (_, i) => {
               const d = decks[i];
               const cls = `${i >= 4 ? "hidden md:block" : ""} w-full h-full`;
@@ -78,10 +81,6 @@ function Info() {
                 <div key={i} className={`${cls} ${popular ? "" : "animate-pulse"} bg-gray-200 dark:bg-gray-700`} />
               );
             })}
-            {/* On fractional-scale screens (Galaxy Fold: 2.2x, 2.625x) the pictures paint one device pixel past this box, which
-                showed as a thin coloured line under the fade (특이점 2026-10-07). The fade is solid for its last tenth and runs
-                4px past the pictures, so that row is always covered. */}
-            <div className="absolute inset-x-0 top-0 -bottom-1 bg-gradient-to-b from-transparent via-white/70 to-white to-90% dark:via-gray-800/70 dark:to-gray-800" />
           </div>
           <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
             <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-blue-400">덱 도감</span>

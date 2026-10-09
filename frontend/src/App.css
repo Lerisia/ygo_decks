@@ -19,6 +19,10 @@
 
 /* The menu bar runs the full width of the window and sits flush with the top, even though
    #root is a centred column with padding (특이점 2026-10-07: it looked cut off, worst in dark mode). */
+.home-collage-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000, rgb(0 0 0 / 0.3) 50%, transparent 90%);
+  mask-image: linear-gradient(to bottom, #000, rgb(0 0 0 / 0.3) 50%, transparent 90%);
+}
 .site-header-bleed {
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
