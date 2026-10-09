@@ -49,10 +49,13 @@ const PODIUM = [
 ];
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
 const OTHERS_COLOR = "#cccccc";
-const PIE_RADIUS = 115;
+// Sized so the pie and its first ring of circles fit the half-width column on 768px screens.
+const PIE_RADIUS = 100;
 const AVATAR_R = 14;
 const AVATAR_RINGS = [PIE_RADIUS + 4, PIE_RADIUS + 34, PIE_RADIUS + 64];
 const RAD = Math.PI / 180;
+// Ranks run clockwise from 3 o'clock (특이점 2026-10-10).
+const START_ANGLE = 0;
 
 const sliceColor = (rank: number) => (rank < 3 ? PODIUM[rank].solid : RAINBOW[rank - 3] ?? OTHERS_COLOR);
 
@@ -62,7 +65,7 @@ const avatarRings = (percents: number[]) => {
   const placed: { x: number; y: number }[] = [];
   let cum = 0;
   return percents.map((p) => {
-    const mid = (90 - ((cum + p / 2) / total) * 360) * RAD;
+    const mid = (START_ANGLE - ((cum + p / 2) / total) * 360) * RAD;
     cum += p;
     for (let ring = 0; ring < AVATAR_RINGS.length; ring++) {
       const x = AVATAR_RINGS[ring] * Math.cos(mid);
@@ -153,8 +156,8 @@ export const MetaDeckPieChart = ({ data, deckCovers }: Props) => {
             cx="50%"
             cy="50%"
             outerRadius={PIE_RADIUS}
-            startAngle={90}
-            endAngle={-270}
+            startAngle={START_ANGLE}
+            endAngle={START_ANGLE - 360}
             label={renderAvatar}
             labelLine={false}
             isAnimationActive={false}
