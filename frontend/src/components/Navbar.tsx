@@ -133,7 +133,8 @@ function Navbar() {
         <div className="flex items-center gap-1.5 min-w-0">
           <SupportLinks compact />
           {isLoggedIn && userInfo ? (
-            <Link to={ALL_MENU_PATH} className="flex items-center gap-1 pl-1 min-w-0" title={userInfo.username}>
+            // The profile picture opens My Page on phones too, the same as on desktop (참혈 2026-10-11).
+            <Link to="/mypage" className="flex items-center gap-1 pl-1 min-w-0" title="마이페이지" aria-label="마이페이지">
               <Avatar icon={avatar?.icon ?? null} border={avatar?.border ?? null} size={26} />
             </Link>
           ) : (
