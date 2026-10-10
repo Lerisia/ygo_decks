@@ -41,6 +41,7 @@ urlpatterns = [
     path('api/tracker/', include('tracker.urls')),
     path('api/carddb/', include('carddb.urls')),
     path('api/', include('inquiry.urls')),
+    path('api/notifications/', include('notification.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

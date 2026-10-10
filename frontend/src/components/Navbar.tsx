@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isAuthenticated, getUserInfo, claimDailyBonus, isAdmin } from "../api/accountApi";
 import { getMyAvatar } from "@/api/avatarApi";
+import { NOTIFICATIONS_UPDATED, getUnreadNotificationCount } from "@/api/notificationApi";
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
 import { ALL_MENU_PATH, CONTACT_PATH, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
@@ -93,6 +94,17 @@ function Navbar() {
     else stopInquiryAlerts();
   }, [isLoggedIn, isAdminUser]);
 
+  // A red dot on the profile picture while a notification waits on My Page; checked again on every page change.
+  const [unreadNotices, setUnreadNotices] = useState(0);
+  useEffect(() => {
+    if (!isLoggedIn) { setUnreadNotices(0); return; }
+    let cancelled = false;
+    const refresh = () => getUnreadNotificationCount().then((c) => { if (!cancelled) setUnreadNotices(c); }).catch(() => {});
+    refresh();
+    window.addEventListener(NOTIFICATIONS_UPDATED, refresh);
+    return () => { cancelled = true; window.removeEventListener(NOTIFICATIONS_UPDATED, refresh); };
+  }, [isLoggedIn, location.pathname]);
+
   // Refetch points balance when something elsewhere awards points.
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -118,6 +130,15 @@ function Navbar() {
   // variant and the actual UI background). The logo itself never changes: a friend drew it.
   const logoImg = (cls: string) => <img src={logo} alt="YGO Decks" className={`${cls} w-auto object-contain ${isDark ? "invert" : ""}`} />;
 
+  const profilePic = (size: number) => (
+    <span className="relative inline-flex shrink-0">
+      <Avatar icon={avatar?.icon ?? null} border={avatar?.border ?? null} size={size} />
+      {unreadNotices > 0 && (
+        <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" aria-label={`새 알림 ${unreadNotices}개`} />
+      )}
+    </span>
+  );
+
   const pointsLink = userInfo && (
     <Link to="/mypage/points" className="inline-flex items-center gap-1 hover:underline" title="포인트 내역">
       <PLogo size={16} />
@@ -135,7 +156,7 @@ function Navbar() {
           {isLoggedIn && userInfo ? (
             // The profile picture opens My Page on phones too, the same as on desktop (참혈 2026-10-11).
             <Link to="/mypage" className="flex items-center gap-1 pl-1 min-w-0" title="마이페이지" aria-label="마이페이지">
-              <Avatar icon={avatar?.icon ?? null} border={avatar?.border ?? null} size={26} />
+              {profilePic(26)}
             </Link>
           ) : (
             <Link to="/login" className="pl-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap hover:underline">로그인</Link>
@@ -205,7 +226,7 @@ function Navbar() {
             {isLoggedIn && userInfo ? (
               <div className="flex items-center gap-2 pl-2">
                 <Link to="/mypage" className="flex items-center gap-2 hover:underline" title="마이페이지">
-                  <Avatar icon={avatar?.icon ?? null} border={avatar?.border ?? null} size={28} />
+                  {profilePic(28)}
                   <span className="hidden lg:inline font-semibold max-w-[8rem] truncate">{userInfo.username}</span>
                 </Link>
                 {pointsLink}

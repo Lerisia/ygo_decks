@@ -18,6 +18,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Mypage from "./pages/Mypage";
 import PointsHistory from "./pages/PointsHistory";
+import NotificationHistory from "./pages/NotificationHistory";
 import AdminPointsGrant from "./pages/AdminPointsGrant";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminCharts from "./pages/AdminCharts";
@@ -132,6 +133,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/mypage" element={<Mypage />} />
           <Route path="/mypage/points" element={<PointsHistory />} />
+          <Route path="/mypage/notifications" element={<NotificationHistory />} />
           <Route path="/mypage/mydecks" element={<Mydecks />} />
           <Route path="/no-results" element={<Noresults />} />
           <Route path="/database" element={null} />

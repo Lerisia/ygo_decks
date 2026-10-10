@@ -30,6 +30,7 @@ def award_points(user, amount: int, kind: str = "other", note: str = "") -> dict
 
     from .models import User, PointTransaction
     from avatar.models import Border, UserBorderUnlock
+    from notification.models import notify
 
     with transaction.atomic():
         # Re-fetch under row lock to avoid races on concurrent awards.
@@ -52,6 +53,7 @@ def award_points(user, amount: int, kind: str = "other", note: str = "") -> dict
         if not crossed_keys:
             return {"newly_unlocked": []}
 
+        threshold = {key: thr for thr, key in BORDER_TIERS}
         borders = list(Border.objects.filter(key__in=crossed_keys))
         existing = set(
             UserBorderUnlock.objects.filter(user=u, border__in=borders)
@@ -66,6 +68,10 @@ def award_points(user, amount: int, kind: str = "other", note: str = "") -> dict
                 defaults={"note": f"누적 {b.key} 등급 자동 지급"},
             )
             unlocked.append(b.key)
+            notify(
+                u, f"누적 포인트 {threshold[b.key]:,}P를 돌파하여 {b.name} 아이콘 테두리를 획득하였습니다.",
+                action_label="아이콘 설정으로 이동", action_url="/mypage/avatar", kind="border_unlock",
+            )
         return {"newly_unlocked": unlocked}
 
 

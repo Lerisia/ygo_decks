@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { getUserInfo, changeUsername, changePassword, logout, checkUsernameExists } from "../api/accountApi";
 import { getMyAvatar, type PublicCardIcon, type Border } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
+import { getNotifications, type SiteNotification } from "@/api/notificationApi";
+import NotificationCard from "@/components/NotificationCard";
+
+// My Page shows at most this many unread notifications; 더보기 opens the whole history.
+const NOTICE_PREVIEW = 3;
 
 const Mypage = () => {
   const [email, setEmail] = useState("");
@@ -20,6 +25,7 @@ const Mypage = () => {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [avatarIcon, setAvatarIcon] = useState<PublicCardIcon | null>(null);
   const [avatarBorder, setAvatarBorder] = useState<Border | null>(null);
+  const [unread, setUnread] = useState<SiteNotification[] | null>(null);
 
   const navigate = useNavigate();
 
@@ -42,6 +48,7 @@ const Mypage = () => {
     };
     fetchUserInfo();
     getMyAvatar().then((d) => { setAvatarIcon(d.icon); setAvatarBorder(d.border); }).catch(() => {});
+    getNotifications(true).then(setUnread).catch(() => setUnread([]));
   }, [navigate]);
 
   const handleChangeUsername = async () => {
@@ -143,35 +150,55 @@ const Mypage = () => {
           </button>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
-          <span className="font-semibold">다크 모드</span>
+        {/* Notifications (참혈 2026-10-11): a plain button to the history when everything is cleared,
+            a yellow section of tan cards while some are not. */}
+        {unread === null ? (
+          <div className="h-12 rounded-xl bg-white dark:bg-gray-800 shadow animate-pulse" aria-hidden="true" />
+        ) : unread.length === 0 ? (
           <button
-            onClick={toggleDarkMode}
-            className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? "bg-blue-600" : "bg-gray-300"}`}
+            onClick={() => navigate("/mypage/notifications")}
+            className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
           >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? "translate-x-6" : ""}`} />
+            알림 내역
           </button>
-        </div>
+        ) : (
+          <section className="rounded-xl border-2 border-yellow-400 dark:border-yellow-500 bg-yellow-300/25 dark:bg-yellow-500/10 px-3 py-3 sm:px-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h2 className="text-base font-semibold m-0">알림 {unread.length}개</h2>
+              <button
+                onClick={() => navigate("/mypage/notifications")}
+                className="text-sm font-semibold text-amber-800 dark:text-amber-300 hover:underline bg-transparent border-0 p-0"
+              >
+                더보기
+              </button>
+            </div>
+            <div className="space-y-2">
+              {unread.slice(0, NOTICE_PREVIEW).map((n) => (
+                <NotificationCard key={n.id} n={n} onDismissed={(id) => setUnread((u) => u && u.filter((x) => x.id !== id))} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <button
           onClick={() => navigate("/mypage/mydecks")}
           className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
         >
-          보유 덱 관리 →
+          보유 덱 관리
         </button>
 
         <button
           onClick={() => navigate("/mypage/avatar")}
           className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
         >
-          아이콘 설정 →
+          아이콘 설정
         </button>
 
         <button
           onClick={() => navigate("/duchmind-wordpacks")}
           className="w-full py-3 bg-white dark:bg-gray-800 rounded-xl shadow text-left px-4 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
         >
-          🎨 듀치마인드 단어장 →
+          🎨 듀치마인드 단어장
         </button>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
@@ -264,6 +291,16 @@ const Mypage = () => {
               </button>
             </div>
           )}
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
+          <span className="font-semibold">다크 모드</span>
+          <button
+            onClick={toggleDarkMode}
+            className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? "bg-blue-600" : "bg-gray-300"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? "translate-x-6" : ""}`} />
+          </button>
         </div>
 
         <button

@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'changelog',
     'tracker',
     'inquiry',
+    'notification',
 ]
 
 MIDDLEWARE = [
