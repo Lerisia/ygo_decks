@@ -140,6 +140,14 @@ def parse_same(data: bytes) -> list[tuple[int, int, int]]:
     return list(struct.iter_unpack("<HHH", data))
 
 
+def is_alt_art(flag: int) -> bool:
+    return 0 < flag < NAME_TREATED
+
+
+def parse_collectible(data: bytes) -> set[int]:
+    return {v for (v,) in struct.iter_unpack("<H", data)}
+
+
 def parse_rarity(data: bytes) -> dict[int, str]:
     out = {}
     for (v,) in struct.iter_unpack("<I", data):

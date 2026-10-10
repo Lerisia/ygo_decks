@@ -5,7 +5,7 @@ from pathlib import Path
 from django.db import transaction
 
 from .md import (
-    NAME_TREATED, card_ids, decrypt, frame_of, is_card, parse_prop, parse_rarity, parse_ruby, parse_same,
+    card_ids, decrypt, frame_of, is_alt_art, is_card, parse_collectible, parse_prop, parse_rarity, parse_ruby, parse_same,
     parse_texts, ruby_reading, split_text,
 )
 from .models import Card, CardText, MdPrint, Override, SrcMd
@@ -47,7 +47,13 @@ def import_md(ja_dir, ko_dir, md_dir=None, today=None):
     today = today or date.today()
     ja, ruby, props = _locale(ja_dir, "ja-jp", ruby=True)
     ko, _, _ = _locale(ko_dir, "ko-kr")
-    alt = {a: b for a, b, flag in parse_same(decrypt((md_dir / "md_card_same.bytes").read_bytes())) if flag != NAME_TREATED}
+    alt = {}
+    for a, b, flag in parse_same(decrypt((md_dir / "md_card_same.bytes").read_bytes())):
+        token_variant = flag == 0 and a in props and b in props and "token" in parse_prop(*props[a]).get("types", []) and ja.get(a) == ja.get(b)
+        if is_alt_art(flag) or token_variant:
+            alt[a] = b
+    collectible = parse_collectible((md_dir / "md_cards_all.bytes").read_bytes())
+    collectible_names = {ja[c][0] for c in collectible if c in ja}
     rarity = parse_rarity((md_dir / "md_card_rarity_asset.bytes").read_bytes())
     first_import = not MdPrint.objects.exists()
     seen = None if first_import else today
@@ -59,7 +65,8 @@ def import_md(ja_dir, ko_dir, md_dir=None, today=None):
             continue
         p = parse_prop(a, b)
         name_ja, text_ja = ja.get(cid, ("", ""))
-        if cid not in alt and not is_card(cid, p, name_ja, text_ja):
+        copy = cid not in collectible and name_ja in collectible_names and "token" not in p.get("types", [])
+        if cid not in alt and (copy or not is_card(cid, p, name_ja, text_ja)):
             skipped += 1
             continue
         for lang, source in (("ja", ja), ("ko", ko)):

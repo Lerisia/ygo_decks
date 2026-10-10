@@ -106,6 +106,8 @@ class SplitTextTest(SimpleTestCase):
         self.assertEqual((t["effect"], t["flavor"]), ("「霊魂鳥神－姫孔雀」の効果で特殊召喚される。", ""))
 
 
+COPY = (30019, "ブラック・マジシャン", "ブラック・マジシャン", "最高クラス。", "블랙 매지션", "최고 클래스.", prop_a(30019 - 16384, 0, 2, 7, 1), prop_b(250, 210, race=18))
+
 CARDS = [
     (3001, "アンノウン", "アンノウン", "なし", "언논", "없음", prop_a(3001, 10), prop_b()),
     (3100, "墓場のゴースト王－パンプキング－", "墓場のゴースト王－パンプキング－", "ソロ用。", "펌프킹", "솔로용.", prop_a(3100, 1, 2, 6, 1), prop_b(180, 200, race=2)),
@@ -114,6 +116,7 @@ CARDS = [
     (3863, "ブラック・マジシャン", "ブラック・マジシャン", "最高クラス。", "블랙 매지션", "최고 클래스.", prop_a(3863, 0, 2, 7, 1), prop_b(250, 210, race=18)),
     (4007, "青眼の白龍", "$R青眼の白龍(ブルーアイズ・ホワイト・ドラゴン)", "伝説のドラゴン。", "푸른 눈의 백룡", "전설의 드래곤.", prop_a(4007, 0, 1, 8, 1), prop_b(300, 250, race=1)),
     (4041, "ブラック・マジシャン", "ブラック・マジシャン", "最高クラス。", "블랙 매지션", "최고 클래스.", prop_a(4041, 0, 2, 7, 1), prop_b(250, 210, race=18)),
+    (5239, "ハーピィ・レディ・ＳＢ", "ハーピィ・レディ・ＳＢ", "このカード名はルール上「ハーピィ・レディ」として扱う。", "하피 레이디 SB", "룰상 \"하피 레이디\"로 취급한다.", prop_a(5239, 0, 6, 4, 1), prop_b(180, 140, race=16)),
     (11213, "オッドアイズ・ペンデュラム・ドラゴン", "オッドアイズ・ペンデュラム・ドラゴン", "①：倍になる。\n【ペンデュラム効果】\n①：０にできる。",
      "오드아이즈 펜듈럼 드래곤", "①: 배가 된다.\n【펜듈럼 효과】\n①: 0으로 할 수 있다.", 1553607629, 539070714),
 ]
@@ -140,7 +143,7 @@ def write_locale(folder: Path, locale: str, rows, with_ruby: bool):
 class ImportMdTest(TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
-        self.write(CARDS)
+        self.write(CARDS + [COPY])
 
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -149,15 +152,17 @@ class ImportMdTest(TestCase):
         rows = sorted(rows, key=lambda r: r[0])
         write_locale(self.dir, "ja-jp", rows, True)
         write_locale(self.dir, "ko-kr", rows, False)
-        same = struct.pack("<HHH", 3863, 4041, 5) + struct.pack("<HHH", 3903, 3902, 1) + struct.pack("<HHH", 12416, 4041, 256)
+        same = struct.pack("<HHH", 3863, 4041, 5) + struct.pack("<HHH", 3903, 3902, 0) + struct.pack("<HHH", 12416, 4041, 256) + struct.pack("<HHH", 5239, 4068, 0)
         (self.dir / "md_card_same.bytes").write_bytes(encrypt(same))
         rarity = b"".join(struct.pack("<I", cid | r << 16) for cid, r in ((3863, 4), (4007, 4), (4041, 3), (11213, 4)))
         (self.dir / "md_card_rarity_asset.bytes").write_bytes(rarity)
+        collectible = [r[0] for r in rows if r[0] >= 4007 and r[0] not in (5239, 30019)]
+        (self.dir / "md_cards_all.bytes").write_bytes(b"".join(struct.pack("<H", c) for c in collectible))
 
     def test_fills_cards_prints_and_texts(self):
         stats = import_md(self.dir, self.dir)
-        self.assertEqual(stats["skipped"], 2)
-        self.assertEqual(sorted(Card.objects.values_list("id", flat=True)), [3902, 4007, 4041, 11213])
+        self.assertEqual(stats["skipped"], 3)
+        self.assertEqual(sorted(Card.objects.values_list("id", flat=True)), [3902, 4007, 4041, 5239, 11213])
         sheep = Card.objects.get(id=3902)
         self.assertEqual((sheep.frame, sheep.name_ja_ruby, sheep.atk), ("token", "ひつじトークン", 0))
         self.assertEqual(CardText.objects.get(card_id=3902, lang="ja").effect, "「スケープ・ゴート」の効果で特殊召喚される。")
@@ -177,7 +182,7 @@ class ImportMdTest(TestCase):
         import_md(self.dir, self.dir, today=date(2026, 10, 10))
         self.assertIsNone(MdPrint.objects.get(md_id=4007).first_seen)
         new = (20000, "新カード", "新カード", "効果。", "신카드", "효과.", prop_a(20000 - 16384, 1, 1, 4, 1), prop_b(100, 100, race=15))
-        self.write(CARDS + [new])
+        self.write(CARDS + [COPY, new])
         import_md(self.dir, self.dir, today=date(2026, 10, 11))
         self.assertEqual(MdPrint.objects.get(md_id=20000).first_seen, date(2026, 10, 11))
         self.assertIsNone(MdPrint.objects.get(md_id=4007).first_seen)
