@@ -130,6 +130,11 @@ class Index:
                 if r:
                     hits[cid] = r
         votes = Counter(rd for cid, r in hits.items() if cid in self.known for rd, clean in r if clean)
+        if not votes:
+            # every name reads x inside a longer ruby (巳剣之尊 ミツルギノミコト): what those readings share
+            common = _common_part([rd for cid, r in hits.items() if cid in self.known for rd, _ in r] or [""])
+            if len(common) >= 2:
+                votes[common] = len(hits)
         readings = self.meant(x, refs, votes) or [votes.most_common(1)[0][0] if votes else x]
         return [(reading, self._members(x, reading, hits)) for reading in readings]
 

@@ -596,6 +596,14 @@ class CardGroupTest(TestCase):
         self.assertEqual(self.members(g["N"]), [13])   # a letter after it still splits the word
         self.assertFalse(any(16 in self.members(x) for k, x in g.items() if k[0] == "C"))   # RESCUE! as R－ACE
 
+    def test_a_group_read_only_inside_whole_name_rubies(self):
+        self.card(60, "巳剣之尊 草那藝", "미츠루기노미코토 쿠사나기", ruby="$R巳剣之尊(ミツルギノミコト)　$R草那藝(クサナギ)",
+                  ja_text="「巳剣」カード１枚を対象として発動できる。")
+        self.card(61, "巳剣勧請", "미츠루기권청", ruby="$R巳剣勧請(ミツルギカンジョウ)")
+        self.card(62, "天叢雲之巳剣", "아메노무라쿠모노미츠루기", ruby="$R天叢雲之巳剣(アメノムラクモノミツルギ)")
+        g = self.build()
+        self.assertEqual((self.members(g["巳剣"]), g["巳剣"].reading), ([60, 61, 62], "ミツルギ"))
+
     def test_reading_is_the_one_the_naming_cards_mean(self):
         from .models import CardGroup
         for cid, name, ruby in ((50, "魔法探査の石版", "$R魔(ま)$R法(ほう)$R探(たん)$R査(さ)の$R石(せき)$R版(ばん)"),
