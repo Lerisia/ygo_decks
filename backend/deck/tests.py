@@ -711,14 +711,18 @@ class DeckHyeolTest(TestCase):
 
     def test_api_serves_stored_summary_and_detail_flags_it(self):
         self.assertEqual(store_archive(parse_archive(self.text)), 1)
-        from card.models import Card
-        Card.objects.create(card_id="9414502100", konami_id="9279", name="Droll & Lock Bird", korean_name="드롤 & 로크 버드",
-                            card_illust="card_illusts/9414502100_illust.jpg")
+        from carddb import display
+        from carddb.models import Card, MdArt, MdPrint
+        Card.objects.create(id=9279, category="monster", name_ja="ドロール＆ロックバード", name_ko="드롤 & 로크 버드", frame="effect")
+        MdPrint.objects.create(md_id=9279, card_id=9279)
+        MdArt.objects.create(md_print_id=9279, version="common", image="cards/art/common/9279.webp")
+        display.forget_art()
+        self.addCleanup(display.forget_art)
         body = APIClient().get(f"/api/deck/{self.deck.id}/hyeol/").json()
         self.assertEqual(body["overview"][0]["label"], "아픔")
         # 엘리스 2026-10-02: 잔존계 패 트랩마다 카드 그림과 전체 카드 이름
         self.assertEqual(body["overview"][0]["name"], "드롤 & 로크 버드")
-        self.assertEqual(body["overview"][0]["image"], "/media/card_illusts/9414502100_illust.jpg")
+        self.assertEqual(body["overview"][0]["image"], "/media/cards/art/common/9279.webp")
         self.assertEqual(body["overview"][1]["name"], "증식의 G")
         self.assertIsNone(body["overview"][1]["image"])
         self.assertTrue(APIClient().get(f"/api/deck/{self.deck.id}/").json()["has_hyeol"])

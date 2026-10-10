@@ -671,11 +671,11 @@ def get_deck_notes(request, deck_id):
 
 # 잔존계 패 트랩: archive id → (full card name, our card_id for the art).
 HYEOL_TRAP_CARDS = {
-    "droll": ("드롤 & 로크 버드", "9414502100"),
-    "maxxc": ("증식의 G", "2343453800"),
-    "fuwalos": ("마루챠미 후와로스", "4214149300"),
-    "purulia": ("마루챠미 푸루리아", "8419258000"),
-    "meowls": ("마루챠미 냐루스", "8712672100"),
+    "droll": ("드롤 & 로크 버드", 9279),
+    "maxxc": ("증식의 G", 9455),
+    "fuwalos": ("마루챠미 후와로스", 20500),
+    "purulia": ("마루챠미 푸루리아", 20206),
+    "meowls": ("마루챠미 냐루스", 20764),
 }
 
 
@@ -684,16 +684,14 @@ def get_deck_hyeol(request, deck_id):
     """상대법: brief 혈자리 summary (듀얼 아카이브 혈자리 아카이브, with permission); details stay on the archive."""
     from .models import DeckHyeol
 
-    from card.models import Card
+    from carddb.display import art_url
 
     h = DeckHyeol.objects.filter(deck_id=deck_id).first()
     if not h:
         return Response({"error": "no data"}, status=404)
     data = h.data
-    arts = {c.card_id: c.card_illust.url for c in Card.objects.filter(card_id__in=[cid for _, cid in HYEOL_TRAP_CARDS.values()])
-            if c.card_illust}
     for o in data.get("overview", []):
         name, cid = HYEOL_TRAP_CARDS.get(o.get("t"), (o.get("short", ""), None))
         o["name"] = name
-        o["image"] = arts.get(cid)
+        o["image"] = art_url(cid) if cid else None
     return Response({"deck_id": deck_id, **data})
