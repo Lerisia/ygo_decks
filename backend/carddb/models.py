@@ -181,7 +181,6 @@ class CardGroup(models.Model):
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
     md_list = models.BooleanField(default=False, help_text="마듀 card_named 목록 하나와 회원이 똑같음")
     needs_review = models.BooleanField(default=False, db_index=True)
-    minor = models.BooleanField(default=False, help_text="효과용 소분류 (CNo.39 같은 이름 계열) — 이용자 화면에는 안 보임")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

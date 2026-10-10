@@ -22,7 +22,7 @@ def _row(g, members):
         "id": g.id, "text": g.text, "reading": g.reading if g.reading != g.text else "",
         "name_ko": g.name_ko, "name_source": g.name_source,
         "name_agreement": g.name_agreement, "name_coverage": g.name_coverage,
-        "members": members, "md_list": g.md_list, "needs_review": g.needs_review, "minor": g.minor,
+        "members": members, "md_list": g.md_list, "needs_review": g.needs_review,
         "parent": {"id": g.parent_id, "text": g.parent.text, "name_ko": g.parent.name_ko} if g.parent_id else None,
     }
 
@@ -79,9 +79,6 @@ def card_group(request, group_id):
             changes.append(f"한국어 이름: {g.name_ko or '(없음)'} → {name}")
             g.name_ko, g.name_source = name, CardGroup.NameSource.MANUAL
             g.needs_review = False
-        if "minor" in request.data:
-            g.minor = bool(request.data.get("minor"))
-            changes.append("효과용 소분류로 표시" if g.minor else "효과용 소분류 표시 해제")
         if request.data.get("reviewed"):
             changes.append(f"확인 완료: {g.name_ko}")
             g.name_source, g.needs_review = CardGroup.NameSource.MANUAL, False

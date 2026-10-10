@@ -176,7 +176,6 @@ export default function AdminCardGroups() {
                     <span className={`truncate ${r.name_ko ? "" : "text-gray-400"}`}>{r.name_ko || "이름 없음"}</span>
                     {r.needs_review && <span className="shrink-0 text-[11px] px-1.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">확인 필요</span>}
                     {r.name_source === "manual" && <span className="shrink-0 text-[11px] px-1.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">운영진</span>}
-                    {r.minor && <span className="shrink-0 text-[11px] px-1.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">소분류</span>}
                   </div>
                 </button>
               </li>
@@ -236,21 +235,13 @@ export default function AdminCardGroups() {
                     : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                 >이름 저장</button>
               </div>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {g.needs_review && g.name_ko && (
-                  <button
-                    disabled={busy}
-                    onClick={() => apply(() => updateCardGroup(g.id, { reviewed: true }))}
-                    className="px-4 py-2 rounded-lg font-semibold transition bg-gray-500 hover:bg-gray-600 text-white text-sm"
-                  >이 이름이 맞음</button>
-                )}
+              {g.needs_review && g.name_ko && (
                 <button
                   disabled={busy}
-                  onClick={() => apply(() => updateCardGroup(g.id, { minor: !g.minor }))}
-                  title="CNo.39처럼 효과 처리에만 쓰는 이름 계열은 이용자 화면에서 뺍니다"
-                  className="px-4 py-2 rounded-lg font-semibold transition bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 text-sm"
-                >{g.minor ? "소분류 해제" : "효과용 소분류로"}</button>
-              </div>
+                  onClick={() => apply(() => updateCardGroup(g.id, { reviewed: true }))}
+                  className="mb-3 px-4 py-2 rounded-lg font-semibold transition bg-gray-500 hover:bg-gray-600 text-white text-sm"
+                >이 이름이 맞음</button>
+              )}
 
               {(g.parent || detail.children.length > 0) && (
                 <div className="mb-3 text-sm flex flex-wrap items-center gap-1.5">
