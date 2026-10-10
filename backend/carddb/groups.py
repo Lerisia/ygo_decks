@@ -98,9 +98,11 @@ def group_texts(texts):
 
 
 class Index:
-    def __init__(self, names, rubies, ja_texts):
-        """names {id: Japanese name}, rubies {id: $R ruby}, ja_texts {id: text}."""
+    def __init__(self, names, rubies, ja_texts, known=None):
+        """names {id: Japanese name}, rubies {id: $R ruby}, ja_texts {id: text}; known = cards whose reading we
+        know (Master Duel's, read as written where it gives no ruby). The rest neither vote nor get turned away."""
         self.seg = {cid: segments(name, rubies.get(cid, "")) for cid, name in names.items()}
+        self.known = set(rubies) if known is None else set(known)
         self.also_groups, self.also_names = {}, {}
         by_name = {}
         for cid, seg in self.seg.items():
@@ -124,9 +126,10 @@ class Index:
                 r = readings_at(self.seg[cid], x)
                 if r:
                     hits[cid] = r
-        votes = Counter(rd for r in hits.values() for rd, clean in r if clean)
+        votes = Counter(rd for cid, r in hits.items() if cid in self.known for rd, clean in r if clean)
         reading = votes.most_common(1)[0][0] if votes else x
-        out = {cid: "name" for cid, r in hits.items() if any(rd == reading or (not clean and reading in rd) for rd, clean in r)}
+        out = {cid: "name" for cid, r in hits.items()
+               if cid not in self.known or any(rd == reading or (not clean and reading in rd) for rd, clean in r)}
         for cid, seg in self.seg.items():
             if cid not in hits and any(x in rd for w, rd in seg if w != rd):
                 out[cid] = "reading"
@@ -211,13 +214,14 @@ def compute(md_named=None):
 
     names = dict(Card.objects.values_list("id", "name_ja"))
     ko_names = dict(Card.objects.exclude(name_ko="").values_list("id", "name_ko"))
-    rubies = {cid: r for cid, r in SrcMd.objects.filter(lang="ja").values_list("md_id", "ruby") if cid in names and r}
+    md_src = dict(SrcMd.objects.filter(lang="ja").values_list("md_id", "ruby"))
+    rubies = {cid: r for cid, r in md_src.items() if cid in names and r}
     md = set(MdPrint.objects.values_list("card_id", flat=True))
     texts = defaultdict(dict)
     for cid, lang, m, e, p in CardText.objects.filter(lang__in=["ja", "ko"]).values_list(
             "card_id", "lang", "materials", "effect", "pendulum_effect"):
         texts[lang][cid] = "\n".join(s for s in (m, e, p) if s)
-    index = Index(names, rubies, texts["ja"])
+    index = Index(names, rubies, texts["ja"], known=set(md_src) & set(names))
     groups = {}
     for x in group_texts(texts["ja"].values()):
         reading, mem = index.members(x)

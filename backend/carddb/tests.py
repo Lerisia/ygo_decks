@@ -566,6 +566,14 @@ class CardGroupTest(TestCase):
         self.assertEqual(self.members(g["R-ACE"]), [15, 16])
         self.assertEqual(self.members(g["C"]), [17])   # RESCUE! counts as R－ACE, whose C sits inside a word
 
+    def test_cards_without_a_known_reading_dont_outvote_master_duel(self):
+        self.card(20, "幻魔皇ラビエル", "환마황제 라비엘", ruby="$R幻(げん)$R魔(ま)$R皇(おう)ラビエル", ja_text="「幻魔」融合モンスター")
+        self.card(21, "混沌幻魔アーミタイル", "혼돈환마 아미타일", ruby="$R混(こん)$R沌(とん)$R幻(げん)$R魔(ま)アーミタイル")
+        for cid, name in ((22, "劫火の三幻魔－神炎皇ウリア"), (23, "罪禍の三幻魔－降雷皇ハモン"), (24, "無窮の三幻魔－幻魔皇ラビエル")):
+            self.card(cid, name, md=False)
+        g = self.build()
+        self.assertEqual((self.members(g["幻魔"]), g["幻魔"].reading), ([20, 21, 22, 23, 24], "げんま"))
+
     def test_a_replaced_name_is_what_counts(self):
         g = self.build()
         self.assertEqual(self.members(g["サイバー"]), [10])
