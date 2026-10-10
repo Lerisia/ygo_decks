@@ -31,9 +31,10 @@ export const MENU_GROUPS: MenuGroup[] = [
     label: "도감",
     icon: "📚",
     to: "/database",
-    paths: ["/database", "/recommend", "/question", "/questions", "/result", "/no-results"],
+    paths: ["/database", "/cards", "/recommend", "/question", "/questions", "/result", "/no-results"],
     items: [
       { label: "덱 목록", to: "/database", desc: "덱별 티어·운영법·전적" },
+      { label: "카드 목록", to: "/cards", desc: "마스터 듀얼 카드 검색·효과·카드군" },
       { label: "덱 성향 테스트", to: "/recommend", desc: "질문에 답하면 맞는 덱을 추천" },
     ],
   },

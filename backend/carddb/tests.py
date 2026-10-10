@@ -705,3 +705,128 @@ class CardGroupReviewApiTest(CardGroupTest):
         self.assertEqual(body["group"]["members"], 3)
         self.assertEqual([c["text"] for c in body["children"]], ["E・HERO"])
         self.assertEqual(LogEntry.objects.count(), 4)
+
+
+class CardDexApiTest(TestCase):
+    """카드 도감: Master Duel cards with art, searched, filtered, sorted newest first, 60 a page; card documents."""
+
+    def card(self, cid, ko, ja="", en="", art=True, md=True, **fields):
+        from .models import MdArt
+        values = dict(category="monster", frame="effect", types=["effect"], attribute="dark", race="spellcaster",
+                      level=4, atk=1800, def_value=1000)
+        values.update(fields)
+        c = Card.objects.create(id=cid, name_ko=ko, name_ja=ja or ko, name_en=en, **values)
+        if md:
+            MdPrint.objects.create(md_id=cid, card=c, rarity="SR")
+            if art:
+                MdArt.objects.create(md_print_id=cid, version="common", image=f"cards/art/common/{cid}.webp")
+        return c
+
+    def setUp(self):
+        from . import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
+        self.dm = self.card(1, "블랙 매지션", "ブラック・マジシャン", "Dark Magician", level=7, atk=2500, def_value=2100,
+                            types=["normal"], frame="normal", ocg_date=date(1999, 2, 4))
+        self.bewd = self.card(2, "푸른 눈의 백룡", "青眼の白龍", "Blue-Eyes White Dragon", level=8, atk=3000, def_value=2500,
+                              types=["normal"], frame="normal", attribute="light", race="dragon", ocg_date=date(1999, 2, 4))
+        self.girl = self.card(3, "블랙 매지션 걸", "ブラック・マジシャン・ガール", "Dark Magician Girl", level=6, atk=2000,
+                              def_value=1700, ocg_date=date(2000, 7, 13))
+        self.quick = self.card(4, "블랙 매지션의 속공", category="spell", frame="spell", types=[], attribute="", race="",
+                               level=None, atk=None, def_value=None, spell_trap_subtype="quick_play", ocg_date=date(2024, 1, 1))
+        self.scale = self.card(5, "펜듈럼 마술사", frame="effect_pendulum", types=["pendulum", "effect"], pendulum_scale=4,
+                               ocg_date=date(2015, 1, 1))
+        self.link = self.card(6, "링크 몬스터", frame="link", types=["link", "effect"], level=None, link_rating=2,
+                              def_value=None, link_markers=["bottom_left", "bottom_right"], race="cyberse", ocg_date=date(2017, 3, 25))
+        self.card(7, "그림 없는 카드", art=False)
+        self.card(8, "OCG 전용 카드", md=False)
+
+    def get(self, **params):
+        return self.client.get("/api/carddb/cards/", params).json()
+
+    def ids(self, **params):
+        return [r["id"] for r in self.get(**params)["results"]]
+
+    def test_list_is_public_newest_first_and_master_duel_only(self):
+        body = self.get()
+        self.assertEqual([r["id"] for r in body["results"]], [4, 6, 5, 3, 2, 1])   # same day: higher id first
+        self.assertEqual((body["total"], body["page"], body["has_more"]), (6, 1, False))
+        self.assertEqual(body["results"][0]["name"], "블랙 매지션의 속공")
+        self.assertEqual(self.ids(sort="name"), [6, 1, 3, 4, 5, 2])
+        self.assertEqual(self.ids(sort="atk")[:3], [2, 1, 3])
+
+    def test_pages(self):
+        for i in range(100, 170):
+            self.card(i, f"카드 {i}", ocg_date=date(2020, 1, 1))
+        first, second = self.get(), self.get(page=2)
+        self.assertEqual((len(first["results"]), first["has_more"], first["total"]), (60, True, 76))
+        self.assertEqual((len(second["results"]), second["has_more"]), (16, False))
+
+    def test_search_any_language_exact_first(self):
+        self.assertEqual(self.ids(q="블랙매지션"), [1, 3, 4])
+        self.assertEqual(self.ids(q="ブラック・マジシャン"), [1, 3])
+        self.assertEqual(self.ids(q="blue-eyes"), [2])
+
+    def test_filters(self):
+        from .models import CardGroup, CardGroupMember
+        self.assertEqual(self.ids(category="spell"), [4])
+        self.assertEqual(self.ids(st="spell:quick_play"), [4])
+        self.assertEqual(self.ids(frame="pendulum"), [5])
+        self.assertEqual(self.ids(frame="normal"), [2, 1])
+        self.assertEqual(self.ids(attribute="light"), [2])
+        self.assertEqual(self.ids(race="cyberse"), [6])
+        self.assertEqual(self.ids(level="2"), [6])                     # link rating counts
+        g = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")
+        for c in (self.dm, self.girl):
+            CardGroupMember.objects.create(group=g, card=c, how="name")
+        CardGroupMember.objects.create(group=g, card=self.quick, how="removed")
+        self.assertEqual(self.ids(group=g.id), [3, 1])
+
+    def test_options_give_korean_labels_and_reviewed_groups(self):
+        from .models import CardGroup, CardGroupMember
+        ok = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")
+        twin = CardGroup.objects.create(text="ブラック・マジシャン２", reading="x", name_ko="블랙 매지션")
+        held = CardGroup.objects.create(text="ガール", reading="ガール", name_ko="걸", needs_review=True)
+        for g in (ok, twin, held):
+            CardGroupMember.objects.create(group=g, card=self.girl, how="name")
+        body = self.client.get("/api/carddb/cards/options/").json()
+        self.assertIn({"value": "light", "label": "빛"}, body["attributes"])
+        self.assertIn({"value": "spellcaster", "label": "마법사족"}, body["races"])
+        self.assertIn({"value": "spell:quick_play", "label": "속공 마법"}, body["spell_trap_kinds"])
+        self.assertEqual(body["groups"], [{"id": ok.id, "name": "블랙 매지션", "count": 1}])
+
+    def test_card_document(self):
+        from deck.models import Deck, DeckCardGroup
+        from .models import CardGroup, CardGroupMember
+        CardText.objects.create(card=self.girl, lang="ko", effect="①: 이 카드의 공격력은 올라간다.")
+        CardText.objects.create(card=self.girl, lang="ja", effect="①：このカードの攻撃力は上がる。")
+        g = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")
+        held = CardGroup.objects.create(text="ガール", reading="ガール", name_ko="걸", needs_review=True)
+        CardGroupMember.objects.create(group=g, card=self.girl, how="name")
+        CardGroupMember.objects.create(group=held, card=self.girl, how="name")
+        deck = Deck.objects.create(name="블랙 매지션", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCardGroup.objects.create(deck=deck, group=g)
+        alt = MdPrint.objects.create(md_id=3901, card=self.girl, is_alt_art=True)
+        from .models import MdArt
+        MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/3901.webp")
+        body = self.client.get("/api/carddb/cards/3/").json()
+        self.assertEqual((body["name_ko"], body["name_ja"], body["name_en"]), ("블랙 매지션 걸", "ブラック・マジシャン・ガール", "Dark Magician Girl"))
+        self.assertEqual((body["type_line"], body["attribute"], body["level_label"]), ("마법사족 / 효과", "어둠", "레벨 6"))
+        self.assertEqual((body["atk"], body["def"]), ("2000", "1700"))
+        self.assertEqual(body["texts"]["ko"]["effect"], "①: 이 카드의 공격력은 올라간다.")
+        self.assertEqual(body["groups"], [{"id": g.id, "name": "블랙 매지션", "parent_id": None}])
+        self.assertEqual([d["name"] for d in body["decks"]], ["블랙 매지션"])
+        self.assertEqual(body["rarity"], "SR")
+        self.assertEqual(body["alt_arts"], ["/media/cards/art/common/3901.webp"])
+        self.assertIsNone(body["full_image_url"])
+        from card.models import Card as OldCard
+        from .models import LegacyCard
+        old = OldCard.objects.create(card_id="c3", konami_id="3", name="Dark Magician Girl", card_image="card_images/3.jpg")
+        LegacyCard.objects.create(old_id=old.id, old_card_id="c3", card=self.girl, how="konami")
+        self.assertEqual(self.client.get("/api/carddb/cards/3/").json()["full_image_url"], "/media/card_images/3.jpg")
+        link = self.client.get("/api/carddb/cards/6/").json()
+        self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
+        spell = self.client.get("/api/carddb/cards/4/").json()
+        self.assertEqual((spell["type_line"], spell["attribute"]), ("속공 마법", ""))
+        self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
+        self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel

@@ -28,6 +28,8 @@ import Mydecks from "./pages/Mydecks";
 import Noresults from "./pages/Noresults";
 import DatabasePage from "./pages/Database";
 import DeckDetail from "./pages/DeckDetail";
+import CardList from "./pages/CardList";
+import CardDetail from "./pages/CardDetail";
 import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
@@ -85,6 +87,13 @@ function App() {
   if (onDeckList && !listOpened) setListOpened(true);
   if (!inDeckBook && listOpened) setListOpened(false);
   const keepDeckList = onDeckList || (listOpened && inDeckBook);
+  // The card list is kept the same way behind a card page.
+  const onCardList = pathname === "/cards";
+  const inCardBook = onCardList || pathname.startsWith("/cards/");
+  const [cardListOpened, setCardListOpened] = useState(onCardList);
+  if (onCardList && !cardListOpened) setCardListOpened(true);
+  if (!inCardBook && cardListOpened) setCardListOpened(false);
+  const keepCardList = onCardList || (cardListOpened && inCardBook);
   // While a player is actively drawing (DuchMind turn / Solo draw page),
   // all site chrome is hidden so nothing overlaps the canvas.
   const drawingMode = useDrawingMode();
@@ -105,6 +114,11 @@ function App() {
           <DatabasePage />
         </div>
       )}
+      {keepCardList && (
+        <div hidden={!onCardList}>
+          <CardList />
+        </div>
+      )}
       <Routes>
           <Route path="/" element={<Info />} />
           <Route path="/recommend" element ={<Recommend />} />
@@ -122,6 +136,8 @@ function App() {
           <Route path="/no-results" element={<Noresults />} />
           <Route path="/database" element={null} />
           <Route path="/database/:deckId" element={<DeckDetail />} />
+          <Route path="/cards" element={null} />
+          <Route path="/cards/:cardId" element={<CardDetail />} />
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
           {/* 대회 (내부 테스트 중 — 네비게이션 미노출) */}
