@@ -1,7 +1,11 @@
-"""Deck inference for the PC tracker: card IDs (Konami cid == Card.konami_id) → site decks."""
+"""Deck inference for the PC tracker: card IDs (Konami cid == base Master Duel id == carddb.Card.id) → site decks."""
 from collections import Counter, defaultdict
+from types import SimpleNamespace
 
-from card.models import Card, CardIdAlias, CardArchetypeOverride
+from card.models import CardIdAlias, CardArchetypeOverride
+from carddb.display import display_name
+from carddb.models import Card, MdPrint
+from cardsite.models import LegacyTheme
 from deck.models import DeckArchetype, DeckInferencePriority
 from .learned import learned_decks
 
@@ -44,8 +48,20 @@ def resolve_aliases(card_ids):
     ids = [int(c) for c in card_ids if str(c).isdigit()]
     if not ids:
         return []
-    alias = {a.md_id: int(a.card.konami_id) for a in CardIdAlias.objects.filter(md_id__in=set(ids)).select_related("card") if str(a.card.konami_id).isdigit()}
+    alias = dict(MdPrint.objects.filter(md_id__in=set(ids)).values_list("md_id", "card_id"))
+    rest = set(ids) - set(alias)
+    if rest:
+        alias.update({a.md_id: int(a.card.konami_id) for a in CardIdAlias.objects.filter(md_id__in=rest).select_related("card")
+                      if str(a.card.konami_id).isdigit()})
     return [alias.get(c, c) for c in ids]
+
+
+def _cards(kids):
+    """{konami id: archetype + frame_type} for the ids the new card DB knows."""
+    ids = [int(k) for k in kids if str(k).isdigit()]
+    themes = dict(LegacyTheme.objects.filter(card_id__in=ids).values_list("card_id", "archetype"))
+    return {str(cid): SimpleNamespace(archetype=themes.get(cid) or None, frame_type=frame)
+            for cid, frame in Card.objects.filter(id__in=ids).values_list("id", "frame")}
 
 
 def infer_decks(card_ids, limit=3):
@@ -59,10 +75,7 @@ def infer_decks(card_ids, limit=3):
     counts = Counter(str(c) for c in resolved if c)
     if not counts:
         return [], []
-    cards = {}
-    for c in Card.objects.filter(konami_id__in=list(counts)).only("konami_id", "archetype", "frame_type"):
-        if c.konami_id not in cards or (c.frame_type and not cards[c.konami_id].frame_type):
-            cards[c.konami_id] = c
+    cards = _cards(counts)
     unknown = sorted(int(k) for k in counts if k not in cards and k.isdigit())
     overrides = {o.konami_id: o.archetype for o in CardArchetypeOverride.objects.filter(konami_id__in=list(counts))}
     card_arch = {}
@@ -155,14 +168,10 @@ def card_names(card_ids):
         if c and c not in counts:
             order.append(c)
         counts[c] += 1
-    # duplicate rows exist for some ids; keep the one that knows its frame type
-    cards = {}
-    for c in Card.objects.filter(konami_id__in=[str(c) for c in order]).only("konami_id", "name", "korean_name", "frame_type"):
-        if c.konami_id not in cards or (c.frame_type and not cards[c.konami_id].frame_type):
-            cards[c.konami_id] = c
+    cards = Card.objects.in_bulk(order)
     out = []
     for c in order:
-        card = cards.get(str(c))
-        out.append({"id": c, "name": (card.korean_name or card.name) if card else f"#{c}", "count": counts[c],
-                    "frame": (card.frame_type or "") if card else ""})
+        card = cards.get(c)
+        out.append({"id": c, "name": display_name(card) if card else f"#{c}", "count": counts[c],
+                    "frame": card.frame if card else ""})
     return out

@@ -46,61 +46,67 @@ class CleanupUploadsTest(TestCase):
         self.assertFalse(UploadRecord.objects.filter(id=boundary.id).exists())
 
 
-def _create_card_with_illust(name, card_id=None):
-    card_id = card_id or name
-    img = PILImage.new("RGB", (100, 100), color="red")
-    buf = BytesIO()
-    img.save(buf, format="JPEG")
-    buf.seek(0)
-    card = Card.objects.create(card_id=card_id, konami_id="0", name=name, korean_name=name)
-    card.card_illust.save(f"{card_id}.jpg", ContentFile(buf.read()))
+def _create_card_with_art(name, cid):
+    """A new-DB card with Master Duel art saved under the current MEDIA_ROOT."""
+    from django.conf import settings
+    from carddb.models import Card as NewCard, MdArt, MdPrint
+    card = NewCard.objects.create(id=cid, category="monster", name_ja=name, name_ko=name, frame="normal")
+    MdPrint.objects.create(md_id=cid, card=card)
+    rel = f"cards/art/common/{cid}.webp"
+    os.makedirs(os.path.join(settings.MEDIA_ROOT, "cards/art/common"), exist_ok=True)
+    PILImage.new("RGB", (512, 512), color="red").save(os.path.join(settings.MEDIA_ROOT, rel), "WEBP")
+    MdArt.objects.create(md_print_id=cid, version="common", image=rel)
     return card
 
 
-@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
-class QuizNextCardTest(TestCase):
+class FreshArt:
     def setUp(self):
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
+        super().setUp()
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class QuizNextCardTest(FreshArt, TestCase):
+    def setUp(self):
+        super().setUp()
         self.client = APIClient()
-        self.card1 = _create_card_with_illust("블루아이즈", "c1")
-        self.card2 = _create_card_with_illust("레드아이즈", "c2")
-        self.card3 = _create_card_with_illust("다크매지션", "c3")
-        self.card4 = _create_card_with_illust("블랙매지션걸", "c4")
+        for i, name in enumerate(("블루아이즈", "레드아이즈", "다크매지션", "블랙매지션걸")):
+            _create_card_with_art(name, 4000 + i)
+        from carddb.models import Card as NewCard
+        NewCard.objects.create(id=5392, category="spell", name_ja="天変地異", name_ko="천재지변", frame="spell")
 
     def test_returns_card_with_choices(self):
         resp = self.client.get("/api/quiz/next/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertIn("card_id", data)
-        self.assertIn("choices", data)
         self.assertEqual(len(data["choices"]), 4)
-        self.assertIn("images", data)
+        self.assertNotIn("천재지변", data["choices"])
+        cid = data["card_id"]
+        self.assertEqual(data["images"]["original"], f"/media/cards/art/common/{cid}.webp")
+        self.assertEqual(data["images"]["8x8"], f"/media/cards/quiz/8x8/{cid}.jpg")
 
     def test_choices_contain_correct_answer(self):
-        resp = self.client.get("/api/quiz/next/")
-        data = resp.json()
-        card = Card.objects.get(card_id=data["card_id"])
-        self.assertIn(card.korean_name, data["choices"])
+        from carddb.models import Card as NewCard
+        data = self.client.get("/api/quiz/next/").json()
+        self.assertIn(NewCard.objects.get(id=data["card_id"]).name_ko, data["choices"])
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
-class QuizCheckAnswerTest(TestCase):
+class QuizCheckAnswerTest(FreshArt, TestCase):
     def setUp(self):
+        super().setUp()
         self.client = APIClient()
-        self.card = _create_card_with_illust("블루아이즈", "c1")
+        _create_card_with_art("블루아이즈", 4007)
 
     def test_correct_answer(self):
-        resp = self.client.post("/api/quiz/check/", {
-            "card_id": "c1",
-            "answer": "블루아이즈",
-        }, format="json")
+        resp = self.client.post("/api/quiz/check/", {"card_id": 4007, "answer": "블루아이즈"}, format="json")
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["correct"])
+        self.assertEqual(resp.json(), {"correct": True, "correct_answer": "블루아이즈"})
 
     def test_wrong_answer(self):
-        resp = self.client.post("/api/quiz/check/", {
-            "card_id": "c1",
-            "answer": "레드아이즈",
-        }, format="json")
+        resp = self.client.post("/api/quiz/check/", {"card_id": 4007, "answer": "레드아이즈"}, format="json")
         self.assertFalse(resp.json()["correct"])
 
     def test_missing_params(self):
@@ -349,19 +355,23 @@ class CardThumbTests(TestCase):
     """Tracker overlay thumbnails: cut once from the illustration, then served from media."""
 
     def test_thumb_is_generated_and_redirected(self):
-        from io import BytesIO
         from PIL import Image
-        from card.models import Card, CardIdAlias
+        from carddb import display
+        from carddb.models import Card as NewCard, MdArt, MdPrint
+        display.forget_art()
+        self.addCleanup(display.forget_art)
         with tempfile.TemporaryDirectory() as media:
             with override_settings(MEDIA_ROOT=media):
-                buf = BytesIO(); Image.new("RGB", (120, 80), (200, 30, 30)).save(buf, "JPEG")
-                card = Card.objects.create(card_id="c1", konami_id="4041", name="Dark Magician",
-                                           card_illust=SimpleUploadedFile("4041.jpg", buf.getvalue(), content_type="image/jpeg"))
-                CardIdAlias.objects.create(md_id=23487, card=card)
+                card = NewCard.objects.create(id=4041, category="monster", name_ja="ブラック・マジシャン", name_ko="블랙 매지션", frame="normal")
+                MdPrint.objects.create(md_id=4041, card=card)
+                MdPrint.objects.create(md_id=23487, card=card, is_alt_art=True)
+                os.makedirs(os.path.join(media, "cards/art/common"))
+                Image.new("RGB", (512, 653), (200, 30, 30)).save(os.path.join(media, "cards/art/common/4041.webp"), "WEBP")
+                MdArt.objects.create(md_print_id=4041, version="common", image="cards/art/common/4041.webp")
                 res = self.client.get("/api/card-thumb/4041/?v=" + MIN_SUPPORTED)
                 self.assertEqual(res.status_code, 302)
-                self.assertTrue(res["Location"].endswith("/card_thumbs/4041_48.jpg"))
-                out = os.path.join(media, "card_thumbs", "4041_48.jpg")
+                self.assertTrue(res["Location"].endswith("/card_thumbs_md/4041_48.jpg"))
+                out = os.path.join(media, "card_thumbs_md", "4041_48.jpg")
                 self.assertEqual(Image.open(out).size, (48, 48))
                 # an alt-art id resolves to the same base card
                 self.assertEqual(self.client.get("/api/card-thumb/23487/?v=" + MIN_SUPPORTED)["Location"], res["Location"])

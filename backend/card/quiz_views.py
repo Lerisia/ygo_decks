@@ -1,15 +1,12 @@
-import os
 import random
 from datetime import date, datetime, time, timedelta
 
-from django.conf import settings
 from django.utils import timezone
-from PIL import Image
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Card, QuizAllTimeBest, QuizHighScore
+from .models import QuizAllTimeBest, QuizHighScore
 
 
 # Cutover from monthly to weekly leaderboard cadence. Anything strictly
@@ -33,53 +30,30 @@ def _week_start_date(dt: datetime) -> date:
 def _is_weekly_active(now_kst: datetime) -> bool:
     return now_kst >= WEEKLY_CUTOVER_KST
 
-SIZES = [8, 10, 12, 16]
-UPSCALE_MAP = {8: 160, 10: 160, 12: 168, 16: 160}
 SCORE_MAP = {8: 4, 10: 3, 12: 2, 16: 1}
-
-
-def _build_image_urls(request, card):
-    original_path = card.card_illust.path
-    urls = {}
-
-    for size in SIZES:
-        output_dir = os.path.join(settings.MEDIA_ROOT, f"quiz_thumbnails/{size}x{size}_shown")
-        os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"{card.card_id}_{size}x{size}.jpg"
-        output_path = os.path.join(output_dir, output_filename)
-
-        if not os.path.exists(output_path):
-            img = Image.open(original_path).convert("RGB")
-            img = img.resize((size, size), Image.NEAREST)
-            img = img.resize((UPSCALE_MAP[size], UPSCALE_MAP[size]), Image.NEAREST)
-            img.save(output_path)
-
-        urls[f"{size}x{size}"] = f"{settings.MEDIA_URL}quiz_thumbnails/{size}x{size}_shown/{output_filename}"
-    urls["original"] = card.card_illust.url
-    return urls
 
 
 @api_view(["GET"])
 def quiz_next_card(request):
-    valid_cards = Card.objects.filter(
-        korean_name__isnull=False,
-        card_illust__isnull=False,
-    ).exclude(card_illust="")
-    unique_names = list(valid_cards.values_list("korean_name", flat=True).distinct())
-    chosen_name = random.choice(unique_names)
-    card = valid_cards.filter(korean_name=chosen_name).first()
-    if not card:
+    from carddb.display import art_url, quiz_image_urls
+    from carddb.models import Card as NewCard, has_art
+
+    valid_cards = NewCard.objects.filter(has_art()).exclude(name_ko="")
+    unique_names = list(valid_cards.values_list("name_ko", flat=True).distinct())
+    if not unique_names:
         return Response({"error": "유효한 카드가 없습니다."}, status=404)
+    chosen_name = random.choice(unique_names)
+    card = valid_cards.filter(name_ko=chosen_name).order_by("id").first()
 
     wrong_cards = list(
-        valid_cards.exclude(korean_name=card.korean_name).order_by("?").values_list("korean_name", flat=True).distinct()[:3]
+        valid_cards.exclude(name_ko=card.name_ko).order_by("?").values_list("name_ko", flat=True).distinct()[:3]
     )
-    choices = [card.korean_name] + wrong_cards
+    choices = [card.name_ko] + wrong_cards
     random.shuffle(choices)
 
     return Response({
-        "card_id": card.card_id,
-        "images": _build_image_urls(request, card),
+        "card_id": card.id,
+        "images": {**quiz_image_urls(card.id), "original": art_url(card.id)},
         "choices": choices,
         "score_map": SCORE_MAP,
     })
@@ -87,6 +61,8 @@ def quiz_next_card(request):
 
 @api_view(["POST"])
 def quiz_check_answer(request):
+    from carddb.models import Card as NewCard
+
     card_id = request.data.get("card_id")
     answer = request.data.get("answer")
 
@@ -94,14 +70,14 @@ def quiz_check_answer(request):
         return Response({"error": "card_id와 answer가 필요합니다."}, status=400)
 
     try:
-        card = Card.objects.get(card_id=card_id)
-    except Card.DoesNotExist:
+        card = NewCard.objects.get(id=int(card_id))
+    except (NewCard.DoesNotExist, TypeError, ValueError):
         return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
 
-    correct = card.korean_name == answer
+    correct = card.name_ko == answer
     return Response({
         "correct": correct,
-        "correct_answer": card.korean_name,
+        "correct_answer": card.name_ko,
     })
 
 

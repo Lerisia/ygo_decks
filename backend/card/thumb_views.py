@@ -1,12 +1,12 @@
-"""Small square card thumbnails for the tracker overlay, cut from the illustration on first request and cached
-under media/card_thumbs/. Kept out of views.py so this endpoint never imports the classifier stack."""
+"""Small square card thumbnails for the tracker overlay, cut from the Master Duel art on first request and cached
+under media/card_thumbs_md/. Kept out of views.py so this endpoint never imports the classifier stack."""
 import os
 
 from django.conf import settings
 from django.http import JsonResponse, Http404, HttpResponseRedirect
 from PIL import Image
 
-from .models import Card, CardIdAlias
+from carddb.display import art_path
 
 SIZE = 48
 
@@ -17,17 +17,18 @@ def card_thumb(request, konami_id):
     from tracker import version as ver
     if ver.is_outdated(request.GET.get("v") or "", ver.MIN_SUPPORTED):
         return JsonResponse({"error": "새 버전으로 업데이트해 주세요. 이 버전은 더 이상 쓸 수 없습니다.", "min_supported": ver.MIN_SUPPORTED}, status=426)
-    alias = CardIdAlias.objects.filter(md_id=konami_id).select_related("card").first()
-    card = alias.card if alias else Card.objects.filter(konami_id=str(konami_id)).exclude(card_illust="").first()
-    if not card or not card.card_illust:
+    from carddb.models import MdPrint
+    base = MdPrint.objects.filter(md_id=konami_id).values_list("card_id", flat=True).first() or konami_id
+    src = art_path(base)
+    if not src:
         raise Http404
-    out_dir = os.path.join(settings.MEDIA_ROOT, "card_thumbs")
-    name = f"{card.konami_id}_{SIZE}.jpg"
+    out_dir = os.path.join(settings.MEDIA_ROOT, "card_thumbs_md")
+    name = f"{base}_{SIZE}.jpg"
     out = os.path.join(out_dir, name)
-    if not os.path.exists(out):
+    if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(src):
         os.makedirs(out_dir, exist_ok=True)
         try:
-            with Image.open(card.card_illust.path) as im:
+            with Image.open(src) as im:
                 im = im.convert("RGB")
                 w, h = im.size
                 s = min(w, h)
@@ -35,4 +36,4 @@ def card_thumb(request, konami_id):
                 im.save(out, "JPEG", quality=82)
         except (OSError, ValueError):
             raise Http404
-    return HttpResponseRedirect(f"{settings.MEDIA_URL}card_thumbs/{name}")
+    return HttpResponseRedirect(f"{settings.MEDIA_URL}card_thumbs_md/{name}")
