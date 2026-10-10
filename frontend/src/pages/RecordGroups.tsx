@@ -14,7 +14,7 @@ import {
   type SheetSummary,
 } from "@/api/toolApi";
 import { KebabMenu, RankIcon, confirmSheetDelete } from "@/components/records/SheetBits";
-import { ResultChips, UsagePie, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/charts";
+import { ResultChips, UsagePie, rate, pctText, winRateTint, COIN_FRONT, COIN_BACK } from "@/components/charts";
 import { getRankLabel } from "@/utils/rankUtils";
 import UpdateBadge from "@/components/UpdateBadge";
 
@@ -34,16 +34,6 @@ type RecordGroupWithStats = RecordGroupBasic & {
   firstWinRate: number;
   secondWinRate: number;
   summary: SheetSummary | null;
-};
-
-// Win rate colour: blue from 55%, red from 45%, plain text only at exactly 50%, and a gradual blend in between
-// (특이점 2026-10-10). The blend mixes into the surrounding text colour so it works in both themes.
-const winRateTint = (rate: number): { cls: string; mix?: string } => {
-  if (rate >= 55) return { cls: "text-blue-600" };
-  if (rate <= 45) return { cls: "text-red-500" };
-  if (rate > 50) return { cls: "", mix: `color-mix(in srgb, #2563eb ${(((rate - 50) / 5) * 100).toFixed(1)}%, currentColor)` };
-  if (rate < 50) return { cls: "", mix: `color-mix(in srgb, #ef4444 ${(((50 - rate) / 5) * 100).toFixed(1)}%, currentColor)` };
-  return { cls: "" };
 };
 
 const RecordGroups = () => {

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { MetaDeckStat } from "@/api/toolApi";
 import UpdateBadge from "@/components/UpdateBadge";
-import { MEDALS, rateTone } from "./theme";
+import { MEDALS, winRateTint } from "./theme";
 
 type Props = {
   data: MetaDeckStat[];
@@ -188,7 +188,11 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
                 </span>
                 {sel.rank > 0 ? (
                   <span className="tabular-nums text-gray-500 dark:text-gray-400" style={{ fontSize: fs - 1 }}>
-                    승률 <span className={rateTone(sel.win_rate)}>{sel.win_rate}%</span>
+                    승률{" "}
+                    {(() => {
+                      const tint = winRateTint(sel.win_rate);
+                      return <span className={`font-semibold ${tint.cls}`} style={tint.mix ? { color: tint.mix } : undefined}>{sel.win_rate}%</span>;
+                    })()}
                   </span>
                 ) : (
                   <span className="text-gray-500 dark:text-gray-400" style={{ fontSize: fs - 1 }}>11위 아래 덱</span>
