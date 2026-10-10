@@ -55,11 +55,10 @@ const winRateTint = (rate: number): { cls: string; mix?: string } => {
 
 // Slices are plain colours (gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
 // picture sits in a small circle on the pie's edge, so ranks read at a glance (특이점 2026-10-10).
-// Flat colours, no sheen. The rainbow and rest-of-field slices use darker, duller versions of their colours so the
-// podium stands out (특이점 2026-10-10); the list's rank squares and the circles' rings keep the bright ones.
+// Flat colours, no sheen; the rainbow and the rest-of-field slices sit at half opacity so the podium stands out
+// (특이점 2026-10-10). The list's rank squares and the circles' rings keep the full colours.
 const PODIUM = [{ solid: "#d4a72c" }, { solid: "#b4b9c0" }, { solid: "#c07a46" }];
-const RAINBOW_SLICE = ["#8b3333", "#804c28", "#806e28", "#2c6340", "#2f538e", "#3b3683", "#5a3180"];
-const OTHERS_SLICE = "#2e2e31";
+const MUTED_SLICE_OPACITY = 0.5;
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
 const OTHERS_COLOR = "#3a3a3d";
 // Up to 200px on PC (특이점 2026-10-10); narrower columns shrink it so the circles still fit.
@@ -255,7 +254,8 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
               {chartData.map((entry, i) => (
                 <Cell
                   key={entry.id}
-                  fill={entry.id === -1 ? OTHERS_SLICE : i < 3 ? PODIUM[i].solid : RAINBOW_SLICE[i - 3]}
+                  fill={entry.id === -1 ? OTHERS_COLOR : sliceColor(i)}
+                  fillOpacity={i < 3 && entry.id !== -1 ? 1 : MUTED_SLICE_OPACITY}
                   strokeWidth={2}
                   className="stroke-white dark:stroke-gray-800"
                 />
