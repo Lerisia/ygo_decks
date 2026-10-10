@@ -1274,13 +1274,12 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         if ok:
             # Echo the card back privately to the drawer so they always have
             # the image + name available (in case they refresh / forget).
-            from card.models import Card
+            from carddb.display import art_url
             image_url = None
             try:
                 @database_sync_to_async
                 def _get_url():
-                    c = Card.objects.filter(pk=int(card_id)).first()
-                    return c.card_illust.url if (c and c.card_illust) else None
+                    return art_url(int(card_id))
                 image_url = await _get_url()
             except Exception:
                 pass
@@ -1843,7 +1842,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     def _db_dm_start_choosing(self, drawer_id):
         from .models import Room, RoomPlayer, DuchMindWord, DuchMindWordPack
         from .games import duchmind as dm
-        from card.models import Card
+        from carddb.display import art_url
         room = Room.objects.get(id=self.room_id)
         state = room.game_state or {}
         # Resolve which pack to use: room's selected pack, else default
@@ -1874,18 +1873,16 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 for c in chosen
             ]
         else:
-            # Dedupe by korean_name so cards with multiple alt-art rows
-            # (same passcode, different card_id index) don't get inflated
-            # draw probability. Keep the lowest card_id per name.
+            # Dedupe by Korean name so two cards sharing a name don't get a double chance.
             raw = (
-                DuchMindWord.objects.filter(pack=pack, enabled=True, card__isnull=False)
-                .order_by("card__card_id")
-                .values("card_id", "card__korean_name")
+                DuchMindWord.objects.filter(pack=pack, enabled=True, new_card__isnull=False)
+                .order_by("new_card_id")
+                .values("new_card_id", "new_card__name_ko")
             )
             seen_names: set = set()
             candidates: list = []
             for r in raw:
-                kr = r["card__korean_name"]
+                kr = r["new_card__name_ko"]
                 if kr in seen_names:
                     continue
                 seen_names.add(kr)
@@ -1893,19 +1890,14 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             if not candidates:
                 return None
             used = set(state.get("used_card_ids", []))
-            pool = [c for c in candidates if c["card_id"] not in used] or candidates
+            pool = [c for c in candidates if c["new_card_id"] not in used] or candidates
             word_options_count = state.get("word_options") or dm.WORD_OPTIONS
             chosen = random.sample(pool, min(word_options_count, len(pool)))
-            chosen_pks = [c["card_id"] for c in chosen]
-            illust_by_pk = {
-                c.pk: (c.card_illust.url if c.card_illust else None)
-                for c in Card.objects.filter(pk__in=chosen_pks)
-            }
             choices = [
                 {
-                    "card_id": c["card_id"],
-                    "name": c["card__korean_name"],
-                    "image_url": illust_by_pk.get(c["card_id"]),
+                    "card_id": c["new_card_id"],
+                    "name": c["new_card__name_ko"],
+                    "image_url": art_url(c["new_card_id"]),
                 }
                 for c in chosen
             ]
@@ -1974,7 +1966,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     def _db_dm_drawing_payload(self):
         from .models import Room
         from .games import duchmind as dm
-        from card.models import Card
+        from carddb.display import art_url
         room = Room.objects.get(id=self.room_id)
         state = room.game_state or {}
         rd = state.get("round_data") or {}
@@ -1988,9 +1980,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             cid = rd.get("word_card_id")
             if cid is not None:
                 try:
-                    card = Card.objects.filter(pk=int(cid)).first()
-                    if card and card.card_illust:
-                        image_url = card.card_illust.url
+                    image_url = art_url(int(cid))
                 except (TypeError, ValueError):
                     pass
         show_len = state.get("show_word_length", True)
@@ -2147,7 +2137,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     def _db_dm_end_turn(self):
         from .models import Room
         from .games import duchmind as dm
-        from card.models import Card
+        from carddb.display import art_url
         room = Room.objects.get(id=self.room_id)
         state = room.game_state or {}
         # Capture the round_data image_url BEFORE end_turn wipes it (end_turn
@@ -2163,9 +2153,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 reveal["image_url"] = stashed_url
             elif reveal.get("card_id") and rd_series != "pokemon":
                 try:
-                    card = Card.objects.filter(pk=int(reveal["card_id"])).first()
-                    if card and card.card_illust:
-                        reveal["image_url"] = card.card_illust.url
+                    reveal["image_url"] = art_url(int(reveal["card_id"]))
                 except (TypeError, ValueError):
                     pass
         return reveal
@@ -2554,7 +2542,8 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     def _db_tw_submit_guess(self, player_id, card_id):
         from .models import Room, RoomPlayer
         from .games import twenty as tw
-        from card.models import Card
+        from carddb.display import display_name
+        from carddb.models import Card
         try:
             room = Room.objects.get(id=self.room_id)
             player = RoomPlayer.objects.get(room=room, id=player_id)
@@ -2576,7 +2565,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         try:
             c = Card.objects.filter(pk=cid).first()
             if c:
-                card_name = c.korean_name or c.name or ""
+                card_name = display_name(c) or ""
         except Exception:
             pass
         # Enrich next_asker / hand_raise transition payloads in place.
@@ -2642,7 +2631,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     def _db_tw_end_turn(self):
         from .models import Room, RoomPlayer
         from .games import twenty as tw
-        from card.models import Card
+        from carddb.display import art_url
         room = Room.objects.get(id=self.room_id)
         state = room.game_state or {}
         reveal = tw.end_turn(state)
@@ -2663,9 +2652,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 pass
         if reveal.get("card_id"):
             try:
-                c = Card.objects.filter(pk=int(reveal["card_id"])).first()
-                if c and c.card_illust:
-                    reveal["image_url"] = c.card_illust.url
+                reveal["image_url"] = art_url(int(reveal["card_id"]))
             except Exception:
                 pass
         return reveal
@@ -2686,7 +2673,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def _db_tw_resume_snapshot(self, player_id):
         from .models import Room, RoomPlayer
-        from card.models import Card
+        from carddb.display import art_url
         try:
             room = Room.objects.get(id=self.room_id)
         except Room.DoesNotExist:
@@ -2761,8 +2748,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         # Send the chosen card privately back to the drawer so they remember it
         if is_drawer and rd.get("card_id"):
             try:
-                card = Card.objects.filter(pk=int(rd["card_id"])).first()
-                image_url = card.card_illust.url if (card and card.card_illust) else None
+                image_url = art_url(int(rd["card_id"]))
             except Exception:
                 image_url = None
             out["drawer_card_for_me"] = {
@@ -3023,13 +3009,11 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 if stashed:
                     out["drawer_image_for_me"] = stashed
                 elif rd.get("word_series", "yugioh") != "pokemon":
-                    from card.models import Card
+                    from carddb.display import art_url
                     cid = rd.get("word_card_id")
                     if cid is not None:
                         try:
-                            card = Card.objects.filter(pk=int(cid)).first()
-                            if card and card.card_illust:
-                                out["drawer_image_for_me"] = card.card_illust.url
+                            out["drawer_image_for_me"] = art_url(int(cid))
                         except (TypeError, ValueError):
                             pass
             # Surface who's already solved / given up this turn so a refresh

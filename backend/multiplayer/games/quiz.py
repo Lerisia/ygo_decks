@@ -14,11 +14,8 @@ All correct players earn their per-stage score; reveal shows everyone's
 result so spectators see the breakdown.
 """
 
-import os
 import random
 import time
-from PIL import Image
-from django.conf import settings
 
 
 SIZES = [8, 10, 12, 16]
@@ -32,23 +29,6 @@ TOTAL_ROUNDS = 5
 INTER_ROUND_PAUSE = 10  # seconds between rounds — answer reveal + chat break
 
 
-def _build_image_urls(card):
-    original_path = card.card_illust.path
-    urls = {}
-    for size in SIZES:
-        output_dir = os.path.join(settings.MEDIA_ROOT, f"quiz_thumbnails/{size}x{size}_shown")
-        os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"{card.card_id}_{size}x{size}.jpg"
-        output_path = os.path.join(output_dir, output_filename)
-        if not os.path.exists(output_path):
-            img = Image.open(original_path).convert("RGB")
-            img = img.resize((size, size), Image.NEAREST)
-            img = img.resize((UPSCALE_MAP[size], UPSCALE_MAP[size]), Image.NEAREST)
-            img.save(output_path)
-        urls[f"{size}x{size}"] = f"{settings.MEDIA_URL}quiz_thumbnails/{size}x{size}_shown/{output_filename}"
-    return urls
-
-
 def make_question(pack_id=None):
     """Pick a random card and return question data.
     Returns (public_data, correct_answer) — public_data does NOT include the answer.
@@ -56,49 +36,39 @@ def make_question(pack_id=None):
     that DuchMindWordPack (must be yugioh series; pokemon packs are ignored
     by quiz). When None, the entire card library is used.
     """
-    from card.models import Card
+    from carddb.display import art_names, art_url, quiz_image_urls
+    from carddb.models import Card
 
-    valid_cards = Card.objects.filter(
-        korean_name__isnull=False,
-        card_illust__isnull=False,
-    ).exclude(card_illust="")
+    valid = Card.objects.exclude(name_ko="")
     if pack_id is not None:
         from ..models import DuchMindWord
         card_ids = list(
             DuchMindWord.objects
-            .filter(pack_id=pack_id, enabled=True, card__isnull=False)
-            .values_list("card_id", flat=True)
+            .filter(pack_id=pack_id, enabled=True, new_card__isnull=False)
+            .values_list("new_card_id", flat=True)
         )
         if not card_ids:
             return None, None, None
-        valid_cards = valid_cards.filter(id__in=card_ids)
-    unique_names = list(valid_cards.values_list("korean_name", flat=True).distinct())
-    if not unique_names:
+        valid = valid.filter(id__in=card_ids)
+    with_art = art_names()
+    by_name = {}
+    for cid, name in valid.order_by("id").values_list("id", "name_ko"):
+        if cid in with_art:
+            by_name.setdefault(name, cid)
+    if not by_name:
         return None, None, None
-    chosen_name = random.choice(unique_names)
-    card = valid_cards.filter(korean_name=chosen_name).first()
-    if not card:
-        return None, None, None
-
-    wrong = list(
-        valid_cards.exclude(korean_name=card.korean_name)
-        .order_by("?")
-        .values_list("korean_name", flat=True)
-        .distinct()[:3]
-    )
-    choices = [card.korean_name] + wrong
+    names = list(by_name)
+    chosen_name = random.choice(names)
+    card_id = by_name[chosen_name]
+    wrong = random.sample([n for n in names if n != chosen_name], min(3, len(names) - 1))
+    choices = [chosen_name] + wrong
     random.shuffle(choices)
-
-    try:
-        original_url = card.card_illust.url
-    except Exception:
-        original_url = None
     public_data = {
-        "card_id": card.card_id,
-        "images": _build_image_urls(card),
+        "card_id": card_id,
+        "images": quiz_image_urls(card_id),
         "choices": choices,
     }
-    return public_data, card.korean_name, original_url
+    return public_data, chosen_name, art_url(card_id)
 
 
 def init_game_state(player_ids, total_rounds=TOTAL_ROUNDS):

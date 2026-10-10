@@ -74,3 +74,22 @@ def make_thumb(md_id, force=False):
         if os.path.exists(tmp):
             os.remove(tmp)
     return True
+
+
+QUIZ_SIZES = [8, 10, 12, 16]
+QUIZ_UPSCALE = {8: 160, 10: 160, 12: 168, 16: 160}
+
+
+def quiz_image_urls(md_id):
+    src = art_path(md_id)
+    urls = {}
+    for size in QUIZ_SIZES:
+        rel = f"cards/quiz/{size}x{size}/{md_id}.jpg"
+        path = os.path.join(settings.MEDIA_ROOT, rel)
+        if src and not os.path.exists(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with Image.open(src) as img:
+                im = img.convert("RGB").resize((size, size), Image.NEAREST)
+            im.resize((QUIZ_UPSCALE[size], QUIZ_UPSCALE[size]), Image.NEAREST).save(path)
+        urls[f"{size}x{size}"] = settings.MEDIA_URL + rel
+    return urls
