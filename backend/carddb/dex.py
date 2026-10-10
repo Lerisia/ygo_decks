@@ -1,16 +1,19 @@
 """카드 도감: the public card list (search, filters, sort, 60 a page) and card documents — Master Duel cards with art."""
+import os
+import time
 import unicodedata
 from collections import defaultdict
 
-from django.db.models import Exists, OuterRef, Q
+from django.conf import settings
+from django.db.models import Count, Max
 from django.http import Http404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .display import art_url, display_name, thumb_url
-from .face import face_thumb_url, face_url
-from .models import Card, CardGroup, CardGroupMember, CardText, MdPrint, has_art
+from .display import THUMB_DIR as CARD_THUMB_DIR, art_url, display_name, thumb_url
+from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url
+from .models import Card, CardGroupMember, MdPrint, has_art
 
 PAGE_SIZE = 60
 
@@ -37,76 +40,143 @@ def _norm(s):
     return "".join(unicodedata.normalize("NFKC", s or "").split()).lower()
 
 
-def _in_group(group_id):
-    return Exists(CardGroupMember.objects.filter(card=OuterRef("pk"), group_id=group_id)
-                  .exclude(how=CardGroupMember.How.REMOVED))
+CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 
 
-def _filtered(p):
-    qs = Card.objects.filter(has_art())
+def choseong(s):
+    """블랙매지션 → ㅂㄹㅁㅈㅅ (other letters stay as they are)."""
+    return "".join(CHOSEONG[(ord(ch) - 0xAC00) // 588] if "가" <= ch <= "힣" else ch for ch in s)
+
+
+class _Row:
+    __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
+                 "groups")
+
+
+_index = {"key": None, "at": 0.0, "new": [], "name": [], "face_thumbs": set(), "thumbs": set()}
+INDEX_MAX_AGE = 600   # seconds; also rebuilt then, for edits the fingerprint can't see (a bare QuerySet.update)
+
+
+def _files(rel_dir):
+    try:
+        return {int(f[:-5]) for f in os.listdir(os.path.join(settings.MEDIA_ROOT, rel_dir)) if f[:-5].isdigit()}
+    except OSError:
+        return set()
+
+
+def _fingerprint():
+    from .models import MdArt
+    dirs = []
+    for d in (FACE_THUMB_DIR, CARD_THUMB_DIR):
+        try:
+            dirs.append(os.stat(os.path.join(settings.MEDIA_ROOT, d)).st_mtime)
+        except OSError:
+            dirs.append(0)
+    return (tuple(Card.objects.aggregate(n=Count("id"), t=Max("updated_at")).values()),
+            tuple(CardGroupMember.objects.aggregate(n=Count("id"), m=Max("id")).values()),
+            tuple(MdArt.objects.aggregate(n=Count("id"), m=Max("id")).values()), tuple(dirs), settings.MEDIA_ROOT)
+
+
+def _card_index():
+    """Every card on the site, with its names normalized once, kept in memory in both list orders and rebuilt only
+    when the cards, their 카드군, their art or the thumbnail folders change — a search is a pass over memory."""
+    key = _fingerprint()
+    if _index["key"] == key and time.monotonic() - _index["at"] < INDEX_MAX_AGE:
+        return _index
+    groups = defaultdict(set)
+    for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
+        groups[cid].add(gid)
+    rows = []
+    for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
+         st) in Card.objects.filter(has_art()).values_list(
+            "id", "name_ko", "name_ja", "name_en", "ocg_date", "tcg_date", "kr_date", "category", "frame", "attribute",
+            "race", "level", "rank", "link_rating", "spell_trap_subtype"):
+        r = _Row()
+        r.id, r.name = cid, ko or ja or en
+        r.norms = [_norm(n) for n in (ko, ja, en) if n]
+        r.cho = choseong(_norm(ko))
+        released = ocg or tcg or kr
+        r.released = released.toordinal() if released else None
+        r.category, r.frame, r.attribute, r.race, r.st = category, frame, attribute, race, st
+        r.numbers = {n for n in (level, rank, link) if n is not None}
+        r.groups = groups.get(cid, set())
+        rows.append(r)
+    _index.update(
+        key=key, at=time.monotonic(),
+        new=sorted(rows, key=lambda r: (r.released is None, -(r.released or 0), -r.id)),
+        name=sorted(rows, key=lambda r: (r.name, r.id)),
+        face_thumbs=_files(FACE_THUMB_DIR), thumbs=_files(CARD_THUMB_DIR),
+    )
+    return _index
+
+
+def _keep(p):
+    """The filters of the query string as one test on an index row."""
+    tests = []
     if p.get("category") in CATEGORIES:
-        qs = qs.filter(category=p["category"])
+        tests.append(lambda r, v=p["category"]: r.category == v)
     frame = p.get("frame")
     if frame == "pendulum":
-        qs = qs.filter(frame__endswith="_pendulum")
+        tests.append(lambda r: r.frame.endswith("_pendulum"))
     elif frame in FRAMES:
-        qs = qs.filter(frame__in=[frame, f"{frame}_pendulum"])
+        tests.append(lambda r, v=(frame, f"{frame}_pendulum"): r.frame in v)
     if p.get("attribute") in ATTRIBUTES:
-        qs = qs.filter(attribute=p["attribute"])
+        tests.append(lambda r, v=p["attribute"]: r.attribute == v)
     if p.get("race") in RACES:
-        qs = qs.filter(race=p["race"])
+        tests.append(lambda r, v=p["race"]: r.race == v)
     if str(p.get("level", "")).isdigit():
-        n = int(p["level"])
-        qs = qs.filter(Q(level=n) | Q(rank=n) | Q(link_rating=n))
+        tests.append(lambda r, v=int(p["level"]): v in r.numbers)
     category, _, kind = str(p.get("st", "")).partition(":")
     if category in ("spell", "trap") and kind:
-        qs = qs.filter(category=category, spell_trap_subtype=kind)
+        tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
     if str(p.get("group", "")).isdigit():
-        qs = qs.filter(_in_group(int(p["group"])))
-    return qs
+        tests.append(lambda r, v=int(p["group"]): v in r.groups)
+    return lambda r: all(t(r) for t in tests)
 
 
-def _released(row):
-    return row[4] or row[5] or row[6]
+def _rank(rows, query):
+    """Rows matching the query, exact names first, then names starting with it, then names holding it (shorter names
+    first within each); a query of bare 초성 (ㅂㄹㅁㅈㅅ) is matched against the Korean names' 초성."""
+    raw = "".join((query or "").split())
+    by_cho = bool(raw) and all(ch in CHOSEONG for ch in raw)   # before NFKC, which turns ㅂ into another jamo
+    q = raw if by_cho else _norm(query)
+    ranked = []
+    for i, r in enumerate(rows):
+        names = [r.cho] if by_cho else r.norms
+        if q in names:
+            bucket = 0
+        elif any(n.startswith(q) for n in names):
+            bucket = 1
+        elif any(q in n for n in names):
+            bucket = 2
+        else:
+            continue
+        ranked.append((bucket, len(r.norms[0]) if r.norms else 0, i, r))
+    return [r for *_, r in sorted(ranked, key=lambda t: t[:3])]
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def cards(request):
-    """Card list: filters, then search (exact → prefix → substring over Korean/Japanese/English names), then sort
-    (new = latest release first, name, atk)."""
+    """Card list: filters, then search (exact → prefix → substring over Korean/Japanese/English names, or 초성), in
+    the chosen order (new = latest release first, or name)."""
     p = request.query_params
-    rows = list(_filtered(p).values_list("id", "name_ko", "name_ja", "name_en", "ocg_date", "tcg_date", "kr_date", "atk"))
-    sort = p.get("sort") or "new"
-    if sort == "name":
-        rows.sort(key=lambda r: (r[1] or r[2], r[0]))
-    elif sort == "atk":
-        rows.sort(key=lambda r: (r[7] is None, -(r[7] or 0), r[1]))
-    else:
-        rows.sort(key=lambda r: (_released(r) is None, _released(r) and -_released(r).toordinal(), -r[0]))
-    q = _norm(p.get("q"))
-    if q:
-        ranked = []
-        for i, r in enumerate(rows):
-            names = [_norm(n) for n in r[1:4] if n]
-            if any(q == n for n in names):
-                bucket = 0
-            elif any(n.startswith(q) for n in names):
-                bucket = 1
-            elif any(q in n for n in names):
-                bucket = 2
-            else:
-                continue
-            ranked.append((bucket, len(_norm(r[1])), i, r))
-        rows = [r for *_, r in sorted(ranked)]
+    index = _card_index()
+    keep = _keep(p)
+    rows = [r for r in index["name" if p.get("sort") == "name" else "new"] if keep(r)]
+    if _norm(p.get("q")):
+        rows = _rank(rows, p.get("q"))
     try:
         page = max(1, int(p.get("page") or 1))
     except ValueError:
         page = 1
     chunk = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
+    media = settings.MEDIA_URL
     return Response({
-        "results": [{"id": r[0], "name": r[1] or r[2] or r[3], "face_thumb_url": face_thumb_url(r[0]),
-                     "thumb_url": thumb_url(r[0]), "image_url": art_url(r[0])} for r in chunk],
+        "results": [{"id": r.id, "name": r.name,
+                     "face_thumb_url": f"{media}{FACE_THUMB_DIR}/{r.id}.webp" if r.id in index["face_thumbs"] else None,
+                     "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
+                     "image_url": art_url(r.id)} for r in chunk],
         "total": len(rows), "page": page, "has_more": page * PAGE_SIZE < len(rows),
     })
 

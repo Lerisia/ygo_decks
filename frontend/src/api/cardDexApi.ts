@@ -1,8 +1,8 @@
 /** 카드 도감: public card list, filter options and card documents (Master Duel cards). */
 const API_BASE = "/api/carddb/cards";
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { signal });
   if (!res.ok) throw new Error(res.status === 404 ? "카드를 찾을 수 없습니다." : `HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -93,10 +93,10 @@ export function searchToFilters(search: string): CardFilters {
   return f;
 }
 
-export const listCards = (f: CardFilters, page: number) => {
+export const listCards = (f: CardFilters, page: number, signal?: AbortSignal) => {
   const qs = new URLSearchParams(filtersToSearch(f));
   if (page > 1) qs.set("page", String(page));
-  return getJson<CardListResponse>(`/?${qs.toString()}`);
+  return getJson<CardListResponse>(`/?${qs.toString()}`, signal);
 };
 
 let optionsPromise: Promise<CardOptions> | null = null;

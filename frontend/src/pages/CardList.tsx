@@ -13,7 +13,6 @@ const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-
 const SORTS = [
   { value: "new", label: "최신 카드순" },
   { value: "name", label: "이름순" },
-  { value: "atk", label: "공격력순" },
 ];
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -66,6 +65,7 @@ export default function CardList() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const request = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
   const key = filtersToSearch(filters);
 
   // The address is the source of truth while the list is on screen (a 카드군 chip links here with ?group=).
@@ -90,7 +90,7 @@ export default function CardList() {
   useEffect(() => {
     const q = qInput.trim();
     if (q === filters.q) return;
-    const t = setTimeout(() => update({ q }), 300);
+    const t = setTimeout(() => update({ q }), 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qInput]);
@@ -99,21 +99,23 @@ export default function CardList() {
     getCardOptions().then(setOptions).catch(() => setOptions(null));
   }, []);
 
+  // A new search keeps the cards on screen (dimmed) until its answer arrives, and cancels the one before it.
   useEffect(() => {
     const id = ++request.current;
+    inFlight.current?.abort();
+    const ctrl = new AbortController();
+    inFlight.current = ctrl;
     setLoading(true);
     setError("");
-    setItems([]);
-    setTotal(null);
     setPage(1);
-    listCards(filters, 1)
+    listCards(filters, 1, ctrl.signal)
       .then((r) => {
         if (id !== request.current) return;
         setItems(r.results);
         setTotal(r.total);
         setHasMore(r.has_more);
       })
-      .catch((e) => id === request.current && setError(e.message))
+      .catch((e) => id === request.current && e.name !== "AbortError" && setError(e.message))
       .finally(() => id === request.current && setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -258,9 +260,9 @@ export default function CardList() {
       {!loading && !error && total === 0 ? (
         <p className="py-16 text-gray-500 dark:text-gray-400">조건에 맞는 카드가 없습니다.</p>
       ) : (
-        <div className={GRID}>
+        <div className={`${GRID} transition-opacity ${loading && page === 1 && items.length ? "opacity-50" : ""}`}>
           {items.map((c) => <CardTile key={c.id} card={c} />)}
-          {loading && Array.from({ length: items.length ? 6 : 18 }, (_, i) => <TileSkeleton key={`s${i}`} />)}
+          {loading && (page > 1 || !items.length) && Array.from({ length: items.length ? 6 : 18 }, (_, i) => <TileSkeleton key={`s${i}`} />)}
         </div>
       )}
       <div ref={sentinel} className="h-px" />

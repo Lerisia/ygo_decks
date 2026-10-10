@@ -771,7 +771,6 @@ class CardDexApiTest(TestCase):
         self.assertEqual((body["total"], body["page"], body["has_more"]), (6, 1, False))
         self.assertEqual(body["results"][0]["name"], "블랙 매지션의 속공")
         self.assertEqual(self.ids(sort="name"), [6, 1, 3, 4, 5, 2])
-        self.assertEqual(self.ids(sort="atk")[:3], [2, 1, 3])
 
     def test_pages(self):
         for i in range(100, 170):
@@ -784,6 +783,17 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.ids(q="블랙매지션"), [1, 3, 4])
         self.assertEqual(self.ids(q="ブラック・マジシャン"), [1, 3])
         self.assertEqual(self.ids(q="blue-eyes"), [2])
+        self.assertEqual(self.ids(q="ㅂㄹㅁㅈㅅ"), [1, 3, 4])           # 초성
+        self.assertEqual(self.ids(q="ㅍㄹ"), [2])
+
+    def test_the_index_follows_changes(self):
+        self.assertEqual(self.ids(q="새카드"), [])
+        self.card(9, "새카드", ocg_date=date(2026, 1, 1))
+        self.assertEqual(self.ids(q="새카드"), [9])
+        renamed = Card.objects.get(id=9)
+        renamed.name_ko = "고친카드"
+        renamed.save()
+        self.assertEqual(self.ids(q="고친카드"), [9])
 
     def test_filters(self):
         from .models import CardGroup, CardGroupMember
