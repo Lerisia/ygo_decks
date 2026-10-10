@@ -86,7 +86,7 @@ def quiz_image_urls(md_id):
     for size in QUIZ_SIZES:
         rel = f"cards/quiz/{size}x{size}/{md_id}.jpg"
         path = os.path.join(settings.MEDIA_ROOT, rel)
-        if src and not os.path.exists(path):
+        if src and (not os.path.exists(path) or os.path.getmtime(path) < os.path.getmtime(src)):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with Image.open(src) as img:
                 im = img.convert("RGB").resize((size, size), Image.NEAREST)

@@ -368,10 +368,38 @@ class ImportArtTest(TestCase):
         self.addCleanup(shutil.rmtree, folder, True)
         manifest = folder / "manifest.json"
         manifest.write_text(json.dumps({"common/4441": {}, "ocg/4441": {}, "tcg/4441": {}, "common/3101": {}}))
-        self.assertEqual(import_art(manifest), {"arts": 3, "without_print": 1})
+        self.assertEqual(import_art(manifest), {"arts": 3, "without_print": 1, "pendulum_restored": 0})
         self.assertEqual(MdArt.objects.get(md_print_id=4441, version="ocg").image.name, "cards/art/ocg/4441.webp")
         self.assertEqual(import_art(manifest)["arts"], 3)
         self.assertEqual(MdArt.objects.count(), 3)
+
+
+class RestorePendulumArtTest(TestCase):
+    def test_pendulum_art_gets_its_proportions_back_once(self):
+        from django.test import override_settings
+        from PIL import Image
+
+        from .importer import restore_pendulum_art
+        from .models import MdArt
+
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, True)
+        with override_settings(MEDIA_ROOT=media):
+            for cid, frame in ((4045, "effect_pendulum"), (22812, "spell"), (4007, "normal")):
+                Card.objects.create(id=cid, category="spell" if frame == "spell" else "monster", name_ja=str(cid), frame=frame)
+                MdPrint.objects.create(md_id=cid, card_id=cid)
+                size = (512, 512) if cid == 4007 else (512, 1024)
+                img = Image.new("RGB", size, (200, 0, 0))
+                img.paste((0, 0, 200), (0, size[1] - 64, 512, size[1]))
+                Path(media, "cards/art/common").mkdir(parents=True, exist_ok=True)
+                img.save(Path(media, f"cards/art/common/{cid}.webp"), "WEBP")
+                MdArt.objects.create(md_print_id=cid, version="common", image=f"cards/art/common/{cid}.webp")
+            self.assertEqual(restore_pendulum_art(), 1)
+            self.assertEqual(restore_pendulum_art(), 0)
+            sizes = {cid: Image.open(Path(media, f"cards/art/common/{cid}.webp")).size for cid in (4045, 22812, 4007)}
+            pend = Image.open(Path(media, "cards/art/common/4045.webp")).convert("RGB")
+        self.assertEqual(sizes, {4045: (512, 653), 22812: (512, 1024), 4007: (512, 512)})
+        self.assertGreater(pend.getpixel((256, 650))[2], 150)
 
 
 class LegacyMapTest(TestCase):

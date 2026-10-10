@@ -211,7 +211,35 @@ def import_art(manifest_path, prefix="cards/art"):
         if int(md_id) in prints:
             rows.append(MdArt(md_print_id=int(md_id), version=version, image=f"{prefix}/{key}.webp"))
     MdArt.objects.bulk_create(rows, update_conflicts=True, unique_fields=["md_print", "version"], update_fields=["image"], batch_size=500)
-    return {"arts": len(rows), "without_print": len(manifest) - len(rows)}
+    return {"arts": len(rows), "without_print": len(manifest) - len(rows), "pendulum_restored": restore_pendulum_art()}
+
+
+STRETCHED = (512, 1024)
+PENDULUM_ART = (512, 653)
+
+
+def restore_pendulum_art():
+    """Master Duel stretches a pendulum card's full art (712:908) to 512×1024; put it back."""
+    import os
+
+    from PIL import Image
+
+    from .models import MdArt
+
+    restored = 0
+    for art in MdArt.objects.filter(md_print__card__frame__endswith="_pendulum"):
+        path = art.image.path
+        if not os.path.exists(path):
+            continue
+        with Image.open(path) as img:
+            if img.size != STRETCHED:
+                continue
+            fixed = img.convert("RGB").resize(PENDULUM_ART, Image.LANCZOS)
+        tmp = f"{path}.{os.getpid()}.tmp"
+        fixed.save(tmp, "WEBP", quality=90, method=6)
+        os.replace(tmp, path)
+        restored += 1
+    return restored
 
 
 def map_legacy_cards():
