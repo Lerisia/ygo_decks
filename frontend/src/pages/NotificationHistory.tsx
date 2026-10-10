@@ -40,7 +40,7 @@ export default function NotificationHistory() {
         ← 마이페이지
       </button>
 
-      <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-3 sm:p-5">
+      <div className="px-2 sm:px-0">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <h1 className="text-xl font-bold">🔔 알림 내역</h1>
           {rows && rows.length > 0 && (
