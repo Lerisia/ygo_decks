@@ -24,3 +24,18 @@ class CopySiteDataTest(TestCase):
         tag = EffectTag.objects.get(card_id=4041)
         self.assertEqual((tag.destroys, tag.cat_draw, tag.searches, tag.manually_reviewed), (True, True, False, True))
         self.assertEqual(copy_site_data()["effect_tags"], 1)
+
+    def test_fills_what_the_base_row_lacks_from_the_other_art_rows(self):
+        Card.objects.create(id=11708, category="monster", name_ja="屋敷わらし", frame="effect")
+        base = Old.objects.create(card_id="5943893000", konami_id="11708", name="Ghost Belle", archetype="Ghost Belle", yugipedia_misc=["Hand trap"])
+        late = Old.objects.create(card_id="5943893003", konami_id="11708", name="Ghost Belle", archetype="Other", korean_archetype="요괴소녀",
+                                  yugipedia_archseries=["Yo-kai Girl"], yugipedia_misc=["late"])
+        CardEffectTag.objects.create(card=late, hand_trap=True)
+        for row in (late, base):
+            LegacyCard.objects.create(old_id=row.id, old_card_id=row.card_id, card_id=11708, how="konami")
+        copy_site_data()
+        theme = LegacyTheme.objects.get(card_id=11708)
+        self.assertEqual((theme.archetype, theme.archetype_ko), ("Ghost Belle", "요괴소녀"))
+        yp = Yugipedia.objects.get(card_id=11708)
+        self.assertEqual((yp.archseries, yp.misc), (["Yo-kai Girl"], ["Hand trap"]))
+        self.assertTrue(EffectTag.objects.get(card_id=11708).hand_trap)
