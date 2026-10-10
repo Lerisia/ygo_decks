@@ -793,7 +793,7 @@ class CardDexApiTest(TestCase):
                 return self.rows
 
         pages = {1: [{"gameId": "1", "release": "2022-01-19T06:00:00.000Z"}, {"gameId": "2", "release": "2022-01-18T20:00:00.000Z"}],
-                 2: [{"gameId": "999", "release": "2023-01-01T00:00:00.000Z"}, {"gameId": "x"}]}
+                 2: [{"gameId": "1", "release": "2024-02-07T06:00:00.000Z", "alternateArt": True}, {"gameId": "x"}]}
         calls = []
 
         def fake_get(url, params, **kw):
@@ -803,7 +803,7 @@ class CardDexApiTest(TestCase):
         with patch.object(md_release, "PAGE", 2), patch.object(md_release.requests, "get", fake_get):
             out = io.StringIO()
             call_command("fetch_md_release", "--pause", "0", stdout=out)
-        self.assertEqual(MdPrint.objects.get(md_id=1).first_seen, date(2022, 1, 19))
+        self.assertEqual(MdPrint.objects.get(md_id=1).first_seen, date(2022, 1, 19))   # not its alternate art's day
         self.assertEqual(MdPrint.objects.get(md_id=2).first_seen, date(2022, 1, 19))   # 20:00 UTC is the next day in Korea
         self.assertIn("2 prints dated", out.getvalue())
         MdPrint.objects.update(first_seen=date(2022, 1, 19))
