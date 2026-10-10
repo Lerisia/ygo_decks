@@ -818,15 +818,75 @@ class CardDexApiTest(TestCase):
         self.assertEqual([d["name"] for d in body["decks"]], ["블랙 매지션"])
         self.assertEqual(body["rarity"], "SR")
         self.assertEqual(body["alt_arts"], ["/media/cards/art/common/3901.webp"])
-        self.assertIsNone(body["full_image_url"])
-        from card.models import Card as OldCard
-        from .models import LegacyCard
-        old = OldCard.objects.create(card_id="c3", konami_id="3", name="Dark Magician Girl", card_image="card_images/3.jpg")
-        LegacyCard.objects.create(old_id=old.id, old_card_id="c3", card=self.girl, how="konami")
-        self.assertEqual(self.client.get("/api/carddb/cards/3/").json()["full_image_url"], "/media/card_images/3.jpg")
+        self.assertIsNone(body["face_url"])   # not drawn yet
         link = self.client.get("/api/carddb/cards/6/").json()
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()
         self.assertEqual((spell["type_line"], spell["attribute"]), ("속공 마법", ""))
         self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
         self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel
+
+
+class CardFaceTest(TestCase):
+    """Korean card faces drawn from Master Duel's pictures (stand-ins here) with the free Noto fonts."""
+
+    def setUp(self):
+        import os
+        from django.conf import settings
+        from django.test import override_settings
+        from PIL import Image
+        from . import display, face
+        fonts = getattr(settings, "CARD_FACE_ASSETS", "")
+        if not all(os.path.exists(os.path.join(fonts, f)) for f in ("NotoSansKR.ttf", "NotoSerifKR.ttf")):
+            self.skipTest("Noto fonts not installed")
+        self.assets, self.media = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.assets)
+        self.addCleanup(shutil.rmtree, self.media)
+        for f in ("NotoSansKR.ttf", "NotoSerifKR.ttf"):
+            os.symlink(os.path.join(fonts, f), os.path.join(self.assets, f))
+        names = ([f"card_frame{k}.png" for k in face.FRAMES.values()] + ["tex_IconLv.png", "tex_IconRank.png"]
+                 + [f"GUI_T_Icon1_Attr0{i}.png" for i in range(1, 10)] + [f"GUI_T_Icon1_Icon0{i}.png" for i in range(1, 7)]
+                 + [f"GUI_CardPicture_MarkerLinkOn_{k}.png" for k in ("U", "D", "L", "R", "UL", "UR", "DL", "DR")])
+        for n in names:
+            if n.startswith("card_frame"):
+                im = Image.new("RGBA", (704, 1024), (200, 120, 60, 255))
+                im.paste((0, 0, 0, 0), face.ART)   # the window the art shows through
+            else:
+                im = Image.new("RGBA", (64, 64), (200, 120, 60, 200))
+            im.save(os.path.join(self.assets, n))
+        os.makedirs(os.path.join(self.media, "cards/art/common"))
+        Image.new("RGB", (512, 512), (10, 200, 10)).save(os.path.join(self.media, "cards/art/common/7.webp"), "WEBP", lossless=True)
+        ctx = override_settings(CARD_FACE_ASSETS=self.assets, MEDIA_ROOT=self.media)
+        ctx.enable()
+        self.addCleanup(ctx.disable)
+        for clear in (face._image.cache_clear, face._font.cache_clear, display.forget_art):
+            clear()
+            self.addCleanup(clear)
+        from .models import MdArt
+        self.card = Card.objects.create(id=7, category="monster", name_ko="스타더스트 드래곤", name_ja="スターダスト・ドラゴン",
+                                        frame="synchro", types=["synchro", "tuner", "effect"], attribute="wind",
+                                        race="dragon", level=8, atk=2500, def_value=2000)
+        MdPrint.objects.create(md_id=7, card=self.card)
+        MdArt.objects.create(md_print_id=7, version="common", image="cards/art/common/7.webp")
+
+    def test_type_line(self):
+        from .face import type_line
+        self.assertEqual(type_line(self.card), "【드래곤족／싱크로／튜너／효과】")
+        self.card.types = ["normal"]
+        self.assertEqual(type_line(self.card), "【드래곤족】")
+
+    def test_face_is_drawn_and_saved(self):
+        import os
+        from django.core.management import call_command
+        from .face import draw_face, face_url
+        img = draw_face(self.card)
+        self.assertEqual((img.size, img.mode), ((704, 1024), "RGBA"))
+        self.assertEqual(img.getpixel((352, 450))[:3], (10, 200, 10))   # the art shows through the frame's window
+        self.assertIsNone(face_url(7))
+        call_command("draw_card_faces", "--workers", "1", stdout=io.StringIO())
+        self.assertTrue(os.path.exists(os.path.join(self.media, "cards/face/7.webp")))
+        self.assertEqual(face_url(7), "/media/cards/face/7.webp")
+        self.assertEqual(self.client.get("/api/carddb/cards/7/").json()["face_url"], "/media/cards/face/7.webp")
+        out = io.StringIO()
+        call_command("draw_card_faces", "--workers", "1", stdout=out)
+        self.assertIn("0 faces drawn", out.getvalue())   # only missing ones by default

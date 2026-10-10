@@ -59,7 +59,7 @@ function Skeleton() {
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
       <div className="md:flex md:gap-6">
         <div className="md:w-80 shrink-0">
-          <div className={`w-full aspect-square ${bar} rounded-xl`} />
+          <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
         </div>
         <div className="flex-1 mt-4 md:mt-0 flex flex-col gap-2">
           <div className={`h-8 w-2/3 ${bar}`} />
@@ -74,21 +74,21 @@ function Skeleton() {
   );
 }
 
-/** 카드 도감 document: picture (illustration, other Master Duel arts, or the whole card), names, stats, effect text,
+/** 카드 도감 document: picture (the Korean card face, or the illustration and other Master Duel arts), names, stats, effect text,
  *  the card's 카드군 (each opens the card list filtered to it) and the decks those 카드군 are linked to. */
 export default function CardDetail() {
   const { cardId } = useParams();
   const [card, setCard] = useState<CardDoc | null>(null);
   const [error, setError] = useState("");
   const [art, setArt] = useState<string | null>(null);
-  const [whole, setWhole] = useState(false);
+  const [showFace, setShowFace] = useState(true);
   const [ja, setJa] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setCard(null);
     setError("");
-    setWhole(false);
+    setShowFace(true);
     setJa(false);
     getCard(cardId ?? "")
       .then((c) => {
@@ -122,20 +122,20 @@ export default function CardDetail() {
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
       <div className="md:flex md:gap-6">
         <div className="md:w-80 shrink-0">
-          {whole && card.full_image_url ? (
-            <img src={card.full_image_url} alt={`${card.name} 카드`} className="w-full aspect-[813/1185] object-contain rounded-xl bg-gray-100 dark:bg-gray-800" />
+          {showFace && card.face_url ? (
+            <img src={card.face_url} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
           ) : (
             <img src={art || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
-          {card.full_image_url && (
+          {card.face_url && (
             <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-gray-200 dark:bg-gray-700 p-1 text-sm font-semibold">
-              {[["일러스트", false], ["카드 이미지", true]].map(([label, value]) => (
+              {([["카드", true], ["일러스트", false]] as const).map(([label, value]) => (
                 <button
-                  key={String(label)}
+                  key={label}
                   type="button"
-                  onClick={() => setWhole(value as boolean)}
+                  onClick={() => setShowFace(value)}
                   className={`py-1.5 rounded-md transition ${
-                    whole === value ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
+                    showFace === value ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
                   }`}
                 >
                   {label}
@@ -143,8 +143,7 @@ export default function CardDetail() {
               ))}
             </div>
           )}
-          {whole && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">카드 이미지는 영문판입니다.</p>}
-          {!whole && arts.length > 1 && (
+          {!(showFace && card.face_url) && arts.length > 1 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {arts.map((u, i) => (
                 <button

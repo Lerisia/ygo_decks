@@ -58,8 +58,8 @@ export type CardDoc = {
   texts: { ko: CardTexts; ja: CardTexts };
   image_url: string | null;
   thumb_url: string | null;
-  /** Whole card with its frame — the English (YGOPRODeck) picture; no Korean one exists. */
-  full_image_url: string | null;
+  /** The whole card in Korean, drawn from Master Duel's frame (null until drawn). */
+  face_url: string | null;
   alt_arts: string[];
   rarity: string;
   dates: { ocg: string | null; kr: string | null; tcg: string | null };

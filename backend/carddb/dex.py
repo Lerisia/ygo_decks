@@ -9,6 +9,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .display import art_url, display_name, thumb_url
+from .face import face_url
 from .models import Card, CardGroup, CardGroupMember, CardText, MdPrint, has_art
 
 PAGE_SIZE = 60
@@ -141,15 +142,6 @@ def card_options(request):
     })
 
 
-def _full_image(card_id):
-    """The old card table's whole-card picture (English, YGOPRODeck) through the legacy id map, or None."""
-    from card.models import Card as OldCard
-    from .models import LegacyCard
-    old_ids = LegacyCard.objects.filter(card_id=card_id).values_list("old_id", flat=True)
-    old = OldCard.objects.filter(id__in=old_ids).exclude(card_image="").order_by("card_id").first()   # art 00 first
-    return old.card_image.url if old else None
-
-
 def _stat(v):
     return None if v is None else "?" if v < 0 else str(v)
 
@@ -198,7 +190,7 @@ def card(request, card_id):
         "atk": _stat(c.atk), "def": None if c.frame == "link" else _stat(c.def_value),
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale,
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
-        "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "full_image_url": _full_image(c.id),
+        "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
         "alt_arts": [u for u in (art_url(m) for m in MdPrint.objects.filter(card=c, is_alt_art=True)
                                  .order_by("md_id").values_list("md_id", flat=True)) if u],
         "rarity": base.rarity if base else "",
