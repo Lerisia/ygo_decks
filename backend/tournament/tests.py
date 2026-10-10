@@ -464,16 +464,33 @@ class ChatTest(TournamentApiTestBase):
 class DeckSubmissionTest(TournamentApiTestBase):
     @classmethod
     def setUpTestData(cls):
-        from card.models import Card
-        cls.c1 = Card.objects.create(card_id="1", konami_id="1", name="Blue-Eyes", korean_name="푸른 눈의 백룡")
-        cls.c2 = Card.objects.create(card_id="2", konami_id="2", name="Dark Magician", korean_name="블랙 매지션")
-        cls.c3 = Card.objects.create(card_id="3", konami_id="3", name="Pot of Greed", korean_name="욕망의 항아리")
+        from carddb.models import Card, LegacyCard, MdArt, MdPrint
+        made = []
+        for old_id, (cid, name) in enumerate(((4007, "푸른 눈의 백룡"), (4041, "블랙 매지션"), (4844, "욕망의 항아리"), (5392, "천재지변")), 1):
+            card = Card.objects.create(id=cid, category="monster", name_ja=name, name_ko=name, frame="normal")
+            if cid != 5392:
+                MdPrint.objects.create(md_id=cid, card=card)
+                MdArt.objects.create(md_print_id=cid, version="common", image=f"cards/art/common/{cid}.webp")
+            LegacyCard.objects.create(old_id=old_id, old_card_id=str(old_id), card=card, how="konami")
+            made.append(card)
+        cls.c1, cls.c2, cls.c3, cls.ocg_only = made
 
     def setUp(self):
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
         super().setUp()
         self.t = Tournament.objects.get(id=self.create(format="swiss").json()["id"])
         self.players = self.make_players(self.t, 2)
         self.u, self.c = self.players[0]
+
+    def test_cards_outside_master_duel_are_unmatched(self):
+        resp = self._upload(self.c, [("1", 0.9), ("4", 0.9)])
+        self.assertEqual(resp.json()["unmatched_count"], 1)
+        self.assertEqual(resp.json()["cards"][0]["card"], {"id": 4007, "name": "푸른 눈의 백룡", "image_url": "/media/cards/art/common/4007.webp"})
+        add = self.c.post(f"/api/tournaments/{self.t.id}/deck/cards/", {"card_id": self.ocg_only.id, "quantity": 1}, format="json")
+        self.assertEqual(add.status_code, 404)
+
 
     def _upload(self, client, scan_result):
         from unittest.mock import patch

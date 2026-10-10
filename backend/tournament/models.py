@@ -210,7 +210,7 @@ class DeckSubmissionCard(models.Model):
     SOURCE_CHOICES = [("auto", "스캐너"), ("manual", "수동")]
 
     submission = models.ForeignKey(DeckSubmission, on_delete=models.CASCADE, related_name="cards")
-    card = models.ForeignKey("card.Card", on_delete=models.CASCADE, related_name="+")
+    card = models.ForeignKey("card.Card", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
     new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     quantity = models.PositiveIntegerField(default=1)
     confidence = models.FloatField(null=True, blank=True)  # null for manual entries
@@ -218,5 +218,5 @@ class DeckSubmissionCard(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["submission", "card"], name="unique_submission_card"),
+            models.UniqueConstraint(fields=["submission", "new_card"], name="unique_submission_new_card"),
         ]

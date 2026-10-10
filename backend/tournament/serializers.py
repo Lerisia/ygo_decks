@@ -180,11 +180,11 @@ class DeckSubmissionCardSerializer(serializers.ModelSerializer):
         fields = ["id", "card", "quantity", "confidence", "source"]
 
     def get_card(self, obj):
-        illust = getattr(obj.card, "card_illust", None)
+        from carddb.display import art_url, display_name
         return {
-            "id": obj.card_id,
-            "name": obj.card.korean_name or obj.card.name,
-            "image_url": illust.url if illust else None,
+            "id": obj.new_card_id,
+            "name": display_name(obj.new_card),
+            "image_url": art_url(obj.new_card_id),
         }
 
 
@@ -198,7 +198,7 @@ class DeckSubmissionSerializer(serializers.ModelSerializer):
         fields = ["id", "entrant_id", "member", "slot", "image", "unmatched_count", "cards", "locked", "updated_at"]
 
     def get_cards(self, obj):
-        qs = obj.cards.select_related("card").order_by("card__korean_name", "card__name")
+        qs = obj.cards.select_related("new_card").order_by("new_card__name_ko", "new_card_id")
         return DeckSubmissionCardSerializer(qs, many=True).data
 
     def get_locked(self, obj):

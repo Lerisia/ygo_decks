@@ -1305,23 +1305,27 @@ def deck_submission(request, tournament_id):
                 f.write(chunk)
         detections = scan_deck_image(image_path, work_dir)
 
-    from card.models import Card
+    from carddb.models import LegacyCard, has_art
     counts = {}
     best_conf = {}
     unmatched = 0
     detections = [(str(cid), float(conf)) for cid, conf in detections]
-    cards_by_scanner_id = {c.card_id: c for c in Card.objects.filter(card_id__in=[d[0] for d in detections])}
+    # The scanner still labels cards by their old card_id; the link table leads to the new card.
+    card_by_scanner_id = dict(
+        LegacyCard.objects.filter(old_card_id__in={d[0] for d in detections}, card__isnull=False)
+        .filter(has_art("card_id")).values_list("old_card_id", "card_id")
+    )
     for scanner_id, confidence in detections:
-        card = cards_by_scanner_id.get(scanner_id)
-        if card is None:
+        card_id = card_by_scanner_id.get(scanner_id)
+        if card_id is None:
             unmatched += 1
             continue
-        counts[card.id] = min(counts.get(card.id, 0) + 1, MAX_COPIES)
-        best_conf[card.id] = max(best_conf.get(card.id, 0.0), float(confidence))
+        counts[card_id] = min(counts.get(card_id, 0) + 1, MAX_COPIES)
+        best_conf[card_id] = max(best_conf.get(card_id, 0.0), float(confidence))
 
     submission.cards.all().delete()
     DeckSubmissionCard.objects.bulk_create([
-        DeckSubmissionCard(submission=submission, card_id=cid, quantity=qty,
+        DeckSubmissionCard(submission=submission, new_card_id=cid, quantity=qty,
                            confidence=best_conf[cid], source="auto")
         for cid, qty in counts.items()
     ])
@@ -1347,8 +1351,11 @@ def deck_card_add(request, tournament_id):
         return _err("quantity가 올바르지 않습니다.")
     if not (1 <= quantity <= MAX_COPIES):
         return _err(f"수량은 1~{MAX_COPIES}장이어야 합니다.")
-    from card.models import Card
-    card = Card.objects.filter(id=request.data.get("card_id")).first()
+    from carddb.models import Card, has_art
+    try:
+        card = Card.objects.filter(has_art()).filter(id=int(request.data.get("card_id"))).first()
+    except (TypeError, ValueError):
+        card = None
     if not card:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     member = _membership(t, request.user) if entrant.is_team else None
@@ -1357,7 +1364,7 @@ def deck_card_add(request, tournament_id):
         return err
     submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member, slot=slot)
     DeckSubmissionCard.objects.update_or_create(
-        submission=submission, card=card,
+        submission=submission, new_card=card,
         defaults={"quantity": quantity, "confidence": None, "source": "manual"},
     )
     return _deck_response(submission)
