@@ -12,14 +12,13 @@ import os
 import re
 from functools import lru_cache
 
-import numpy as np
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
 
 from .display import art_name, art_path
 
 W, H = 704, 1024
-FACE_VERSION = 4          # raise after any change to how faces are drawn: every face is drawn again
+FACE_VERSION = 3          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
@@ -111,43 +110,6 @@ def _cover(img, w, h, top=0.5):
     x = (img.width - w) // 2
     y = round((img.height - h) * top)
     return img.crop((x, y, x + w, y + h))
-
-
-@lru_cache(maxsize=1)
-def special_frames():
-    """{print id: {"mask", "normal"}}: prints Master Duel finishes specially (WCS rewards), from
-    SpecialIllustCardSetting (exported to special_illust.json with the textures)."""
-    try:
-        with open(_asset("special_illust.json")) as f:
-            return {int(k): v for k, v in json.load(f).items()}
-    except (OSError, ValueError):
-        return {}
-
-
-@lru_cache(maxsize=8)
-def _gold_layers(mask, normal):
-    """(coverage, colour) of a special frame: the mask's red lines (outer border, art frame, text box rules) in
-    brushed gold, lit from the top left through the normal map so they stand out like embossed foil."""
-    red = np.asarray(_image(mask + ".png").resize((W, H), Image.LANCZOS))[..., 0].astype(np.float32)[..., None] / 255
-    n = np.asarray(_image(normal + ".png").convert("RGB").resize((W, H), Image.LANCZOS)).astype(np.float32) / 127.5 - 1
-    n /= np.linalg.norm(n, axis=2, keepdims=True) + 1e-6
-    light = np.array([-0.5, 0.6, 0.62], np.float32)
-    light /= np.linalg.norm(light)
-    half = light + np.array([0, 0, 1], np.float32)
-    half /= np.linalg.norm(half)
-    diffuse = np.clip(n @ light, 0, 1)[..., None]
-    specular = (np.clip(n @ half, 0, 1) ** 24)[..., None]
-    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-    sheen = (0.5 + 0.5 * np.sin((xx * 0.6 + yy) / 85.0))[..., None]
-    base = np.array([196, 150, 52], np.float32) * (0.8 + 0.35 * sheen)
-    return red, np.clip(base * (0.45 + 0.75 * diffuse) + 255 * 0.55 * specular, 0, 255)
-
-
-def _special_frame(face, special):
-    cover, gold = _gold_layers(special["mask"], special["normal"])
-    a = np.asarray(face).astype(np.float32)
-    a[..., :3] = a[..., :3] * (1 - cover) + gold * cover
-    return Image.fromarray(a.astype(np.uint8), "RGBA")
 
 
 def is_overframe(art):
@@ -303,9 +265,6 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
                 art = _cover(art, x1 - x0, y1 - y0)
             face.alpha_composite(art, (x0, y0))
         face.alpha_composite(_image(f"card_frame{FRAMES[frame_key]}.png"))
-        special = special_frames().get(art_id or card.id)
-        if special:
-            face = _special_frame(face, special)
     draw = ImageDraw.Draw(face)
 
     # name and attribute; over a 오버프레임 art the name is white on a soft shadow so it reads on any picture
@@ -360,7 +319,7 @@ def signature(card, md_id):
     again when this changes."""
     parts = [FACE_VERSION, card.name_ko or card.name_ja, card.category, card.frame, card.attribute, card.race,
              card.types, card.level, card.rank, card.link_rating, card.link_markers, card.atk, card.def_value,
-             card.pendulum_scale, card.spell_trap_subtype, art_name(md_id), special_frames().get(md_id)]
+             card.pendulum_scale, card.spell_trap_subtype, art_name(md_id)]
     return hashlib.sha1(json.dumps(parts, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
 
 
