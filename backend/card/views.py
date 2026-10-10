@@ -242,19 +242,16 @@ def _get_card_search_index():
     global _CARD_SEARCH_INDEX, _CARD_SEARCH_INDEX_AT
     if _CARD_SEARCH_INDEX is not None and _t.time() - _CARD_SEARCH_INDEX_AT < _CARD_SEARCH_TTL:
         return _CARD_SEARCH_INDEX
-    qs = (
-        Card.objects.filter(card_illust__isnull=False)
-        .exclude(card_illust="")
-        .only("id", "korean_name", "name", "card_illust")
-    )
+    from carddb.display import art_names, art_url, display_name, thumb_url
+    from carddb.models import Card as NewCard
+
+    with_art = art_names()
     index = []
-    for c in qs:
-        name = c.korean_name or c.name or ""
-        try:
-            url = c.card_illust.url if c.card_illust else None
-        except Exception:
-            url = None
-        index.append((c.id, name, _normalize_for_search(name), url, search_thumb_url(c.card_illust.name) if url else None))
+    for c in NewCard.objects.only("id", "name_ko", "name_ja", "name_en"):
+        if c.id not in with_art:
+            continue
+        name = display_name(c)
+        index.append((c.id, name, _normalize_for_search(name), art_url(c.id), thumb_url(c.id)))
     _CARD_SEARCH_INDEX = index
     _CARD_SEARCH_INDEX_AT = _t.time()
     return _CARD_SEARCH_INDEX

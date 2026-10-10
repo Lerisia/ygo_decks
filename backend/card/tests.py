@@ -378,55 +378,54 @@ class CardThumbTests(TestCase):
 
 
 class CardSearchThumbTests(TestCase):
-    """Card search results show a 256px webp thumbnail instead of the full illustration (2026-10-06)."""
+    """Card search reads the new card DB: Korean names, Master Duel art (OCG original first) and 256px thumbnails."""
 
     def setUp(self):
         from card import views
+        from carddb import display
         self.media = tempfile.mkdtemp()
         self.override = override_settings(MEDIA_ROOT=self.media)
         self.override.enable()
         views._CARD_SEARCH_INDEX = None
+        display.forget_art()
 
     def tearDown(self):
         from card import views
+        from carddb import display
         import shutil
         views._CARD_SEARCH_INDEX = None
+        display.forget_art()
         self.override.disable()
         shutil.rmtree(self.media, ignore_errors=True)
 
-    def _card(self, konami_id, name, size=(624, 624)):
-        buf = BytesIO()
-        PILImage.new("RGB", size, (30, 90, 200)).save(buf, "JPEG")
-        return Card.objects.create(card_id=konami_id, konami_id=konami_id, name=name, korean_name=name,
-                                   card_illust=SimpleUploadedFile(f"{konami_id}_illust.jpg", buf.getvalue(), content_type="image/jpeg"))
+    def _card(self, cid, name, versions=("common",)):
+        from carddb.models import Card as NewCard, MdArt, MdPrint
+        card = NewCard.objects.create(id=cid, category="monster", name_ja=name, name_ko=name, frame="normal")
+        MdPrint.objects.create(md_id=cid, card=card)
+        for v in versions:
+            rel = f"cards/art/{v}/{cid}.webp"
+            os.makedirs(os.path.join(self.media, os.path.dirname(rel)), exist_ok=True)
+            PILImage.new("RGB", (512, 512), (30, 90, 200)).save(os.path.join(self.media, rel), "WEBP")
+            MdArt.objects.create(md_print_id=cid, version=v, image=rel)
+        return card
 
     def test_command_makes_webp_thumbs_once(self):
-        card = self._card("4041", "블랙 매지션")
-        call_command("make_card_search_thumbs", stdout=open(os.devnull, "w"))
-        path = os.path.join(self.media, "card_search_thumbs", "4041_illust.webp")
+        self._card(4041, "블랙 매지션")
+        call_command("make_card_thumbs", stdout=open(os.devnull, "w"))
+        path = os.path.join(self.media, "cards", "thumb256", "4041.webp")
         with PILImage.open(path) as im:
             self.assertEqual((im.format, im.size), ("WEBP", (256, 256)))
-        os.utime(card.card_illust.path, (500_000, 500_000))
-        os.utime(path, (1_000_000, 1_000_000))
-        call_command("make_card_search_thumbs", stdout=open(os.devnull, "w"))
-        self.assertEqual(os.path.getmtime(path), 1_000_000)
+        os.utime(path, (2_000_000_000, 2_000_000_000))
+        call_command("make_card_thumbs", stdout=open(os.devnull, "w"))
+        self.assertEqual(os.path.getmtime(path), 2_000_000_000)
 
-    def test_changed_illustration_gets_a_new_thumb(self):
-        card = self._card("4041", "블랙 매지션")
-        call_command("make_card_search_thumbs", stdout=open(os.devnull, "w"))
-        path = os.path.join(self.media, "card_search_thumbs", "4041_illust.webp")
-        os.utime(path, (500_000, 500_000))
-        call_command("make_card_search_thumbs", stdout=open(os.devnull, "w"))
-        self.assertGreater(os.path.getmtime(path), 500_000)
-
-    def test_search_returns_thumb_or_falls_back(self):
-        self._card("4041", "블랙 매지션")
-        self._card("4042", "블랙 매지션 걸")
-        call_command("make_card_search_thumbs", stdout=open(os.devnull, "w"))
-        os.remove(os.path.join(self.media, "card_search_thumbs", "4042_illust.webp"))
-        from card import views
-        views._CARD_SEARCH_INDEX = None
-        rows = {r["name"]: r for r in self.client.get("/api/search/", {"q": "블랙 매지션"}).json()["results"]}
-        self.assertEqual(rows["블랙 매지션"]["thumb_url"], "/media/card_search_thumbs/4041_illust.webp")
-        self.assertTrue(rows["블랙 매지션"]["image_url"].endswith("4041_illust.jpg"))
-        self.assertIsNone(rows["블랙 매지션 걸"]["thumb_url"])
+    def test_search_returns_new_ids_original_art_and_thumbs(self):
+        self._card(4441, "워터 걸", versions=("ocg", "tcg"))
+        self._card(4442, "워터 걸 2")
+        call_command("make_card_thumbs", stdout=open(os.devnull, "w"))
+        os.remove(os.path.join(self.media, "cards", "thumb256", "4442.webp"))
+        rows = {r["name"]: r for r in self.client.get("/api/search/", {"q": "워터 걸"}).json()["results"]}
+        self.assertEqual(rows["워터 걸"]["id"], 4441)
+        self.assertEqual(rows["워터 걸"]["image_url"], "/media/cards/art/ocg/4441.webp")
+        self.assertEqual(rows["워터 걸"]["thumb_url"], "/media/cards/thumb256/4441.webp")
+        self.assertIsNone(rows["워터 걸 2"]["thumb_url"])
