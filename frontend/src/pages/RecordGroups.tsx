@@ -146,7 +146,6 @@ const RecordGroups = () => {
   }, [metaLinked, metaStats]);
 
   const topMeta = metaStats.slice(0, 10);
-  const moreMeta = metaStats.slice(10, 30);
 
   const renderMetaRow = (deck: MetaDeckStat, idx: number) => {
     const tint = winRateTint(deck.win_rate);
@@ -321,7 +320,8 @@ const RecordGroups = () => {
               ※ 월초 셀렉션 팩 출시 시 초기화
             </p>
             <div className="flex items-center justify-end mb-3">
-              {/* Phones open on the pie alone and 더보기 brings the numbers; on PC it adds 11위 ~ 30위 (특이점 2026-10-10). */}
+              {/* Phones open on the pie alone and 더보기 brings the numbers. PC already shows 1~10위 and nothing below 10위 is
+                  offered: those samples are too thin to trust (특이점 2026-10-10). */}
               {topMeta.length > 0 && (
                 <button
                   type="button"
@@ -329,7 +329,7 @@ const RecordGroups = () => {
                   aria-label={showMoreMeta ? "순위 접기" : "순위 더보기"}
                   aria-expanded={showMoreMeta}
                   title={showMoreMeta ? "순위 접기" : "순위 더보기"}
-                  className={`${moreMeta.length ? "" : "md:hidden"} group flex items-center gap-1 rounded-full hover:border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400`}
+                  className={`md:hidden group flex items-center gap-1 rounded-full hover:border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400`}
                 >
                   <span className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200">더보기</span>
                   <span
@@ -360,14 +360,6 @@ const RecordGroups = () => {
                 {topMeta.map((deck, idx) => renderMetaRow(deck, idx))}
               </div>
             </div>
-            {showMoreMeta && moreMeta.length > 0 && (
-              <div className="mt-4 pt-3 border-t dark:border-gray-700">
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">11위 ~ {10 + moreMeta.length}위</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                  {moreMeta.map((deck, i) => renderMetaRow(deck, i + 10))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

@@ -478,8 +478,8 @@ def recent_meta_deck_stats(request):
             "win_rate": round(win_rate, 1),
         })
 
-    # Top 30: the page shows 10 and reveals 11-30 behind an (i) button (특이점 2026-09-27).
-    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:30]
+    # Top 10 only: below that the samples are too thin to trust (특이점 2026-10-10; it was 30 since 09-27).
+    results = sorted(results, key=lambda x: x["appearance_percent"], reverse=True)[:10]
     covers = Deck.objects.in_bulk([r["meta_deck_id"] for r in results])
     for r in results:
         d = covers.get(r["meta_deck_id"])
