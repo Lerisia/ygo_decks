@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'channels',
     'deck',
     'card',
+    'carddb',
     'question',
     'tournament',
     'analytics',
