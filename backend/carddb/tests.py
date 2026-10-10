@@ -1,3 +1,4 @@
+import io
 import shutil
 import struct
 import tempfile
@@ -456,3 +457,47 @@ class FillNewCardLinksTest(TestCase):
         game.refresh_from_db()
         self.assertEqual((icon.new_card_id, game.new_card_id), (4041, None))
         self.assertEqual(fill_new_card_links()["avatar.CardIcon"], 0)
+
+
+class SwapStepsTest(TestCase):
+    """swap_cards prepare: what has to be true before the migration that switches features to the new card ids."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+
+        from solo.models import SoloDailyPoints, SoloDrawing, SoloTwentyGame
+        self.user = get_user_model().objects.create_user(email="sw@test.com", username="swap", password="x")
+        card = Card.objects.create(id=4041, category="monster", name_ja="ブラック・マジシャン", name_ko="블랙 매지션", frame="normal")
+        self.game = SoloTwentyGame.objects.create(user=self.user, new_card=card, card_name_snapshot="블랙매지션", status="active")
+        self.done = SoloTwentyGame.objects.create(user=self.user, new_card=card, card_name_snapshot="블랙매지션", status="won")
+        later = timezone.now() + timedelta(days=3)
+        self.drawing = SoloDrawing.objects.create(drawer=self.user, new_card=card, word="블랙매지션", strokes_json=[], expires_at=later)
+        SoloDailyPoints.objects.create(user=self.user, date=timezone.localdate(), pending_offer_cards=[1, 2, 3], pending_offer_token="t")
+
+    def test_words_to_drop_keeps_one_enabled_word_per_card(self):
+        from .management.commands.swap_cards import words_to_drop
+        rows = [(1, 10, 4041, False), (2, 10, 4041, True), (3, 10, 4041, True), (4, 10, 4007, False), (5, 11, 4041, False)]
+        self.assertEqual(words_to_drop(rows), [1, 3])
+
+    def test_prepare_moves_live_answers_to_master_duel_names(self):
+        from django.core.management import call_command
+
+        from solo.models import SoloDailyPoints
+        call_command("swap_cards", "prepare", stdout=io.StringIO())
+        self.game.refresh_from_db(); self.done.refresh_from_db(); self.drawing.refresh_from_db()
+        self.assertEqual((self.game.card_name_snapshot, self.done.card_name_snapshot), ("블랙 매지션", "블랙매지션"))
+        self.assertEqual(self.drawing.word, "블랙 매지션")
+        self.assertEqual(list(SoloDailyPoints.objects.values_list("pending_offer_cards", "pending_offer_token")), [([], "")])
+
+    def test_prepare_stops_while_a_room_is_mid_game(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        from multiplayer.models import Room
+        Room.objects.create(name="방", host=self.user, status="in_game")
+        with self.assertRaises(CommandError):
+            call_command("swap_cards", "prepare", stdout=io.StringIO())
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.card_name_snapshot, "블랙매지션")
