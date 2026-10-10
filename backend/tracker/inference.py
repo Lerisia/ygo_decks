@@ -2,11 +2,10 @@
 from collections import Counter, defaultdict
 from types import SimpleNamespace
 
-from card.models import CardIdAlias, CardArchetypeOverride
+from card.models import CardIdAlias
 from carddb.display import display_name
-from carddb.models import Card, MdPrint
-from cardsite.models import LegacyTheme
-from deck.models import DeckArchetype, DeckInferencePriority
+from carddb.models import Card, CardGroupMember, MdPrint
+from deck.models import CardDeckOverride, Deck, DeckCardGroup, DeckInferencePriority
 from .learned import learned_decks
 
 # 지엽적인 카드에 더 큰 표를 준다 (특이점 2026-09-29). 기록된 듀얼에서 그 카드가 보였을 때 실제로 자기 테마 덱이었던
@@ -57,19 +56,37 @@ def resolve_aliases(card_ids):
 
 
 def _cards(kids):
-    """{konami id: archetype + frame_type} for the ids the new card DB knows."""
+    """{konami id: frame_type} for the ids the new card DB knows."""
     ids = [int(k) for k in kids if str(k).isdigit()]
-    themes = dict(LegacyTheme.objects.filter(card_id__in=ids).values_list("card_id", "archetype"))
-    return {str(cid): SimpleNamespace(archetype=themes.get(cid) or None, frame_type=frame)
-            for cid, frame in Card.objects.filter(id__in=ids).values_list("id", "frame")}
+    return {str(cid): SimpleNamespace(frame_type=frame) for cid, frame in Card.objects.filter(id__in=ids).values_list("id", "frame")}
+
+
+def card_decks(kids):
+    """{konami id: {deck id: weight}} for the cards that vote: the decks each card's 카드군 link to, once per deck at
+    its strongest link, or the decks a CardDeckOverride sets instead. A card in no linked 카드군 still votes, for
+    no deck (its deck isn't on the site); a card in no 카드군, or overridden to no deck (a generic card), doesn't."""
+    ids = [int(k) for k in kids if str(k).isdigit()]
+    out, groups = {}, defaultdict(set)
+    for cid, gid in CardGroupMember.objects.filter(card_id__in=ids).exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
+        groups[gid].add(cid)
+        out.setdefault(str(cid), {})
+    for gid, deck_id, weight in DeckCardGroup.objects.filter(group_id__in=groups).values_list("group_id", "deck_id", "weight"):
+        for cid in groups[gid]:
+            out[str(cid)][deck_id] = max(weight, out[str(cid)].get(deck_id, 0.0))
+    overrides = defaultdict(dict)
+    for cid, deck_id, weight in CardDeckOverride.objects.filter(card_id__in=ids).values_list("card_id", "deck_id", "weight"):
+        overrides[str(cid)].update({deck_id: weight} if deck_id else {})
+    out.update(overrides)
+    return {k: v for k, v in out.items() if v or k not in overrides}
 
 
 def infer_decks(card_ids, limit=3):
     """Vote decks from a list of Konami card IDs (duplicates count).
 
     Returns (candidates, unknown_ids): candidates = [{"deck_id", "name", "score", "share", "is_engine"}] sorted by
-    score, share = score / total votes (0..1). Cards without an archetype contribute nothing. Engine decks drop
-    below a non-engine candidate that reaches ENGINE_DEMOTE_MIN_RATIO of their score, but stay in the list.
+    score, share = score / total votes (0..1). Each card votes once, for every deck card_decks gives it; cards with
+    no deck contribute nothing. Engine decks drop below a non-engine candidate that reaches
+    ENGINE_DEMOTE_MIN_RATIO of their score, but stay in the list.
     """
     resolved = resolve_aliases(card_ids)
     counts = Counter(str(c) for c in resolved if c)
@@ -77,38 +94,24 @@ def infer_decks(card_ids, limit=3):
         return [], []
     cards = _cards(counts)
     unknown = sorted(int(k) for k in counts if k not in cards and k.isdigit())
-    overrides = {o.konami_id: o.archetype for o in CardArchetypeOverride.objects.filter(konami_id__in=list(counts))}
-    card_arch = {}
-    for kid in counts:
-        card = cards.get(kid)
-        archetype = overrides.get(kid, card.archetype) if card else None
-        if archetype:
-            card_arch[kid] = archetype
-    if not card_arch:
+    links = card_decks([k for k in counts if k in cards])
+    if not any(links.values()):
         return learned_decks(resolved, limit), unknown
-    arch_rows = defaultdict(list)
-    for da in DeckArchetype.objects.filter(name__in=set(card_arch.values())).select_related("deck"):
-        arch_rows[da.name].append(da)
-    weights = card_specificity(card_arch, arch_rows, cards)
-    arch_votes = Counter()
-    for kid, archetype in card_arch.items():
-        arch_votes[archetype] += counts[kid] * weights[kid]
-    arch_specific = defaultdict(float)
-    arch_main = defaultdict(bool)   # does any main-deck card vote for this archetype?
-    for kid, archetype in card_arch.items():
-        arch_specific[archetype] = max(arch_specific[archetype], weights[kid])
-        frame = (cards[kid].frame_type or "") if kid in cards else ""
-        arch_main[archetype] = arch_main[archetype] or not any(w in frame for w in EXTRA_FRAME_WORDS)
+    decks = Deck.objects.in_bulk({d for m in links.values() for d in m})
+    weights = card_specificity(links, decks, cards)
     scores = defaultdict(float)
-    names, engines, specific, has_main = {}, {}, defaultdict(float), defaultdict(bool)
-    for archetype, rows in arch_rows.items():
-        for da in rows:
-            scores[da.deck_id] += arch_votes[archetype] * da.weight
-            names[da.deck_id] = da.deck.name
-            engines[da.deck_id] = da.deck.is_engine
-            specific[da.deck_id] = max(specific[da.deck_id], arch_specific[archetype])
-            has_main[da.deck_id] = has_main[da.deck_id] or arch_main[archetype]
-    total = sum(arch_votes.values())
+    specific, has_main = defaultdict(float), defaultdict(bool)   # has_main: does any main-deck card vote for it?
+    total = 0.0
+    for kid, m in links.items():
+        vote = counts[kid] * weights[kid]
+        total += vote
+        main = not any(w in (cards[kid].frame_type or "") for w in EXTRA_FRAME_WORDS)
+        for deck_id, w in m.items():
+            scores[deck_id] += vote * w
+            specific[deck_id] = max(specific[deck_id], weights[kid])
+            has_main[deck_id] = has_main[deck_id] or main
+    names = {d: decks[d].name for d in scores}
+    engines = {d: decks[d].is_engine for d in scores}
     best_plain = max((s for d, s in scores.items() if not engines[d] and specific[d] >= SPECIFIC_MIN), default=0.0)
     beaten = {p.loser_id for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores)}
 
@@ -139,18 +142,18 @@ def infer_opponent(card_ids, limit=3):
     return cands, [], unknown
 
 
-def card_specificity(card_arch, arch_rows, cards):
-    """Vote weight per card id: how reliably seeing this card meant its own theme's deck in recorded duels."""
+def card_specificity(links, decks, cards):
+    """Vote weight per card id: how reliably seeing this card meant one of its own decks in recorded duels."""
     from .models import TrackerCardDeckStat
     seen, hits = Counter(), Counter()
-    for kid, deck_id, n in TrackerCardDeckStat.objects.filter(konami_id__in=[int(k) for k in card_arch]).values_list("konami_id", "deck_id", "games"):
+    for kid, deck_id, n in TrackerCardDeckStat.objects.filter(konami_id__in=[int(k) for k in links]).values_list("konami_id", "deck_id", "games"):
         k = str(kid)
         seen[k] += n
-        if deck_id in {da.deck_id for da in arch_rows.get(card_arch.get(k), [])}:
+        if deck_id in links.get(k, {}):
             hits[k] += n
     weights = {}
-    for kid in card_arch:
-        if any(da.deck.name in ENGINE_ALWAYS_TOP for da in arch_rows.get(card_arch[kid], [])):
+    for kid in links:
+        if any(decks[d].name in ENGINE_ALWAYS_TOP for d in links[kid]):
             weights[kid] = 1.0   # 낙인: its cards also get splashed elsewhere, but pure builds dominate — keep full weight
         elif seen[kid] >= SPEC_MIN_GAMES:
             share = (hits[kid] + 1) / (seen[kid] + 2)   # smoothed so one odd label doesn't swing it

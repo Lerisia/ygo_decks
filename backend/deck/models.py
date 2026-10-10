@@ -245,6 +245,23 @@ class DeckCardGroup(models.Model):
         return f"{self.deck.name}: {self.group}"
 
 
+class CardDeckOverride(models.Model):
+    """A card whose recorder vote is set by hand instead of through its 카드군: it votes only for the decks its rows
+    name (at their weight), and for no deck at all when its row leaves the deck empty (a generic card)."""
+    card = models.ForeignKey("carddb.Card", on_delete=models.CASCADE, related_name="deck_overrides")
+    deck = models.ForeignKey(Deck, null=True, blank=True, on_delete=models.CASCADE, related_name="card_overrides")
+    weight = models.FloatField(default=1.0)
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "카드별 덱 지정"
+        verbose_name_plural = "카드별 덱 지정"
+        constraints = [models.UniqueConstraint(fields=["card", "deck"], name="uniq_card_deck_override")]
+
+    def __str__(self):
+        return f"{self.card_id} → {self.deck.name if self.deck_id else '(표 없음)'}"
+
+
 class DeckArchetype(models.Model):
     """Card.archetype values (YGOPRODeck English names) that identify this deck.
     Used by the PC tracker to infer decks from card IDs; several decks may share an archetype."""

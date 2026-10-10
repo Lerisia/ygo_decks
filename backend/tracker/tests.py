@@ -8,16 +8,25 @@ from tracker.inference import infer_decks
 
 
 def old_style_card(card_id="", konami_id="", name="", korean_name="", archetype=None, frame_type=""):
-    """A card in the new card DB, from the fields these tests used to give the old card table."""
-    from carddb.models import Card, MdPrint
-    from cardsite.models import LegacyTheme
+    """A card in the new card DB, from the fields these tests used to give the old card table; `archetype` names
+    the 카드군 it belongs to."""
+    from carddb.models import Card, CardGroup, CardGroupMember, MdPrint
     kid = int(konami_id)
     category = frame_type if frame_type in ("spell", "trap") else "monster"
     card = Card.objects.create(id=kid, category=category, name_ja=name, name_ko=korean_name or "", frame=frame_type or "")
     MdPrint.objects.create(md_id=kid, card=card)
     if archetype:
-        LegacyTheme.objects.create(card=card, archetype=archetype)
+        group, _ = CardGroup.objects.get_or_create(text=archetype, reading=archetype)
+        CardGroupMember.objects.create(group=group, card=card, how="name")
     return card
+
+
+def link_group(deck, name, weight=1.0):
+    """The site deck is built on 카드군 `name`."""
+    from carddb.models import CardGroup
+    from deck.models import DeckCardGroup
+    group, _ = CardGroup.objects.get_or_create(text=name, reading=name)
+    return DeckCardGroup.objects.create(deck=deck, group=group, weight=weight)
 
 
 def _create_deck(name="테스트 덱", **kwargs):
@@ -30,17 +39,16 @@ class TrackerInferTest(TestCase):
     """POST /api/tracker/infer/ — card ids → deck candidates for the PC tracker."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         self.client = APIClient()
         self.user = User.objects.create_user(email="t@test.com", username="tracker", password="pass1234")
         self.client.force_authenticate(user=self.user)
         self.blue = _create_deck("푸른 눈")
         self.reso = _create_deck("레조네이터")
         self.dragon_link = _create_deck("드래곤 링크")
-        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes")
-        DeckArchetype.objects.create(deck=self.reso, name="Resonator")
-        DeckArchetype.objects.create(deck=self.reso, name="Red Dragon Archfiend")
-        DeckArchetype.objects.create(deck=self.dragon_link, name="Blue-Eyes", weight=0.3)
+        link_group(deck=self.blue, name="Blue-Eyes")
+        link_group(deck=self.reso, name="Resonator")
+        link_group(deck=self.reso, name="Red Dragon Archfiend")
+        link_group(deck=self.dragon_link, name="Blue-Eyes", weight=0.3)
         for kid, name, arch in [("4007", "Blue-Eyes White Dragon", "Blue-Eyes"), ("12292", "Sage with Eyes of Blue", "Blue-Eyes"),
                                 ("9015", "Red Lotus King", "Red Dragon Archfiend"), ("19014", "Soul Resonator", "Resonator"),
                                 ("9279", "Droll & Lock Bird", None)]:
@@ -108,10 +116,9 @@ class TrackerSnapshotTest(TestCase):
 class TrackerAliasTest(TestCase):
     def test_alt_art_ids_count_as_base_card(self):
         from carddb.models import MdPrint
-        from deck.models import DeckArchetype
         from .inference import infer_decks, card_names
         blue = _create_deck("푸른 눈")
-        DeckArchetype.objects.create(deck=blue, name="Blue-Eyes")
+        link_group(deck=blue, name="Blue-Eyes")
         bewd = old_style_card(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon", korean_name="푸른 눈의 백룡", archetype="Blue-Eyes")
         MdPrint.objects.create(md_id=3892, card=bewd, is_alt_art=True)
         cands, unknown = infer_decks([3892, 3892, 3891])
@@ -128,9 +135,8 @@ class TrackerAliasTest(TestCase):
         self.assertEqual(resolve_aliases([39999, 4007, 3891]), [4007, 4007, 3891])
 
     def test_a_token_votes_for_its_theme(self):
-        from deck.models import DeckArchetype
         from .inference import infer_decks
-        DeckArchetype.objects.create(deck=_create_deck("섬도희"), name="Sky Striker")
+        link_group(deck=_create_deck("섬도희"), name="Sky Striker")
         old_style_card(konami_id="13681", name="閃刀姫トークン", archetype="Sky Striker", frame_type="token")
         self.assertEqual(infer_decks([13681])[0][0]["name"], "섬도희")
 
@@ -139,7 +145,6 @@ class TrackerPendingTest(TestCase):
     """Tracker uploads a captured game → it waits on the record page → saving a record consumes it."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         from tool.models import RecordGroup
         self.client = APIClient()
         self.user = User.objects.create_user(email="p@test.com", username="pending", password="pass1234")
@@ -147,8 +152,8 @@ class TrackerPendingTest(TestCase):
         self.client.force_authenticate(user=self.user)
         self.blue = _create_deck("푸른 눈")
         self.reso = _create_deck("레드 데몬")
-        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes")
-        DeckArchetype.objects.create(deck=self.reso, name="Resonator")
+        link_group(deck=self.blue, name="Blue-Eyes")
+        link_group(deck=self.reso, name="Resonator")
         old_style_card(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon", korean_name="푸른 눈의 백룡", archetype="Blue-Eyes")
         old_style_card(card_id="c19014", konami_id="19014", name="Soul Resonator", korean_name="소울 레조네이터", archetype="Resonator")
         self.group = RecordGroup.objects.create(user=self.user, name="테스트")
@@ -727,7 +732,6 @@ class TrackerEngineDemotionTest(TestCase):
     """엔진 덱은 비엔진 후보가 함께 보이면 뒤로, 단 낙인은 예외 (특이점 2026-09-15)."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         self.engine = _create_deck("엘펜노츠")
         self.engine.is_engine = True
         self.engine.save(update_fields=["is_engine"])
@@ -735,9 +739,9 @@ class TrackerEngineDemotionTest(TestCase):
         self.branded = _create_deck("낙인")
         self.branded.is_engine = True
         self.branded.save(update_fields=["is_engine"])
-        DeckArchetype.objects.create(deck=self.engine, name="Elfnote")
-        DeckArchetype.objects.create(deck=self.plain, name="Synchron")
-        DeckArchetype.objects.create(deck=self.branded, name="Branded")
+        link_group(deck=self.engine, name="Elfnote")
+        link_group(deck=self.plain, name="Synchron")
+        link_group(deck=self.branded, name="Branded")
         for kid, arch in [("101", "Elfnote"), ("102", "Synchron"), ("103", "Branded")]:
             old_style_card(card_id=f"c{kid}", konami_id=kid, name=f"card{kid}", archetype=arch)
 
@@ -762,22 +766,21 @@ class TrackerEngineDemotionTest(TestCase):
 
 
 class TrackerArchetypeOverrideTest(TestCase):
-    """CardArchetypeOverride: 범용 카드는 투표 제외, 용병 파츠는 실제로 쓰는 덱으로 (특이점 2026-09-15)."""
+    """CardDeckOverride: 범용 카드는 투표 제외, 용병 파츠는 실제로 쓰는 덱으로 (특이점 2026-09-15)."""
 
     def setUp(self):
-        from card.models import CardArchetypeOverride
-        from deck.models import DeckArchetype
+        from deck.models import CardDeckOverride
         self.endymion = _create_deck("엔디미온")
         self.fairy = _create_deck("페어리테일")
-        DeckArchetype.objects.create(deck=self.endymion, name="Endymion")
-        DeckArchetype.objects.create(deck=self.fairy, name="Fairy Tail")
-        DeckArchetype.objects.create(deck=self.fairy, name="Magistus", weight=0.6)
+        link_group(deck=self.endymion, name="Endymion")
+        link_group(deck=self.fairy, name="Fairy Tail")
+        link_group(deck=self.fairy, name="Magistus", weight=0.6)
         for kid, name, arch in [("8135", "마법 도시 엔디미온", "Endymion"), ("14937", "신성마황후 셀레네", "Endymion"),
                                 ("21220", "크레센트 오브 마기스토스 엔디미온", "Endymion"), ("15614", "마기스토스 베르 산드리용", "Magistus"),
                                 ("22499", "페어리테일－위캣", "Fairy Tail")]:
             old_style_card(card_id=f"c{kid}", konami_id=kid, name=name, archetype=arch)
-        CardArchetypeOverride.objects.create(konami_id="14937", archetype="", note="범용 링크")
-        CardArchetypeOverride.objects.create(konami_id="21220", archetype="Magistus", note="마기스토스 파츠")
+        CardDeckOverride.objects.create(card_id=14937, deck=None, note="범용 링크")
+        CardDeckOverride.objects.create(card_id=21220, deck=self.fairy, weight=0.6, note="마기스토스 파츠")
 
     def test_blank_override_removes_the_vote(self):
         cands, _ = infer_decks([14937])
@@ -796,15 +799,43 @@ class TrackerArchetypeOverrideTest(TestCase):
         self.assertEqual([c["name"] for c in cands], ["엔디미온"])
 
 
+class TrackerCardGroupVoteTest(TestCase):
+    """A card in several 카드군 votes once for each deck they lead to, at that deck's strongest link."""
+
+    def test_one_vote_per_deck_at_the_strongest_link(self):
+        from carddb.models import CardGroup, CardGroupMember
+        utopia, actor = _create_deck("유토피아"), _create_deck("마계극단")
+        link_group(utopia, "希望皇ホープ")
+        link_group(utopia, "ホープ", weight=0.8)
+        link_group(actor, "魔界劇団")
+        hope = old_style_card(konami_id="401", name="No.39 希望皇ホープ", archetype="希望皇ホープ")
+        CardGroupMember.objects.create(group=CardGroup.objects.get(text="ホープ"), card=hope, how="name")
+        wild = old_style_card(konami_id="402", name="魔界劇団－ワイルド・ホープ", archetype="魔界劇団")
+        CardGroupMember.objects.create(group=CardGroup.objects.get(text="ホープ"), card=wild, how="name")
+        cands, _ = infer_decks([401])
+        self.assertEqual([(c["name"], c["score"]) for c in cands], [("유토피아", 1.0)])
+        cands, _ = infer_decks([402])
+        self.assertEqual([(c["name"], c["score"]) for c in cands], [("마계극단", 1.0), ("유토피아", 0.8)])
+        self.assertEqual(cands[0]["share"], 1.0)
+
+    def test_a_card_left_out_of_its_group_does_not_vote(self):
+        from carddb.models import CardGroupMember
+        dt = _create_deck("DT")
+        link_group(dt, "DT")
+        old_style_card(konami_id="403", name="エッジインプ・DTモドキ", archetype="DT")
+        CardGroupMember.objects.filter(card_id=403).update(how="removed")
+        self.assertEqual(infer_decks([403])[0], [])
+
+
 class TrackerDeckPriorityTest(TestCase):
     """DeckInferencePriority: 혼용 덱은 지정한 쪽으로 (특이점 2026-09-15, 십이수현람 → 현람)."""
 
     def setUp(self):
-        from deck.models import DeckArchetype, DeckInferencePriority
+        from deck.models import DeckInferencePriority
         self.zoo = _create_deck("십이수")
         self.rad = _create_deck("현람")
-        DeckArchetype.objects.create(deck=self.zoo, name="Zoodiac")
-        DeckArchetype.objects.create(deck=self.rad, name="Radiant Typhoon")
+        link_group(deck=self.zoo, name="Zoodiac")
+        link_group(deck=self.rad, name="Radiant Typhoon")
         for kid, arch in [("201", "Zoodiac"), ("202", "Radiant Typhoon")]:
             old_style_card(card_id=f"c{kid}", konami_id=kid, name=f"card{kid}", archetype=arch)
         DeckInferencePriority.objects.create(winner=self.rad, loser=self.zoo, note="혼용은 현람")
@@ -818,9 +849,8 @@ class TrackerDeckPriorityTest(TestCase):
         self.assertEqual([c["name"] for c in cands], ["십이수"])
 
     def test_priority_only_applies_to_the_listed_pair(self):
-        from deck.models import DeckArchetype
         other = _create_deck("령수")
-        DeckArchetype.objects.create(deck=other, name="Spiritual Beast")
+        link_group(deck=other, name="Spiritual Beast")
         old_style_card(card_id="c203", konami_id="203", name="card203", archetype="Spiritual Beast")
         cands, _ = infer_decks([201, 201, 203])
         self.assertEqual(cands[0]["name"], "십이수")
@@ -879,9 +909,8 @@ class TrackerLearnedFallbackTest(TestCase):
         self.assertEqual(infer_decks([301])[0], [])
 
     def test_theme_votes_still_come_first(self):
-        from deck.models import DeckArchetype
         blue = _create_deck("푸른 눈")
-        DeckArchetype.objects.create(deck=blue, name="Blue-Eyes")
+        link_group(deck=blue, name="Blue-Eyes")
         old_style_card(card_id="c4007", konami_id="4007", name="Blue-Eyes White Dragon", archetype="Blue-Eyes")
         for _ in range(3):
             self._game([301], self.rescue)
@@ -967,15 +996,14 @@ class TrackerCardSpecificityTest(TestCase):
     """지엽적인 카드일수록 표가 무겁게 (특이점 2026-09-29): 범용 카드(알미라지)가 전용 카드(해머·로어)를 이기지 못하게."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         from tracker.models import TrackerCardDeckStat
         self.tri = _create_deck("트라이브리게이드")
         self.tri.is_engine = True
         self.tri.save(update_fields=["is_engine"])
         self.sala = _create_deck("샐러맨그레이트")
         self.others = [_create_deck(f"다른덱{i}") for i in range(5)]
-        DeckArchetype.objects.create(deck=self.tri, name="Tri-Brigade")
-        DeckArchetype.objects.create(deck=self.sala, name="Salamangreat")
+        link_group(deck=self.tri, name="Tri-Brigade")
+        link_group(deck=self.sala, name="Salamangreat")
         old_style_card(card_id="c301", konami_id="301", name="해머", archetype="Tri-Brigade", frame_type="spell")
         old_style_card(card_id="c302", konami_id="302", name="로어", archetype="Tri-Brigade", frame_type="spell")
         old_style_card(card_id="c303", konami_id="303", name="알미라지", archetype="Salamangreat", frame_type="link")
@@ -997,18 +1025,16 @@ class TrackerCardSpecificityTest(TestCase):
         self.assertAlmostEqual(cands[0]["score"], 1.0, places=1)
 
     def test_extra_deck_card_without_data_counts_less_than_main_deck_card(self):
-        from deck.models import DeckArchetype
         code = _create_deck("코드 토커")
-        DeckArchetype.objects.create(deck=code, name="Code Talker")
+        link_group(deck=code, name="Code Talker")
         old_style_card(card_id="c305", konami_id="305", name="액세스코드", archetype="Code Talker", frame_type="link")
         cands, _ = infer_decks([305, 304])   # both non-engine, neither has enough records to judge
         self.assertEqual(cands[0]["name"], "샐러맨그레이트")
 
     def test_generic_card_alone_cannot_push_down_an_engine_deck(self):
-        from deck.models import DeckArchetype
         from tracker.models import TrackerCardDeckStat
         code = _create_deck("코드 토커")
-        DeckArchetype.objects.create(deck=code, name="Code Talker")
+        link_group(deck=code, name="Code Talker")
         old_style_card(card_id="c306", konami_id="306", name="범용 링크", archetype="Code Talker", frame_type="link")
         TrackerCardDeckStat.objects.create(konami_id=306, deck=code, games=1)
         TrackerCardDeckStat.objects.create(konami_id=306, deck=self.others[0], games=9)   # weight ≈ 0.28, above 20% of 1.0
@@ -1016,10 +1042,9 @@ class TrackerCardSpecificityTest(TestCase):
         self.assertEqual(cands[0]["name"], "트라이브리게이드")
 
     def test_branded_cards_keep_full_weight_even_when_splashed(self):
-        from deck.models import DeckArchetype
         from tracker.models import TrackerCardDeckStat
         branded = _create_deck("낙인")
-        DeckArchetype.objects.create(deck=branded, name="Branded")
+        link_group(deck=branded, name="Branded")
         old_style_card(card_id="c307", konami_id="307", name="낙인 카드", archetype="Branded", frame_type="spell")
         TrackerCardDeckStat.objects.create(konami_id=307, deck=branded, games=2)
         TrackerCardDeckStat.objects.create(konami_id=307, deck=self.others[1], games=10)
@@ -1032,14 +1057,13 @@ class TrackerSuggestionCaptureTest(TestCase):
     """판이 끝날 때 서버가 제안한 상대 덱을 남겨, 유저가 다른 덱으로 저장하면 '교정'으로 구분한다 (특이점 2026-09-30)."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         from tool.models import RecordGroup
         self.client = APIClient()
         self.user = User.objects.create_user(email="sg@test.com", username="suggest", password="pass1234")
         self.client.force_authenticate(user=self.user)
         self.ign = _create_deck("@이그니스터")
         self.mal = _create_deck("M∀LICE")
-        DeckArchetype.objects.create(deck=self.ign, name="@Ignister")
+        link_group(deck=self.ign, name="@Ignister")
         old_style_card(card_id="c501", konami_id="501", name="이그니스터 카드", archetype="@Ignister", frame_type="effect")
         self.group = RecordGroup.objects.create(user=self.user, name="교정")
         self.capture = {"did": "900000000000000001", "game_mode": 3, "result": "win", "coin_win": True, "first": True,
@@ -1054,9 +1078,9 @@ class TrackerSuggestionCaptureTest(TestCase):
         self.assertEqual(self._game().suggested_opp_deck_id, self.ign.id)
 
     def test_reupload_does_not_overwrite_the_first_suggestion(self):
-        from deck.models import DeckArchetype
         self.client.post("/api/tracker/games/", self.capture, format="json")
-        DeckArchetype.objects.filter(deck=self.ign).update(deck=self.mal)   # inference would now say M∀LICE
+        from deck.models import DeckCardGroup
+        DeckCardGroup.objects.filter(deck=self.ign).update(deck=self.mal)   # inference would now say M∀LICE
         self.client.post("/api/tracker/games/", {**self.capture, "turn": 4}, format="json")
         self.assertEqual(self._game().suggested_opp_deck_id, self.ign.id)
 
@@ -1078,16 +1102,15 @@ class TrackerUnsureOpponentTest(TestCase):
     근거가 엑스트라 덱 카드뿐이거나 1순위 덱 표가 전체의 절반 미만이면 제안하지 않는다(과거 기록에서 교정률 ~20%)."""
 
     def setUp(self):
-        from deck.models import DeckArchetype
         self.client = APIClient()
         self.user = User.objects.create_user(email="u@test.com", username="unsure", password="pass1234")
         self.client.force_authenticate(user=self.user)
         self.ign = _create_deck("@이그니스터")
         self.kewl = _create_deck("킬러튠")
         self.blue = _create_deck("푸른 눈")
-        DeckArchetype.objects.create(deck=self.ign, name="@Ignister")
-        DeckArchetype.objects.create(deck=self.kewl, name="Kewl Tune")
-        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes")
+        link_group(deck=self.ign, name="@Ignister")
+        link_group(deck=self.kewl, name="Kewl Tune")
+        link_group(deck=self.blue, name="Blue-Eyes")
         for kid, name, arch, frame in [
             ("14851", "Windpegasus @Ignister", "@Ignister", "synchro"),
             ("22533", "Fidraulis Harmonia", None, "effect"),
