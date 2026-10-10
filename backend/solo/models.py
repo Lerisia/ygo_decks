@@ -44,6 +44,7 @@ class SoloDrawing(models.Model):
         null=True, blank=True,
         related_name="solo_drawings",
     )
+    new_card = models.ForeignKey("carddb.Card", on_delete=models.SET_NULL, null=True, blank=True, related_name="solo_drawings")
     word = models.CharField(max_length=200, help_text="정답 (스냅샷)")
     # The canvas stroke buffer (same DmStrokePayload[] shape the multi-
     # player drawer pushes). Stored as JSON.
@@ -206,6 +207,7 @@ class SoloTwentyGame(models.Model):
         null=True, blank=True,
         related_name="solo_tw_games",
     )
+    new_card = models.ForeignKey("carddb.Card", on_delete=models.SET_NULL, null=True, blank=True, related_name="solo_tw_games")
     # Korean name snapshot so a card rename can't rewrite history.
     card_name_snapshot = models.CharField(max_length=200, default="")
     # Pool used for card selection. Matches DuchMindWordPack.name. Empty

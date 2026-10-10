@@ -246,3 +246,25 @@ def map_legacy_cards():
         counts[how] = counts.get(how, 0) + 1
     LegacyCard.objects.bulk_create(rows, update_conflicts=True, unique_fields=["old_id"], update_fields=["old_card_id", "card", "how"], batch_size=1000)
     return counts
+
+
+NEW_CARD_LINKS = [
+    ("avatar", "CardIcon"), ("multiplayer", "DuchMindWord"), ("tournament", "DeckSubmissionCard"),
+    ("solo", "SoloDrawing"), ("solo", "SoloTwentyGame"), ("card", "CardDetection"),
+]
+
+
+def fill_new_card_links(only_missing=True):
+    from django.apps import apps
+    from django.db.models import OuterRef, Subquery
+
+    from .models import LegacyCard
+
+    target = Subquery(LegacyCard.objects.filter(old_id=OuterRef("card_id")).values("card_id")[:1])
+    out = {}
+    for app, model in NEW_CARD_LINKS:
+        qs = apps.get_model(app, model).objects.exclude(card=None)
+        if only_missing:
+            qs = qs.filter(new_card=None)
+        out[f"{app}.{model}"] = qs.update(new_card=target)
+    return out

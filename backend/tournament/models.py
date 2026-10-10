@@ -211,6 +211,7 @@ class DeckSubmissionCard(models.Model):
 
     submission = models.ForeignKey(DeckSubmission, on_delete=models.CASCADE, related_name="cards")
     card = models.ForeignKey("card.Card", on_delete=models.CASCADE, related_name="+")
+    new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     quantity = models.PositiveIntegerField(default=1)
     confidence = models.FloatField(null=True, blank=True)  # null for manual entries
     source = models.CharField(max_length=8, choices=SOURCE_CHOICES, default="manual")

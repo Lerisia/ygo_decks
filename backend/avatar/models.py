@@ -157,6 +157,7 @@ class CardIcon(models.Model):
         related_name="icons",
         null=True, blank=True,
     )
+    new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="card_icons")
     custom_illust = models.ForeignKey(
         CustomIllust,
         on_delete=models.CASCADE,

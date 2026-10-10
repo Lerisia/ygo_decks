@@ -401,3 +401,30 @@ class LegacyMapTest(TestCase):
         self.assertEqual(got[skill.id], (None, "none"))
         self.assertEqual(got[wrong.id], (21000, "manual"))
         self.assertEqual(counts["konami"], 2)
+
+
+class FillNewCardLinksTest(TestCase):
+    def test_new_card_follows_the_legacy_map(self):
+        from django.contrib.auth import get_user_model
+
+        from avatar.models import CardIcon
+        from card.models import Card as Old
+        from solo.models import SoloTwentyGame
+
+        from .importer import fill_new_card_links
+        from .models import LegacyCard
+
+        Card.objects.create(id=4041, category="monster", name_ja="ブラック・マジシャン", frame="normal")
+        old = Old.objects.create(card_id="4602257801", konami_id="4041", name="Dark Magician")
+        lost = Old.objects.create(card_id="30030202200", konami_id="0", name="Ancient Fusion")
+        LegacyCard.objects.create(old_id=old.id, old_card_id=old.card_id, card_id=4041, how="konami")
+        LegacyCard.objects.create(old_id=lost.id, old_card_id=lost.card_id, how="none")
+        icon = CardIcon.objects.create(card=old, center_x=0.5, center_y=0.5, radius=0.3)
+        user = get_user_model().objects.create_user(email="t@test.com", username="t1", password="pass1234")
+        game = SoloTwentyGame.objects.create(user=user, card=lost, card_name_snapshot="x")
+        out = fill_new_card_links()
+        self.assertEqual((out["avatar.CardIcon"], out["solo.SoloTwentyGame"]), (1, 1))
+        icon.refresh_from_db()
+        game.refresh_from_db()
+        self.assertEqual((icon.new_card_id, game.new_card_id), (4041, None))
+        self.assertEqual(fill_new_card_links()["avatar.CardIcon"], 0)

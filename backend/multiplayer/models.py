@@ -224,6 +224,7 @@ class DuchMindWord(models.Model):
         null=True, blank=True,
         related_name="duchmind_words",
     )
+    new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="duchmind_words")
     pokemon = models.ForeignKey(
         "PokemonCard",
         on_delete=models.CASCADE,
