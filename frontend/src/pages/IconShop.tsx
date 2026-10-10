@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import {
   listShopIcons, purchaseIcon, listShopBorders, purchaseBorder, getMyAvatar,
@@ -18,7 +19,9 @@ const RARITY_ORDER: Record<Exclude<IconRarity, "">, number> = {
 
 export default function IconShop() {
   const loggedIn = isAuthenticated();
-  const [mainTab, setMainTab] = useState<"icon" | "border">("icon");
+  // /icon-shop?tab=border opens on the frames (linked from My Page, 참혈 2026-10-11).
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState<"icon" | "border">(searchParams.get("tab") === "border" ? "border" : "icon");
   const [icons, setIcons] = useState<ShopCardIcon[]>([]);
   const [borders, setBorders] = useState<ShopBorder[]>([]);
   const [bordersLoaded, setBordersLoaded] = useState(false);

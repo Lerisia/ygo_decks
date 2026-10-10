@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Avatar from "@/components/Avatar";
 import {
   listMyIcons, getMyAvatar, setMyAvatar,
@@ -177,12 +177,20 @@ export default function MyAvatar() {
 
       {borders.length > 1 && (
         <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-4">
-          <h2 className="font-semibold mb-3 text-sm">
-            테두리{" "}
-            <span className="font-normal text-gray-500 dark:text-gray-400 tabular-nums">
-              {borderCollection.owned} / {borderCollection.total}
-            </span>
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="font-semibold text-sm">
+              테두리{" "}
+              <span className="font-normal text-gray-500 dark:text-gray-400 tabular-nums">
+                {borderCollection.owned} / {borderCollection.total}
+              </span>
+            </h2>
+            <Link
+              to="/icon-shop?tab=border"
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+            >
+              상점으로 가기
+            </Link>
+          </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {shownBorders.map((b) => {
               const isSelected = currentBorder?.id === b.id;
