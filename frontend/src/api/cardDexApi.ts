@@ -69,7 +69,8 @@ export type CardDoc = {
   /** The card's faces: its own print first, then Master Duel's alternate arts. */
   faces: { id: number; face: string; thumb: string | null }[];
   rarity: string;
-  dates: { ocg: string | null; kr: string | null; tcg: string | null };
+  /** md: the day the card came to Master Duel. */
+  dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];
   decks: { id: number; name: string; cover: string | null }[];
 };

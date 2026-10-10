@@ -74,7 +74,9 @@ def _fingerprint():
             dirs.append(0)
     return (tuple(Card.objects.aggregate(n=Count("id"), t=Max("updated_at")).values()),
             tuple(CardGroupMember.objects.aggregate(n=Count("id"), m=Max("id")).values()),
-            tuple(MdArt.objects.aggregate(n=Count("id"), m=Max("id")).values()), tuple(dirs), settings.MEDIA_ROOT)
+            tuple(MdArt.objects.aggregate(n=Count("id"), m=Max("id")).values()),
+            tuple(MdPrint.objects.aggregate(n=Count("md_id"), d=Max("first_seen"), u=Count("first_seen")).values()),
+            tuple(dirs), settings.MEDIA_ROOT)
 
 
 def _card_index():
@@ -86,6 +88,7 @@ def _card_index():
     groups = defaultdict(set)
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
         groups[cid].add(gid)
+    md_release = dict(MdPrint.objects.filter(is_alt_art=False).exclude(first_seen=None).values_list("md_id", "first_seen"))
     rows = []
     for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
          st) in Card.objects.filter(has_art()).values_list(
@@ -95,7 +98,7 @@ def _card_index():
         r.id, r.name = cid, ko or ja or en
         r.norms = [_norm(n) for n in (ko, ja, en) if n]
         r.cho = choseong(_norm(ko))
-        released = ocg or tcg or kr
+        released = md_release.get(cid) or ocg or tcg or kr   # Master Duel's day first (엘리스 10/11)
         r.released = released.toordinal() if released else None
         r.category, r.frame, r.attribute, r.race, r.st = category, frame, attribute, race, st
         r.numbers = {n for n in (level, rank, link) if n is not None}
@@ -159,7 +162,8 @@ def _rank(rows, query):
 @permission_classes([AllowAny])
 def cards(request):
     """Card list: filters, then search (exact → prefix → substring over Korean/Japanese/English names, or 초성), in
-    the chosen order (new = latest release first, or name)."""
+    the chosen order (new = latest first by the day the card came to Master Duel, else its first paper release; or
+    name)."""
     p = request.query_params
     index = _card_index()
     keep = _keep(p)
@@ -273,7 +277,7 @@ def card(request, card_id):
                   for m in [c.id] + list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id")
                                          .values_list("md_id", flat=True)) if face_url(m)],
         "rarity": base.rarity if base else "",
-        "dates": {"ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
+        "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
         "decks": decks,
     })

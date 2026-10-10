@@ -772,6 +772,46 @@ class CardDexApiTest(TestCase):
         self.assertEqual(body["results"][0]["name"], "블랙 매지션의 속공")
         self.assertEqual(self.ids(sort="name"), [6, 1, 3, 4, 5, 2])
 
+    def test_newest_goes_by_the_day_a_card_came_to_master_duel(self):
+        MdPrint.objects.filter(md_id=1).update(first_seen=date(2026, 9, 1))   # an old card, newly in Master Duel
+        self.assertEqual(self.ids()[:2], [1, 4])
+        self.assertEqual(self.client.get("/api/carddb/cards/1/").json()["dates"]["md"], "2026-09-01")
+
+    def test_master_duel_release_days_from_mdm(self):
+        from unittest.mock import patch
+        from django.core.management import call_command
+        from . import md_release
+
+        class Reply:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self.rows
+
+        pages = {1: [{"gameId": "1", "release": "2022-01-19T06:00:00.000Z"}, {"gameId": "2", "release": "2022-01-18T20:00:00.000Z"}],
+                 2: [{"gameId": "999", "release": "2023-01-01T00:00:00.000Z"}, {"gameId": "x"}]}
+        calls = []
+
+        def fake_get(url, params, **kw):
+            calls.append(params["page"])
+            return Reply(pages.get(params["page"], []))
+
+        with patch.object(md_release, "PAGE", 2), patch.object(md_release.requests, "get", fake_get):
+            out = io.StringIO()
+            call_command("fetch_md_release", "--pause", "0", stdout=out)
+        self.assertEqual(MdPrint.objects.get(md_id=1).first_seen, date(2022, 1, 19))
+        self.assertEqual(MdPrint.objects.get(md_id=2).first_seen, date(2022, 1, 19))   # 20:00 UTC is the next day in Korea
+        self.assertIn("2 prints dated", out.getvalue())
+        MdPrint.objects.update(first_seen=date(2022, 1, 19))
+        with patch.object(md_release.requests, "get", fake_get):
+            out = io.StringIO()
+            call_command("fetch_md_release", "--if-needed", stdout=out)
+        self.assertIn("nothing to check", out.getvalue())
+
     def test_pages(self):
         for i in range(100, 170):
             self.card(i, f"카드 {i}", ocg_date=date(2020, 1, 1))
@@ -956,9 +996,12 @@ class CardFaceTest(TestCase):
     def test_refresh_card_book_runs_every_step(self):
         from django.core.management import call_command
         from django.test import override_settings
+        from unittest.mock import patch
+        from . import md_release
         out = io.StringIO()
-        with override_settings(MD_NAMED_PATH=""):
+        with override_settings(MD_NAMED_PATH=""), patch.object(md_release, "fetch_releases", lambda **kw: {}):
             call_command("refresh_card_book", "--workers", "1", stdout=out)
+        self.assertIn("md release", out.getvalue())
         self.assertIn("faces drawn", out.getvalue())
         self.assertIn("thumbnails made", out.getvalue())
 

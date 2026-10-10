@@ -113,7 +113,7 @@ export default function CardDetail() {
   const pendulum = card.pendulum_scale !== null && card.pendulum_scale !== undefined;
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
-  const dates = [["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
+  const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
