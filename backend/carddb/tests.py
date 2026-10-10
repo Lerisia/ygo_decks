@@ -953,6 +953,20 @@ class CardFaceTest(TestCase):
         self.assertIn("thumbnails made", out.getvalue())
 
 
+    def test_an_overframe_art_covers_the_whole_card(self):
+        import os
+        from PIL import Image
+        from . import display
+        from .face import draw_face
+        from .models import MdArt
+        Image.new("RGB", (512, 1024), (200, 10, 200)).save(os.path.join(self.media, "cards/art/common/22789.webp"), "WEBP", lossless=True)
+        of = MdPrint.objects.create(md_id=22789, card=self.card, is_alt_art=True)
+        MdArt.objects.create(md_print=of, version="common", image="cards/art/common/22789.webp")
+        display.forget_art()
+        img = draw_face(self.card, art_id=22789)
+        self.assertEqual(img.getpixel((10, 500))[:3], (200, 10, 200))     # where the frame would be
+        self.assertEqual(draw_face(self.card).getpixel((10, 500))[:3], (200, 120, 60))   # the usual print keeps its frame
+
     def test_pendulum_scale_is_drawn_with_the_text_boxes_empty(self):
         from .face import PEND_SCALE_X, draw_face
         self.card.frame, self.card.types, self.card.pendulum_scale = "effect_pendulum", ["pendulum", "effect"], 7

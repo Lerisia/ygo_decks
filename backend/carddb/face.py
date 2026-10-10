@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .display import art_name, art_path
 
 W, H = 704, 1024
-FACE_VERSION = 2          # raise after any change to how faces are drawn: every face is drawn again
+FACE_VERSION = 3          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
@@ -110,6 +110,12 @@ def _cover(img, w, h, top=0.5):
     x = (img.width - w) // 2
     y = round((img.height - h) * top)
     return img.crop((x, y, x + w, y + h))
+
+
+def is_overframe(art):
+    """Master Duel's 오버프레임 prints carry the whole card as their art (512×1024, squeezed sideways): the art
+    covers the frame, and only the letters and icons go on top."""
+    return art.height >= 1.5 * art.width
 
 
 def _squeezed_text(text, font, fill, max_w, height):
@@ -243,25 +249,31 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
         texts = card.texts.filter(lang="ko").first()
     frame_key = card.frame if card.frame in FRAMES else ("spell" if card.category == "spell" else
                                                           "trap" if card.category == "trap" else "effect")
-    frame = _image(f"card_frame{FRAMES[frame_key]}.png")
     pendulum = frame_key.endswith("_pendulum")
-    face = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-
     path = art_path(art_id or card.id)
-    if path and os.path.exists(path):
-        art = Image.open(path).convert("RGBA")
-        x0, y0, x1, y1 = PEND_ART if pendulum else ART
-        if pendulum:
-            art = art.resize((x1 - x0, round(art.height * (x1 - x0) / art.width)), Image.LANCZOS).crop((0, 0, x1 - x0, y1 - y0))
-        else:
-            art = _cover(art, x1 - x0, y1 - y0)
-        face.alpha_composite(art, (x0, y0))
-    face.alpha_composite(frame)
+    art = Image.open(path).convert("RGBA") if path and os.path.exists(path) else None
+    overframe = art is not None and is_overframe(art)
+    if overframe:
+        face = art.resize((W, H), Image.LANCZOS)
+    else:
+        face = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        if art is not None:
+            x0, y0, x1, y1 = PEND_ART if pendulum else ART
+            if pendulum:
+                art = art.resize((x1 - x0, round(art.height * (x1 - x0) / art.width)), Image.LANCZOS).crop((0, 0, x1 - x0, y1 - y0))
+            else:
+                art = _cover(art, x1 - x0, y1 - y0)
+            face.alpha_composite(art, (x0, y0))
+        face.alpha_composite(_image(f"card_frame{FRAMES[frame_key]}.png"))
     draw = ImageDraw.Draw(face)
 
-    # name and attribute
-    name_fill = (255, 255, 255, 255) if frame_key in WHITE_NAME else (0, 0, 0, 255)
+    # name and attribute; over a 오버프레임 art the name is white on a soft shadow so it reads on any picture
     x0, y0, x1, y1 = NAME_BOX
+    if overframe:
+        shadow = _squeezed_text(card.name_ko or card.name_ja, title(48), (0, 0, 0, 200), x1 - x0, y1 - y0)
+        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2), (2, 2)):
+            face.alpha_composite(shadow, (x0 + dx, y0 + dy))
+    name_fill = (255, 255, 255, 255) if overframe or frame_key in WHITE_NAME else (0, 0, 0, 255)
     name = _squeezed_text(card.name_ko or card.name_ja, title(48), name_fill, x1 - x0, y1 - y0)
     face.alpha_composite(name, (x0, y0))
     attr = ATTR_ICON.get(card.category if card.category in ("spell", "trap") else card.attribute)
