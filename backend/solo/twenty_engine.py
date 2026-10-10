@@ -1207,12 +1207,12 @@ _ARCHETYPE_REMOVE |= _ARCHETYPE_PENDING_KOREAN
 
 
 def _build_archetype_en_to_kr() -> dict[str, str]:
-    """Seed EN→KR archetype map from existing (Card.archetype, Card.korean_archetype) pairs.
+    """Seed EN→KR archetype map from existing (archetype, archetype_ko) pairs.
     Cached at module level — call _reset_archetype_cache() to refresh."""
     from collections import Counter
-    from card.models import Card
+    from cardsite.models import LegacyTheme
     pairs: dict[str, Counter] = {}
-    for en, kr in Card.objects.exclude(archetype__isnull=True).exclude(archetype="").exclude(korean_archetype__isnull=True).exclude(korean_archetype="").values_list("archetype", "korean_archetype"):
+    for en, kr in LegacyTheme.objects.exclude(archetype="").exclude(archetype_ko="").values_list("archetype", "archetype_ko"):
         pairs.setdefault(en, Counter())[kr] += 1
     base = {en: c.most_common(1)[0][0].strip() for en, c in pairs.items() if c.most_common(1)[0][0].strip()}
     base.update(_ARCHETYPE_LABEL_OVERRIDES)
@@ -1245,20 +1245,20 @@ def _archetype_items(difficulty: str = "중급", exclude_st: bool = False) -> li
     currently in the solo 딱무고개 pool. Sorted by frequency, drops
     singletons (always-yes-for-one-card is no fun)."""
     from collections import Counter
-    from card.models import Card
+    from cardsite.models import Yugipedia
     from .twenty_views import _pool_card_ids
     pool_ids = set(_pool_card_ids(difficulty, exclude_st=exclude_st))
     if not pool_ids:
         return []
     counter: Counter = Counter()
-    for archs in Card.objects.filter(id__in=pool_ids).exclude(yugipedia_archseries=[]).values_list("yugipedia_archseries", flat=True):
+    for archs in Yugipedia.objects.filter(card_id__in=pool_ids).exclude(archseries=[]).values_list("archseries", flat=True):
         for a in archs:
             counter[a] += 1
     # No real archetype data yet (Yugipedia fetch incomplete) → return
     # empty so the menu builder hides the whole 카드군 group.
     if not counter:
         return []
-    no_arch = Card.objects.filter(id__in=pool_ids, yugipedia_archseries=[]).count()
+    no_arch = Yugipedia.objects.filter(card_id__in=pool_ids, archseries=[]).count()
     items: list[dict] = []
     for en, n in counter.most_common():
         if n < 2:

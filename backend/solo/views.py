@@ -24,7 +24,8 @@ from rest_framework.response import Response
 
 from avatar.serializers import CardIconSerializer, BorderSerializer
 from avatar.views import _resolve_default_icon, _resolve_default_border
-from card.models import Card
+from carddb.display import art_url, display_name
+from carddb.models import Card
 from multiplayer.models import DuchMindWord, DuchMindWordPack
 from user.points import award_points
 
@@ -107,13 +108,8 @@ def _intermediate_pack() -> Optional[DuchMindWordPack]:
     return DuchMindWordPack.objects.filter(name="중급", owner__isnull=True).first()
 
 
-def _card_image_url(card: Card) -> Optional[str]:
-    try:
-        if card.card_illust:
-            return card.card_illust.url
-    except ValueError:
-        pass
-    return card.image_url or None
+def _card_image_url(card_id) -> Optional[str]:
+    return art_url(card_id) if card_id else None
 
 
 def _get_or_create_daily(user, *, lock: bool = False, source: str = "duchmind") -> SoloDailyPoints:
@@ -182,7 +178,7 @@ def _serialize_drawing_summary(d: SoloDrawing, *, viewer, include_strokes: bool 
         "my_attempts_used": my_guess.attempts_used if my_guess else 0,
         # Answer + card image only revealed to drawer / solver / gave-up.
         "word": d.word if reveal else None,
-        "card_image_url": _card_image_url(d.card) if (reveal and d.card) else None,
+        "card_image_url": _card_image_url(d.new_card_id) if reveal else None,
     }
     if include_strokes:
         # Board previews ship a decimated buffer so the response stays
@@ -206,8 +202,8 @@ def _cards_payload(card_ids: list) -> list:
             continue
         out.append({
             "card_id": c.id,
-            "name": c.korean_name or c.name,
-            "image_url": _card_image_url(c),
+            "name": display_name(c),
+            "image_url": _card_image_url(c.id),
         })
     return out
 
@@ -244,11 +240,11 @@ def start_draw(request):
         if not pack:
             return Response({"error": "단어팩 설정이 잘못되어 있습니다. 관리자에게 문의해주세요."}, status=500)
 
-        pool = list(
+        pool = sorted(set(
             DuchMindWord.objects
-            .filter(pack=pack, enabled=True, card__isnull=False)
-            .values_list("card_id", flat=True)
-        )
+            .filter(pack=pack, enabled=True, new_card__isnull=False)
+            .values_list("new_card_id", flat=True)
+        ))
         if len(pool) < 3:
             return Response({"error": "단어 풀이 부족합니다."}, status=500)
 
@@ -310,10 +306,10 @@ def submit_draw(request):
         if not card:
             return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
 
-        word = card.korean_name or card.name or ""
+        word = display_name(card) or ""
         d = SoloDrawing.objects.create(
             drawer=user,
-            card=card,
+            new_card=card,
             word=word,
             strokes_json=strokes,
             aspect_ratio=aspect,
@@ -363,7 +359,7 @@ def board(request):
     page_size = 12
     now = timezone.now()
 
-    base = SoloDrawing.objects.select_related("drawer", "card").filter(
+    base = SoloDrawing.objects.select_related("drawer", "new_card").filter(
         is_hidden=False, expires_at__gt=now,
     )
     # Viewer-relative tabs (unsolved / mine) only make sense when logged
@@ -379,7 +375,7 @@ def board(request):
     elif tab == "mine" and is_authed:
         # User's own drawings — also surfaces hidden ones since the
         # drawer themselves should be able to see what they've posted.
-        base = SoloDrawing.objects.select_related("drawer", "card").filter(drawer=user)
+        base = SoloDrawing.objects.select_related("drawer", "new_card").filter(drawer=user)
     else:
         tab = "all"
 
@@ -398,7 +394,7 @@ def board(request):
     # Hall of Fame — the 3 most-recommended drawings (must have at least one
     # recommend to qualify). Always returned, independent of tab/order.
     hof = list(
-        SoloDrawing.objects.select_related("drawer", "card")
+        SoloDrawing.objects.select_related("drawer", "new_card")
         .filter(is_hidden=False, expires_at__gt=now, recommend_count__gt=0)
         .order_by("-recommend_count", "-created_at")[:3]
     )
@@ -423,7 +419,7 @@ def board(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def drawing_detail(request, drawing_id: int):
-    d = SoloDrawing.objects.select_related("drawer", "card").filter(id=drawing_id).first()
+    d = SoloDrawing.objects.select_related("drawer", "new_card").filter(id=drawing_id).first()
     if not d:
         return Response({"error": "그림을 찾을 수 없습니다."}, status=404)
     viewer_id = getattr(request.user, "id", None) if request.user.is_authenticated else None
@@ -484,7 +480,7 @@ def submit_guess(request, drawing_id: int):
     if not raw:
         return Response({"error": "정답을 입력해주세요."}, status=400)
 
-    d = SoloDrawing.objects.select_related("card").filter(id=drawing_id).first()
+    d = SoloDrawing.objects.select_related("new_card").filter(id=drawing_id).first()
     if not d:
         return Response({"error": "그림을 찾을 수 없습니다."}, status=404)
     if d.is_hidden:
@@ -510,7 +506,7 @@ def submit_guess(request, drawing_id: int):
             "first_solver": False,
             "guest": True,
             "word": d.word if correct else None,
-            "card_image_url": _card_image_url(d.card) if (correct and d.card) else None,
+            "card_image_url": _card_image_url(d.new_card_id) if correct else None,
         })
 
     points_awarded = 0
@@ -593,7 +589,7 @@ def submit_guess(request, drawing_id: int):
         "solved_without_points": bool(correct and not within_point_window),
         "point_attempt_limit": SOLO_POINT_ATTEMPT_LIMIT,
         "word": d.word if correct else None,
-        "card_image_url": _card_image_url(d.card) if (correct and d.card) else None,
+        "card_image_url": _card_image_url(d.new_card_id) if correct else None,
     })
 
 
@@ -628,7 +624,7 @@ def give_up(request, drawing_id: int):
     return Response({
         "gave_up": True,
         "word": d.word,
-        "card_image_url": _card_image_url(d.card) if d.card else None,
+        "card_image_url": _card_image_url(d.new_card_id),
     })
 
 
@@ -713,7 +709,7 @@ def my_status(request):
 
     # Quick "my recent drawings" for the my-page widget.
     my_recent = (
-        SoloDrawing.objects.select_related("card")
+        SoloDrawing.objects.select_related("new_card")
         .filter(drawer=user)
         .order_by("-created_at")[:10]
     )
