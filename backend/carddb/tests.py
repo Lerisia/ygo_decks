@@ -372,3 +372,32 @@ class ImportArtTest(TestCase):
         self.assertEqual(MdArt.objects.get(md_print_id=4441, version="ocg").image.name, "cards/art/ocg/4441.webp")
         self.assertEqual(import_art(manifest)["arts"], 3)
         self.assertEqual(MdArt.objects.count(), 3)
+
+
+class LegacyMapTest(TestCase):
+    def test_maps_by_konami_then_names_and_keeps_manual(self):
+        from card.models import Card as Old
+
+        from .importer import map_legacy_cards
+        from .models import LegacyCard
+
+        Card.objects.create(id=4007, category="monster", name_ja="青眼の白龍", name_ko="푸른 눈의 백룡", frame="normal")
+        Card.objects.create(id=3906, category="monster", name_ja="兵隊アリトークン", name_ko="병사개미 토큰", frame="token")
+        Card.objects.create(id=19359, category="monster", name_ja="", name_en="Anotherverse Gluttonia", frame="normal")
+        Card.objects.create(id=21000, category="monster", name_ja="ドミナス・スパーク", name_ko="도미나스 스파크", frame="effect")
+        a = Old.objects.create(card_id="8989333900", konami_id="4007", name="Blue-Eyes White Dragon", korean_name="푸른 눈의 백룡")
+        b = Old.objects.create(card_id="8989333901", konami_id="4007", name="Blue-Eyes White Dragon", korean_name="푸른 눈의 백룡")
+        tok = Old.objects.create(card_id="2249381200", konami_id="0", name="Army Ant Token", korean_name="병사개미 토큰")
+        tcg = Old.objects.create(card_id="8689370200", konami_id="1", name="Anotherverse Gluttonia", korean_name="")
+        skill = Old.objects.create(card_id="30030202200", konami_id="0", name="Ancient Fusion", korean_name="")
+        wrong = Old.objects.create(card_id="6325660000", konami_id="6325660", name="Dominus Spark", korean_name="도미나스 스파크(옛)")
+        LegacyCard.objects.create(old_id=wrong.id, card_id=21000, how="manual")
+        counts = map_legacy_cards()
+        got = {l.old_id: (l.card_id, l.how) for l in LegacyCard.objects.all()}
+        self.assertEqual(got[a.id], (4007, "konami"))
+        self.assertEqual(got[b.id], (4007, "konami"))
+        self.assertEqual(got[tok.id], (3906, "name_ko"))
+        self.assertEqual(got[tcg.id], (19359, "name_en"))
+        self.assertEqual(got[skill.id], (None, "none"))
+        self.assertEqual(got[wrong.id], (21000, "manual"))
+        self.assertEqual(counts["konami"], 2)

@@ -146,3 +146,17 @@ class SrcOfficial(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["cid", "lang"], name="carddb_srcofficial_cid_lang")]
+
+
+class LegacyCard(models.Model):
+    class How(models.TextChoices):
+        KONAMI = "konami"
+        NAME_KO = "name_ko"
+        NAME_EN = "name_en"
+        MANUAL = "manual"
+        NONE = "none"
+
+    old_id = models.PositiveIntegerField(primary_key=True, help_text="옛 card.Card.id")
+    old_card_id = models.CharField(max_length=100, blank=True, help_text="옛 card_id (YGOPRODeck 패스코드×100+그림 번호)")
+    card = models.ForeignKey(Card, null=True, blank=True, on_delete=models.SET_NULL, related_name="legacy_cards")
+    how = models.CharField(max_length=8, choices=How.choices, default=How.NONE)

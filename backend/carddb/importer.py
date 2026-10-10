@@ -212,3 +212,37 @@ def import_art(manifest_path, prefix="cards/art"):
             rows.append(MdArt(md_print_id=int(md_id), version=version, image=f"{prefix}/{key}.webp"))
     MdArt.objects.bulk_create(rows, update_conflicts=True, unique_fields=["md_print", "version"], update_fields=["image"], batch_size=500)
     return {"arts": len(rows), "without_print": len(manifest) - len(rows)}
+
+
+def map_legacy_cards():
+    from django.apps import apps
+
+    from .models import LegacyCard
+
+    Old = apps.get_model("card", "Card")
+    ids = set(Card.objects.values_list("id", flat=True))
+    manual = dict(LegacyCard.objects.filter(how=LegacyCard.How.MANUAL).values_list("old_id", "card_id"))
+
+    def unique(field):
+        seen = {}
+        for cid, name in Card.objects.exclude(**{field: ""}).values_list("id", field):
+            seen[name] = None if name in seen else cid
+        return seen
+
+    by_ko, by_en = unique("name_ko"), unique("name_en")
+    rows, counts = [], {}
+    for o in Old.objects.values("id", "card_id", "konami_id", "korean_name", "name"):
+        how, target = LegacyCard.How.NONE, None
+        konami = int(o["konami_id"]) if str(o["konami_id"] or "").isdigit() else 0
+        if o["id"] in manual:
+            how, target = LegacyCard.How.MANUAL, manual[o["id"]]
+        elif konami in ids:
+            how, target = LegacyCard.How.KONAMI, konami
+        elif by_ko.get(o["korean_name"] or ""):
+            how, target = LegacyCard.How.NAME_KO, by_ko[o["korean_name"]]
+        elif by_en.get(o["name"] or ""):
+            how, target = LegacyCard.How.NAME_EN, by_en[o["name"]]
+        rows.append(LegacyCard(old_id=o["id"], old_card_id=o["card_id"] or "", card_id=target, how=how))
+        counts[how] = counts.get(how, 0) + 1
+    LegacyCard.objects.bulk_create(rows, update_conflicts=True, unique_fields=["old_id"], update_fields=["old_card_id", "card", "how"], batch_size=1000)
+    return counts
