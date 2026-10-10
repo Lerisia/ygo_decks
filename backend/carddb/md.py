@@ -38,7 +38,7 @@ LINK_MARKERS = ["top_left", "top", "top_right", "left", "right", "bottom_left", 
 RARITIES = {1: "N", 2: "R", 3: "SR", 4: "UR"}
 EXTRA_DECK = {"fusion", "synchro", "xyz", "link"}
 PENDULUM_MARK = {"ja": "【ペンデュラム効果】", "ko": "【펜듈럼 효과】"}
-NO_MATERIALS = ("このカード", "이 카드")
+NO_MATERIALS = ("このカード", "이 카드", "This card", "Must be", "Cannot be")
 NAME_TREATED = 256
 
 

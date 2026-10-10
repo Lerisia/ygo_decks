@@ -189,3 +189,162 @@ class ImportMdTest(TestCase):
         import_md(self.dir, self.dir)
         self.assertEqual(Card.objects.get(id=4041).name_ko, "블랙 매지션(고침)")
         self.assertEqual(CardText.objects.get(card_id=4041, lang="ko").flavor, "고친 설명")
+
+
+def official_row(cid, name, ruby, attr, text, *, rarity="R", level=None, rank=None, link=None, species=None, atk=None, dfn=None,
+                 scale=None, pen="", subtype=None, note=""):
+    spec = f'<img class="icon_img" src="external/image/parts/attribute/attribute_icon_{attr}.png" alt="">'
+    if subtype:
+        spec += f'<span class="box_card_effect"><img class="icon_img" src="external/image/parts/effect/effect_icon_{subtype}.png"><span>x</span></span>'
+    if level is not None or rank is not None:
+        kind, word, n = ("level", "レベル", level) if level is not None else ("rank", "ランク", rank)
+        spec += f'<span class="box_card_level_rank {kind}">\n<img class="icon_img" src="x.png">\n<span>{word} {n}</span>\n</span>'
+    if link:
+        spec += f'<span class="box_card_linkmarker">\n<img class="icon_img" src="external/image/parts/link_pc/link{link}.png" alt="リンク">\n<span>リンク {len(link)}</span>\n</span>'
+    if species:
+        spec += f'<span class="card_info_species_and_other_item"><span>\n【\n{species}<!--\n-->\n】\n</span></span>'
+    if atk is not None:
+        spec += f'<div class="atkdef">\n<span class="atk_power">\n<span>攻撃力 {atk}</span>\n</span>\n<span class="def_power"><span>\n守備力 {dfn}\n</span></span>\n</div>'
+    pen_block = ""
+    if scale is not None:
+        pen_block = (f'<dd class="box_card_pen_info flex_1">\n<span class="box_card_pen_scale">\n<img class="icon_img" src="external/image/parts/icon_pendulum.png" alt="">\n'
+                     f'Pスケール {scale}\n</span>\n<span class="box_card_pen_effect c_text flex_1 text_linebreak">\n{pen}\n</span>\n</dd>')
+    biko = f'<dd class="box_card_text c_text flex_1 biko text_linebreak">\n&lt;hr&gt;※{note}\n</dd>' if note else ""
+    return (f'<div class="t_row c_normal open t_rid_2">\n<dl class="flex_1">\n<dd class="box_card_name flex_1 top_set">\n<span class="card_ruby">{ruby}</span>\n'
+            f'<span class="card_name">\n{name}\n</span>\n</dd>\n<input type="hidden" class="cid" value="{cid}">\n'
+            f'<dd class="box_card_spec flex_1">\n<span class="box_card_attribute">{spec}</span>\n</dd>\n{pen_block}\n'
+            f'<dd class="box_card_text c_text flex_1 text_linebreak">\n{text}\n</dd>\n{biko}\n</dl>\n'
+            f'<div class="icon rarity pack_r">\n<div class="lr_icon rid rid_2" style="x">\n<p>{rarity}</p>\n</div>\n</div>\n'
+            f'</div><!-- .t_row c_normal -->\n')
+
+
+def official_page(day, rows, label="公開日"):
+    return f'<header id="broad_title"><p id="previewed">\n(\n{label} : {day}\n)\n</p></header>\n' + "".join(rows)
+
+
+KNIGHT = dict(level=4, species="戦士族／ペンデュラム／通常", atk=1800, dfn=600, scale=7)
+TOWER = dict(rarity="UR", link="8462", species="岩石族／リンク／効果", atk=2400, dfn="-", note="公式のデュエルでは使用できません。")
+
+
+class OfficialParseTest(SimpleTestCase):
+    def test_monster_rows(self):
+        from .official import parse_product
+
+        page = official_page("2014年04月19日", [
+            official_row(11210, "閃光の騎士", "せんこうのきし", "light", "神の振り子により覚醒した騎士。", **KNIGHT),
+            official_row(14797, "黒き森の航天閣", "くろきもりのこうてんかく", "wind", "岩石族の効果モンスター３体以上&lt;br&gt;このカードはリンク召喚でしか特殊召喚できない。", **TOWER),
+            official_row(5000, "謎の竜", "なぞのりゅう", "dark", "①：効果。", rank=4, species="ドラゴン族／エクシーズ／効果", atk="?", dfn="?"),
+        ])
+        p = parse_product(page, "ja")
+        self.assertEqual(p["release_date"], date(2014, 4, 19))
+        knight, tower, xyz = p["rows"]
+        self.assertEqual((knight["types"], knight["race"], knight["level"], knight["pendulum_scale"], knight["atk"]), (["pendulum", "normal"], "warrior", 4, 7, 1800))
+        self.assertEqual((tower["link_rating"], tower["link_markers"], tower["def_value"]), (4, ["top", "left", "right", "bottom"], None))
+        self.assertEqual(tower["text"], "岩石族の効果モンスター３体以上\nこのカードはリンク召喚でしか特殊召喚できない。")
+        self.assertEqual(tower["note"], "公式のデュエルでは使用できません。")
+        self.assertEqual((xyz["rank"], xyz["level"], xyz["atk"], xyz["def_value"]), (4, None, -1, -1))
+
+    def test_spell_subtypes(self):
+        from .official import parse_product
+
+        p = parse_product(official_page("2014年04月19日", [
+            official_row(11264, "カバーカーニバル", "カバーカーニバル", "spell", "①：効果。", subtype="quickplay"),
+            official_row(11265, "蛮族の狂宴LV５", "ばんぞくのきょうえんレベル５", "spell", "①：効果。"),
+            official_row(4887, "聖なるバリア －ミラーフォース－", "せいなるバリア －ミラーフォース－", "trap", "①：効果。", subtype="counter"),
+        ]), "ja")
+        self.assertEqual([(r["category"], r["spell_trap_subtype"]) for r in p["rows"]], [("spell", "quick_play"), ("spell", "normal"), ("trap", "counter")])
+
+    def test_korean_and_english_formats(self):
+        from .official import parse_product
+
+        ko = parse_product(official_page("2014/07/18", [official_row(11210, "섬광의 기사", "", "light", "x", **{**KNIGHT, "species": "전사족／펜듈럼／일반"})], label="공개일"), "ko")
+        self.assertEqual((ko["release_date"], ko["rows"][0]["race"], ko["rows"][0]["types"]), (date(2014, 7, 18), "warrior", ["pendulum", "normal"]))
+        en = parse_product(official_page("08/15/2014", [official_row(11210, "Flash Knight", "", "light", "x", **{**KNIGHT, "species": "Warrior／Pendulum／Normal"})], label="Release Date"), "en")
+        self.assertEqual((en["release_date"], en["rows"][0]["race"], en["rows"][0]["types"]), (date(2014, 8, 15), "warrior", ["pendulum", "normal"]))
+
+
+class ImportOfficialTest(TestCase):
+    def setUp(self):
+        import gzip
+        import json
+
+        self.dir = Path(tempfile.mkdtemp())
+        (self.dir / "raw" / "ja").mkdir(parents=True)
+        (self.dir / "raw" / "ko").mkdir(parents=True)
+        pages = {
+            "ja": {
+                "100": official_page("2014年04月19日", [official_row(11210, "閃光の騎士", "せんこうのきし", "light", "神の振り子により覚醒した騎士。", **KNIGHT)]),
+                "200": official_page("2022年08月14日", [
+                    official_row(14797, "黒き森の航天閣", "くろきもりのこうてんかく", "wind", "岩石族の効果モンスター３体以上&lt;br&gt;このカードは特殊召喚できない。", **TOWER),
+                    official_row(11210, "閃光の騎士", "せんこうのきし", "light", "神の振り子により覚醒した騎士。", rarity="UR", **KNIGHT),
+                    official_row(9001, "羊トークン", "ひつじトークン", "earth", "「スケープ・ゴート」の効果で特殊召喚される。", level=1, species="獣族／トークン", atk=0, dfn=0),
+                ]),
+            },
+            "ko": {"300": official_page("2014/07/18", [
+                official_row(11210, "섬광의 기사(공식)", "", "light", "공식 문장.", **{**KNIGHT, "species": "전사족／펜듈럼／일반"}),
+                official_row(14797, "검은 숲의 항천각", "", "wind", "암석족 효과 몬스터 3장 이상&lt;br&gt;특수 소환할 수 없다.", **{**TOWER, "species": "암석족／링크／효과"}),
+            ], label="공개일")},
+        }
+        for lang, by_pid in pages.items():
+            (self.dir / f"products_{lang}.json").write_text(json.dumps([{"pid": pid, "name": f"상품{pid}", "category": "packc1"} for pid in by_pid]))
+            for pid, page in by_pid.items():
+                with gzip.open(self.dir / "raw" / lang / f"{pid}.html.gz", "wt", encoding="utf-8") as g:
+                    g.write(page)
+        Card.objects.create(id=11210, category="monster", name_ja="閃光の騎士", name_ko="섬광의 기사", frame="normal_pendulum", types=["pendulum", "normal"], level=4, atk=1800, def_value=600, pendulum_scale=7)
+        CardText.objects.create(card_id=11210, lang="ko", flavor="마듀 문장.")
+        CardText.objects.create(card_id=11210, lang="ja", flavor="マスターデュエルの文。")
+        SrcMd.objects.create(md_id=11210, lang="ko", name="섬광의 기사", prop_a=0, prop_b=0)
+        Card.objects.create(id=3902, category="monster", name_ja="羊トークン", frame="token", types=["token"])
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_ocg_import(self):
+        from .importer import import_official
+        from .models import ProductCard
+
+        stats = import_official(self.dir, "ja")
+        self.assertEqual((stats["new_cards"], stats["merged_tokens"]), (1, 1))
+        knight = Card.objects.get(id=11210)
+        self.assertEqual((knight.ocg_date, knight.name_ja, knight.name_ja_ruby), (date(2014, 4, 19), "閃光の騎士", ""))
+        self.assertEqual(CardText.objects.get(card_id=11210, lang="ja").flavor, "マスターデュエルの文。")
+        tower = Card.objects.get(id=14797)
+        self.assertEqual((tower.frame, tower.link_markers, tower.def_value, tower.ocg_date), ("link", ["top", "left", "right", "bottom"], None, date(2022, 8, 14)))
+        self.assertEqual(CardText.objects.get(card_id=14797, lang="ja").materials, "岩石族の効果モンスター３体以上")
+        self.assertFalse(Card.objects.filter(id=9001).exists())
+        self.assertEqual(ProductCard.objects.filter(cid=11210).count(), 2)
+
+    def test_printed_level_or_rank_zero_wins_over_master_duel(self):
+        import gzip
+
+        from .importer import import_official
+
+        Card.objects.create(id=11413, category="monster", name_ja="FNo.0 未来皇ホープ", frame="xyz", types=["xyz", "effect"], rank=1)
+        SrcMd.objects.create(md_id=11413, lang="ko", name="FNo.0 미래황 호프", prop_a=0, prop_b=0)
+        page = official_page("2015年01月01日", [official_row(11413, "FNo.0 未来皇ホープ", "", "light", "①：効果。", rank=0, species="戦士族／エクシーズ／効果", atk=0, dfn=0)])
+        with gzip.open(self.dir / "raw" / "ja" / "100.html.gz", "wt", encoding="utf-8") as g:
+            g.write(page)
+        import_official(self.dir, "ja")
+        self.assertEqual(Card.objects.get(id=11413).rank, 0)
+        self.assertEqual(Card.objects.get(id=11210).level, 4)
+
+    def test_reimport_refreshes_cards_only_the_official_db_has(self):
+        from .importer import import_official
+
+        import_official(self.dir, "ja")
+        Card.objects.filter(id=14797).update(atk=1, name_ja="古い名前")
+        import_official(self.dir, "ja")
+        tower = Card.objects.get(id=14797)
+        self.assertEqual((tower.atk, tower.name_ja), (2400, "黒き森の航天閣"))
+
+    def test_korean_official_only_fills_what_master_duel_lacks(self):
+        from .importer import import_official
+
+        import_official(self.dir, "ja")
+        import_official(self.dir, "ko")
+        knight = Card.objects.get(id=11210)
+        self.assertEqual((knight.name_ko, knight.kr_date), ("섬광의 기사", date(2014, 7, 18)))
+        self.assertEqual(CardText.objects.get(card_id=11210, lang="ko").flavor, "마듀 문장.")
+        tower = Card.objects.get(id=14797)
+        self.assertEqual(tower.name_ko, "검은 숲의 항천각")
+        self.assertEqual(CardText.objects.get(card_id=14797, lang="ko").effect, "특수 소환할 수 없다.")

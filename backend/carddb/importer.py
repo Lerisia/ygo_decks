@@ -89,3 +89,103 @@ def import_md(ja_dir, ko_dir, md_dir=None, today=None):
     SrcMd.objects.bulk_create(srcs, update_conflicts=True, unique_fields=["md_id", "lang"], update_fields=["name", "ruby", "text", "prop_a", "prop_b", "fetched_at"])
     apply_overrides(list(cards))
     return {"cards": len(cards), "prints": len(prints), "alt_arts": sum(p.is_alt_art for p in prints), "texts": len(texts), "skipped": skipped}
+
+
+REGION = {"ja": "ocg", "ko": "kr", "en": "tcg"}
+DATE_FIELD = {"ja": "ocg_date", "ko": "kr_date", "en": "tcg_date"}
+
+
+def read_products(offdb_dir, lang):
+    import gzip
+    import json
+
+    from .official import parse_product
+
+    root = Path(offdb_dir)
+    out = []
+    for p in json.loads((root / f"products_{lang}.json").read_text()):
+        page = root / "raw" / lang / f"{p['pid']}.html.gz"
+        if page.exists():
+            out.append((p, parse_product(gzip.open(page, "rt", encoding="utf-8").read(), lang)))
+    return out
+
+
+def _official_card(cid, row, lang):
+    from .md import frame_of
+
+    fields = {k: row.get(k) for k in ("attribute", "race", "level", "rank", "link_rating", "atk", "def_value", "pendulum_scale")}
+    fields = {k: (v if v is not None else (None if k not in ("attribute", "race") else "")) for k, v in fields.items()}
+    return Card(
+        id=cid, category=row["category"], types=row["types"], frame=frame_of(row["category"], row["types"]),
+        link_markers=row.get("link_markers", []), spell_trap_subtype=row.get("spell_trap_subtype", ""), **fields,
+    )
+
+
+def _official_text(row, lang):
+    t = split_text(row["text"], row["types"], lang)
+    t["pendulum_effect"] = row.get("pendulum_effect", "")
+    return t
+
+
+@transaction.atomic
+def import_official(offdb_dir, lang):
+    from .models import Product, ProductCard, SrcOfficial
+
+    products = read_products(offdb_dir, lang)
+    products.sort(key=lambda x: x[1]["release_date"] or date.max)
+    latest, first_date, links = {}, {}, set()
+    for meta, page in products:
+        pid, day = int(meta["pid"]), page["release_date"]
+        Product.objects.update_or_create(id=pid, defaults={"region": REGION[lang], "name": meta["name"], "category": meta.get("category", ""), "release_date": day})
+        for row in page["rows"]:
+            latest[row["cid"]] = row
+            links.add((pid, row["cid"], row["rarity"]))
+            if day and (row["cid"] not in first_date or day < first_date[row["cid"]]):
+                first_date[row["cid"]] = day
+    ProductCard.objects.bulk_create([ProductCard(product_id=p, cid=c, rarity=r) for p, c, r in links], ignore_conflicts=True)
+    SrcOfficial.objects.bulk_create(
+        [SrcOfficial(cid=c, lang=lang, name=r["name"], data=r) for c, r in latest.items()],
+        update_conflicts=True, unique_fields=["cid", "lang"], update_fields=["name", "data", "fetched_at"],
+    )
+
+    existing = set(Card.objects.values_list("id", flat=True))
+    in_md = set(SrcMd.objects.values_list("md_id", flat=True))
+    md_tokens = dict(Card.objects.filter(frame="token").values_list("name_ja", "id"))
+    date_field = DATE_FIELD[lang]
+    name_fields = {"ja": ["name_ja", "name_ja_ruby"], "ko": ["name_ko"], "en": ["name_en"]}[lang]
+    new_cards, dated, named, refreshed, zeroed, texts, merged_tokens = [], [], [], [], [], [], 0
+    for cid, row in latest.items():
+        if cid not in existing and row["category"] == "monster" and "token" in row["types"] and lang == "ja" and row["name"] in md_tokens:
+            merged_tokens += 1
+            continue
+        from_md = cid in in_md
+        official = lang == "en" or not from_md
+        card = _official_card(cid, row, lang) if (cid not in existing or (official and lang == "ja")) else Card(id=cid)
+        setattr(card, date_field, first_date.get(cid))
+        if official:
+            if lang == "ja":
+                card.name_ja, card.name_ja_ruby = row["name"], row["ruby"] or row["name"]
+            elif lang == "ko":
+                card.name_ko = row["name"]
+            else:
+                card.name_en = row["name"]
+            texts.append(CardText(card_id=cid, lang=lang, **_official_text(row, lang)))
+        if cid not in existing:
+            new_cards.append(card)
+            continue
+        dated.append(card)
+        if official:
+            named.append(card)
+            if lang == "ja":
+                refreshed.append(card)
+        elif lang == "ja" and (row.get("level") == 0 or row.get("rank") == 0):
+            card.level, card.rank = row.get("level"), row.get("rank")
+            zeroed.append(card)
+    Card.objects.bulk_create(new_cards, batch_size=500)
+    Card.objects.bulk_update(dated, [date_field], batch_size=500)
+    Card.objects.bulk_update(named, name_fields, batch_size=500)
+    Card.objects.bulk_update(refreshed, [f for f in CARD_FIELDS if f not in ("name_ko",)], batch_size=500)
+    Card.objects.bulk_update(zeroed, ["level", "rank"], batch_size=500)
+    CardText.objects.bulk_create(texts, update_conflicts=True, unique_fields=["card", "lang"], update_fields=TEXT_FIELDS, batch_size=500)
+    apply_overrides([t.card_id for t in texts])
+    return {"products": len(products), "cards_seen": len(latest), "new_cards": len(new_cards), "updated": len(dated), "level_rank_zero": len(zeroed), "merged_tokens": merged_tokens}

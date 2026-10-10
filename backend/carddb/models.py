@@ -113,3 +113,36 @@ class Override(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["card", "field"], name="carddb_override_card_field")]
+
+
+class Product(models.Model):
+    class Region(models.TextChoices):
+        OCG = "ocg"
+        KR = "kr"
+        TCG = "tcg"
+
+    id = models.BigIntegerField(primary_key=True, help_text="공식 DB 상품 번호 (pid)")
+    region = models.CharField(max_length=3, choices=Region.choices)
+    name = models.CharField(max_length=300)
+    category = models.CharField(max_length=40, blank=True)
+    release_date = models.DateField(null=True, blank=True)
+
+
+class ProductCard(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="cards")
+    cid = models.PositiveIntegerField(db_index=True)
+    rarity = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["product", "cid", "rarity"], name="carddb_productcard_unique")]
+
+
+class SrcOfficial(models.Model):
+    cid = models.PositiveIntegerField()
+    lang = models.CharField(max_length=2)
+    name = models.CharField(max_length=200)
+    data = models.JSONField()
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["cid", "lang"], name="carddb_srcofficial_cid_lang")]
