@@ -280,15 +280,49 @@ class IconFitTest(TestCase):
         card = md_card(4045, "심의", versions=("ocg", "tcg"), image=art)
         self.assertEqual(fit(self.icon_with_crop(card, old_crop(art, .5, .5, .25)))["version"], "ocg")
 
-    def test_command_refits_matches_and_leaves_the_rest(self):
+    def test_command_records_the_spot_and_keeps_the_picture(self):
         from django.core.management import call_command
         art = smooth_noise(4)
         good = self.icon_with_crop(md_card(4046, "맞음", image=art), old_crop(art, .3, .6, .15))
         lost = self.icon_with_crop(md_card(4047, "다른 그림", image=smooth_noise(5)), smooth_noise(6, (256, 256)))
-        lost_crop = lost.cropped_image.name
+        good_crop, lost_crop = good.cropped_image.name, lost.cropped_image.name
         call_command("fit_card_icons", stdout=io.StringIO())
         good.refresh_from_db(); lost.refresh_from_db()
         self.assertAlmostEqual(good.center_x, .3, delta=.012)
-        self.assertEqual((good.art_print_id, good.art_version), (4046, "common"))
-        self.assertNotIn("old_", good.cropped_image.name)
+        self.assertEqual((good.art_print_id, good.art_version, good.cropped_image.name), (4046, "common", good_crop))
         self.assertEqual((lost.center_x, lost.cropped_image.name, lost.art_print_id), (.5, lost_crop, None))
+
+    def test_recut_cuts_again_from_the_master_duel_art(self):
+        from django.core.management import call_command
+        art = smooth_noise(7)
+        icon = self.icon_with_crop(md_card(4048, "다시 자름", image=art), old_crop(art, .4, .4, .2))
+        call_command("fit_card_icons", recut=True, stdout=io.StringIO())
+        icon.refresh_from_db()
+        self.assertNotIn("old_", icon.cropped_image.name)
+
+    def test_icons_cut_from_a_hand_picked_picture_keep_it(self):
+        import os
+
+        from django.core.management import call_command
+        from card.models import Card as OldCard
+        os.makedirs(os.path.join(MEDIA, "card_illusts"), exist_ok=True)
+        picked = smooth_noise(8, (750, 750))
+        picked.save(os.path.join(MEDIA, "card_illusts/picked.jpg"), quality=95)
+        smooth_noise(9, (624, 624)).save(os.path.join(MEDIA, "card_illusts/9000000000.jpg"), quality=95)
+        hand = OldCard.objects.create(card_id="8149728501", konami_id="4049", name="Lady", korean_name="레이디",
+                                      card_illust="card_illusts/picked.jpg")
+        stock = OldCard.objects.create(card_id="9000000000", konami_id="4050", name="Stock", card_illust="card_illusts/9000000000.jpg")
+        icon = self.icon_with_crop(md_card(4049, "레이디 오브 더 라뷰린스", image=picked.resize((512, 512))), old_crop(picked, .5, .4, .2, 1))
+        CardIconTable = type(icon)
+        CardIconTable.objects.filter(id=icon.id).update(card=hand, center_x=.5, center_y=.4, radius=.2)
+        plain = self.icon_with_crop(md_card(4050, "평범", image=smooth_noise(10)), smooth_noise(11, (256, 256)))
+        CardIconTable.objects.filter(id=plain.id).update(card=stock)
+        crop = CardIconTable.objects.get(id=icon.id).cropped_image.name
+        call_command("fit_card_icons", stdout=io.StringIO())
+        icon.refresh_from_db(); plain.refresh_from_db()
+        self.assertIsNotNone(icon.custom_illust)
+        self.assertEqual((icon.custom_illust.name, icon.center_x, icon.center_y, icon.radius, icon.cropped_image.name),
+                         ("레이디 오브 더 라뷰린스", .5, .4, .2, crop))
+        self.assertEqual(Image.open(icon.custom_illust.image.path).size, (750, 750))
+        self.assertEqual(icon.new_card_id, 4049)
+        self.assertIsNone(plain.custom_illust)

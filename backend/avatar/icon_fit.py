@@ -84,9 +84,42 @@ def fit(icon):
     }
 
 
-def apply(icon, found):
-    """Point the icon at the matched art and spot; saving re-cuts its crop from that art."""
-    icon.art_print_id = found["md_id"]
-    icon.art_version = found["version"]
-    icon.center_x, icon.center_y, icon.radius = found["cx"], found["cy"], found["r"]
-    icon.save()
+def apply(icon, found, recut=False):
+    """Point the icon at the matched art and spot. The crop users bought stays unless `recut`."""
+    fields = {"art_print_id": found["md_id"], "art_version": found["version"],
+              "center_x": found["cx"], "center_y": found["cy"], "radius": found["r"]}
+    if recut:
+        for k, v in fields.items():
+            setattr(icon, k, v)
+        icon.save()
+    else:
+        type(icon).objects.filter(pk=icon.pk).update(**fields)
+
+
+STOCK_SIZES = {(624, 624), (712, 908), (710, 530), (712, 528)}
+
+
+def keep_hand_picked_base(icon):
+    """An icon cut from a picture staff put in instead of the stock card art keeps that picture as its custom
+    illustration, with its crop and coordinates untouched. Returns True when it did."""
+    import os
+
+    from django.core.files import File
+
+    from .models import CustomIllust
+
+    old = icon.card
+    if not old or not old.card_illust:
+        return False
+    path = old.card_illust.path
+    if not os.path.exists(path):
+        return False
+    with Image.open(path) as img:
+        if img.size in STOCK_SIZES:
+            return False
+    name = (icon.new_card.name_ko if icon.new_card else "") or old.korean_name or old.name
+    with open(path, "rb") as f:
+        illust = CustomIllust(name=name[:100])
+        illust.image.save(os.path.basename(path), File(f), save=True)
+    type(icon).objects.filter(pk=icon.pk).update(custom_illust=illust)
+    return True
