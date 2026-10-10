@@ -882,7 +882,8 @@ class CardFaceTest(TestCase):
         ctx = override_settings(CARD_FACE_ASSETS=self.assets, MEDIA_ROOT=self.media)
         ctx.enable()
         self.addCleanup(ctx.disable)
-        for clear in (face._image.cache_clear, face._font.cache_clear, display.forget_art):
+        for clear in (face._image.cache_clear, face._font.cache_clear, face.special_frames.cache_clear,
+                      face._gold_layers.cache_clear, display.forget_art):
             clear()
             self.addCleanup(clear)
         from .models import MdArt
@@ -966,6 +967,27 @@ class CardFaceTest(TestCase):
         img = draw_face(self.card, art_id=22789)
         self.assertEqual(img.getpixel((10, 500))[:3], (200, 10, 200))     # where the frame would be
         self.assertEqual(draw_face(self.card).getpixel((10, 500))[:3], (200, 120, 60))   # the usual print keeps its frame
+
+    def test_a_special_print_gets_gold_frame_lines(self):
+        import json
+        import os
+        from PIL import Image
+        from . import display
+        from .face import draw_face, signature
+        from .models import MdArt
+        mask = Image.new("RGBA", (512, 512), (0, 0, 0, 255))
+        mask.paste((255, 0, 0, 255), (0, 0, 20, 512))           # a red line down the left edge
+        mask.save(os.path.join(self.assets, "CardMask_N_test.png"))
+        Image.new("RGB", (512, 512), (128, 128, 255)).save(os.path.join(self.assets, "CardNormal_test.png"))   # flat
+        with open(os.path.join(self.assets, "special_illust.json"), "w") as f:
+            json.dump({"23489": {"mask": "CardMask_N_test", "normal": "CardNormal_test"}}, f)
+        wcs = MdPrint.objects.create(md_id=23489, card=self.card, is_alt_art=True)
+        MdArt.objects.create(md_print=wcs, version="common", image="cards/art/common/7.webp")
+        display.forget_art()
+        r, g, b, _ = draw_face(self.card, art_id=23489).getpixel((10, 500))
+        self.assertTrue(r > b + 60 and g > b + 40, (r, g, b))     # gold, not the frame's (200, 120, 60)
+        self.assertEqual(draw_face(self.card).getpixel((10, 500))[:3], (200, 120, 60))
+        self.assertNotEqual(signature(self.card, 23489), signature(self.card, 7))
 
     def test_pendulum_scale_is_drawn_with_the_text_boxes_empty(self):
         from .face import PEND_SCALE_X, draw_face
