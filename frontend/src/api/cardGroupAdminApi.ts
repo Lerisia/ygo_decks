@@ -37,6 +37,7 @@ export type CardGroupRow = {
   members: number;
   md_list: boolean;
   needs_review: boolean;
+  minor: boolean;
   parent: { id: number; text: string; name_ko: string } | null;
 };
 
@@ -73,7 +74,7 @@ export const listCardGroups = (p: { q?: string; review?: boolean; page?: number 
 
 export const getCardGroup = (id: number) => request<CardGroupDetail>(`/${id}/`);
 
-export const updateCardGroup = (id: number, body: { name_ko?: string; reviewed?: boolean }) =>
+export const updateCardGroup = (id: number, body: { name_ko?: string; reviewed?: boolean; minor?: boolean }) =>
   request<CardGroupDetail>(`/${id}/`, { method: "PATCH", body: JSON.stringify(body) });
 
 export const editCardGroupMember = (id: number, cardId: number, action: "add" | "remove") =>

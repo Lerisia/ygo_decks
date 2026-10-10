@@ -652,4 +652,9 @@ class CardGroupReviewApiTest(CardGroupTest):
         body = self.client.post(f"/api/carddb/card-groups/{gid}/members/", {"card_id": 14, "action": "add"}, format="json").json()
         self.assertEqual(body["group"]["members"], 3)
         self.assertEqual([c["text"] for c in body["children"]], ["E・HERO"])
-        self.assertEqual(LogEntry.objects.count(), 4)
+        minor = self.client.patch(f"/api/carddb/card-groups/{gid}/", {"minor": True}, format="json").json()
+        self.assertTrue(minor["group"]["minor"])
+        self.build()
+        from .models import CardGroup
+        self.assertTrue(CardGroup.objects.get(id=gid).minor)   # a rebuild keeps it
+        self.assertEqual(LogEntry.objects.count(), 5)
