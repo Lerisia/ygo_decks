@@ -26,18 +26,20 @@ def forget_art():
     _art["map"] = None
 
 
-def art_name(md_id):
+def art_name(md_id, version=None):
     versions = art_names().get(md_id) or {}
+    if version in versions:
+        return versions[version]
     return next((versions[v] for v in ART_ORDER if v in versions), None)
 
 
-def art_url(md_id):
-    name = art_name(md_id)
+def art_url(md_id, version=None):
+    name = art_name(md_id, version)
     return settings.MEDIA_URL + name if name else None
 
 
-def art_path(md_id):
-    name = art_name(md_id)
+def art_path(md_id, version=None):
+    name = art_name(md_id, version)
     return os.path.join(settings.MEDIA_ROOT, name) if name else None
 
 

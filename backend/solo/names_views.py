@@ -93,7 +93,7 @@ def _players():
     when they share an address or a nickname: one person trying several nicknames stays one row, and so does one
     person whose phone changes address between games.
     """
-    games = list(SkillNameScore.objects.select_related("user", "user__avatar_icon", "user__avatar_icon__card", "user__equipped_border"))
+    games = list(SkillNameScore.objects.select_related("user", "user__avatar_icon", "user__avatar_icon__new_card", "user__equipped_border"))
     parent = {}
 
     def find(x):

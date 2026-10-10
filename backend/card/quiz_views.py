@@ -184,7 +184,7 @@ def quiz_leaderboard(request):
     window_start = timezone.make_aware(window_start_kst, timezone.get_current_timezone())
 
     qs = QuizHighScore.objects.select_related(
-        "user", "user__avatar_icon", "user__avatar_icon__card", "user__equipped_border"
+        "user", "user__avatar_icon", "user__avatar_icon__new_card", "user__equipped_border"
     ).filter(created_at__gte=window_start)
 
     top_records = qs.order_by("-score")[:10]

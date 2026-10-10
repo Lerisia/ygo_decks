@@ -133,15 +133,17 @@ class BorderUploadTest(TestCase):
         self.assertEqual((row["owners"], row["uploaded"]), (1, True))
 
 
+@override_settings(MEDIA_ROOT=MEDIA)
 class CardSearchPagingTest(TestCase):
     def setUp(self):
-        from card.models import Card
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
         self.admin = User.objects.create_user(email="admin@example.com", username="운영자", password="x", is_staff=True)
         self.c = APIClient(); self.c.force_authenticate(self.admin)
         for i in range(65):
-            Card.objects.create(card_id=f"gk{i}", konami_id=str(i), name=f"Gem-Knight {i}",
-                                korean_name=f"젬나이트 {i:02d}", card_illust=f"card_illusts/gk{i}.jpg")
-        Card.objects.create(card_id="no-art", konami_id="x", name="No art", korean_name="젬나이트 일러 없음")
+            md_card(5000 + i, f"젬나이트 {i:02d}")
+        md_card(6000, "젬나이트 일러 없음", art=False)
 
     def search(self, **params):
         return self.c.get("/api/avatar/card-icons/search-cards/", params).data
@@ -153,7 +155,140 @@ class CardSearchPagingTest(TestCase):
         for page in (1, 2, 3):
             names += [r["name"] for r in self.search(q="젬나이트", page=page)["results"]]
         self.assertEqual(names, [f"젬나이트 {i:02d}" for i in range(65)])   # in order, none twice, none missing
+        self.assertEqual(first["results"][0], {"id": 5000, "card_id": 5000, "name": "젬나이트 00",
+                                               "image_url": "/media/cards/art/common/5000.webp"})
 
     def test_a_page_past_the_end_is_empty_and_a_bad_page_is_the_first(self):
         self.assertEqual(self.search(q="젬나이트", page=9)["results"], [])
         self.assertEqual(self.search(q="젬나이트", page="abc")["page"], 1)
+
+
+def md_card(cid, name, art=True, versions=("common",), image=None):
+    """A new-DB card with one print and Master Duel art (files only when `image` is given)."""
+    import os
+
+    from carddb.models import Card, MdArt, MdPrint
+    card = Card.objects.filter(id=cid).first() or Card.objects.create(
+        id=cid, category="monster", name_ja=name, name_ko=name, frame="effect")
+    MdPrint.objects.get_or_create(md_id=cid, defaults={"card": card})
+    if art:
+        for v in versions:
+            rel = f"cards/art/{v}/{cid}.webp"
+            if image is not None:
+                os.makedirs(os.path.join(MEDIA, f"cards/art/{v}"), exist_ok=True)
+                image.save(os.path.join(MEDIA, rel), "WEBP", quality=95)
+            MdArt.objects.create(md_print_id=cid, version=v, image=rel)
+    return card
+
+
+def smooth_noise(seed, size=(512, 512)):
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    small = Image.fromarray(rng.integers(0, 255, (24, 24, 3), dtype=np.uint8))
+    return small.resize(size, Image.BICUBIC)
+
+
+def old_crop(img, cx, cy, r, scale=624 / 512):
+    """The crop users see today: made from a differently sized copy of the art."""
+    big = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+    w, h = big.size
+    x, y, rr = cx * w, cy * h, r * min(w, h)
+    return big.crop((round(x - rr), round(y - rr), round(x + rr), round(y + rr))).resize((256, 256), Image.LANCZOS)
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class CardIconArtTest(TestCase):
+    def setUp(self):
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
+        self.admin = User.objects.create_user(email="ad@example.com", username="관리", password="x", is_staff=True)
+        self.c = APIClient(); self.c.force_authenticate(self.admin)
+
+    def test_icon_reads_the_art_it_was_made_from(self):
+        from avatar.models import CardIcon
+        from avatar.serializers import CardIconSerializer
+        from carddb.models import MdArt, MdPrint
+        card = md_card(4041, "블랙 매지션")
+        MdPrint.objects.create(md_id=23001, card=card, is_alt_art=True)
+        MdArt.objects.create(md_print_id=23001, version="tcg", image="cards/art/tcg/23001.webp")
+        plain = CardIcon.objects.create(new_card=card, center_x=.5, center_y=.5, radius=.3)
+        alt = CardIcon.objects.create(new_card=card, art_print_id=23001, art_version="tcg", center_x=.5, center_y=.5, radius=.3)
+        data = CardIconSerializer(plain).data
+        self.assertEqual((data["card_id"], data["card_name"], data["card_image_url"]), (4041, "블랙 매지션", "/media/cards/art/common/4041.webp"))
+        self.assertEqual(CardIconSerializer(alt).data["card_image_url"], "/media/cards/art/tcg/23001.webp")
+
+    def test_crop_comes_from_the_master_duel_art(self):
+        from avatar.models import CardIcon
+        art = Image.new("RGB", (512, 512), (0, 0, 255))
+        art.paste((255, 0, 0), (0, 0, 256, 512))
+        card = md_card(4042, "반반", image=art)
+        icon = CardIcon.objects.create(new_card=card, center_x=.25, center_y=.5, radius=.2)
+        self.assertGreater(Image.open(icon.cropped_image.path).convert("RGB").getpixel((128, 128))[0], 200)
+
+    def test_create_an_icon_from_a_new_card(self):
+        from avatar.models import CardIcon
+        from avatar.views import _resolve_default_icon
+        card = md_card(4043, "크리보", image=Image.new("RGB", (512, 512), (90, 60, 30)))
+        r = self.c.post("/api/avatar/card-icons/create/", {"card_id": 4043, "center_x": .5, "center_y": .5, "radius": .4,
+                                                           "category": "default"}, format="json")
+        self.assertEqual(r.status_code, 201)
+        icon = CardIcon.objects.get(id=r.data["id"])
+        self.assertEqual((icon.new_card_id, bool(icon.cropped_image)), (card.id, True))
+        self.assertEqual(_resolve_default_icon(), icon)
+        mine = self.c.get("/api/avatar/card-icons/my/", {"q": "크리"}).data["icons"]
+        self.assertEqual([i["id"] for i in mine], [icon.id])
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class IconFitTest(TestCase):
+    def setUp(self):
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
+
+    def icon_with_crop(self, card, crop):
+        from django.core.files.base import ContentFile
+        from avatar.models import CardIcon
+        icon = CardIcon.objects.create(new_card=card, center_x=.5, center_y=.5, radius=.5)
+        buf = io.BytesIO(); crop.save(buf, "JPEG", quality=92)
+        icon.cropped_image.save(f"old_{icon.id}.jpg", ContentFile(buf.getvalue()), save=False)
+        CardIcon.objects.filter(id=icon.id).update(cropped_image=icon.cropped_image.name)
+        icon.refresh_from_db()
+        return icon
+
+    def test_finds_the_same_spot_on_the_right_art(self):
+        import os
+
+        from avatar.icon_fit import fit
+        from carddb.models import MdArt, MdPrint
+        base, alt = smooth_noise(1), smooth_noise(2)
+        card = md_card(4044, "기본", image=base)
+        MdPrint.objects.create(md_id=23002, card=card, is_alt_art=True)
+        os.makedirs(os.path.join(MEDIA, "cards/art/common"), exist_ok=True)
+        alt.save(os.path.join(MEDIA, "cards/art/common/23002.webp"), "WEBP", quality=95)
+        MdArt.objects.create(md_print_id=23002, version="common", image="cards/art/common/23002.webp")
+        found = fit(self.icon_with_crop(card, old_crop(alt, .4, .55, .2)))
+        self.assertEqual((found["md_id"], found["version"]), (23002, "common"))
+        self.assertGreater(found["score"], .9)
+        for got, want in zip((found["cx"], found["cy"], found["r"]), (.4, .55, .2)):
+            self.assertAlmostEqual(got, want, delta=.012)
+
+    def test_prefers_the_original_when_it_looks_the_same_there(self):
+        from avatar.icon_fit import fit
+        art = smooth_noise(3)
+        card = md_card(4045, "심의", versions=("ocg", "tcg"), image=art)
+        self.assertEqual(fit(self.icon_with_crop(card, old_crop(art, .5, .5, .25)))["version"], "ocg")
+
+    def test_command_refits_matches_and_leaves_the_rest(self):
+        from django.core.management import call_command
+        art = smooth_noise(4)
+        good = self.icon_with_crop(md_card(4046, "맞음", image=art), old_crop(art, .3, .6, .15))
+        lost = self.icon_with_crop(md_card(4047, "다른 그림", image=smooth_noise(5)), smooth_noise(6, (256, 256)))
+        lost_crop = lost.cropped_image.name
+        call_command("fit_card_icons", stdout=io.StringIO())
+        good.refresh_from_db(); lost.refresh_from_db()
+        self.assertAlmostEqual(good.center_x, .3, delta=.012)
+        self.assertEqual((good.art_print_id, good.art_version), (4046, "common"))
+        self.assertNotIn("old_", good.cropped_image.name)
+        self.assertEqual((lost.center_x, lost.cropped_image.name, lost.art_print_id), (.5, lost_crop, None))

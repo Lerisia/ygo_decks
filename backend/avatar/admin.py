@@ -20,10 +20,11 @@ class CustomIllustAdmin(admin.ModelAdmin):
 
 @admin.register(CardIcon)
 class CardIconAdmin(admin.ModelAdmin):
-    list_display = ("id", "preview", "title", "card", "category", "rarity", "price", "theme", "created_at")
+    list_display = ("id", "preview", "title", "new_card", "category", "rarity", "price", "theme", "created_at")
     list_filter = ("category", "rarity", "theme")
-    search_fields = ("title", "card__korean_name", "card__name", "theme")
-    autocomplete_fields = ("card",)
+    search_fields = ("title", "new_card__name_ko", "new_card__name_ja", "theme")
+    autocomplete_fields = ("new_card", "art_print")
+    exclude = ("card",)
     ordering = ("-created_at",)
 
     def preview(self, obj):
@@ -32,10 +33,10 @@ class CardIconAdmin(admin.ModelAdmin):
                 '<img src="{}" style="width:36px;height:36px;border-radius:50%;object-fit:cover" />',
                 obj.cropped_image.url,
             )
-        if obj.card and obj.card.card_illust:
+        if obj.source_image_url:
             return format_html(
                 '<img src="{}" style="width:36px;height:36px;border-radius:50%;object-fit:cover" title="(crop pending)" />',
-                obj.card.card_illust.url,
+                obj.source_image_url,
             )
         return "—"
 
@@ -51,7 +52,7 @@ class BorderAdmin(admin.ModelAdmin):
 @admin.register(UserIconUnlock)
 class UserIconUnlockAdmin(admin.ModelAdmin):
     list_display = ("user", "icon", "granted_at", "note")
-    search_fields = ("user__username", "icon__title", "icon__card__korean_name")
+    search_fields = ("user__username", "icon__title", "icon__new_card__name_ko")
     autocomplete_fields = ("user", "icon")
     ordering = ("-granted_at",)
 

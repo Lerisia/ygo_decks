@@ -4,28 +4,38 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
-from card.models import Card
+from carddb.models import Card, has_art
 from .models import CardIcon, Border, UserBorderUnlock, UserIconUnlock, CustomIllust, TwitterCredentials
 from .serializers import CardIconSerializer, BorderSerializer
+
+
+def _korean_name_for(jp_name):
+    """Korean name of the card a tweet names in Japanese (full/half-width ignored), else the Japanese name."""
+    import unicodedata
+    key = unicodedata.normalize("NFKC", jp_name)
+    for ja, ko in Card.objects.exclude(name_ko="").values_list("name_ja", "name_ko").iterator():
+        if unicodedata.normalize("NFKC", ja) == key:
+            return ko
+    return jp_name
 
 
 def _resolve_default_icon():
     """Return the default 'Kuriboh' icon if available, else first icon, else None."""
     icon = (
         CardIcon.objects
-        .filter(card__korean_name="크리보")
-        .select_related("card")
+        .filter(new_card__name_ko="크리보")
+        .select_related("new_card")
         .first()
     )
     if not icon:
-        icon = CardIcon.objects.select_related("card").first()
+        icon = CardIcon.objects.select_related("new_card").first()
     return icon
 
 
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 def list_icons(request):
-    icons = CardIcon.objects.select_related("card", "custom_illust").all()
+    icons = CardIcon.objects.select_related("new_card", "custom_illust").all()
     return Response({"icons": CardIconSerializer(icons, many=True).data})
 
 
@@ -74,12 +84,9 @@ def create_icon(request):
             return Response({"error": "커스텀 일러스트를 찾을 수 없습니다."}, status=404)
     else:
         try:
-            card = Card.objects.get(pk=int(card_id))
+            card = Card.objects.filter(has_art()).get(pk=int(card_id))
         except (Card.DoesNotExist, ValueError, TypeError):
-            try:
-                card = Card.objects.get(card_id=str(card_id))
-            except Card.DoesNotExist:
-                return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
+            return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
 
     try:
         cx = float(request.data.get("center_x"))
@@ -99,7 +106,9 @@ def create_icon(request):
     # the new artwork — handy for fixing a bad crop without re-granting.
     existing = CardIcon.objects.filter(title=title).first() if title else None
     if existing:
-        existing.card = card
+        existing.new_card = card
+        existing.art_print = None
+        existing.art_version = ""
         existing.custom_illust = custom_illust
         existing.center_x = cx
         existing.center_y = cy
@@ -111,7 +120,7 @@ def create_icon(request):
         existing.save()
         return Response(CardIconSerializer(existing).data, status=200)
     icon = CardIcon.objects.create(
-        card=card,
+        new_card=card,
         custom_illust=custom_illust,
         title=title,
         center_x=cx,
@@ -202,12 +211,12 @@ def my_icons(request):
     from django.db.models import Q
     user = request.user
     q = (request.GET.get("q") or "").strip()
-    qs = CardIcon.objects.select_related("card").filter(
+    qs = CardIcon.objects.select_related("new_card").filter(
         Q(category="default") | Q(user_unlocks__user=user)
     )
     if q:
-        qs = qs.filter(Q(card__korean_name__icontains=q) | Q(title__icontains=q))
-    qs = qs.distinct().order_by("card__korean_name", "id")
+        qs = qs.filter(Q(new_card__name_ko__icontains=q) | Q(title__icontains=q))
+    qs = qs.distinct().order_by("new_card__name_ko", "id")
     return Response({"icons": CardIconSerializer(qs, many=True).data})
 
 
@@ -224,14 +233,14 @@ def shop_list_icons(request):
     cutoff = timezone.now() - timedelta(days=NEW_DAYS)
 
     q = (request.GET.get("q") or "").strip()
-    qs = CardIcon.objects.select_related("card").filter(category="shop")
+    qs = CardIcon.objects.select_related("new_card").filter(category="shop")
     if q:
-        qs = qs.filter(card__korean_name__icontains=q) | qs.filter(title__icontains=q)
+        qs = qs.filter(new_card__name_ko__icontains=q) | qs.filter(title__icontains=q)
     # Newest-first within the "new arrivals" window, then alphabetical.
     # NULLS LAST so admin-cleared listings drop into the regular bucket.
     qs = qs.distinct().order_by(
         models.F("shop_listed_at").desc(nulls_last=True),
-        "card__korean_name", "id",
+        "new_card__name_ko", "id",
     )
 
     user = request.user if request.user.is_authenticated else None
@@ -664,17 +673,18 @@ def search_cards(request):
         page = max(1, int(request.GET.get("page") or 1))
     except (ValueError, TypeError):
         page = 1
-    qs = Card.objects.filter(card_illust__isnull=False).exclude(card_illust="")
+    from carddb.display import art_url, display_name
+    qs = Card.objects.filter(has_art())
     if q:
-        qs = qs.filter(korean_name__icontains=q)
+        qs = qs.filter(name_ko__icontains=q)
     total = qs.count()
-    qs = qs.order_by("korean_name", "id")[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
+    qs = qs.order_by("name_ko", "id")[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
     results = [
         {
             "id": c.id,
-            "card_id": c.card_id,
-            "name": c.korean_name or c.name,
-            "image_url": c.card_illust.url if c.card_illust else None,
+            "card_id": c.id,
+            "name": display_name(c),
+            "image_url": art_url(c.id),
         }
         for c in qs
     ]
@@ -896,12 +906,7 @@ def scrape_twitter_range(request):
             import re as _re
             m_quote = _re.search(r"[「『]([^」』]+)[」』]", tweet_text)
             if m_quote:
-                jp_name = m_quote.group(1).strip()
-                kr_match = Card.objects.filter(name_ja=jp_name).first()
-                if kr_match and kr_match.korean_name:
-                    base = kr_match.korean_name
-                else:
-                    base = jp_name
+                base = _korean_name_for(m_quote.group(1).strip())
             else:
                 cleaned = _re.sub(r"https?://\S+", "", tweet_text)
                 cleaned = _re.sub(r"#\S+", "", cleaned).strip()
@@ -1020,12 +1025,7 @@ def import_tweet_illusts(request):
     if not auto_name:
         m_quote = re.search(r"[「『]([^」』]+)[」』]", tweet_text)
         if m_quote:
-            jp_name = m_quote.group(1).strip()
-            kr_match = Card.objects.filter(name_ja=jp_name).first()
-            if kr_match and kr_match.korean_name:
-                auto_name = kr_match.korean_name
-            else:
-                auto_name = jp_name
+            auto_name = _korean_name_for(m_quote.group(1).strip())
 
     created = []
     for i, p in enumerate(photos):

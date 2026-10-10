@@ -129,7 +129,9 @@ class CardIcon(models.Model):
     """A circular crop of a card illustration, usable as a user avatar.
 
     Crop is stored as relative coordinates (0~1) on top of the card's
-    `card_illust` image, so it's resolution-independent and easy to re-edit.
+    Master Duel art — `art_print`/`art_version` when the icon was made from
+    an alternate art or a regional version, else the card's own art — so
+    it's resolution-independent and easy to re-edit.
     """
 
     CATEGORY_CHOICES = [
@@ -158,6 +160,9 @@ class CardIcon(models.Model):
         null=True, blank=True,
     )
     new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="card_icons")
+    art_print = models.ForeignKey("carddb.MdPrint", on_delete=models.SET_NULL, null=True, blank=True, related_name="card_icons",
+                                  help_text="대체 일러로 만든 아이콘이면 그 마듀 ID (비우면 카드 기본 일러)")
+    art_version = models.CharField(max_length=6, blank=True, default="", help_text="ocg / common / tcg (비우면 원본 우선)")
     custom_illust = models.ForeignKey(
         CustomIllust,
         on_delete=models.CASCADE,
@@ -195,20 +200,30 @@ class CardIcon(models.Model):
         ordering = ["-created_at"]
 
     # Fields that, when changed, should trigger a crop regeneration.
-    _CROP_INVALIDATING_FIELDS = ("card_id", "custom_illust_id", "center_x", "center_y", "radius")
+    _CROP_INVALIDATING_FIELDS = ("new_card_id", "art_print_id", "art_version", "custom_illust_id", "center_x", "center_y", "radius")
 
     def __str__(self):
         if self.custom_illust_id:
             return self.title or f"icon for custom #{self.custom_illust_id}"
-        return self.title or f"icon for card {self.card_id}"
+        return self.title or f"icon for card {self.new_card_id}"
 
     @property
     def source_image_path(self):
         """Path to the underlying illustration file (card or custom)."""
         if self.custom_illust_id and self.custom_illust and self.custom_illust.image:
             return self.custom_illust.image.path
-        if self.card_id and self.card and self.card.card_illust:
-            return self.card.card_illust.path
+        if self.new_card_id:
+            from carddb.display import art_path
+            return art_path(self.art_print_id or self.new_card_id, self.art_version or None)
+        return None
+
+    @property
+    def source_image_url(self):
+        if self.custom_illust_id and self.custom_illust and self.custom_illust.image:
+            return self.custom_illust.image.url
+        if self.new_card_id:
+            from carddb.display import art_url
+            return art_url(self.art_print_id or self.new_card_id, self.art_version or None)
         return None
 
     def regenerate_crop(self, save=True):
@@ -275,39 +290,3 @@ class CardIcon(models.Model):
         super().save(*args, **kwargs)
         if regen:
             self.regenerate_crop(save=True)
-
-
-# Signal: when a Card's illustration changes, regenerate every dependent
-# CardIcon's crop. Hooked here (instead of in card/) since the dependency is
-# from avatar → card.
-from django.db.models.signals import pre_save, post_save  # noqa: E402
-from django.dispatch import receiver  # noqa: E402
-
-
-def _track_card_illust_change(sender, instance, **kwargs):
-    if not instance.pk:
-        instance._card_illust_changed = True
-        return
-    try:
-        old = sender.objects.only("card_illust").get(pk=instance.pk)
-        instance._card_illust_changed = (old.card_illust != instance.card_illust)
-    except sender.DoesNotExist:
-        instance._card_illust_changed = True
-
-
-def _regen_crops_for_card(sender, instance, **kwargs):
-    if not getattr(instance, "_card_illust_changed", False):
-        return
-    for icon in CardIcon.objects.filter(card=instance):
-        icon.regenerate_crop(save=True)
-
-
-def _connect_card_signals():
-    from card.models import Card
-    pre_save.connect(_track_card_illust_change, sender=Card, dispatch_uid="avatar_track_card_illust")
-    post_save.connect(_regen_crops_for_card, sender=Card, dispatch_uid="avatar_regen_crops_on_card_save")
-
-
-# Connect lazily — `from card.models import Card` here would cause a circular
-# import if avatar.models is loaded before card.models. AppConfig.ready() is
-# the right place; we wire it from apps.py.

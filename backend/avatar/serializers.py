@@ -19,7 +19,8 @@ class BorderSerializer(serializers.ModelSerializer):
 
 
 class CardIconSerializer(serializers.ModelSerializer):
-    card_id = serializers.SerializerMethodField()
+    card = serializers.IntegerField(source="new_card_id", read_only=True)
+    card_id = serializers.IntegerField(source="new_card_id", read_only=True)
     card_name = serializers.SerializerMethodField()
     card_image_url = serializers.SerializerMethodField()
     cropped_image_url = serializers.SerializerMethodField()
@@ -50,23 +51,16 @@ class CardIconSerializer(serializers.ModelSerializer):
     def get_is_custom(self, obj):
         return bool(obj.custom_illust_id)
 
-    def get_card_id(self, obj):
-        return obj.card.card_id if obj.card_id and obj.card else None
-
     def get_card_name(self, obj):
         if obj.custom_illust_id and obj.custom_illust:
             return obj.custom_illust.name
-        return obj.card.korean_name if obj.card_id and obj.card else None
+        return obj.new_card.name_ko if obj.new_card_id and obj.new_card else None
 
     def get_card_image_url(self, obj):
         try:
-            if obj.custom_illust_id and obj.custom_illust and obj.custom_illust.image:
-                return obj.custom_illust.image.url
-            if obj.card_id and obj.card and obj.card.card_illust:
-                return obj.card.card_illust.url
+            return obj.source_image_url
         except Exception:
             return None
-        return None
 
     def get_cropped_image_url(self, obj):
         try:

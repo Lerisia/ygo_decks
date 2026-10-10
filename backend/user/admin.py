@@ -22,10 +22,10 @@ class UserIconUnlockInline(admin.TabularInline):
                 '<img src="{}" style="width:48px;height:48px;border-radius:50%;object-fit:cover" />',
                 icon.cropped_image.url,
             )
-        if icon and icon.card and icon.card.card_illust:
+        if icon and icon.source_image_url:
             return format_html(
                 '<img src="{}" style="width:48px;height:48px;border-radius:50%;object-fit:cover" title="(crop pending)" />',
-                icon.card.card_illust.url,
+                icon.source_image_url,
             )
         return "—"
     icon_preview.short_description = "미리보기"
@@ -84,10 +84,10 @@ class CustomUserAdmin(UserAdmin):
                 '<img src="{}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" />',
                 icon.cropped_image.url,
             )
-        if icon and icon.card and icon.card.card_illust:
+        if icon and icon.source_image_url:
             return format_html(
                 '<img src="{}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" title="(crop pending)" />',
-                icon.card.card_illust.url,
+                icon.source_image_url,
             )
         return "—"
     avatar_thumb.short_description = "장착"
@@ -104,15 +104,15 @@ class CustomUserAdmin(UserAdmin):
             return "(아이콘 없음)"
         if icon.cropped_image:
             url = icon.cropped_image.url
-        elif icon.card and icon.card.card_illust:
-            url = icon.card.card_illust.url
+        elif icon.source_image_url:
+            url = icon.source_image_url
         else:
             return "(아이콘 없음)"
         return format_html(
             '<img src="{}" style="width:80px;height:80px;border-radius:50%;'
             'object-fit:cover;border:2px solid #999" />'
             '<div style="margin-top:6px;font-size:12px;">{} (id={})</div>',
-            url, icon.title or (icon.card.korean_name if icon.card else "") or "", icon.id,
+            url, icon.title or (icon.new_card.name_ko if icon.new_card else "") or "", icon.id,
         )
     avatar_preview.short_description = "장착 아이콘 미리보기"
 
