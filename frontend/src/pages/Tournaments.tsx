@@ -17,18 +17,18 @@ const STATUS_BADGES: Record<string, { label: string; cls: string }> = {
   completed: { label: "종료", cls: "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300" },
 };
 
-const TABS = [
-  { key: "all", label: "전체" },
-  { key: "recruiting", label: "모집 중" },
-  { key: "ongoing", label: "진행 중" },
-  { key: "completed", label: "종료" },
-] as const;
-type TabKey = (typeof TABS)[number]["key"];
+// Tournaments are mostly run by outside hosts who use the site to manage them, so there are no status tabs: one list,
+// open ones first, finished ones last and greyed out (특이점 2026-10-10).
+const STATUS_ORDER: Record<string, number> = { recruiting: 0, ongoing: 1, completed: 2 };
+const byStatusThenDate = (a: TournamentListItem, b: TournamentListItem) => {
+  const s = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
+  if (s) return s;
+  const d = new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+  return a.status === "completed" ? -d : d; // finished: latest first; others: soonest first
+};
 
 function Tournaments() {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
-  // "참여자로 참가하기" lists only the tournaments still taking entrants (특이점 2026-10-10).
-  const [tab] = useState<TabKey>("recruiting");
   const navigate = useNavigate();
   const loggedIn = !!localStorage.getItem("access_token");
 
@@ -55,18 +55,23 @@ function Tournaments() {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">대회는 로그인한 회원만 참가할 수 있습니다.</p>
       )}
       {(() => {
-        const visible = tab === "all" ? tournaments : tournaments.filter((t) => t.status === tab);
+        const visible = [...tournaments].sort(byStatusThenDate);
         if (visible.length === 0) {
-          return <p className="text-gray-500 dark:text-gray-400">지금 참가 신청을 받는 대회가 없습니다.</p>;
+          return <p className="text-gray-500 dark:text-gray-400">아직 열린 대회가 없습니다.</p>;
         }
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {visible.map((t) => {
               const badge = STATUS_BADGES[t.status] || STATUS_BADGES.recruiting;
+              const done = t.status === "completed";
               return (
                 <div
                   key={t.id}
-                  className="relative border dark:border-gray-700 rounded-lg p-4 shadow cursor-pointer hover:shadow-lg transition bg-white dark:bg-gray-800"
+                  className={`relative border dark:border-gray-700 rounded-lg p-4 cursor-pointer transition ${
+                    done
+                      ? "bg-gray-100 dark:bg-gray-900 opacity-60 grayscale hover:opacity-80"
+                      : "bg-white dark:bg-gray-800 shadow hover:shadow-lg"
+                  }`}
                   onClick={() => navigate(`/tournaments/${t.id}`)}
                 >
                   <span className={`absolute top-2 right-2 z-10 text-xs font-semibold px-2 py-1 rounded-full shadow ${badge.cls}`}>
