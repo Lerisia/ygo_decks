@@ -14,7 +14,7 @@ import {
   type SheetSummary,
 } from "@/api/toolApi";
 import { KebabMenu, RankIcon, confirmSheetDelete } from "@/components/records/SheetBits";
-import { ResultChips, UsagePie, RAINBOW, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/charts";
+import { ResultChips, UsagePie, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/charts";
 import { getRankLabel } from "@/utils/rankUtils";
 import UpdateBadge from "@/components/UpdateBadge";
 
@@ -60,6 +60,8 @@ const RecordGroups = () => {
   const metaScrolled = useRef(false);
   const [showMoreMeta, setShowMoreMeta] = useState(false);
   const [deckCovers, setDeckCovers] = useState<Record<number, string>>({});
+  const [pieMeta, setPieMeta] = useState<number | null>(null);
+  const [rowMeta, setRowMeta] = useState<number | null>(null);
   const [totalMatches, setTotalMatches] = useState<number>(0);
   // "최근 7일", or "10/6 18:00 이후" while a reset (balance update) is less than a week old
   const [metaSince, setMetaSince] = useState("최근 7일");
@@ -161,18 +163,21 @@ const RecordGroups = () => {
     return (
       <div
         key={deck.meta_deck_id}
-        className="flex items-center justify-between border-b pb-2"
+        onMouseEnter={() => setRowMeta(deck.meta_deck_id)}
+        onMouseLeave={() => setRowMeta(null)}
+        className={`flex items-center justify-between border-b pb-2 rounded-lg transition-colors ${
+          (rowMeta ?? pieMeta) === deck.meta_deck_id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+        }`}
       >
         <div className="flex items-center gap-2">
-          {/* Medals are big enough to read their numbers; 4–10 sit on a faint square in their pie slice's colour (특이점 2026-10-10). */}
+          {/* Medals are big enough to read their numbers (특이점 2026-10-10). */}
           {idx < 3 ? (
             <span className="w-9 h-9 flex items-center justify-center text-[32px] leading-none shrink-0" aria-label={`${idx + 1}위`}>
               {["🥇", "🥈", "🥉"][idx]}
             </span>
           ) : (
             <span
-              className={`w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0 ${idx < 10 ? "" : "bg-gray-200 dark:bg-gray-700"}`}
-              style={idx < 10 ? { backgroundColor: `${RAINBOW[idx - 3]}38` } : undefined}
+              className={`w-9 h-9 flex items-center justify-center rounded-md font-mono font-semibold shrink-0 ${idx < 10 ? "bg-gray-100 dark:bg-gray-700" : "bg-gray-200 dark:bg-gray-700"}`}
             >
               {idx + 1}
             </span>
@@ -325,10 +330,7 @@ const RecordGroups = () => {
             <p className="text-xs text-gray-700 dark:text-gray-300">
               ※ 월초 셀렉션 팩 출시 시 초기화
             </p>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
-                총 집계 게임 수: {totalMatches.toLocaleString()}
-              </p>
+            <div className="flex items-center justify-end mb-3">
               {/* Phones open on the pie alone and 더보기 brings the numbers; on PC it adds 11위 ~ 30위 (특이점 2026-10-10). */}
               {topMeta.length > 0 && (
                 <button
@@ -354,7 +356,15 @@ const RecordGroups = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
               <div>
-                <UsagePie data={topMeta} deckCovers={deckCovers} showUpdateKey={metaStats.some((d) => d.is_upcoming)} />
+                <UsagePie
+                  data={topMeta}
+                  deckCovers={deckCovers}
+                  showUpdateKey={metaStats.some((d) => d.is_upcoming)}
+                  total={totalMatches}
+                  since={metaSince === "최근 7일" ? "최근 1주일" : metaSince}
+                  active={rowMeta}
+                  onActive={setPieMeta}
+                />
               </div>
               <div className={`${showMoreMeta ? "" : "hidden md:block"} space-y-2`}>
                 {topMeta.map((deck, idx) => renderMetaRow(deck, idx))}

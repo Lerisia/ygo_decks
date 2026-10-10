@@ -120,6 +120,8 @@ class Deck(models.Model):
     cover_image_phone = models.ImageField(upload_to='deck_covers/phone/', blank=True, null=True)
     # Deck page and test result: up to 960px webp in place of the original upload, which can be a 3MB PNG.
     cover_image_detail = models.ImageField(upload_to='deck_covers/detail/', blank=True, null=True)
+    # Usage donut: each slice is filled with the deck's art, up to 640px (특이점 2026-10-10).
+    cover_image_chart = models.ImageField(upload_to='deck_covers/chart/', blank=True, null=True)
 
     strength = models.IntegerField(choices=_Strength.choices)
     difficulty = models.IntegerField(choices=_Difficulty.choices)
@@ -157,7 +159,7 @@ class Deck(models.Model):
     def __str__(self):
         return self.name
     
-    COVER_VERSIONS = ("cover_image_small", "cover_image_list", "cover_image_phone", "cover_image_detail")
+    COVER_VERSIONS = ("cover_image_small", "cover_image_list", "cover_image_phone", "cover_image_detail", "cover_image_chart")
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -176,6 +178,7 @@ class Deck(models.Model):
             "cover_image_list": f"deck_covers/list/{stem}.webp",
             "cover_image_phone": f"deck_covers/phone/{stem}.webp",
             "cover_image_detail": f"deck_covers/detail/{stem}.webp",
+            "cover_image_chart": f"deck_covers/chart/{stem}.webp",
         }
 
     def cover_versions_stale(self):
@@ -207,6 +210,7 @@ class Deck(models.Model):
             self.make_list_cover(img, self.pk, os.path.basename(self.cover_image.name))
             _save_webp(img, names["cover_image_phone"], 320, quality=80)
             _save_webp(img, names["cover_image_detail"], 960, quality=82)
+            _save_webp(img, names["cover_image_chart"], 640, quality=82)
         for field, name in names.items():
             getattr(self, field).name = name
         super().save(update_fields=list(names))

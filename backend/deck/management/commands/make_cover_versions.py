@@ -4,7 +4,7 @@ from deck.models import Deck
 
 
 class Command(BaseCommand):
-    help = "Build the deck cover versions (200px small, 480px list, 320px phone, 960px detail) that are missing or out of date."
+    help = "Build the deck cover versions (200px small, 480px list, 320px phone, 960px detail, 640px chart) that are missing or out of date."
 
     def add_arguments(self, parser):
         parser.add_argument("--all", action="store_true", help="rebuild every deck, not only out-of-date ones")

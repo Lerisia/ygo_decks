@@ -252,6 +252,7 @@ export type MetaDeckStat = {
   appearance_percent: number;
   win_rate: number;
   cover_image_small?: string | null;
+  cover_image_chart?: string | null;
   is_upcoming?: boolean;
 };
 

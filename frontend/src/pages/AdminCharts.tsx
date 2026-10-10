@@ -78,6 +78,8 @@ export default function AdminCharts() {
   const navigate = useNavigate();
   const [meta, setMeta] = useState<MetaDeckStat[]>(SAMPLE_META);
   const [live, setLive] = useState(false);
+  const [total, setTotal] = useState(3329);
+  const [since, setSince] = useState("최근 1주일");
 
   useEffect(() => {
     isAdmin().then((ok) => { if (!ok) navigate("/"); }).catch(() => navigate("/"));
@@ -88,6 +90,11 @@ export default function AdminCharts() {
       .then((d) => {
         if (d.meta_decks?.length) {
           setMeta(d.meta_decks);
+          setTotal(d.total_matches || 0);
+          if (d.since_reset && d.since) {
+            const t = new Date(d.since);
+            setSince(`${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")} 이후`);
+          }
           setLive(true);
         }
       })
@@ -109,7 +116,7 @@ export default function AdminCharts() {
       </div>
 
       <Pair title={`덱 사용률 파이 · ${live ? "실제 최근 데이터" : "예시 데이터"}`} file="Pie.tsx · UsagePie">
-        <UsagePie data={meta.slice(0, 10)} deckCovers={covers} showUpdateKey={meta.slice(0, 10).some((d) => d.is_upcoming)} />
+        <UsagePie data={meta.slice(0, 10)} deckCovers={covers} showUpdateKey={meta.slice(0, 10).some((d) => d.is_upcoming)} total={total} since={since} />
       </Pair>
 
       <Pair title="랭크 곡선" file="Curve.tsx · RankCurve">

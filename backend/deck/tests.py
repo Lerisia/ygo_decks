@@ -605,14 +605,23 @@ class CoverVersionsTest(TestCase):
         self.assertTrue(deck.cover_image_phone.path.startswith(self.media))
         self.assertTrue(deck.cover_image_detail.path.startswith(self.media))
 
+    def test_save_makes_640_chart_cover(self):
+        # The usage donut fills each slice with the deck's art, so it gets a 640px version (특이점 2026-10-10)
+        deck = _create_deck(cover_image=_png((2000, 1500)))
+        self.assertEqual(self._size(deck.cover_image_chart), ("WEBP", (640, 480)))
+        self.assertTrue(deck.cover_image_chart.path.startswith(self.media))
+        square = _create_deck(name="정사각", cover_image=_png((1079, 1079)))
+        self.assertEqual(self._size(square.cover_image_chart), ("WEBP", (640, 640)))
+
     def test_small_original_is_not_upscaled(self):
         deck = _create_deck(cover_image=_png((300, 300)))
         self.assertEqual(self._size(deck.cover_image_phone), ("WEBP", (300, 300)))
         self.assertEqual(self._size(deck.cover_image_detail), ("WEBP", (300, 300)))
+        self.assertEqual(self._size(deck.cover_image_chart), ("WEBP", (300, 300)))
 
     def test_counting_a_view_does_not_rebuild_covers(self):
         deck = _create_deck(cover_image=_png((800, 800)))
-        paths = [deck.cover_image_small.path, deck.cover_image_list.path, deck.cover_image_phone.path, deck.cover_image_detail.path]
+        paths = [deck.cover_image_small.path, deck.cover_image_list.path, deck.cover_image_phone.path, deck.cover_image_detail.path, deck.cover_image_chart.path]
         os.utime(deck.cover_image.path, (500_000, 500_000))
         for p in paths:
             os.utime(p, (1_000_000, 1_000_000))
@@ -620,7 +629,7 @@ class CoverVersionsTest(TestCase):
         deck.save(update_fields=["num_views"])
         deck.name = "이름만 바꿈"
         deck.save()
-        self.assertEqual([os.path.getmtime(p) for p in paths], [1_000_000] * 4)
+        self.assertEqual([os.path.getmtime(p) for p in paths], [1_000_000] * 5)
 
     def test_new_cover_rebuilds_versions(self):
         deck = _create_deck(cover_image=_png((800, 800)))
