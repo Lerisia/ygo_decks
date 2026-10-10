@@ -174,12 +174,24 @@ export default function CardList() {
     <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 py-4 text-center">
       <DexTabs />
       {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
-      <Input
-        placeholder="카드 이름 검색 (한국어·일본어·영어)"
-        value={qInput}
-        onChange={(e) => setQInput(e.target.value)}
+      {/* Enter (the phone keyboard's 검색 key) ends the typing: search at once and put the keyboard away. A form
+          submit fires even while a Korean syllable is still being composed, where a bare Enter key may not. */}
+      <form
+        role="search"
         className="mb-4"
-      />
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (qInput.trim() !== filters.q) update({ q: qInput.trim() });
+          (document.activeElement as HTMLElement | null)?.blur();
+        }}
+      >
+        <Input
+          placeholder="카드 이름 검색 (한국어·일본어·영어)"
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
+          enterKeyHint="search"
+        />
+      </form>
 
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
         <button

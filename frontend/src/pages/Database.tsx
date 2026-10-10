@@ -264,12 +264,22 @@ export default function DatabasePage() {
       <DatabaseTrackerPromo />
 
       {/* Search decks */}
-      <Input
-        placeholder="덱 이름 검색..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+      {/* Enter (the phone keyboard's 검색 key) puts the keyboard away; the list already follows the typing. */}
+      <form
+        role="search"
         className="mb-4"
-      />
+        onSubmit={(e) => {
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur();
+        }}
+      >
+        <Input
+          placeholder="덱 이름 검색..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          enterKeyHint="search"
+        />
+      </form>
 
       {/* Filter expand / fold + deck power border toggle */}
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
