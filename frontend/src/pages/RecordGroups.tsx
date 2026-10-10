@@ -53,15 +53,12 @@ const winRateTint = (rate: number): { cls: string; mix?: string } => {
   return { cls: "" };
 };
 
-// Slices are plain colours (metallic gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
+// Slices are plain colours (gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
 // picture sits in a small circle on the pie's edge, so ranks read at a glance (특이점 2026-10-10).
-// Metal: a gentle highlight band on a near-flat base — the first, stronger sheen read as too flashy (특이점 2026-10-10).
-const PODIUM = [
-  { stops: ["#c79a2e", "#d6ab42", "#e4c063", "#d5a940", "#c4962c"], solid: "#d4a72c" },
-  { stops: ["#a5abb3", "#b8bdc4", "#cdd1d6", "#b6bbc2", "#a2a8b0"], solid: "#b4b9c0" },
-  { stops: ["#ad6a3c", "#bd7a4a", "#cf9266", "#bb7747", "#a9663a"], solid: "#c07a46" },
-];
-const PODIUM_OFFSETS = ["0%", "38%", "52%", "68%", "100%"];
+// Flat colours, no sheen; the rainbow and the rest-of-field slices sit at half opacity so the podium stands out
+// (특이점 2026-10-10). The list's rank squares and the circles' rings keep the full colours.
+const PODIUM = [{ solid: "#d4a72c" }, { solid: "#b4b9c0" }, { solid: "#c07a46" }];
+const MUTED_SLICE_OPACITY = 0.5;
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
 const OTHERS_COLOR = "#3a3a3d";
 // Up to 200px on PC (특이점 2026-10-10); narrower columns shrink it so the circles still fit.
@@ -177,7 +174,7 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
         <title>{`${index + 1}위 ${entry.label} · ${entry.appearance_percent}%`}</title>
         {rings[index] > 0 && <line x1={edgeX} y1={edgeY} x2={x} y2={y} stroke={color} strokeWidth={1.5} />}
         <circle cx={x} cy={y} r={avatarR + 4} className="fill-white dark:fill-gray-800" />
-        <circle cx={x} cy={y} r={avatarR + 2} fill={index < 3 ? `url(#meta-podium-${index})` : color} />
+        <circle cx={x} cy={y} r={avatarR + 2} fill={color} />
         <clipPath id={`deck-avatar-${entry.id}`}>
           <circle cx={x} cy={y} r={avatarR} />
         </clipPath>
@@ -240,13 +237,6 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
                 <stop offset="64%" stopColor="#0b3fd6" />
                 <stop offset="100%" stopColor="#0a2a8f" />
               </radialGradient>
-              {PODIUM.map((c, i) => (
-                <linearGradient key={i} id={`meta-podium-${i}`} x1="0" y1="0" x2="1" y2="1">
-                  {c.stops.map((color, j) => (
-                    <stop key={j} offset={PODIUM_OFFSETS[j]} stopColor={color} />
-                  ))}
-                </linearGradient>
-              ))}
             </defs>
             <Pie
               data={chartData}
@@ -264,7 +254,8 @@ export const MetaDeckPieChart = ({ data, deckCovers, showUpdateKey = false }: Pr
               {chartData.map((entry, i) => (
                 <Cell
                   key={entry.id}
-                  fill={entry.id === -1 ? OTHERS_COLOR : i < 3 ? `url(#meta-podium-${i})` : sliceColor(i)}
+                  fill={entry.id === -1 ? OTHERS_COLOR : sliceColor(i)}
+                  fillOpacity={i < 3 && entry.id !== -1 ? 1 : MUTED_SLICE_OPACITY}
                   strokeWidth={2}
                   className="stroke-white dark:stroke-gray-800"
                 />
