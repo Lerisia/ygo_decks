@@ -353,3 +353,22 @@ class ImportOfficialTest(TestCase):
         tower = Card.objects.get(id=14797)
         self.assertEqual(tower.name_ko, "검은 숲의 항천각")
         self.assertEqual(CardText.objects.get(card_id=14797, lang="ko").effect, "특수 소환할 수 없다.")
+
+
+class ImportArtTest(TestCase):
+    def test_links_saved_art_to_prints(self):
+        import json
+
+        from .importer import import_art
+        from .models import MdArt
+
+        Card.objects.create(id=4441, category="monster", name_ja="ウォーター・ガール", frame="normal")
+        MdPrint.objects.create(md_id=4441, card_id=4441)
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, folder, True)
+        manifest = folder / "manifest.json"
+        manifest.write_text(json.dumps({"common/4441": {}, "ocg/4441": {}, "tcg/4441": {}, "common/3101": {}}))
+        self.assertEqual(import_art(manifest), {"arts": 3, "without_print": 1})
+        self.assertEqual(MdArt.objects.get(md_print_id=4441, version="ocg").image.name, "cards/art/ocg/4441.webp")
+        self.assertEqual(import_art(manifest)["arts"], 3)
+        self.assertEqual(MdArt.objects.count(), 3)

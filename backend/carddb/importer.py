@@ -196,3 +196,19 @@ def import_official(offdb_dir, lang):
     CardText.objects.bulk_create(texts, update_conflicts=True, unique_fields=["card", "lang"], update_fields=TEXT_FIELDS, batch_size=500)
     apply_overrides([t.card_id for t in texts])
     return {"products": len(products), "cards_seen": len(latest), "new_cards": len(new_cards), "updated": len(dated), "level_rank_zero": len(zeroed), "merged_tokens": merged_tokens}
+
+
+def import_art(manifest_path, prefix="cards/art"):
+    import json
+
+    from .models import MdArt
+
+    manifest = json.loads(Path(manifest_path).read_text())
+    prints = set(MdPrint.objects.values_list("md_id", flat=True))
+    rows = []
+    for key in manifest:
+        version, md_id = key.split("/")
+        if int(md_id) in prints:
+            rows.append(MdArt(md_print_id=int(md_id), version=version, image=f"{prefix}/{key}.webp"))
+    MdArt.objects.bulk_create(rows, update_conflicts=True, unique_fields=["md_print", "version"], update_fields=["image"], batch_size=500)
+    return {"arts": len(rows), "without_print": len(manifest) - len(rows)}
