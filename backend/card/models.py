@@ -20,9 +20,7 @@ class Card(models.Model):
     # scraped cards at the top of the 듀치마인드 단어장 browser.
     created_at = models.DateTimeField(auto_now_add=True)
     korean_name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
-    # Japanese card name (e.g. 青眼の白龍). Backfilled from YGOPRODeck via
-    # `manage.py backfill_card_jp_names` so the Twitter SAMPLE scraper can
-    # map JP-only tweet text to our Korean DB entries.
+    # Japanese card name (e.g. 青眼の白龍), backfilled from YGOPRODeck.
     name_ja = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     image_url = models.URLField(blank=True, null=True)

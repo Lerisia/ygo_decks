@@ -1191,9 +1191,7 @@ _ARCHETYPE_ALIAS_SUBSUMED: set[str] = {
 
 # Brand-new archseries discovered on Yugipedia for which there's no
 # official Korean name yet. Hidden from the 카드군 menu (treated like
-# REMOVE) until a Korean translation lands. Run
-# `python manage.py review_pending_archseries` after a DB refresh to
-# see which entries now have Korean-named cards and can be promoted.
+# REMOVE) until a Korean translation lands.
 _ARCHETYPE_PENDING_KOREAN: set[str] = {
     "Blitzclique",                         # 2026-06 신규
     "Dark Tuner (archetype)",              # 2026-06 신규 — 다크 튜너 정식 명칭 미정

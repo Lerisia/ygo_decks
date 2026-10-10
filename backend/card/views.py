@@ -6,7 +6,6 @@ from django.http import HttpResponse
 from django.conf import settings
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
-from .search_thumbs import thumb_url as search_thumb_url
 from .models import UploadRecord, CardDetection, Card
 from rest_framework.parsers import MultiPartParser
 from rest_framework import permissions
