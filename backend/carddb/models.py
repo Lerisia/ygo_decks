@@ -172,8 +172,8 @@ class CardGroup(models.Model):
         MANUAL = "manual", "운영진"
         NONE = "none", "없음"
 
-    text = models.CharField(max_length=60, unique=True, help_text="효과문 「」 안의 문자열 (NFKC)")
-    reading = models.CharField(max_length=120, blank=True)
+    text = models.CharField(max_length=60, help_text="효과문 「」 안의 문자열 (NFKC)")
+    reading = models.CharField(max_length=120, blank=True, help_text="같은 문자열도 읽는 법이 다르면 다른 카드군 (「C」 コクーン·チェーン)")
     name_ko = models.CharField(max_length=120, blank=True)
     name_source = models.CharField(max_length=8, choices=NameSource.choices, default=NameSource.NONE)
     name_agreement = models.FloatField(default=0, help_text="일본어·한국어 효과문 짝 가운데 이 이름인 비율")
@@ -184,10 +184,12 @@ class CardGroup(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["text"]
+        ordering = ["text", "reading"]
+        constraints = [models.UniqueConstraint(fields=["text", "reading"], name="uniq_card_group_text_reading")]
 
     def __str__(self):
-        return f"「{self.text}」 {self.name_ko}"
+        reading = f"({self.reading})" if self.reading and self.reading != self.text else ""
+        return f"「{self.text}」{reading} {self.name_ko}"
 
 
 class CardGroupMember(models.Model):

@@ -542,14 +542,21 @@ class CardGroupTest(TestCase):
         self.card(15, "R－ACEインパルス", "R－ACE 임펄스", ruby="$RR－ACE(レスキュー・エース)インパルス",
                   ja_text="「R－ACE」モンスター", ko_text='"R－ACE(레스큐 에이스)" 몬스터')
         self.card(16, "RESCUE!", "RESCUE!", ja_text="このカード名はルール上「R－ACE」カードとしても扱う。")
-        self.card(17, "H・C 強襲のハルベルト", "H·C 강습의 할베르트", ruby="$RＨ(ヒロイック)・$RＣ(チャレンジャー)　強襲のハルベルト",
-                  ja_text="「C」モンスター", ko_text='"C" 몬스터')
+        self.card(17, "H・C 強襲のハルベルト", "H·C 강습의 할베르트", ruby="$RＨ(ヒロイック)・$RＣ(チャレンジャー)　強襲のハルベルト")
+        self.card(18, "C・リペアラー", "C·리페어러", ruby="$RＣ(チェーン)・リペアラー", ja_text="「C」モンスター", ko_text='"C" 몬스터')
+        self.card(19, "C・ドラゴン", "C·드래곤", ruby="$RＣ(チェーン)・ドラゴン")
+        self.card(25, "C・チッキー", "C·치키", ruby="$RＣ(コクーン)・チッキー")
+        self.card(26, "コクーン・パーティ", "코쿤 파티", ja_text="「C」モンスター", ko_text='"C" 몬스터')
 
     def build(self):
         from .groups import compute, save
         from .models import CardGroup
         save(compute())
-        return {g.text: g for g in CardGroup.objects.all()}
+        out = {}
+        for g in CardGroup.objects.all():
+            out[(g.text, g.reading)] = g
+            out.setdefault(g.text, g)
+        return out
 
     def members(self, group):
         return sorted(group.members.exclude(how="removed").values_list("card_id", flat=True))
@@ -564,7 +571,44 @@ class CardGroupTest(TestCase):
         self.assertEqual(dict(g["ギャラクシーアイズ"].members.values_list("card_id", "how")), {7: "reading", 8: "name", 9: "treated"})
         self.assertEqual(self.members(g["N"]), [13])
         self.assertEqual(self.members(g["R-ACE"]), [15, 16])
-        self.assertEqual(self.members(g["C"]), [17])   # RESCUE! counts as R－ACE, whose C sits inside a word
+
+    def test_one_text_read_two_ways_is_two_groups(self):
+        g = self.build()
+        self.assertEqual(self.members(g[("C", "チェーン")]), [18, 19])
+        self.assertEqual(self.members(g[("C", "コクーン")]), [25])   # コクーン・パーティ spells out which C it means
+        self.assertNotIn(("C", "チャレンジャー"), g)   # no card names H・C's C on its own
+        self.assertTrue(g[("C", "チェーン")].needs_review)
+
+    def test_latin_letters_in_front_still_count(self):
+        self.card(40, "DDリリス", "DD 릴리스", ruby="$RＤ(ディー)$RＤ(ディー)リリス", ja_text="「DD」モンスター")
+        self.card(41, "DDD制覇王カイゼル", "DDD 제패왕 카이젤", ruby="$RＤ(ディー)$RＤ(ディー)$RＤ(ディー)$R制(せい)$R覇(は)$R王(おう)カイゼル")
+        self.card(42, "D・ライトン", "D·라이튼", ruby="$RＤ(ディフォーマー)・ライトン", ja_text="「D」モンスター")
+        self.card(43, "D・バリア", "D·배리어", ruby="$RＤ(ディフォーマー)・バリア", ja_text="「D」モンスター")
+        self.card(44, "ダブルツールD&C", "더블 툴 D&C", ruby="ダブルツール$RＤ(ディー)＆$RＣ(シー)", ja_text="「D」モンスター")
+        self.card(45, "CNo.39 希望皇ホープレイ", "CNo.39 유토피아 레이", ruby="$RＣＮｏ．(カオスナンバーズ)３９ 希望皇ホープレイ",
+                  ja_text="「No.」モンスター")
+        from .models import SrcMd
+        SrcMd.objects.filter(md_id=14).update(ruby="$RＮｏ．(ナンバーズ)３９ 希望皇ホープ")
+        g = self.build()
+        self.assertEqual(self.members(g["DD"]), [40, 41])
+        self.assertEqual((self.members(g["D"]), g["D"].reading), ([42, 43], "ディフォーマー"))
+        self.assertEqual(self.members(g["No."]), [14, 45])
+        self.assertEqual(self.members(g["N"]), [13])   # a letter after it still splits the word
+        self.assertFalse(any(16 in self.members(x) for k, x in g.items() if k[0] == "C"))   # RESCUE! as R－ACE
+
+    def test_reading_is_the_one_the_naming_cards_mean(self):
+        from .models import CardGroup
+        for cid, name, ruby in ((50, "魔法探査の石版", "$R魔(ま)$R法(ほう)$R探(たん)$R査(さ)の$R石(せき)$R版(ばん)"),
+                                (51, "ヒエログリフの石版", "ヒエログリフの$R石(せき)$R版(ばん)"),
+                                (52, "墓守の石版", "$R墓(はか)$R守(もり)の$R石(せき)$R版(ばん)"),
+                                (53, "石版の神殿", "$R石版(ウェジュ)の$R神(しん)$R殿(でん)")):
+            self.card(cid, name, ruby=ruby)
+        self.card(54, "嘆きの石版", ruby="$R嘆(なげ)きの$R石版(ウェジュ)", ja_text="「嘆きの石版」以外の「石版」カード１枚")
+        old = CardGroup.objects.create(text="石版", reading="せきばん", name_ko="석판", name_source="manual")
+        g = self.build()
+        self.assertEqual((g["石版"].id, g["石版"].reading, g["石版"].name_ko), (old.id, "ウェジュ", "석판"))
+        self.assertEqual(self.members(g["石版"]), [53, 54])
+        self.assertEqual(CardGroup.objects.filter(text="石版").count(), 1)
 
     def test_cards_without_a_known_reading_dont_outvote_master_duel(self):
         self.card(20, "幻魔皇ラビエル", "환마황제 라비엘", ruby="$R幻(げん)$R魔(ま)$R皇(おう)ラビエル", ja_text="「幻魔」融合モンスター")

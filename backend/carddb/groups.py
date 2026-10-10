@@ -1,6 +1,7 @@
 """카드군 (card groups) by the rule, checked against Master Duel.
 
-A group is a 「text」 the Japanese effect texts use as a group (「X」モンスター, 「X」カード …). A card is a member when
+A group is a 「text」 the Japanese effect texts use as a group (「X」モンスター, 「X」カード …), read the way the cards that
+name it mean it; one text read two ways is two groups (「C」 コクーン and 「C」 チェーン). A card is a member when
 its written Japanese name holds the text and reads it the group's way there (EM read エンタメイト, not EMPRESS),
 when the text sits in the reading of a ruby part of its name (銀河眼 read ギャラクシーアイズ), or when its own text
 treats it as one. "このカード名はルール上「X」として扱う" replaces the name the rule looks at.
@@ -49,7 +50,9 @@ def holds(name, x):
 
 
 def readings_at(seg, x):
-    """Reading of every place the written name holds x, and whether x lines up with whole ruby parts there."""
+    """Reading of every place the written name holds x, and whether x lines up with whole ruby parts there.
+    A Latin x may follow other letters (DD in DDD, No. in CNo.) but not run on into more (N in NEX); such a
+    place counts as cut through, so it joins on the reading but does not vote for it."""
     starts, p = [], 0
     for w, _ in seg:
         starts.append(p)
@@ -58,12 +61,12 @@ def readings_at(seg, x):
     i = name.find(x)
     while i >= 0:
         j = i + len(x)
-        latin_glued = (LATIN.match(x[0]) and i > 0 and LATIN.match(name[i - 1])) or \
-                      (LATIN.match(x[-1]) and j < len(name) and LATIN.match(name[j]))
-        if not latin_glued:
+        after = LATIN.match(x[-1]) and j < len(name) and LATIN.match(name[j])
+        before = LATIN.match(x[0]) and i > 0 and LATIN.match(name[i - 1])
+        if not after:
             span = [k for k, s in enumerate(starts) if s < j and s + len(seg[k][0]) > i]
             clean = starts[span[0]] == i and starts[span[-1]] + len(seg[span[-1]][0]) == j
-            out.append(("".join(seg[k][1] for k in span), clean))
+            out.append(("".join(seg[k][1] for k in span), clean and not before))
         i = name.find(x, i + 1)
     return out
 
@@ -118,8 +121,8 @@ class Index:
                 self.seg[cid] = self.seg[src] if src is not None else [(ch, ch) for ch in N(renamed)]
         self.written = {cid: written(seg) for cid, seg in self.seg.items()}
 
-    def members(self, x):
-        """(reading, {card id: how}) of group x."""
+    def members(self, x, refs=()):
+        """[(reading, {card id: how})] of group x, one per reading the cards in refs (those naming 「x」) mean."""
         hits = {}
         for cid, name in self.written.items():
             if x in name:
@@ -127,7 +130,27 @@ class Index:
                 if r:
                     hits[cid] = r
         votes = Counter(rd for cid, r in hits.items() if cid in self.known for rd, clean in r if clean)
-        reading = votes.most_common(1)[0][0] if votes else x
+        readings = self.meant(x, refs, votes) or [votes.most_common(1)[0][0] if votes else x]
+        return [(reading, self._members(x, reading, hits)) for reading in readings]
+
+    def meant(self, x, refs, votes):
+        """Readings of x the naming cards mean: the one their name spells out (コクーン・パーティ → コクーン), else the
+        one their own name reads x with (C・リペアラー → チェーン). One that few of them mean is dropped
+        (ダブルツールD&C names 「D」 ディフォーマー while its own D reads ディー)."""
+        points = Counter()
+        for cid in refs:
+            said = [r for r in votes if r != x and r in self.written.get(cid, "")]
+            own = {rd for rd, _ in readings_at(self.seg[cid], x)} & set(votes) if cid in self.known else set()
+            if len(said) == 1:
+                points[said[0]] += 1
+            elif len(own) == 1:
+                points[own.pop()] += 1
+        if not points:
+            return []
+        top = max(points.values())
+        return sorted(r for r, n in points.items() if n == top or n >= max(2, top / 4))
+
+    def _members(self, x, reading, hits):
         out = {cid: "name" for cid, r in hits.items()
                if cid not in self.known or any(rd == reading or (not clean and reading in rd) for rd, clean in r)}
         for cid, seg in self.seg.items():
@@ -137,7 +160,7 @@ class Index:
             for cid, ys in src.items():
                 if any(holds(N(y), x) for y in ys):
                     out.setdefault(cid, "treated")
-        return reading, out
+        return out
 
 
 def _clean_ko(k):
@@ -162,7 +185,7 @@ def _common_part(names):
 
 
 def korean_names(groups, ja_texts, ko_texts, ko_names):
-    """{x: (name, source, agreement, coverage)} from the cards' paired Japanese/Korean quotes."""
+    """{(text, reading): (name, source, agreement, coverage)} from the cards' paired Japanese/Korean quotes."""
     pairs, loose = defaultdict(Counter), Counter()
     for cid, ja in ja_texts.items():
         ko = ko_texts.get(cid)
@@ -175,32 +198,33 @@ def korean_names(groups, ja_texts, ko_texts, ko_names):
             for a, b in zip(jq, kq):
                 pairs[a][b] += 1
     out = {}
-    for x, mem in groups.items():
+    for key, mem in groups.items():
+        x = key[0]
         names = [ko_names[c] for c in mem if ko_names.get(c)]
         if pairs.get(x):
             c = pairs[x]
             name, n = max(c.items(), key=lambda kv: kv[1] * (0.2 + _coverage(kv[0], names)))
-            out[x] = (name, "pair", n / sum(c.values()), _coverage(name, names))
+            out[key] = (name, "pair", n / sum(c.values()), _coverage(name, names))
             continue
         cands = [k for k in loose if len(k) >= 2 and _coverage(k, names) >= 0.5]
         if cands:
             name = max(cands, key=lambda k: (_coverage(k, names), loose[k], len(k)))
-            out[x] = (name, "quote", 0.0, _coverage(name, names))
+            out[key] = (name, "quote", 0.0, _coverage(name, names))
         elif len(names) >= 2 and len(_common_part(names)) >= 2:
             name = _common_part(names)
-            out[x] = (name, "common", 0.0, _coverage(name, names))
+            out[key] = (name, "common", 0.0, _coverage(name, names))
         else:
-            out[x] = ("", "none", 0.0, 0.0)
+            out[key] = ("", "none", 0.0, 0.0)
     return out
 
 
 def parents(groups):
-    """{child: parent}: the nearest group whose text sits in the child's and whose members include all of it."""
+    """{child: parent} by (text, reading): the nearest group whose text sits in the child's and whose members include all of it."""
     out = {}
     for y, ym in groups.items():
-        ups = [x for x, xm in groups.items() if x != y and x in y and ym <= xm and len(xm) > len(ym)]
+        ups = [x for x, xm in groups.items() if x != y and x[0] in y[0] and ym <= xm and len(xm) > len(ym)]
         if ups:
-            out[y] = max(ups, key=len)
+            out[y] = max(ups, key=lambda k: len(k[0]))
     return out
 
 
@@ -222,21 +246,26 @@ def compute(md_named=None):
             "card_id", "lang", "materials", "effect", "pendulum_effect"):
         texts[lang][cid] = "\n".join(s for s in (m, e, p) if s)
     index = Index(names, rubies, texts["ja"], known=set(md_src) & set(names))
+    refs = defaultdict(set)
+    for cid, t in texts["ja"].items():
+        for x in group_texts([t]):
+            refs[x].add(cid)
     groups = {}
-    for x in group_texts(texts["ja"].values()):
-        reading, mem = index.members(x)
-        if mem:
-            groups[x] = (reading, mem)
-    sets = {x: set(m) for x, (_, m) in groups.items()}
+    for x, cids in refs.items():
+        for reading, mem in index.members(x, cids):
+            if mem:
+                groups[(x, reading)] = mem
+    sets = {k: set(m) for k, m in groups.items()}
     md_texts = {cid: t for cid, t in texts["ja"].items() if cid in md}
     ko = korean_names({x: {c for c in m if c in md} for x, m in sets.items()}, md_texts,
                       {cid: t for cid, t in texts["ko"].items() if cid in md}, ko_names)
     md_lists = {frozenset(ids) & frozenset(md) for ids in (md_named or [])}
-    twins = Counter(_twin_key(x) for x in groups)
+    twins = Counter(_twin_key(x) for x, _ in groups)
     result = {}
-    for x, (reading, mem) in groups.items():
-        name, source, agreement, coverage = ko[x]
-        result[x] = {
+    for key, mem in groups.items():
+        x, reading = key
+        name, source, agreement, coverage = ko[key]
+        result[key] = {
             "reading": reading, "members": mem, "name_ko": name, "name_source": source,
             "name_agreement": round(agreement, 3), "name_coverage": round(coverage, 3),
             "md_list": frozenset(c for c in mem if c in md) in md_lists,
@@ -249,13 +278,23 @@ def compute(md_named=None):
 
 @transaction.atomic
 def save(result):
-    """Write computed groups; staff names and member additions/removals survive."""
+    """Write computed groups by (text, reading); staff names and member additions/removals survive, and a text
+    that stays one group keeps its row when its reading changes."""
     from .models import CardGroup, CardGroupMember
 
-    existing = {g.text: g for g in CardGroup.objects.all()}
-    manual_groups = set(CardGroupMember.objects.filter(how__in=CardGroupMember.MANUAL).values_list("group__text", flat=True))
+    existing = {(g.text, g.reading): g for g in CardGroup.objects.all()}
+    old_by_text, new_by_text = defaultdict(list), defaultdict(list)
+    for key in existing:
+        old_by_text[key[0]].append(key)
+    for key in result:
+        new_by_text[key[0]].append(key)
+    for key in result:
+        olds = old_by_text[key[0]]
+        if key not in existing and len(olds) == 1 and len(new_by_text[key[0]]) == 1 and olds[0] not in result:
+            existing[key] = existing.pop(olds[0])
+    manual_groups = set(CardGroupMember.objects.filter(how__in=CardGroupMember.MANUAL).values_list("group_id", flat=True))
     for x, r in result.items():
-        g = existing.get(x) or CardGroup(text=x)
+        g = existing.get(x) or CardGroup(text=x[0])
         g.reading = r["reading"]
         g.md_list = r["md_list"]
         if g.name_source != CardGroup.NameSource.MANUAL:
@@ -265,7 +304,7 @@ def save(result):
         g.save()
         existing[x] = g
     dropped = [g.id for x, g in existing.items()
-               if x not in result and g.name_source != CardGroup.NameSource.MANUAL and x not in manual_groups]
+               if x not in result and g.name_source != CardGroup.NameSource.MANUAL and g.id not in manual_groups]
     CardGroup.objects.filter(id__in=dropped).delete()
     for x, g in existing.items():
         if g.id in dropped:
