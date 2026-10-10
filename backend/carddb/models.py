@@ -162,6 +162,52 @@ class LegacyCard(models.Model):
     how = models.CharField(max_length=8, choices=How.choices, default=How.NONE)
 
 
+class CardGroup(models.Model):
+    """카드군: cards whose Japanese name holds 「text」 read as `reading`, plus cards treated as such by their text."""
+
+    class NameSource(models.TextChoices):
+        PAIR = "pair", "효과문 대조"
+        QUOTE = "quote", "한국어 효과문"
+        COMMON = "common", "카드 이름 공통 부분"
+        MANUAL = "manual", "운영진"
+        NONE = "none", "없음"
+
+    text = models.CharField(max_length=60, unique=True, help_text="효과문 「」 안의 문자열 (NFKC)")
+    reading = models.CharField(max_length=120, blank=True)
+    name_ko = models.CharField(max_length=120, blank=True)
+    name_source = models.CharField(max_length=8, choices=NameSource.choices, default=NameSource.NONE)
+    name_agreement = models.FloatField(default=0, help_text="일본어·한국어 효과문 짝 가운데 이 이름인 비율")
+    name_coverage = models.FloatField(default=0, help_text="회원 카드 한국어 이름에 이 이름이 들어 있는 비율")
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
+    md_list = models.BooleanField(default=False, help_text="마듀 card_named 목록 하나와 회원이 똑같음")
+    needs_review = models.BooleanField(default=False, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["text"]
+
+    def __str__(self):
+        return f"「{self.text}」 {self.name_ko}"
+
+
+class CardGroupMember(models.Model):
+    class How(models.TextChoices):
+        NAME = "name", "이름"
+        READING = "reading", "읽는 법"
+        TREATED = "treated", "취급 문구"
+        ADDED = "added", "운영진 추가"
+        REMOVED = "removed", "운영진 제외"
+
+    MANUAL = (How.ADDED, How.REMOVED)
+
+    group = models.ForeignKey(CardGroup, on_delete=models.CASCADE, related_name="members")
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="group_memberships")
+    how = models.CharField(max_length=8, choices=How.choices)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["group", "card"], name="carddb_group_card")]
+
+
 def has_art(card_field="pk"):
     """Filter for cards (or rows pointing at one) with Master Duel art — the site leaves out cards outside Master Duel."""
     return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))

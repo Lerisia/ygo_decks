@@ -50,6 +50,12 @@ const tiles = [
     description: "사용자 포인트 직접 지급 또는 차감",
   },
   {
+    to: "/manage/card-groups",
+    icon: "🗂️",
+    label: "카드군",
+    description: "효과문에서 뽑은 카드군의 한국어 이름과 회원 확인",
+  },
+  {
     to: "/manage/effect-tags",
     icon: "🏷️",
     label: "카드 효과 태그 검수",

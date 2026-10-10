@@ -501,3 +501,137 @@ class SwapStepsTest(TestCase):
             call_command("swap_cards", "prepare", stdout=io.StringIO())
         self.game.refresh_from_db()
         self.assertEqual(self.game.card_name_snapshot, "블랙매지션")
+
+
+class CardGroupTest(TestCase):
+    """카드군 by the rule, on cards that show each case."""
+
+    def card(self, cid, name, ko="", ruby="", ja_text="", ko_text="", md=True):
+        from .models import CardText, MdPrint, SrcMd
+        Card.objects.create(id=cid, category="monster", name_ja=name, name_ko=ko, frame="effect")
+        if md:
+            MdPrint.objects.create(md_id=cid, card_id=cid)
+            SrcMd.objects.create(md_id=cid, lang="ja", name=name, ruby=ruby, text=ja_text, prop_a=0, prop_b=0)
+        if ja_text:
+            CardText.objects.create(card_id=cid, lang="ja", effect=ja_text)
+        if ko_text:
+            CardText.objects.create(card_id=cid, lang="ko", effect=ko_text)
+
+    def setUp(self):
+        self.card(1, "E・HERO エアーマン", "엘리멘틀 히어로 에어맨",
+                  ja_text="①：デッキから「HERO」モンスター１体を手札に加える。", ko_text='①: 덱에서 "HERO" 몬스터 1장을 패에 넣는다.')
+        self.card(2, "E・HERO クレイマン", "엘리멘틀 히어로 클레이맨")
+        self.card(3, "D-HERO ディアボリックガイ", "데스티니 히어로 디아볼릭 가이",
+                  ja_text="「E・HERO」モンスターを対象とする。", ko_text='"엘리멘틀 히어로" 몬스터를 대상으로 한다.')
+        self.card(4, "EMペンデュラム・マジシャン", "EM 펜듈럼 매지션", ruby="$REM(エンタメイト)ペンデュラム・マジシャン",
+                  ja_text="「EM」モンスター", ko_text='"EM" 몬스터')
+        self.card(5, "EMドクロバット・ジョーカー", "EM 도크로뱃 조커", ruby="$REM(エンタメイト)ドクロバット・ジョーカー")
+        self.card(6, "アルカナフォースIII－THE EMPRESS", "아르카나 포스 III－디 임프레스")
+        self.card(7, "銀河眼の光子竜", "갤럭시아이즈 포톤 드래곤", ruby="$R銀河眼の光子竜(ギャラクシーアイズ・フォトン・ドラゴン)",
+                  ja_text="「ギャラクシーアイズ」モンスター", ko_text='"갤럭시아이즈" 몬스터')
+        self.card(8, "ギャラクシーアイズ・FA・フォトン・ドラゴン", "갤럭시아이즈 FA 포톤 드래곤")
+        self.card(9, "最後の希望", "마지막 희망",
+                  ja_text="このカード名はルール上「ギャラクシーアイズ」カードとしても扱う。", ko_text='이 카드명은 룰상 "갤럭시아이즈" 카드로도 취급한다.')
+        self.card(10, "サイバー・ドラゴン", "사이버 드래곤", ja_text="「サイバー」カード", ko_text='"사이버" 카드')
+        self.card(11, "ハーピィ・レディ", "해피 레이디")
+        self.card(12, "ハーピィ・レディ・SB", "해피 레이디·SB", ruby="ハーピィ・レディ・$RSB(サイバー・ボンテージ)",
+                  ja_text="このカード名はルール上「ハーピィ・レディ」として扱う。「ハーピィ」モンスター", ko_text='"해피 레이디" "해피" 몬스터')
+        self.card(13, "N・アクア・ドルフィン", "네오 스페이시언 아쿠아 돌핀", ruby="$RN(ネオスペーシアン)・アクア・ドルフィン",
+                  ja_text="「N」モンスター", ko_text='"네오 스페이시언" 몬스터')
+        self.card(14, "No.39 希望皇ホープ", "No.39 유토피아")
+
+    def build(self):
+        from .groups import compute, save
+        from .models import CardGroup
+        save(compute())
+        return {g.text: g for g in CardGroup.objects.all()}
+
+    def members(self, group):
+        return sorted(group.members.exclude(how="removed").values_list("card_id", flat=True))
+
+    def test_members_by_written_name_and_reading(self):
+        g = self.build()
+        self.assertEqual(self.members(g["HERO"]), [1, 2, 3])
+        self.assertEqual(self.members(g["E・HERO"]), [1, 2])
+        self.assertEqual(g["E・HERO"].parent, g["HERO"])
+        self.assertEqual((self.members(g["EM"]), g["EM"].reading), ([4, 5], "エンタメイト"))
+        self.assertEqual(self.members(g["ギャラクシーアイズ"]), [7, 8, 9])
+        self.assertEqual(dict(g["ギャラクシーアイズ"].members.values_list("card_id", "how")), {7: "reading", 8: "name", 9: "treated"})
+        self.assertEqual(self.members(g["N"]), [13])
+
+    def test_a_replaced_name_is_what_counts(self):
+        g = self.build()
+        self.assertEqual(self.members(g["サイバー"]), [10])
+        self.assertEqual(self.members(g["ハーピィ"]), [11, 12])
+
+    def test_korean_names_from_paired_texts(self):
+        g = self.build()
+        self.assertEqual((g["E・HERO"].name_ko, g["E・HERO"].name_source), ("엘리멘틀 히어로", "pair"))
+        self.assertEqual(g["ギャラクシーアイズ"].name_ko, "갤럭시아이즈")
+        self.assertEqual(g["N"].name_ko, "네오 스페이시언")
+
+    def test_staff_edits_survive_a_rebuild(self):
+        from .models import CardGroup, CardGroupMember
+        g = self.build()
+        CardGroup.objects.filter(id=g["HERO"].id).update(name_ko="히어로", name_source="manual", needs_review=False)
+        CardGroupMember.objects.filter(group=g["HERO"], card_id=3).update(how="removed")
+        CardGroupMember.objects.create(group=g["HERO"], card_id=14, how="added")
+        g = self.build()
+        self.assertEqual((g["HERO"].name_ko, g["HERO"].name_source), ("히어로", "manual"))
+        self.assertEqual(self.members(g["HERO"]), [1, 2, 14])
+
+    def test_master_duel_named_lists(self):
+        from .md import parse_named
+        import struct
+        lists = [[], [1, 2, 3], [4, 5]]
+        ids = [c for l in lists for c in l]
+        offs, pos = [], 0
+        for l in lists:
+            offs.append((pos, len(l)))
+            pos += len(l)
+        blob = struct.pack("<HH", len(lists), len(ids)) + b"".join(struct.pack("<HH", *o) for o in offs) + struct.pack(f"<{len(ids)}H", *ids)
+        self.assertEqual(parse_named(blob), lists)
+        from .groups import compute, save
+        from .models import CardGroup
+        save(compute(lists))
+        self.assertEqual(sorted(CardGroup.objects.filter(md_list=True).values_list("text", flat=True)), ["EM", "HERO"])
+
+
+class CardGroupReviewApiTest(CardGroupTest):
+    def setUp(self):
+        super().setUp()
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+        self.groups = self.build()
+        self.staff = get_user_model().objects.create_user(email="cg@test.com", username="cg", password="x", is_staff=True)
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+
+    def test_only_staff(self):
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(get_user_model().objects.create_user(email="u@test.com", username="u", password="x"))
+        self.assertEqual(c.get("/api/carddb/card-groups/").status_code, 403)
+
+    def test_list_puts_groups_to_check_first(self):
+        from .models import CardGroup
+        CardGroup.objects.update(needs_review=False)
+        CardGroup.objects.filter(text="EM").update(needs_review=True)
+        body = self.client.get("/api/carddb/card-groups/").json()
+        self.assertEqual(body["results"][0]["text"], "EM")
+        self.assertEqual(body["review_count"], CardGroup.objects.filter(needs_review=True).count())
+        self.assertEqual([r["text"] for r in self.client.get("/api/carddb/card-groups/", {"q": "엘리멘틀"}).json()["results"]], ["E・HERO"])
+
+    def test_rename_and_edit_members_are_logged(self):
+        from django.contrib.admin.models import LogEntry
+        gid = self.groups["HERO"].id
+        body = self.client.patch(f"/api/carddb/card-groups/{gid}/", {"name_ko": "히어로"}, format="json").json()
+        self.assertEqual((body["group"]["name_ko"], body["group"]["name_source"], body["group"]["needs_review"]), ("히어로", "manual", False))
+        body = self.client.post(f"/api/carddb/card-groups/{gid}/members/", {"card_id": 3, "action": "remove"}, format="json").json()
+        self.assertEqual(body["group"]["members"], 2)
+        self.assertEqual(next(m["how"] for m in body["members"] if m["card_id"] == 3), "removed")
+        body = self.client.post(f"/api/carddb/card-groups/{gid}/members/", {"card_id": 14, "action": "add"}, format="json").json()
+        self.assertEqual(body["group"]["members"], 3)
+        self.assertEqual([c["text"] for c in body["children"]], ["E・HERO"])
+        self.assertEqual(LogEntry.objects.count(), 3)

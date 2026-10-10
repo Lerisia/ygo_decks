@@ -170,3 +170,11 @@ def split_text(text: str, types: list[str], lang: str) -> dict[str, str]:
             materials, main = first, rest.strip("\n")
     flavor, effect = (main, "") if "normal" in types else ("", main)
     return {"materials": materials, "effect": effect, "pendulum_effect": pend, "flavor": flavor}
+
+
+def parse_named(data: bytes) -> list[list[int]]:
+    """card_named: the card lists Master Duel's effects point at (card groups, card groups with a kind, mentions)."""
+    n, total = struct.unpack_from("<HH", data, 0)
+    spans = [struct.unpack_from("<HH", data, 4 + 4 * i) for i in range(n)]
+    ids = struct.unpack_from(f"<{total}H", data, 4 + 4 * n)
+    return [list(ids[off:off + cnt]) for off, cnt in spans]
