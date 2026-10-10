@@ -131,8 +131,8 @@ def _clean_ko(k):
 
 
 def _coverage(ko, names):
-    k = ko.replace(" ", "")
-    return sum(1 for n in names if k in n.replace(" ", "")) / len(names) if names else 0.0
+    k = N(ko).replace(" ", "")
+    return sum(1 for n in names if k in N(n).replace(" ", "")) / len(names) if names else 0.0
 
 
 def _common_part(names):
@@ -153,7 +153,7 @@ def korean_names(groups, ja_texts, ko_texts, ko_names):
         ko = ko_texts.get(cid)
         if not ko:
             continue
-        kq = [_clean_ko(k) for k in QUOTE_KO.findall(N(ko))]
+        kq = [_clean_ko(k) for k in QUOTE_KO.findall(ko)]
         loose.update(kq)
         jq = QUOTE_JA.findall(N(ja))
         if jq and len(jq) == len(kq):

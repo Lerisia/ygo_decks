@@ -539,6 +539,8 @@ class CardGroupTest(TestCase):
         self.card(13, "N・アクア・ドルフィン", "네오 스페이시언 아쿠아 돌핀", ruby="$RN(ネオスペーシアン)・アクア・ドルフィン",
                   ja_text="「N」モンスター", ko_text='"네오 스페이시언" 몬스터')
         self.card(14, "No.39 希望皇ホープ", "No.39 유토피아")
+        self.card(15, "R－ACEインパルス", "R－ACE 임펄스", ruby="$RR－ACE(レスキュー・エース)インパルス",
+                  ja_text="「R－ACE」モンスター", ko_text='"R－ACE(레스큐 에이스)" 몬스터')
 
     def build(self):
         from .groups import compute, save
@@ -569,6 +571,7 @@ class CardGroupTest(TestCase):
         self.assertEqual((g["E・HERO"].name_ko, g["E・HERO"].name_source), ("엘리멘틀 히어로", "pair"))
         self.assertEqual(g["ギャラクシーアイズ"].name_ko, "갤럭시아이즈")
         self.assertEqual(g["N"].name_ko, "네오 스페이시언")
+        self.assertEqual(g["R-ACE"].name_ko, "R－ACE")   # the card names' own dash, reading dropped
 
     def test_staff_edits_survive_a_rebuild(self):
         from .models import CardGroup, CardGroupMember
@@ -626,6 +629,8 @@ class CardGroupReviewApiTest(CardGroupTest):
     def test_rename_and_edit_members_are_logged(self):
         from django.contrib.admin.models import LogEntry
         gid = self.groups["HERO"].id
+        ok = self.client.patch(f"/api/carddb/card-groups/{self.groups['EM'].id}/", {"reviewed": True}, format="json").json()
+        self.assertEqual((ok["group"]["name_source"], ok["group"]["needs_review"]), ("manual", False))
         body = self.client.patch(f"/api/carddb/card-groups/{gid}/", {"name_ko": "히어로"}, format="json").json()
         self.assertEqual((body["group"]["name_ko"], body["group"]["name_source"], body["group"]["needs_review"]), ("히어로", "manual", False))
         body = self.client.post(f"/api/carddb/card-groups/{gid}/members/", {"card_id": 3, "action": "remove"}, format="json").json()
@@ -634,4 +639,4 @@ class CardGroupReviewApiTest(CardGroupTest):
         body = self.client.post(f"/api/carddb/card-groups/{gid}/members/", {"card_id": 14, "action": "add"}, format="json").json()
         self.assertEqual(body["group"]["members"], 3)
         self.assertEqual([c["text"] for c in body["children"]], ["E・HERO"])
-        self.assertEqual(LogEntry.objects.count(), 3)
+        self.assertEqual(LogEntry.objects.count(), 4)

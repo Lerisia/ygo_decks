@@ -81,7 +81,7 @@ def card_group(request, group_id):
             g.needs_review = False
         if request.data.get("reviewed"):
             changes.append(f"확인 완료: {g.name_ko}")
-            g.needs_review = False
+            g.name_source, g.needs_review = CardGroup.NameSource.MANUAL, False
         if changes:
             g.save()
             _log(request, g, "; ".join(changes))
