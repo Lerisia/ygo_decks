@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db import connections
 
 from carddb.display import art_names
-from carddb.face import face_rel, save_face, save_thumb, thumb_rel
+from carddb.face import face_rel, load_signatures, save_face, save_thumb, signature, thumb_rel, write_signatures
 from carddb.models import Card, MdPrint
 
 
@@ -25,11 +25,13 @@ def _job(job):
 
 class Command(BaseCommand):
     help = ("Draw the Korean card faces the card book shows (media/cards/face/<print id>.webp, alternate arts too, "
-            "and their list thumbnails): only missing ones, every print with --all, or the cards whose ids are given.")
+            "and their list thumbnails): those missing or whose card or art changed since they were drawn, every "
+            "print with --all, or the cards whose ids are given. --sign-only records what the existing faces show.")
 
     def add_arguments(self, parser):
         parser.add_argument("ids", nargs="*", type=int)
         parser.add_argument("--all", action="store_true")
+        parser.add_argument("--sign-only", action="store_true")
         parser.add_argument("--workers", type=int, default=4)
 
     def handle(self, *args, **opts):
@@ -40,21 +42,31 @@ class Command(BaseCommand):
                    if card_id in cards and md_id in with_art]
         if opts["ids"]:
             prints = [p for p in prints if p[0] in set(opts["ids"])]
+        sigs = load_signatures()
+        now = {str(md_id): signature(cards[card_id], md_id) for card_id, md_id in prints}
+        if opts["sign_only"]:
+            sigs.update({k: v for k, v in now.items() if _exists(face_rel(int(k)))})
+            write_signatures(sigs)
+            self.stdout.write(f"{len(sigs)} faces signed")
+            return
         jobs = []
         for card_id, md_id in sorted(prints, key=lambda p: p[1]):
-            if opts["all"] or opts["ids"] or not _exists(face_rel(md_id)):
+            if opts["all"] or opts["ids"] or not _exists(face_rel(md_id)) or sigs.get(str(md_id)) != now[str(md_id)]:
                 jobs.append((cards[card_id], md_id, True))
             elif not _exists(thumb_rel(md_id)):
                 jobs.append((cards[card_id], md_id, False))
-        done = 0
+        done = []
         if opts["workers"] <= 1:
-            for done, _ in enumerate(map(_job, jobs), 1):
-                pass
+            done = list(map(_job, jobs))
         elif jobs:
             connections.close_all()   # the workers are forked and draw from memory only
             with multiprocessing.get_context("fork").Pool(opts["workers"]) as pool:
-                for done, _ in enumerate(pool.imap_unordered(_job, jobs, chunksize=20), 1):
-                    if done % 1000 == 0:
-                        self.stdout.write(f"{done}/{len(jobs)}")
-        drawn = sum(1 for j in jobs if j[2])
-        self.stdout.write(f"{drawn} faces drawn, {len(jobs) - drawn} thumbnails made")
+                for md_id in pool.imap_unordered(_job, jobs, chunksize=20):
+                    done.append(md_id)
+                    if len(done) % 1000 == 0:
+                        self.stdout.write(f"{len(done)}/{len(jobs)}")
+        drawn = [j[1] for j in jobs if j[2]]
+        if drawn:
+            sigs.update({str(m): now[str(m)] for m in drawn})
+            write_signatures(sigs)
+        self.stdout.write(f"{len(drawn)} faces drawn, {len(jobs) - len(drawn)} thumbnails made")

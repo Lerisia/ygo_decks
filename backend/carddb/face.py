@@ -1,10 +1,13 @@
 """Korean card faces: a Master Duel card drawn whole — frame, art, name, attribute, stars, Korean text, ATK/DEF —
 from the client's own pictures (frames, icons, link markers). Every letter is set in free (OFL) Noto fonts: no
-commercial font, the game's own included, is ever used.
+commercial font, the game's own included, is ever used: Pretendard (the site's own face) for the name and the
+type lines, Noto Serif KR for ATK/DEF and the card text.
 
 The pieces live outside the repo in settings.CARD_FACE_ASSETS; the faces are saved as media/cards/face/<id>.webp.
 Coordinates are on Master Duel's 704×1024 frame.
 """
+import hashlib
+import json
 import os
 import re
 from functools import lru_cache
@@ -12,10 +15,12 @@ from functools import lru_cache
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
 
-from .display import art_path
+from .display import art_name, art_path
 
 W, H = 704, 1024
+FACE_VERSION = 2          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
+SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
 THUMB_W = 300
 
@@ -75,6 +80,11 @@ def _font(name, size, variation=None):
     if variation:
         f.set_variation_by_name(variation)
     return f
+
+
+def title(size, weight="Bold"):
+    """Pretendard, the face the site itself is set in, for names and type lines."""
+    return _font(f"Pretendard-{weight}.otf", size)
 
 
 def sans(size, weight="Medium"):
@@ -197,7 +207,7 @@ def _stats(draw, card, link, right, bottom):   # bottom = the baseline
 def _spell_trap_line(face, draw, card):
     label = "【마법 카드" if card.category == "spell" else "【함정 카드"
     icon_name = KIND_ICON.get(card.spell_trap_subtype)
-    font = sans(38, "Bold")
+    font = title(38)
     x0, y0, x1, y1 = STAR_ROW
     icon = _image(f"GUI_T_Icon1_Icon{icon_name}.png").resize((40, 40), Image.LANCZOS) if icon_name else None
     tail_w = font.getlength("】")
@@ -252,7 +262,7 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
     # name and attribute
     name_fill = (255, 255, 255, 255) if frame_key in WHITE_NAME else (0, 0, 0, 255)
     x0, y0, x1, y1 = NAME_BOX
-    name = _squeezed_text(card.name_ko or card.name_ja, sans(48, "Bold"), name_fill, x1 - x0, y1 - y0)
+    name = _squeezed_text(card.name_ko or card.name_ja, title(48), name_fill, x1 - x0, y1 - y0)
     face.alpha_composite(name, (x0, y0))
     attr = ATTR_ICON.get(card.category if card.category in ("spell", "trap") else card.attribute)
     if attr:
@@ -265,7 +275,7 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
             _link_markers(face, card.link_markers or [])
         else:
             _stars(face, card)
-        draw.text((tx0, ty0), type_line(card), font=sans(26, "Bold"), fill=(0, 0, 0, 255))
+        draw.text((tx0, ty0), type_line(card), font=title(26), fill=(0, 0, 0, 255))
         body_top, body_bottom = ty0 + TYPE_LINE_H, STAT_RULE_Y - 2
         draw.line([(tx0, STAT_RULE_Y), (tx1, STAT_RULE_Y)], fill=(0, 0, 0, 255), width=2)
         _stats(draw, card, frame_key == "link", tx1, STAT_BASELINE_Y)
@@ -290,6 +300,31 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
         font, lines, lh = fit(body, tx1 - tx0, body_bottom - body_top - 4, font_for)
         _draw_lines(draw, lines, font, tx0, body_top, lh)
     return face
+
+
+def signature(card, md_id):
+    """What a face is drawn from (the drawing version, the card's face fields and the art file): a face is drawn
+    again when this changes."""
+    parts = [FACE_VERSION, card.name_ko or card.name_ja, card.category, card.frame, card.attribute, card.race,
+             card.types, card.level, card.rank, card.link_rating, card.link_markers, card.atk, card.def_value,
+             card.pendulum_scale, card.spell_trap_subtype, art_name(md_id)]
+    return hashlib.sha1(json.dumps(parts, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
+
+
+def load_signatures():
+    try:
+        with open(os.path.join(settings.MEDIA_ROOT, SIGNATURES)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def write_signatures(sigs):
+    path = os.path.join(settings.MEDIA_ROOT, SIGNATURES)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".tmp", "w") as f:
+        json.dump(sigs, f)
+    os.replace(path + ".tmp", path)
 
 
 def face_rel(md_id):

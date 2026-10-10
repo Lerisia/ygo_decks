@@ -648,6 +648,18 @@ class CardGroupTest(TestCase):
         self.assertEqual((g["HERO"].name_ko, g["HERO"].name_source), ("히어로", "manual"))
         self.assertEqual(self.members(g["HERO"]), [1, 2, 14])
 
+    def test_a_group_a_deck_is_linked_to_is_never_dropped(self):
+        from deck.models import Deck, DeckCardGroup
+        from .models import CardGroup
+        gone = CardGroup.objects.create(text="消えた", reading="きえた", name_ko="사라진")
+        deck = Deck.objects.create(name="덱", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCardGroup.objects.create(deck=deck, group=gone)
+        CardGroup.objects.create(text="ただの", reading="ただの", name_ko="그냥")
+        self.build()
+        self.assertTrue(CardGroup.objects.filter(text="消えた").exists())
+        self.assertFalse(CardGroup.objects.filter(text="ただの").exists())
+        self.assertEqual(DeckCardGroup.objects.count(), 1)
+
     def test_master_duel_named_lists(self):
         from .md import parse_named
         import struct
@@ -833,7 +845,7 @@ class CardDexApiTest(TestCase):
 
 
 class CardFaceTest(TestCase):
-    """Korean card faces drawn from Master Duel's pictures (stand-ins here) with the free Noto fonts."""
+    """Korean card faces drawn from Master Duel's pictures (stand-ins here) with free fonts (Pretendard, Noto)."""
 
     def setUp(self):
         import os
@@ -842,12 +854,13 @@ class CardFaceTest(TestCase):
         from PIL import Image
         from . import display, face
         fonts = getattr(settings, "CARD_FACE_ASSETS", "")
-        if not all(os.path.exists(os.path.join(fonts, f)) for f in ("NotoSansKR.ttf", "NotoSerifKR.ttf")):
-            self.skipTest("Noto fonts not installed")
+        font_files = ("NotoSansKR.ttf", "NotoSerifKR.ttf", "Pretendard-Bold.otf")
+        if not all(os.path.exists(os.path.join(fonts, f)) for f in font_files):
+            self.skipTest("free fonts not installed")
         self.assets, self.media = tempfile.mkdtemp(), tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.assets)
         self.addCleanup(shutil.rmtree, self.media)
-        for f in ("NotoSansKR.ttf", "NotoSerifKR.ttf"):
+        for f in font_files:
             os.symlink(os.path.join(fonts, f), os.path.join(self.assets, f))
         names = ([f"card_frame{k}.png" for k in face.FRAMES.values()] + ["tex_IconLv.png", "tex_IconRank.png"]
                  + [f"GUI_T_Icon1_Attr0{i}.png" for i in range(1, 10)] + [f"GUI_T_Icon1_Icon0{i}.png" for i in range(1, 7)]
@@ -905,6 +918,35 @@ class CardFaceTest(TestCase):
         out = io.StringIO()
         call_command("draw_card_faces", "--workers", "1", stdout=out)
         self.assertIn("0 faces drawn, 1 thumbnails made", out.getvalue())   # only what is missing
+        Card.objects.filter(id=7).update(atk=2600)
+        out = io.StringIO()
+        call_command("draw_card_faces", "--workers", "1", stdout=out)
+        self.assertIn("2 faces drawn", out.getvalue())   # ATK changed: the card and its alternate art
+        out = io.StringIO()
+        call_command("draw_card_faces", "--workers", "1", stdout=out)
+        self.assertIn("0 faces drawn, 0 thumbnails made", out.getvalue())
+
+    def test_sign_only_records_existing_faces_without_drawing(self):
+        import os
+        from django.core.management import call_command
+        from .face import load_signatures, save_face
+        save_face(self.card)
+        out = io.StringIO()
+        call_command("draw_card_faces", "--sign-only", stdout=out)
+        self.assertEqual(list(load_signatures()), ["7"])
+        out = io.StringIO()
+        call_command("draw_card_faces", "--workers", "1", stdout=out)
+        self.assertIn("0 faces drawn", out.getvalue())
+
+    def test_refresh_card_book_runs_every_step(self):
+        from django.core.management import call_command
+        from django.test import override_settings
+        out = io.StringIO()
+        with override_settings(MD_NAMED_PATH=""):
+            call_command("refresh_card_book", "--workers", "1", stdout=out)
+        self.assertIn("faces drawn", out.getvalue())
+        self.assertIn("thumbnails made", out.getvalue())
+
 
     def test_pendulum_scale_is_drawn_with_the_text_boxes_empty(self):
         from .face import PEND_SCALE_X, draw_face

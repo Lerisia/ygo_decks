@@ -20,6 +20,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Master Duel pictures the Korean card faces are drawn from (carddb/face.py); kept outside the repo.
 CARD_FACE_ASSETS = os.environ.get("CARD_FACE_ASSETS", "/home/elyss/storage/md/face_assets")
+# Master Duel's card_named list file (ja-jp) the 카드군 are checked against; skipped when missing.
+MD_NAMED_PATH = os.environ.get("MD_NAMED_PATH", "/home/elyss/storage/md/extract/raw_jp/ja-jp_card_named.bytes")
 
 from django.conf import settings
 from django.conf.urls.static import static

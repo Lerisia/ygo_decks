@@ -283,8 +283,10 @@ def compute(md_named=None):
 
 @transaction.atomic
 def save(result):
-    """Write computed groups by (text, reading); staff names and member additions/removals survive, and a text
-    that stays one group keeps its row when its reading changes."""
+    """Write computed groups by (text, reading); staff names and member additions/removals survive, a text that
+    stays one group keeps its row when its reading changes, and a group a deck is linked to is never dropped (the
+    link would go with it)."""
+    from deck.models import DeckCardGroup
     from .models import CardGroup, CardGroupMember
 
     existing = {(g.text, g.reading): g for g in CardGroup.objects.all()}
@@ -298,6 +300,7 @@ def save(result):
         if key not in existing and len(olds) == 1 and len(new_by_text[key[0]]) == 1 and olds[0] not in result:
             existing[key] = existing.pop(olds[0])
     manual_groups = set(CardGroupMember.objects.filter(how__in=CardGroupMember.MANUAL).values_list("group_id", flat=True))
+    manual_groups |= set(DeckCardGroup.objects.values_list("group_id", flat=True))
     for x, r in result.items():
         g = existing.get(x) or CardGroup(text=x[0])
         g.reading = r["reading"]
