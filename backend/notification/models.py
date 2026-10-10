@@ -14,6 +14,8 @@ class Notification(models.Model):
     kind = models.CharField(max_length=30, blank=True, default="", help_text="what raised it, e.g. border_unlock")
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True, help_text="cleared from My Page (X or the action button)")
+    acted_at = models.DateTimeField(null=True, blank=True, help_text="the action button was used; it stays disabled after")
+    hidden_at = models.DateTimeField(null=True, blank=True, help_text="cleared from the history page too; the row is kept")
 
     class Meta:
         ordering = ["-created_at", "-id"]

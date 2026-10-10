@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getNotifications, type SiteNotification } from "@/api/notificationApi";
+import { getNotifications, hideNotification, type SiteNotification } from "@/api/notificationApi";
 import NotificationCard from "@/components/NotificationCard";
 
 function formatDate(iso: string): string {
@@ -13,8 +13,8 @@ function formatDate(iso: string): string {
   return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-// Every notification a member has had, newest first. The ones not yet cleared keep their tan card and X;
-// cleared ones turn grey but keep their action, so a link can still be followed later.
+// Every notification a member has had, newest first. Ones still on My Page keep their tan card, cleared ones
+// turn grey. X here takes it off this page as well; the server keeps the record either way.
 export default function NotificationHistory() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<SiteNotification[] | null>(null);
@@ -28,7 +28,11 @@ export default function NotificationHistory() {
     getNotifications().then(setRows).catch(() => setError("불러올 수 없습니다."));
   }, [navigate]);
 
-  const markRead = (id: number) => setRows((rs) => rs && rs.map((r) => (r.id === id ? { ...r, read: true } : r)));
+  const markActed = (id: number) => setRows((rs) => rs && rs.map((r) => (r.id === id ? { ...r, read: true, acted: true } : r)));
+  const hide = (id: number) => {
+    setRows((rs) => rs && rs.filter((r) => r.id !== id));
+    hideNotification(id);
+  };
   const unread = rows ? rows.filter((r) => !r.read).length : 0;
 
   return (
@@ -56,7 +60,7 @@ export default function NotificationHistory() {
         {rows && rows.length > 0 && (
           <div className="space-y-2">
             {rows.map((n) => (
-              <NotificationCard key={n.id} n={n} onDismissed={markRead} date={formatDate(n.created_at)} />
+              <NotificationCard key={n.id} n={n} onClear={hide} onActed={markActed} date={formatDate(n.created_at)} />
             ))}
           </div>
         )}

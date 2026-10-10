@@ -36,6 +36,27 @@ class NotificationApiTest(TestCase):
         theirs = notify(self.other, "남의 알림")
         self.assertEqual(self.c.post(f"/api/notifications/{theirs.id}/dismiss/").status_code, 404)
 
+    def test_hide_removes_it_from_the_history_but_keeps_the_record(self):
+        a = notify(self.me, "숨길 알림")
+        notify(self.me, "남길 알림")
+        self.assertEqual(self.c.post(f"/api/notifications/{a.id}/hide/").status_code, 200)
+        self.assertEqual([r["body"] for r in self.c.get("/api/notifications/").json()["notifications"]], ["남길 알림"])
+        self.assertEqual(self.c.get("/api/notifications/unread-count/").json()["count"], 1)
+        a.refresh_from_db()
+        self.assertIsNotNone(a.hidden_at)
+        self.assertIsNotNone(a.read_at)
+        theirs = notify(self.other, "남의 알림")
+        self.assertEqual(self.c.post(f"/api/notifications/{theirs.id}/hide/").status_code, 404)
+
+    def test_action_is_used_once(self):
+        a = notify(self.me, "이동 알림", action_label="홈페이지로 이동", action_url="/")
+        self.assertFalse(self.c.get("/api/notifications/").json()["notifications"][0]["acted"])
+        self.assertEqual(self.c.post(f"/api/notifications/{a.id}/act/").status_code, 200)
+        row = self.c.get("/api/notifications/").json()["notifications"][0]
+        self.assertTrue(row["acted"])
+        self.assertTrue(row["read"])
+        self.assertEqual(self.c.get("/api/notifications/unread-count/").json()["count"], 0)
+
     def test_login_required(self):
         self.assertEqual(APIClient().get("/api/notifications/").status_code, 401)
 

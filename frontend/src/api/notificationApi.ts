@@ -9,6 +9,8 @@ export type SiteNotification = {
   action_url: string;
   created_at: string;
   read: boolean;
+  // the action button was followed once; it stays disabled after
+  acted: boolean;
 };
 
 // Fired after a notification is cleared, so the red dot on the profile picture catches up at once.
@@ -31,7 +33,14 @@ export async function getUnreadNotificationCount(): Promise<number> {
   return (await res.json()).count ?? 0;
 }
 
-export async function dismissNotification(id: number): Promise<void> {
-  await fetch(`${API_BASE}/${id}/dismiss/`, { method: "POST", headers: authHeaders() }).catch(() => {});
+async function mark(id: number, what: "dismiss" | "act" | "hide"): Promise<void> {
+  await fetch(`${API_BASE}/${id}/${what}/`, { method: "POST", headers: authHeaders() }).catch(() => {});
   window.dispatchEvent(new Event(NOTIFICATIONS_UPDATED));
 }
+
+// X on My Page: off My Page, still in the history.
+export const dismissNotification = (id: number) => mark(id, "dismiss");
+// The action button was followed (also clears it from My Page).
+export const actOnNotification = (id: number) => mark(id, "act");
+// X on the history page: gone from the history too, though the server keeps the record.
+export const hideNotification = (id: number) => mark(id, "hide");

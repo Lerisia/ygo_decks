@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getUserInfo, changeUsername, changePassword, logout, checkUsernameExists } from "../api/accountApi";
 import { getMyAvatar, type PublicCardIcon, type Border } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
-import { getNotifications, type SiteNotification } from "@/api/notificationApi";
+import { dismissNotification, getNotifications, type SiteNotification } from "@/api/notificationApi";
 import NotificationCard from "@/components/NotificationCard";
 
 // My Page shows at most this many unread notifications; 더보기 opens the whole history.
@@ -26,6 +26,7 @@ const Mypage = () => {
   const [avatarIcon, setAvatarIcon] = useState<PublicCardIcon | null>(null);
   const [avatarBorder, setAvatarBorder] = useState<Border | null>(null);
   const [unread, setUnread] = useState<SiteNotification[] | null>(null);
+  const dropUnread = (id: number) => setUnread((u) => u && u.filter((x) => x.id !== id));
 
   const navigate = useNavigate();
 
@@ -174,7 +175,12 @@ const Mypage = () => {
             </div>
             <div className="space-y-2">
               {unread.slice(0, NOTICE_PREVIEW).map((n) => (
-                <NotificationCard key={n.id} n={n} onDismissed={(id) => setUnread((u) => u && u.filter((x) => x.id !== id))} />
+                <NotificationCard
+                  key={n.id}
+                  n={n}
+                  onClear={(id) => { dropUnread(id); dismissNotification(id); }}
+                  onActed={dropUnread}
+                />
               ))}
             </div>
           </section>

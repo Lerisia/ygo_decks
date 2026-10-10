@@ -1,24 +1,25 @@
 import { useNavigate } from "react-router-dom";
-import { dismissNotification, type SiteNotification } from "@/api/notificationApi";
+import { actOnNotification, type SiteNotification } from "@/api/notificationApi";
 
 // One notification on a tan card: who sent it, a way to clear it, what it says, and where it leads.
-// Following the action clears it too, since the member has seen it.
+// The action works once: after it is followed the button stays disabled (참혈 2026-10-11).
+// What X does depends on the page, so the caller passes it in.
 export default function NotificationCard({
   n,
-  onDismissed,
+  onClear,
+  onActed,
   date,
 }: {
   n: SiteNotification;
-  onDismissed: (id: number) => void;
+  onClear: (id: number) => void;
+  onActed: (id: number) => void;
   date?: string;
 }) {
   const navigate = useNavigate();
-  const clear = () => {
-    onDismissed(n.id);
-    dismissNotification(n.id);
-  };
   const follow = () => {
-    if (!n.read) clear();
+    if (n.acted) return;
+    onActed(n.id);
+    actOnNotification(n.id);
     if (/^https?:\/\//.test(n.action_url)) window.open(n.action_url, "_blank", "noopener,noreferrer");
     else navigate(n.action_url);
   };
@@ -29,17 +30,15 @@ export default function NotificationCard({
           {n.sender}
           {date && <span className="ml-2 font-normal text-gray-600 dark:text-gray-300">{date}</span>}
         </p>
-        {!n.read && (
-          <button
-            type="button"
-            onClick={clear}
-            title="지우기"
-            aria-label="지우기"
-            className="shrink-0 -mt-1 -mr-1.5 w-7 h-7 rounded-full text-lg leading-none p-0 bg-transparent border-0 text-amber-900/70 hover:text-amber-950 hover:bg-black/10 dark:text-amber-100/70 dark:hover:text-white dark:hover:bg-white/10"
-          >
-            ×
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => onClear(n.id)}
+          title="지우기"
+          aria-label="지우기"
+          className="shrink-0 -mt-1 -mr-1.5 w-7 h-7 rounded-full text-lg leading-none p-0 bg-transparent border-0 text-amber-900/70 hover:text-amber-950 hover:bg-black/10 dark:text-amber-100/70 dark:hover:text-white dark:hover:bg-white/10"
+        >
+          ×
+        </button>
       </div>
       <p className="mt-1 text-sm whitespace-pre-wrap break-words">{n.body}</p>
       {n.action_url && (
@@ -47,7 +46,12 @@ export default function NotificationCard({
           <button
             type="button"
             onClick={follow}
-            className="px-3 py-1.5 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-sm font-semibold"
+            disabled={n.acted}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+              n.acted
+                ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+            }`}
           >
             {n.action_label || "이동"}
           </button>
