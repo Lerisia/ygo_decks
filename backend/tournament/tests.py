@@ -1211,3 +1211,52 @@ class TeamPlayTest(TournamentApiTestBase):
         rows = self.client.get(f"/api/tournaments/{t.id}/standings/").json()
         self.assertEqual(len(rows[0]["members"]), 2)
         self.assertIn("avatar_icon", rows[0]["members"][0])
+
+
+class PasswordAndHostUidTest(TournamentApiTestBase):
+    """특이점 2026-10-10: 주최자 UID·참가 비밀번호를 정해 개최하고, 비밀번호가 걸린 대회는 맞혀야 참가한다."""
+
+    def test_host_sets_uid_and_password_which_is_never_shown(self):
+        resp = self.create(host_md_uid="123456789", password="엘리스컵1")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        body = resp.json()
+        self.assertTrue(body["has_password"])
+        self.assertNotIn("password", body)
+        self.assertEqual(body["host_md_uid"], "123456789")
+        t = Tournament.objects.get(id=body["id"])
+        self.assertNotEqual(t.password, "엘리스컵1")  # stored hashed
+        self.host.refresh_from_db()
+        self.assertEqual(self.host.md_uid, "123456789")
+        listed = {x["id"]: x for x in self.client.get("/api/tournaments/").json()}
+        self.assertTrue(listed[t.id]["has_password"])
+        self.assertNotIn("password", listed[t.id])
+
+    def test_bad_host_uid_is_rejected(self):
+        self.assertEqual(self.create(host_md_uid="12345").status_code, 400)
+
+    def test_host_uid_hidden_from_strangers(self):
+        t_id = self.create(host_md_uid="123456789").json()["id"]
+        stranger = _auth(_user("stranger"))
+        self.assertIsNone(stranger.get(f"/api/tournaments/{t_id}/").json()["host_md_uid"])
+
+    def test_join_needs_the_right_password(self):
+        t_id = self.create(password="secret").json()["id"]
+        c = _auth(_user("joiner"))
+        url = f"/api/tournaments/{t_id}/register/"
+        self.assertEqual(c.post(url, {"md_uid": "100000001"}, format="json").status_code, 403)
+        self.assertEqual(c.post(url, {"md_uid": "100000001", "password": "wrong"}, format="json").status_code, 403)
+        self.assertEqual(c.post(url, {"md_uid": "100000001", "password": "secret"}, format="json").status_code, 200)
+
+    def test_open_tournament_needs_no_password(self):
+        t_id = self.create().json()["id"]
+        self.assertFalse(self.client.get(f"/api/tournaments/{t_id}/").json()["has_password"])
+        c = _auth(_user("joiner2"))
+        self.assertEqual(c.post(f"/api/tournaments/{t_id}/register/", {"md_uid": "100000002"}, format="json").status_code, 200)
+
+    def test_host_can_change_or_remove_the_password(self):
+        t_id = self.create(password="old").json()["id"]
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t_id}/", {"password": "new"}, format="json").status_code, 200)
+        c = _auth(_user("joiner3"))
+        self.assertEqual(c.post(f"/api/tournaments/{t_id}/register/", {"md_uid": "100000003", "password": "new"}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(f"/api/tournaments/{t_id}/", {"password": ""}, format="json").status_code, 200)
+        self.assertFalse(self.client.get(f"/api/tournaments/{t_id}/").json()["has_password"])

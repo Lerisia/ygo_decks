@@ -7,8 +7,11 @@ const inputCls = "w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 t
 function CreateTournament() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [hostUid, setHostUid] = useState("");
+  const [usePassword, setUsePassword] = useState(false);
+  const [password, setPassword] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState<TournamentFormat>("swiss");
+  const [format, setFormat] = useState<TournamentFormat>("single_elim");
   const [capacity, setCapacity] = useState("8");
   const [eventDate, setEventDate] = useState("");
   const [swissRounds, setSwissRounds] = useState("");
@@ -22,8 +25,16 @@ function CreateTournament() {
 
   const submit = async () => {
     setError("");
+    if (!/^\d{9}$/.test(hostUid)) {
+      setError("주최자 마스터 듀얼 UID(숫자 9자리)를 입력해 주세요.");
+      return;
+    }
     if (!name.trim() || !eventDate) {
       setError("대회 이름과 일시는 필수입니다.");
+      return;
+    }
+    if (usePassword && !password.trim()) {
+      setError("참가 비밀번호를 입력해 주세요.");
       return;
     }
     const cap = Number(capacity);
@@ -45,6 +56,8 @@ function CreateTournament() {
         team_size: teamSize,
         event_date: new Date(eventDate).toISOString(),
         format_config: config,
+        host_md_uid: hostUid,
+        password: usePassword ? password.trim() : undefined,
       }, coverFile);
       navigate(`/tournaments/${t.id}`);
     } catch (e) {
@@ -56,12 +69,42 @@ function CreateTournament() {
 
   return (
     <div className="px-4 py-6 min-h-screen max-w-lg mx-auto">
-      <button onClick={() => navigate("/tournaments")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회 목록</button>
-      <h1 className="text-2xl font-bold mb-4">대회 생성</h1>
+      <button onClick={() => navigate("/tournaments")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회</button>
+      <h1 className="text-2xl font-bold mb-4">🏆 대회 개최하기</h1>
+      {!localStorage.getItem("access_token") ? (
+        <p className="text-sm text-gray-600 dark:text-gray-400">로그인 후 대회를 개최할 수 있습니다.</p>
+      ) : (
       <div className="flex flex-col gap-3">
+        <div>
+          <label className="block text-sm font-semibold mb-1">주최자 마스터 듀얼 UID *</label>
+          <input
+            className={`${inputCls} font-mono`}
+            inputMode="numeric"
+            maxLength={9}
+            value={hostUid}
+            onChange={(e) => setHostUid(e.target.value.replace(/\D/g, ""))}
+            placeholder="123456789"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">숫자 9자리 · 참가자와 주최자에게만 보입니다</p>
+        </div>
         <div>
           <label className="block text-sm font-semibold mb-1">대회 이름 *</label>
           <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="제1회 OO컵" />
+        </div>
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={usePassword} onChange={(e) => setUsePassword(e.target.checked)} />
+            🔒 참가 비밀번호 설정
+          </label>
+          {usePassword && (
+            <input
+              className={`${inputCls} mt-2`}
+              maxLength={30}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="참가자에게 알려 줄 비밀번호 (30자 이하)"
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1">설명</label>
@@ -166,9 +209,10 @@ function CreateTournament() {
           disabled={busy}
           className="mt-2 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
         >
-          {busy ? "생성 중..." : "대회 만들기"}
+          {busy ? "만드는 중..." : "대회 개최하기"}
         </button>
       </div>
+      )}
     </div>
   );
 }

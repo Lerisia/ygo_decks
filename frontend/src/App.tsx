@@ -31,6 +31,7 @@ import RecordGroups from "./pages/RecordGroups";
 import RecordGroupDetail from "./pages/RecordGroupDetail";
 import RecordGroupStatistics from "./pages/RecordGroupStatistics";
 import Tournaments from "./pages/Tournaments";
+import TournamentHub from "./pages/TournamentHub";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentDetailPage from "./pages/TournamentDetail";
 import DeckScanner from "./pages/DeckScanner";
@@ -120,7 +121,8 @@ function App() {
           <Route path="/records" element={<RecordGroups />} />
           <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
           {/* 대회 (내부 테스트 중 — 네비게이션 미노출) */}
-          <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/tournaments" element={<TournamentHub />} />
+          <Route path="/tournaments/join" element={<Tournaments />} />
           <Route path="/tournaments/create" element={<CreateTournament />} />
           <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
           <Route path="/record-groups/:recordGroupId" element={<RecordGroupDetail />} />

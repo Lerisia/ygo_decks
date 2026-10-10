@@ -106,14 +106,18 @@ class RoundSerializer(serializers.ModelSerializer):
 class TournamentListSerializer(serializers.ModelSerializer):
     host_name = serializers.CharField(source="host.username", read_only=True)
     entrant_count = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
 
     class Meta:
         model = Tournament
         fields = ["id", "name", "format", "status", "capacity", "team_size", "event_date",
-                  "current_round", "host_name", "entrant_count", "cover_image", "created_at"]
+                  "current_round", "host_name", "entrant_count", "cover_image", "created_at", "has_password"]
 
     def get_entrant_count(self, obj):
         return obj.entrants.exclude(status__in=["withdrawn", "kicked"]).count()
+
+    def get_has_password(self, obj):
+        return bool(obj.password)
 
 
 class TournamentDetailSerializer(TournamentListSerializer):
@@ -125,11 +129,18 @@ class TournamentDetailSerializer(TournamentListSerializer):
     class Meta(TournamentListSerializer.Meta):
         fields = TournamentListSerializer.Meta.fields + [
             "description", "format_config", "entrants", "rounds", "host", "host_avatar_icon", "host_border",
+            "host_md_uid",
         ]
 
     def get_entrants(self, obj):
         qs = obj.entrants.exclude(status="kicked").select_related("user__avatar_icon", "user__equipped_border").order_by("created_at")
         return EntrantSerializer(qs, many=True, context=self.context).data
+
+    host_md_uid = serializers.SerializerMethodField()
+
+    def get_host_md_uid(self, obj):
+        # Like entrant UIDs: only the host and entrants see it.
+        return obj.host_md_uid if self.context.get("show_uid") else None
 
     def get_host_avatar_icon(self, obj):
         return user_avatar(obj.host)[0]

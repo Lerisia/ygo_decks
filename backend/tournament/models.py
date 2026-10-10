@@ -29,6 +29,10 @@ class Tournament(models.Model):
     capacity = models.PositiveIntegerField(default=8)
     team_size = models.PositiveSmallIntegerField(default=1)  # 1 = individual; 2+ = every entrant is a team of this many
     event_date = models.DateTimeField()
+    # The host's Master Duel UID, so entrants can find them in game; only entrants and the host see it.
+    host_md_uid = models.CharField(max_length=9, blank=True, default="")
+    # Optional join password, stored hashed; empty means anyone may register (특이점 2026-10-10).
+    password = models.CharField(max_length=128, blank=True, default="")
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="recruiting")
     current_round = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

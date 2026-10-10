@@ -86,6 +86,8 @@ export type TournamentListItem = {
   entrant_count: number;
   cover_image: string | null;
   created_at: string;
+  /** A join password is set (the password itself is never sent). */
+  has_password?: boolean;
 };
 
 export type TournamentDetail = TournamentListItem & {
@@ -94,6 +96,8 @@ export type TournamentDetail = TournamentListItem & {
   host: number;
   host_avatar_icon: AvatarIcon | null;
   host_border: Border | null;
+  /** Only the host and entrants receive it. */
+  host_md_uid?: string | null;
   entrants: Entrant[];
   rounds: RoundItem[];
 };
@@ -122,6 +126,7 @@ export const getTournament = (id: number) => req<TournamentDetail>(`/${id}/`);
 export const createTournament = (payload: {
   name: string; description?: string; format: TournamentFormat;
   capacity: number; team_size?: number; event_date: string; format_config?: Record<string, unknown>;
+  host_md_uid?: string; password?: string;
 }, coverFile?: File | null) => {
   if (!coverFile) {
     return req<TournamentDetail>("/create/", { method: "POST", body: JSON.stringify(payload) });
@@ -134,6 +139,8 @@ export const createTournament = (payload: {
   if (payload.team_size) form.append("team_size", String(payload.team_size));
   form.append("event_date", payload.event_date);
   if (payload.format_config) form.append("format_config", JSON.stringify(payload.format_config));
+  if (payload.host_md_uid) form.append("host_md_uid", payload.host_md_uid);
+  if (payload.password) form.append("password", payload.password);
   form.append("cover_image", coverFile);
   return req<TournamentDetail>("/create/", { method: "POST", body: form });
 };
@@ -150,8 +157,11 @@ export const updateCover = (id: number, coverFile: File | null) => {
   return req<TournamentDetail>(`/${id}/cover/`, { method: "POST", body: form });
 };
 
-export const registerTournament = (id: number, mdUid?: string, teamName?: string) =>
-  req<Entrant>(`/${id}/register/`, { method: "POST", body: JSON.stringify({ ...(mdUid ? { md_uid: mdUid } : {}), ...(teamName ? { team_name: teamName } : {}) }) });
+export const registerTournament = (id: number, mdUid?: string, teamName?: string, password?: string) =>
+  req<Entrant>(`/${id}/register/`, {
+    method: "POST",
+    body: JSON.stringify({ ...(mdUid ? { md_uid: mdUid } : {}), ...(teamName ? { team_name: teamName } : {}), ...(password ? { password } : {}) }),
+  });
 export const joinTeam = (id: number, code: string, mdUid?: string) =>
   req<Entrant>(`/${id}/team/join/`, { method: "POST", body: JSON.stringify({ code, ...(mdUid ? { md_uid: mdUid } : {}) }) });
 export const leaveTeam = (id: number) => req<{ ok: boolean }>(`/${id}/team/leave/`, { method: "POST", body: "{}" });

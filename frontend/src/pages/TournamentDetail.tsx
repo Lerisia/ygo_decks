@@ -68,6 +68,7 @@ function TournamentDetailPage() {
   const [me, setMe] = useState<string | null>(null);
   const [tab, setTab] = useState<"players" | "bracket" | "deck" | "notice" | "chat" | null>(null);
   const [uidInput, setUidInput] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
   const [teamName, setTeamName] = useState("");
   const [teamCode, setTeamCode] = useState("");
   const [error, setError] = useState("");
@@ -265,7 +266,7 @@ function TournamentDetailPage() {
 
   return (
     <div className="px-4 py-6 min-h-screen max-w-3xl mx-auto">
-      <button onClick={() => navigate("/tournaments")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회 목록</button>
+      <button onClick={() => navigate("/tournaments/join")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회 목록</button>
 
       {t.cover_image && (
         <img src={t.cover_image} alt={t.name} className="w-full max-h-64 object-cover rounded-xl mb-3" />
@@ -309,6 +310,8 @@ function TournamentDetailPage() {
       <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
         <Avatar icon={t.host_avatar_icon} border={t.host_border} size={22} />
         <span>주최 {t.host_name}</span>
+        {t.host_md_uid && <span className="font-mono">· 주최자 UID {t.host_md_uid}</span>}
+        {t.has_password && <span title="참가하려면 비밀번호가 필요합니다">· 🔒 비밀번호</span>}
         <span>· {FORMAT_LABELS[t.format]}{t.status === "ongoing" ? ` · ${t.current_round}라운드` : ""}</span>
         <span>· {new Date(t.event_date).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
       </div>
@@ -318,7 +321,7 @@ function TournamentDetailPage() {
       {/* 참가/운영 액션 */}
       <div className="flex gap-2 flex-wrap mb-6">
         {t.status === "recruiting" && me && !myEntrant && !teamMode && (
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <input
               className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-56"
               placeholder="MD UID 9자리 (저장돼 있으면 생략)"
@@ -326,7 +329,16 @@ function TournamentDetailPage() {
               maxLength={9}
               onChange={(e) => setUidInput(e.target.value.replace(/\D/g, ""))}
             />
-            <button className={blueBtn} onClick={() => act(() => registerTournament(t.id, uidInput || undefined))}>참가 신청</button>
+            {t.has_password && (
+              <input
+                type="password"
+                className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-36"
+                placeholder="🔒 대회 비밀번호"
+                value={joinPassword}
+                onChange={(e) => setJoinPassword(e.target.value)}
+              />
+            )}
+            <button className={blueBtn} disabled={!!t.has_password && !joinPassword} onClick={() => act(() => registerTournament(t.id, uidInput || undefined, undefined, joinPassword || undefined))}>참가 신청</button>
           </div>
         )}
         {t.status === "recruiting" && me && !myEntrant && teamMode && (
@@ -340,7 +352,16 @@ function TournamentDetailPage() {
             />
             <div className="flex gap-2">
               <input className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-36" placeholder="팀 이름" maxLength={100} value={teamName} onChange={(e) => setTeamName(e.target.value)} />
-              <button className={blueBtn} disabled={!teamName.trim()} onClick={() => act(() => registerTournament(t.id, uidInput || undefined, teamName.trim()))}>팀 만들기</button>
+              {t.has_password && (
+                <input
+                  type="password"
+                  className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-32"
+                  placeholder="🔒 비밀번호"
+                  value={joinPassword}
+                  onChange={(e) => setJoinPassword(e.target.value)}
+                />
+              )}
+              <button className={blueBtn} disabled={!teamName.trim() || (!!t.has_password && !joinPassword)} onClick={() => act(() => registerTournament(t.id, uidInput || undefined, teamName.trim(), joinPassword || undefined))}>팀 만들기</button>
             </div>
             <div className="flex gap-2">
               <input className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-28 font-mono uppercase" placeholder="팀 코드" maxLength={6} value={teamCode} onChange={(e) => setTeamCode(e.target.value.toUpperCase())} />

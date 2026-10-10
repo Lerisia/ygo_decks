@@ -10,6 +10,7 @@ from rest_framework import status
 from . import engine
 import re
 
+from django.contrib.auth.hashers import check_password, make_password
 from django.db.models import Q
 
 from .models import Announcement, Board, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
@@ -425,8 +426,19 @@ def create_tournament(request):
         if opt_err:
             return _err(opt_err)
         format_config = {**format_config, "groups": opts[0], "advance": opts[1]}
+    host_md_uid = str(data.get("host_md_uid") or "").strip() or request.user.md_uid or ""
+    if host_md_uid and not re.fullmatch(r"\d{9}", host_md_uid):
+        return _err("주최자 마스터 듀얼 UID는 숫자 9자리입니다.")
+    if host_md_uid and host_md_uid != request.user.md_uid:
+        request.user.md_uid = host_md_uid
+        request.user.save(update_fields=["md_uid"])
+    password = str(data.get("password") or "").strip()
+    if len(password) > 30:
+        return _err("비밀번호는 30자 이하로 정해 주세요.")
     t = Tournament.objects.create(
         name=data["name"],
+        host_md_uid=host_md_uid,
+        password=make_password(password) if password else "",
         description=data.get("description", ""),
         host=request.user,
         format=fmt,
@@ -480,6 +492,16 @@ def _edit_tournament(request, t):
         if not data["event_date"]:
             return _err("일시를 입력해 주세요.")
         t.event_date = data["event_date"]; changed.append("event_date")
+    if "password" in data:  # empty removes it
+        password = str(data["password"] or "").strip()
+        if len(password) > 30:
+            return _err("비밀번호는 30자 이하로 정해 주세요.")
+        t.password = make_password(password) if password else ""; changed.append("password")
+    if "host_md_uid" in data:
+        uid = str(data["host_md_uid"] or "").strip()
+        if uid and not re.fullmatch(r"\d{9}", uid):
+            return _err("주최자 마스터 듀얼 UID는 숫자 9자리입니다.")
+        t.host_md_uid = uid; changed.append("host_md_uid")
     locked = [k for k in ("capacity", "format", "format_config") if k in data]
     if locked and t.status != "recruiting":
         return _err("대회 시작 후에는 정원·형식을 바꿀 수 없습니다.")
@@ -549,6 +571,8 @@ def register(request, tournament_id):
         return err
     if t.status != "recruiting":
         return _err("모집 중인 대회가 아닙니다.")
+    if t.password and not check_password(str(request.data.get("password") or ""), t.password):
+        return _err("대회 비밀번호가 맞지 않습니다.", status.HTTP_403_FORBIDDEN)
     if t.team_size > 1:
         return _register_team(request, t)
     active = t.entrants.exclude(status__in=["withdrawn", "kicked"])

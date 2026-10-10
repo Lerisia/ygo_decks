@@ -27,7 +27,8 @@ type TabKey = (typeof TABS)[number]["key"];
 
 function Tournaments() {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
-  const [tab, setTab] = useState<TabKey>("all");
+  // "참여자로 참가하기" opens on the tournaments still taking entrants.
+  const [tab, setTab] = useState<TabKey>("recruiting");
   const navigate = useNavigate();
   const loggedIn = !!localStorage.getItem("access_token");
 
@@ -37,17 +38,22 @@ function Tournaments() {
 
   return (
     <div className="px-4 py-6 min-h-screen max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">대회 목록</h1>
+      <button onClick={() => navigate("/tournaments")} className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 mb-2">← 대회</button>
+      <div className="flex justify-between items-center mb-1">
+        <h1 className="text-2xl font-bold">🙋 참여자로 참가하기</h1>
         {loggedIn && (
           <button
             onClick={() => navigate("/tournaments/create")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
           >
-            대회 생성
+            대회 개최하기
           </button>
         )}
       </div>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">🔒 표시가 있는 대회는 주최자에게 받은 비밀번호가 있어야 참가할 수 있습니다.</p>
+      {!loggedIn && (
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">대회는 로그인한 회원만 참가할 수 있습니다.</p>
+      )}
       <div className="flex gap-2 mb-4 flex-wrap">
         {TABS.map(({ key, label }) => {
           const count = key === "all" ? tournaments.length : tournaments.filter((t) => t.status === key).length;
@@ -87,7 +93,10 @@ function Tournaments() {
                   {t.cover_image && (
                     <img src={t.cover_image} alt={t.name} className="w-full h-40 object-cover mb-2 rounded" />
                   )}
-                  <h2 className="text-lg font-semibold pr-16">{t.name}</h2>
+                  <h2 className="text-lg font-semibold pr-16">
+                    {t.has_password && <span className="mr-1" title="비밀번호가 필요한 대회">🔒</span>}
+                    {t.name}
+                  </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {FORMAT_LABELS[t.format]}{t.team_size > 1 ? ` · ${t.team_size}인 팀전` : ""} · {t.entrant_count}/{t.capacity}{t.team_size > 1 ? "팀" : "명"} · 주최 {t.host_name}
                   </p>
