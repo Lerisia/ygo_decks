@@ -1014,7 +1014,7 @@ class OtherMyDeckTest(TestCase):
 
 
 class MetaDeckStatsTopThirtyTest(TestCase):
-    """메타 덱 통계는 상위 30개까지 내려준다 — 화면은 10개 + (i) 버튼으로 11~30위 (특이점 2026-09-27)."""
+    """메타 덱 통계는 상위 10개까지만 내려준다 — 11위부터는 표본이 적어 신뢰하기 어렵다 (특이점 2026-10-10; 이전엔 30개)."""
 
     def setUp(self):
         self.client = APIClient()
@@ -1027,13 +1027,13 @@ class MetaDeckStatsTopThirtyTest(TestCase):
             for _ in range(i + 1):
                 _create_match(self.group, self.my, d, rank="diamond3")
 
-    def test_returns_top_thirty_in_order_with_covers(self):
+    def test_returns_only_top_ten_in_order_with_covers(self):
         resp = self.client.get("/api/recent-meta-deck-stats/")
         self.assertEqual(resp.status_code, 200)
         decks = resp.json()["meta_decks"]
-        self.assertEqual(len(decks), 30)
+        self.assertEqual(len(decks), 10)
         self.assertEqual(decks[0]["meta_deck_name"], "상대34")
-        self.assertEqual(decks[29]["meta_deck_name"], "상대05")
+        self.assertEqual(decks[9]["meta_deck_name"], "상대25")
         pct = [d["appearance_percent"] for d in decks]
         self.assertEqual(pct, sorted(pct, reverse=True))
         self.assertIn("cover_image_small", decks[0])
