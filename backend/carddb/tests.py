@@ -541,6 +541,9 @@ class CardGroupTest(TestCase):
         self.card(14, "No.39 希望皇ホープ", "No.39 유토피아")
         self.card(15, "R－ACEインパルス", "R－ACE 임펄스", ruby="$RR－ACE(レスキュー・エース)インパルス",
                   ja_text="「R－ACE」モンスター", ko_text='"R－ACE(레스큐 에이스)" 몬스터')
+        self.card(16, "RESCUE!", "RESCUE!", ja_text="このカード名はルール上「R－ACE」カードとしても扱う。")
+        self.card(17, "H・C 強襲のハルベルト", "H·C 강습의 할베르트", ruby="$RＨ(ヒロイック)・$RＣ(チャレンジャー)　強襲のハルベルト",
+                  ja_text="「C」モンスター", ko_text='"C" 몬스터')
 
     def build(self):
         from .groups import compute, save
@@ -560,6 +563,8 @@ class CardGroupTest(TestCase):
         self.assertEqual(self.members(g["ギャラクシーアイズ"]), [7, 8, 9])
         self.assertEqual(dict(g["ギャラクシーアイズ"].members.values_list("card_id", "how")), {7: "reading", 8: "name", 9: "treated"})
         self.assertEqual(self.members(g["N"]), [13])
+        self.assertEqual(self.members(g["R-ACE"]), [15, 16])
+        self.assertEqual(self.members(g["C"]), [17])   # RESCUE! counts as R－ACE, whose C sits inside a word
 
     def test_a_replaced_name_is_what_counts(self):
         g = self.build()

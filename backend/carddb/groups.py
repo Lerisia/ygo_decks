@@ -36,6 +36,18 @@ def written(seg):
     return "".join(w for w, _ in seg)
 
 
+def holds(name, x):
+    """Does name hold x, not counting a Latin x glued to other Latin letters (C in R－ACE, N in No.)?"""
+    i = name.find(x)
+    while i >= 0:
+        j = i + len(x)
+        if not ((LATIN.match(x[0]) and i > 0 and LATIN.match(name[i - 1])) or
+                (LATIN.match(x[-1]) and j < len(name) and LATIN.match(name[j]))):
+            return True
+        i = name.find(x, i + 1)
+    return False
+
+
 def readings_at(seg, x):
     """Reading of every place the written name holds x, and whether x lines up with whole ruby parts there."""
     starts, p = [], 0
@@ -120,7 +132,7 @@ class Index:
                 out[cid] = "reading"
         for src in (self.also_groups, self.also_names):
             for cid, ys in src.items():
-                if any(x in y for y in ys):
+                if any(holds(N(y), x) for y in ys):
                     out.setdefault(cid, "treated")
         return reading, out
 
