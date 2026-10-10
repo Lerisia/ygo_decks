@@ -10,7 +10,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
-from .models import Card, CardEffectTag
+from carddb.display import art_url, display_name
+from carddb.models import Card, has_art
+from cardsite.models import EffectTag
 
 
 TAG_FIELDS = [
@@ -70,17 +72,24 @@ TAG_LABELS = {
 PAGE_SIZE = 30
 
 
-def _serialize_row(card: Card, tag: CardEffectTag | None) -> dict:
+def _korean_text(card: Card) -> str:
+    text = next((t for t in card.texts.all() if t.lang == "ko"), None)
+    if not text:
+        return ""
+    return "\n".join(s for s in (text.materials, text.effect, text.pendulum_effect, text.flavor) if s)
+
+
+def _serialize_row(card: Card, tag: EffectTag | None) -> dict:
     """A compact list row — full description is fetched on detail expand to
     keep the list payload small."""
     return {
         "card_pk": card.id,
-        "card_id": card.card_id,
-        "korean_name": card.korean_name or card.name or "",
-        "frame_type": card.frame_type or "",
-        "card_type": card.card_type or "",
-        "image_url": (card.card_illust.url if card.card_illust else card.image_url) or "",
-        "description": card.korean_description or "",
+        "card_id": str(card.id),
+        "korean_name": display_name(card) or "",
+        "frame_type": card.frame,
+        "card_type": " ".join(card.types) or card.category,
+        "image_url": art_url(card.id) or "",
+        "description": _korean_text(card),
         "tags": {f: bool(getattr(tag, f)) if tag else False for f in TAG_FIELDS},
         "manually_reviewed": bool(tag.manually_reviewed) if tag else False,
         "classifier_version": tag.classifier_version if tag else "",
@@ -105,11 +114,11 @@ def effect_tags_list(request):
     has_tags = request.query_params.get("has_tags", "any")
     page = max(1, int(request.query_params.get("page") or "1"))
 
-    qs = Card.objects.exclude(korean_description__isnull=True).exclude(korean_description="")
-    qs = qs.select_related("effect_tag")
+    qs = Card.objects.filter(has_art(), texts__lang="ko").distinct()
+    qs = qs.select_related("effect_tag").prefetch_related("texts")
 
     if q:
-        qs = qs.filter(Q(korean_name__icontains=q) | Q(card_id__icontains=q))
+        qs = qs.filter(Q(name_ko__icontains=q) | Q(id__icontains=q))
 
     if tag and tag in TAG_FIELDS:
         qs = qs.filter(**{f"effect_tag__{tag}": True})
@@ -137,9 +146,9 @@ def effect_tags_list(request):
         rows.append(_serialize_row(c, tag_row))
 
     # Aggregate stats — counts per tag, plus total tagged & reviewed.
-    total_with_tags = CardEffectTag.objects.count()
-    total_reviewed = CardEffectTag.objects.filter(manually_reviewed=True).count()
-    per_tag = {f: CardEffectTag.objects.filter(**{f: True}).count() for f in TAG_FIELDS}
+    total_with_tags = EffectTag.objects.count()
+    total_reviewed = EffectTag.objects.filter(manually_reviewed=True).count()
+    per_tag = {f: EffectTag.objects.filter(**{f: True}).count() for f in TAG_FIELDS}
 
     return Response({
         "results": rows,
@@ -166,7 +175,7 @@ def effect_tag_update(request, card_pk: int):
     except Card.DoesNotExist:
         return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
 
-    tag, _ = CardEffectTag.objects.get_or_create(card=card, defaults={"classifier_version": "v1"})
+    tag, _ = EffectTag.objects.get_or_create(card=card, defaults={"classifier_version": "v1"})
 
     updates = {}
     for field in TAG_FIELDS:

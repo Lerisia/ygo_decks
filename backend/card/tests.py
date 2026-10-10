@@ -485,3 +485,41 @@ class DeckScannerTest(FreshArt, TestCase):
         self.assertTrue(body["image_url"].endswith("/media/cards/art/common/4041.webp"))
         with patch("card.views.predict_card_from_bytes", return_value=("6296633200", 0.9)):
             self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class EffectTagAdminTest(FreshArt, TestCase):
+    """Effect tags are site data on the new card ids (cardsite.EffectTag)."""
+
+    def setUp(self):
+        super().setUp()
+        from carddb.models import CardText
+        from cardsite.models import EffectTag
+        self.admin = User.objects.create_user(email="tag@test.com", username="tagger", password="x", is_staff=True)
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+        ash = _create_card_with_art("하루 우라라", 14558)
+        CardText.objects.create(card=ash, lang="ko", effect="①: 덱에서 카드를 서치하는 효과를 무효로 한다.")
+        EffectTag.objects.create(card=ash, hand_trap=True, negates=True)
+        plain = _create_card_with_art("통상 몬스터", 4041)
+        CardText.objects.create(card=plain, lang="ko", flavor="그냥 몬스터.")
+        _create_card_with_art("효과문 없음", 4042)
+
+    def test_list_and_filter(self):
+        body = self.client.get("/api/admin/effect-tags/").json()
+        self.assertEqual([r["card_pk"] for r in body["results"]], [4041, 14558])
+        row = body["results"][1]
+        self.assertEqual((row["korean_name"], row["image_url"], row["tags"]["hand_trap"]),
+                         ("하루 우라라", "/media/cards/art/common/14558.webp", True))
+        self.assertIn("무효", row["description"])
+        self.assertEqual(body["per_tag_count"]["hand_trap"], 1)
+        only = self.client.get("/api/admin/effect-tags/", {"tag": "hand_trap"}).json()["results"]
+        self.assertEqual([r["card_pk"] for r in only], [14558])
+        self.assertEqual([r["card_pk"] for r in self.client.get("/api/admin/effect-tags/", {"q": "우라라"}).json()["results"]], [14558])
+
+    def test_update_marks_reviewed(self):
+        from cardsite.models import EffectTag
+        r = self.client.patch("/api/admin/effect-tags/4041/", {"cat_destroy_monster": True}, format="json")
+        self.assertEqual(r.status_code, 200)
+        tag = EffectTag.objects.get(card_id=4041)
+        self.assertEqual((tag.cat_destroy_monster, tag.manually_reviewed), (True, True))
