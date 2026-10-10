@@ -5,8 +5,10 @@ import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { CONTACT_PATH, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
 import DeckPickerModal from "@/components/DeckPickerModal";
+import CardPickerModal from "@/components/CardPickerModal";
+import { useDexCounts } from "@/components/DexTabs";
 
-// Home (redesign 2026-10): two pillars, 덱 도감 then 레코더; the rest as small tiles; 문의·후원 at the bottom.
+// Home (redesign 2026-10): two pillars, the 도감 (decks and cards) then 레코더; the rest as small tiles; 문의·후원 at the bottom.
 
 const COLLAGE = 6;   // phone shows the first 4
 
@@ -27,22 +29,23 @@ function Info() {
   const [dismissed, setDismissed] = useState(false);
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  // Desktop opens the deck search out in place; phones keep the modal (특이점 2026-10-08).
-  const [searchInline, setSearchInline] = useState(false);
+  const counts = useDexCounts();
+  const [picker, setPicker] = useState<"deck" | "card" | null>(null);
+  // Desktop opens the search out in place; phones keep the modal (특이점 2026-10-08). Cards search the same way (엘리스 2026-10-11).
+  const [searchInline, setSearchInline] = useState<"deck" | "card" | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   // The desktop search is a dropdown: a click anywhere outside it closes it.
   useEffect(() => {
     if (!searchInline) return;
     const onDown = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchInline(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchInline(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [searchInline]);
-  const openSearch = () => {
-    if (window.matchMedia("(min-width: 768px)").matches) setSearchInline(true);
-    else setPickerOpen(true);
+  const openSearch = (kind: "deck" | "card") => {
+    if (window.matchMedia("(min-width: 768px)").matches) setSearchInline(kind);
+    else setPicker(kind);
   };
 
   useEffect(() => {
@@ -67,7 +70,8 @@ function Info() {
   return (
     <div className="min-h-screen px-4 py-5 md:py-8 max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex flex-col gap-4 md:gap-5 text-gray-900 dark:text-white">
       <h1 className="sr-only">YGO Decks · 유희왕 마스터 듀얼 덱 도감과 전적 기록</h1>
-      <DeckPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={(id) => navigate(`/database/${id}`)} />
+      <DeckPickerModal open={picker === "deck"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/database/${id}`)} />
+      <CardPickerModal open={picker === "card"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/cards/${id}`)} />
 
       <div className="grid gap-4 md:gap-5 lg:grid-cols-[2fr_1fr]">
         {/* Pillar 1: the deck book */}
@@ -88,28 +92,37 @@ function Info() {
             })}
           </div>
           <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
-            <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-blue-400">덱 도감</span>
+            <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-blue-400">도감</span>
             {/* 17px on phones keeps the line whole down to 360px-wide screens (특이점 2026-10-07). */}
             <h2 id="home-dex" className="text-[17px] leading-6 sm:text-2xl md:text-3xl font-extrabold tracking-tight">
-              마스터 듀얼의{" "}
-              {popular ? <span className="tabular-nums">{popular.total || ""}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
-              개의 덱을, 한 곳에서.
+              덱{" "}
+              {counts ? <span className="tabular-nums">{counts.decks.toLocaleString()}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
+              개, 카드{" "}
+              {counts ? <span className="tabular-nums">{counts.cards.toLocaleString()}</span> : <span className="inline-block w-14 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
+              장을 한 곳에서.
             </h2>
-            {/* Opens a picker of real decks: choosing one goes straight to its page, so no search can miss.
+            {/* Opens a picker of real decks or cards: choosing one goes straight to its page, so no search can miss.
                 On desktop it drops down over the page from the search box instead of growing the card (참혈 2026-10-10). */}
-            <div ref={searchRef} className="relative">
-              <button
-                type="button"
-                onClick={openSearch}
-                aria-expanded={searchInline}
-                className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              >
-                <span aria-hidden="true">🔍</span>
-                <span className="flex-1">덱 이름으로 찾기</span>
-              </button>
+            <div ref={searchRef} className="relative grid grid-cols-2 gap-2">
+              {([["deck", "덱 이름으로 찾기", "덱 찾기"], ["card", "카드 이름으로 찾기", "카드 찾기"]] as const).map(([kind, label, short]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => openSearch(kind)}
+                  aria-expanded={searchInline === kind}
+                  className="flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                >
+                  <span aria-hidden="true">🔍</span>
+                  <span className="flex-1 whitespace-nowrap"><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span></span>
+                </button>
+              ))}
               {searchInline && (
                 <div className="absolute inset-x-0 top-0 z-30 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 p-3 shadow-xl">
-                  <DeckPickerModal inline open onClose={() => setSearchInline(false)} onPick={(id) => navigate(`/database/${id}`)} />
+                  {searchInline === "deck" ? (
+                    <DeckPickerModal inline open onClose={() => setSearchInline(null)} onPick={(id) => navigate(`/database/${id}`)} />
+                  ) : (
+                    <CardPickerModal inline open onClose={() => setSearchInline(null)} onPick={(id) => navigate(`/cards/${id}`)} />
+                  )}
                 </div>
               )}
             </div>

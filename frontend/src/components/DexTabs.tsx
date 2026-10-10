@@ -18,13 +18,19 @@ function loadCounts() {
   return pending;
 }
 
-/** The 도감's two books, decks and cards, as tabs with how many each holds. */
-export default function DexTabs() {
-  const { pathname } = useLocation();
+/** How many decks and cards the 도감 holds (null while loading). */
+export function useDexCounts() {
   const [counts, setCounts] = useState<Counts | null>(cached);
   useEffect(() => {
     if (!cached) loadCounts().then(setCounts);
   }, []);
+  return counts;
+}
+
+/** The 도감's two books, decks and cards, as tabs with how many each holds. */
+export default function DexTabs() {
+  const { pathname } = useLocation();
+  const counts = useDexCounts();
   const onCards = pathname.startsWith("/cards");
   const tab = (to: string, active: boolean, label: string, n: number | undefined, unit: string) => (
     <Link
