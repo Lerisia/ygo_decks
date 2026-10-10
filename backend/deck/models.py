@@ -228,6 +228,23 @@ class DeckAlias(models.Model):
     def __str__(self):
         return self.name
 
+class DeckCardGroup(models.Model):
+    """카드군 a site deck is built on. The recorder sends a card's vote to the decks of its card groups (once per
+    deck, at the strongest link); support cards outside these groups are set up separately."""
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="card_groups")
+    group = models.ForeignKey("carddb.CardGroup", on_delete=models.CASCADE, related_name="decks")
+    # 0..1 multiplier — lower for engines/splash themes so they don't outvote the main theme
+    weight = models.FloatField(default=1.0)
+
+    class Meta:
+        verbose_name = "덱 카드군"
+        verbose_name_plural = "덱 카드군"
+        constraints = [models.UniqueConstraint(fields=["deck", "group"], name="uniq_deck_card_group")]
+
+    def __str__(self):
+        return f"{self.deck.name}: {self.group}"
+
+
 class DeckArchetype(models.Model):
     """Card.archetype values (YGOPRODeck English names) that identify this deck.
     Used by the PC tracker to infer decks from card IDs; several decks may share an archetype."""

@@ -1082,3 +1082,36 @@ class EditorRoleTest(TestCase):
         self.client.force_authenticate(user=staff)
         self.assertEqual(self.client.get("/api/is_admin/").json(), {"is_admin": True, "can_edit_dex": True})
         self.assertEqual(self.client.put(f"/api/deck/{self.deck.id}/update_wiki/", {"wiki_content": "x"}, format="json").status_code, 200)
+
+
+class DeckCardGroupDraftTest(TestCase):
+    """Decks move from YGOPRODeck themes to 카드군: a group is picked when most of its members sit in the theme."""
+
+    def setUp(self):
+        from carddb.models import Card, CardGroup, CardGroupMember, MdPrint
+        from cardsite.models import LegacyTheme
+        from .models import DeckArchetype
+        self.blue = Deck.objects.create(name="푸른 눈", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.ss = Deck.objects.create(name="섬도희", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckArchetype.objects.create(deck=self.blue, name="Blue-Eyes", weight=1.0)
+        DeckArchetype.objects.create(deck=self.ss, name="Sky Striker", weight=0.8)
+        cards = {4007: "Blue-Eyes", 4008: "Blue-Eyes", 4009: "Blue-Eyes", 13670: "Sky Striker", 13671: "Sky Striker"}
+        for cid, theme in cards.items():
+            Card.objects.create(id=cid, category="monster", name_ja=str(cid), frame="effect")
+            MdPrint.objects.create(md_id=cid, card_id=cid)
+            LegacyTheme.objects.create(card_id=cid, archetype=theme)
+        self.be = CardGroup.objects.create(text="ブルーアイズ", name_ko="푸른 눈")
+        self.sky = CardGroup.objects.create(text="閃刀姫", name_ko="섬도희")
+        for cid in (4007, 4008):
+            CardGroupMember.objects.create(group=self.be, card_id=cid, how="name")
+        for cid in (13670, 13671):
+            CardGroupMember.objects.create(group=self.sky, card_id=cid, how="name")
+
+    def test_draft_and_apply_sure_links(self):
+        from .card_groups import apply, draft
+        from .models import DeckCardGroup
+        rows = {r["deck"]: r for r in draft()}
+        self.assertEqual((rows["푸른 눈"]["kind"], rows["푸른 눈"]["group_id"], rows["푸른 눈"]["coverage"]), ("core", self.be.id, 0.67))
+        self.assertEqual((rows["섬도희"]["kind"], rows["섬도희"]["group_id"]), ("sure", self.sky.id))
+        self.assertEqual(apply(list(rows.values())), 1)
+        self.assertEqual(list(DeckCardGroup.objects.values_list("deck__name", "group__text", "weight")), [("섬도희", "閃刀姫", 0.8)])

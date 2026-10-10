@@ -126,6 +126,17 @@ class DeckArchetypeAdmin(admin.ModelAdmin):
     autocomplete_fields = ("deck",)
 
 
+from .models import DeckCardGroup
+
+
+@admin.register(DeckCardGroup)
+class DeckCardGroupAdmin(admin.ModelAdmin):
+    list_display = ("deck", "group", "weight")
+    list_editable = ("weight",)
+    search_fields = ("deck__name", "group__text", "group__name_ko")
+    autocomplete_fields = ("deck", "group")
+
+
 from .models import DeckInferencePriority
 
 

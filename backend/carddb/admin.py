@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Card, CardText, MdArt, MdPrint, Override, Product
+from .models import Card, CardGroup, CardText, MdArt, MdPrint, Override, Product
 
 
 class CardTextInline(admin.StackedInline):
@@ -37,3 +37,9 @@ class ProductAdmin(admin.ModelAdmin):
 
 admin.site.register(MdArt)
 admin.site.register(Override)
+
+
+@admin.register(CardGroup)
+class CardGroupAdmin(admin.ModelAdmin):
+    list_display = ("text", "name_ko", "name_source", "needs_review")
+    search_fields = ("text", "name_ko", "reading")
