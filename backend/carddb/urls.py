@@ -3,6 +3,7 @@ from django.urls import path
 from . import dex, views
 
 urlpatterns = [
+    path("dex-counts/", dex.dex_counts),
     path("cards/", dex.cards),
     path("cards/options/", dex.card_options),
     path("cards/<int:card_id>/", dex.card),

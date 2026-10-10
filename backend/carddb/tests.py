@@ -800,6 +800,11 @@ class CardDexApiTest(TestCase):
         CardGroupMember.objects.create(group=g, card=self.quick, how="removed")
         self.assertEqual(self.ids(group=g.id), [3, 1])
 
+    def test_dex_counts(self):
+        from deck.models import Deck
+        Deck.objects.create(name="덱", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.assertEqual(self.client.get("/api/carddb/dex-counts/").json(), {"decks": 1, "cards": 6})
+
     def test_options_give_korean_labels_and_reviewed_groups(self):
         from .models import CardGroup, CardGroupMember
         ok = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")

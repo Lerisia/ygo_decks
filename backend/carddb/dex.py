@@ -111,6 +111,14 @@ def cards(request):
     })
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def dex_counts(request):
+    """How many decks and cards the 도감 holds (its tabs and the home page show them)."""
+    from deck.models import Deck
+    return Response({"decks": Deck.objects.count(), "cards": Card.objects.filter(has_art()).count()})
+
+
 def _options(labels):
     return [{"value": k, "label": v} for k, v in labels.items()]
 

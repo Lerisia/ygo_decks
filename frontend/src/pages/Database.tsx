@@ -4,6 +4,7 @@ import EngineBadge from "@/components/EngineBadge";
 import UpdateBadge from "@/components/UpdateBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
+import DexTabs from "@/components/DexTabs";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 
@@ -259,6 +260,7 @@ export default function DatabasePage() {
 
   return (
     <div className="h-auto min-h-screen px-4 py-4 text-center">
+      <DexTabs />
       <DatabaseTrackerPromo />
 
       {/* Search decks */}

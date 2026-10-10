@@ -27,6 +27,8 @@ interface PickerPanelProps {
   viewKey: string;
   defaultView?: View;
   imageFit?: "contain" | "cover";
+  /** Tailwind aspect class of a grid picture (cards are taller than they are wide). */
+  imageAspect?: string;
   /** "inline": drawn in the page (wider grid, fixed height, no overlay); "modal": inside PickerModal. */
   variant?: "modal" | "inline";
 }
@@ -89,6 +91,7 @@ export default function PickerModal({ open, ...panel }: PickerModalProps) {
 export function PickerPanel({
   onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
   idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView = "grid", imageFit = "contain",
+  imageAspect = "aspect-square",
   variant = "modal",
 }: PickerPanelProps) {
   const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
@@ -198,7 +201,7 @@ export function PickerPanel({
             <div className={`grid gap-2 ${inline ? "grid-cols-5 lg:grid-cols-8" : "grid-cols-3 sm:grid-cols-4"}`}>
               {drawn.map((it) => (
                 <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition" title={it.name}>
-                  {thumb(it, "w-full aspect-square")}
+                  {thumb(it, `w-full ${imageAspect}`)}
                   <p className="text-[10px] sm:text-xs mt-0.5 break-words leading-tight">{it.name}</p>
                 </button>
               ))}
