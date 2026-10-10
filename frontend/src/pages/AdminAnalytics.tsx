@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ColumnChart } from "@/components/charts";
 import { isAdmin } from "@/api/accountApi";
 import { getAnalyticsSummary, type AnalyticsSummary } from "@/api/analyticsApi";
 
@@ -74,18 +74,7 @@ export default function AdminAnalytics() {
                   <span className="ml-2 normal-case font-normal">· 페이지뷰 {rangeTotals.views.toLocaleString()} · 체류 {fmtDuration(rangeTotals.dwell)}</span>
                 )}
               </h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.daily} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    formatter={(v: number) => [v.toLocaleString(), "방문자"]}
-                    labelFormatter={(d) => String(d)}
-                    contentStyle={{ fontSize: "0.8rem" }}
-                  />
-                  <Bar dataKey="visitors" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ColumnChart data={data.daily} xKey="date" yKey="visitors" valueName="방문자" xTick={(d) => d.slice(5)} />
             </section>
 
             <section>

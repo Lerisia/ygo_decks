@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Tooltip, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   getRecordGroupStatisticsFull, getRecordGroupRankHistory, getUserStatisticsFull, getUserRecordGroups, getSheetContributors,
   type SheetContributor, type StatsPeriod,
 } from "@/api/toolApi";
 import { OTHER_DECK_IMAGE, UNKNOWN_DECK_IMAGE } from "@/utils/deckImages";
-import { BarStat, CoinSplit, RankIcon, pctText, rateTone } from "@/components/records/SheetBits";
-import { rankIconSrc } from "@/utils/rankUtils";
+import { RankIcon } from "@/components/records/SheetBits";
+import { BarStat, CoinSplit, MeterBar, RankCurve, RANK_SHORT_LABELS, rankToNumeric, pctText, rateTone } from "@/components/charts";
 
 interface DeckInfo {
   id: number;
@@ -56,45 +55,6 @@ interface RankHistoryItem {
   score: number | null;
   result: string;
 }
-
-const RANK_ORDER = [
-  "rookie2", "rookie1",
-  "bronze5", "bronze4", "bronze3", "bronze2", "bronze1",
-  "silver5", "silver4", "silver3", "silver2", "silver1",
-  "gold5", "gold4", "gold3", "gold2", "gold1",
-  "platinum5", "platinum4", "platinum3", "platinum2", "platinum1",
-  "diamond5", "diamond4", "diamond3", "diamond2", "diamond1",
-  "master5", "master4", "master3", "master2", "master1",
-];
-
-const RANK_LABELS: Record<string, string> = {
-  rookie2: "루키 2", rookie1: "루키 1",
-  bronze5: "브론즈 5", bronze4: "브론즈 4", bronze3: "브론즈 3", bronze2: "브론즈 2", bronze1: "브론즈 1",
-  silver5: "실버 5", silver4: "실버 4", silver3: "실버 3", silver2: "실버 2", silver1: "실버 1",
-  gold5: "골드 5", gold4: "골드 4", gold3: "골드 3", gold2: "골드 2", gold1: "골드 1",
-  platinum5: "플래 5", platinum4: "플래 4", platinum3: "플래 3", platinum2: "플래 2", platinum1: "플래 1",
-  diamond5: "다이아 5", diamond4: "다이아 4", diamond3: "다이아 3", diamond2: "다이아 2", diamond1: "다이아 1",
-  master5: "마스터 5", master4: "마스터 4", master3: "마스터 3", master2: "마스터 2", master1: "마스터 1",
-};
-
-const rankToNumeric = (rank: string, wins: number | null): number => {
-  const idx = RANK_ORDER.indexOf(rank);
-  if (idx === -1) return 0;
-  return idx + (wins ?? 0) / 8;
-};
-
-// Rank axis label with the tier's emblem in front.
-const RankTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value?: number } }) => {
-  const rank = RANK_ORDER[payload?.value ?? -1];
-  if (!rank) return null;
-  const icon = rankIconSrc(rank);
-  return (
-    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
-      {icon && <image href={icon} x={-60} y={-8} width={16} height={16} />}
-      <text x={-2} y={0} dy={3.5} fontSize={10} textAnchor="end" className="fill-gray-500 dark:fill-gray-400">{RANK_LABELS[rank]}</text>
-    </g>
-  );
-};
 
 const isUnknownDeck = (entry: { deck: DeckInfo | null; custom_name?: string | null }) => !entry.deck && !entry.custom_name;
 const getOppDeckName = (entry: { deck: DeckInfo | null; custom_name?: string | null }) => entry.deck?.name || entry.custom_name || "모름/기타";
@@ -180,9 +140,7 @@ const MyDecksCard = ({ stats }: { stats: StatisticsData }) => {
           <div key={e.deck.id} className="flex items-center gap-2 text-[13px]">
             <img src={e.deck.cover_image_small || UNKNOWN_DECK_IMAGE} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
             <span className="w-24 shrink-0 break-words leading-tight">{e.deck.name}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${e.ratio}%` }} />
-            </div>
+            <MeterBar value={e.ratio} className="flex-1" />
             <b className="w-10 text-right">{e.count}판</b>
             <span className={`w-10 text-right ${rateTone(e.win_rate)}`}>{pctText(e.win_rate)}</span>
           </div>
@@ -322,7 +280,7 @@ const StatisticsPage = () => {
   const rankData = rankHistory.filter((m) => m.rank).map((m, i) => ({
     index: i + 1,
     value: rankToNumeric(m.rank!, m.wins),
-    label: `${RANK_LABELS[m.rank!] || m.rank}${m.wins != null ? ` · ${m.wins}승` : ""}`,
+    label: `${RANK_SHORT_LABELS[m.rank!] || m.rank}${m.wins != null ? ` · ${m.wins}승` : ""}`,
   }));
   const scoreData = rankHistory.filter((m) => m.score != null).map((m, i) => ({ index: i + 1, value: m.score!, label: `${m.score}점` }));
   useEffect(() => {
@@ -370,14 +328,6 @@ const StatisticsPage = () => {
   const showDeckSwitch = stats.my_deck_stats.length > 1 || byDeck;
 
   const curveData = curve === "rank" ? rankData : scoreData;
-  const yDomain: [number, number] = (() => {
-    if (curveData.length === 0) return [0, 1];
-    const vals = curveData.map((d) => d.value);
-    if (curve === "rank") return [Math.max(0, Math.floor(Math.min(...vals))), Math.min(RANK_ORDER.length - 1, Math.ceil(Math.max(...vals)) + 0)];
-    const lo = Math.min(...vals), hi = Math.max(...vals), pad = Math.max(10, (hi - lo) * 0.1);
-    return [Math.floor((lo - pad) / 10) * 10, Math.ceil((hi + pad) / 10) * 10];
-  })();
-  const rankTicks = curve === "rank" ? Array.from({ length: yDomain[1] - yDomain[0] + 1 }, (_, i) => yDomain[0] + i) : undefined;
   const firstRank = rankHistory.find((m) => m.rank)?.rank;
   const lastRank = [...rankHistory].reverse().find((m) => m.rank)?.rank;
 
@@ -497,7 +447,7 @@ const StatisticsPage = () => {
               title={curve === "rank" ? "랭크 변화 · 모든 덱" : "점수 변화 · 모든 덱"}
               aside={curve === "rank" && firstRank && lastRank ? (
                 <span className="inline-flex items-center gap-1">
-                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_LABELS[lastRank]}
+                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_SHORT_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_SHORT_LABELS[lastRank]}
                 </span>
               ) : `${curveData.length}판`}
             >
@@ -508,28 +458,7 @@ const StatisticsPage = () => {
                   <button type="button" onClick={() => setCurve("score")} className={chip(curve === "score")}>점수</button>
                 </div>
               )}
-              <ResponsiveContainer width="100%" height={210}>
-                <AreaChart data={curveData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#e5e7eb" strokeOpacity={0.7} />
-                  <XAxis dataKey="index" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis
-                    domain={yDomain}
-                    ticks={rankTicks}
-                    allowDecimals={curve !== "rank"}
-                    tickFormatter={(v: number) => (curve === "rank" ? RANK_LABELS[RANK_ORDER[v]] || "" : String(v))}
-                    tick={curve === "rank" ? <RankTick /> : { fontSize: 10 }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={curve === "rank" ? 64 : 42}
-                  />
-                  <Tooltip
-                    formatter={(_: number, __: string, props: { payload?: { label?: string } }) => [props.payload?.label ?? "", curve === "rank" ? "랭크" : "점수"]}
-                    labelFormatter={(v: number) => `${v}번째 듀얼`}
-                    contentStyle={{ fontSize: "0.8rem" }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="#2563eb" fillOpacity={0.1} dot={false} activeDot={{ r: 4 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <RankCurve data={curveData} mode={curve} />
               <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">가로는 듀얼 순서{curve === "rank" ? ", 세로는 랭크 (칸 사이는 승수)" : ""}</p>
             </Card>
           )}
@@ -543,7 +472,7 @@ const StatisticsPage = () => {
               title={curve === "rank" ? "랭크 변화" : "점수 변화"}
               aside={curve === "rank" && firstRank && lastRank ? (
                 <span className="inline-flex items-center gap-1">
-                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_LABELS[lastRank]}
+                  <RankIcon rank={firstRank} className="w-4 h-4" />{RANK_SHORT_LABELS[firstRank]} → <RankIcon rank={lastRank} className="w-4 h-4" />{RANK_SHORT_LABELS[lastRank]}
                 </span>
               ) : `${curveData.length}판`}
             >
@@ -554,28 +483,7 @@ const StatisticsPage = () => {
                   <button type="button" onClick={() => setCurve("score")} className={chip(curve === "score")}>점수</button>
                 </div>
               )}
-              <ResponsiveContainer width="100%" height={210}>
-                <AreaChart data={curveData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#e5e7eb" strokeOpacity={0.7} />
-                  <XAxis dataKey="index" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis
-                    domain={yDomain}
-                    ticks={rankTicks}
-                    allowDecimals={curve !== "rank"}
-                    tickFormatter={(v: number) => (curve === "rank" ? RANK_LABELS[RANK_ORDER[v]] || "" : String(v))}
-                    tick={curve === "rank" ? <RankTick /> : { fontSize: 10 }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={curve === "rank" ? 64 : 42}
-                  />
-                  <Tooltip
-                    formatter={(_: number, __: string, props: { payload?: { label?: string } }) => [props.payload?.label ?? "", curve === "rank" ? "랭크" : "점수"]}
-                    labelFormatter={(v: number) => `${v}번째 듀얼`}
-                    contentStyle={{ fontSize: "0.8rem" }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="#2563eb" fillOpacity={0.1} dot={false} activeDot={{ r: 4 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <RankCurve data={curveData} mode={curve} />
               <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">가로는 듀얼 순서{curve === "rank" ? ", 세로는 랭크 (칸 사이는 승수)" : ""}</p>
             </Card>
           )}

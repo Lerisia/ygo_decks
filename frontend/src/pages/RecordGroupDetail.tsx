@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRecordGroupMatches, addMatchToRecordGroup, deleteMatchRecord, deleteRecordGroup, getRecordGroupStatistics,
          updateRecordGroupName, updateMatchRecord, updateRecordGroupVisibility, type SheetSummary } from "@/api/toolApi";
-import { ResultChips, BarStat, CoinSplit, KebabMenu, RankIcon, confirmSheetDelete, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/records/SheetBits";
+import { KebabMenu, RankIcon, confirmSheetDelete } from "@/components/records/SheetBits";
+import { ResultChips, BarStat, CoinSplit, rate, pctText, COIN_FRONT, COIN_BACK } from "@/components/charts";
 import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";

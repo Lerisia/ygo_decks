@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchDeckResult, DeckData } from "../api/deckApi";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
-import { statPlot, statText } from "@/utils/deckStats";
+import { StatRadar } from "@/components/charts";
 
 const fieldMapping: { [key: string]: string } = {
   s: "strength",
@@ -25,14 +24,6 @@ const expandAnswerKey = (answerKey: string): string => {
     })
     .join("|");
 };
-
-const statLabels = [
-  { key: "consistency", label: "안정성" },
-  { key: "breakthrough", label: "돌파력" },
-  { key: "deck_space", label: "덱 스페이스" },
-  { key: "recovery", label: "복구력" },
-  { key: "interruption", label: "견제력" },
-] as const;
 
 function ResultPage() {
   const [searchParams] = useSearchParams();
@@ -81,13 +72,6 @@ function ResultPage() {
     );
   }
 
-  const hasStats = result?.stats && statLabels.some(({ key }) => result.stats?.[key] != null);
-  const chartData = statLabels.map(({ key, label }) => ({
-    stat: label,
-    value: statPlot(result?.stats?.[key]),
-    raw: result?.stats?.[key],
-  }));
-
   const tags = [
     ...(result?.performance_tags || []),
     ...(result?.aesthetic_tags || []),
@@ -106,46 +90,7 @@ function ResultPage() {
         />
       )}
 
-      <div className="mt-6 mx-auto relative">
-        <ResponsiveContainer width="100%" height={320}>
-          <RadarChart data={hasStats ? chartData : statLabels.map(({ label }) => ({ stat: label, value: 0 }))} outerRadius="75%">
-            <PolarGrid />
-            <PolarAngleAxis
-              dataKey="stat"
-              tick={({ x, y, payload, index }: any) => {
-                if (!hasStats) {
-                  return (
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-gray-400" style={{ fontSize: 15 }}>
-                      {payload.value}
-                    </text>
-                  );
-                }
-                const raw = chartData[index]?.raw;
-                const display = `${payload.value} ${statText(raw)}`;
-                return (
-                  <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-current" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {display}
-                  </text>
-                );
-              }}
-            />
-            <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
-            <Radar
-              dataKey="value"
-              fill={hasStats ? "#3b82f6" : "#9ca3af"}
-              fillOpacity={hasStats ? 0.4 : 0.15}
-              stroke={hasStats ? "#3b82f6" : "#9ca3af"}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-        {!hasStats && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-gray-400 dark:text-gray-500 text-sm font-semibold bg-white/70 dark:bg-gray-900/70 px-3 py-1 rounded">
-              정보 없음
-            </span>
-          </div>
-        )}
-      </div>
+      <StatRadar stats={result?.stats} height={320} className="mt-6 mx-auto" />
 
       <div className="mt-6 bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 space-y-2 text-sm">
         <div className="flex justify-between">

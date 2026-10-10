@@ -20,6 +20,7 @@ import Mypage from "./pages/Mypage";
 import PointsHistory from "./pages/PointsHistory";
 import AdminPointsGrant from "./pages/AdminPointsGrant";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminCharts from "./pages/AdminCharts";
 import { usePageTracking } from "./hooks/usePageTracking";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
 import AdminIndex from "./pages/AdminIndex";
@@ -151,6 +152,7 @@ function App() {
           <Route path="/manage/duchmind-words" element={<AdminDuchMindWords />} />
           <Route path="/manage/points-grant" element={<AdminPointsGrant />} />
           <Route path="/manage/analytics" element={<AdminAnalytics />} />
+          <Route path="/manage/charts" element={<AdminCharts />} />
           <Route path="/duchmind-wordpacks" element={<DuchMindWordPacks />} />
           <Route path="/duchmind-wordpacks/:packId" element={<DuchMindWordPackDetail />} />
           <Route path="/mypage/avatar" element={<MyAvatar />} />

@@ -20,6 +20,12 @@ const tiles = [
     description: "일 방문자·페이지뷰·체류 시간 요약",
   },
   {
+    to: "/manage/charts",
+    icon: "📊",
+    label: "그래프 견본",
+    description: "사이트의 모든 그래프를 낮·밤으로 한눈에",
+  },
+  {
     to: "/manage/card-icons",
     icon: "🎴",
     label: "아이콘 관리",
