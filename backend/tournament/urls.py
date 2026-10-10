@@ -1,5 +1,7 @@
 from django.urls import path
 
+from .notices import my_announcements
+
 from .views import (update_cover, cancel_tournament, check_password, team_join, team_leave, team_order,
                     report_board, confirm_board, dispute_board, override_board, set_lineup,
                     deck_card_add, deck_card_remove, deck_submission,
@@ -11,6 +13,7 @@ from .views import (update_cover, cancel_tournament, check_password, team_join, 
 
 urlpatterns = [
     path("create/", create_tournament),
+    path("my-announcements/", my_announcements),
     path("", list_tournaments),
     path("<int:tournament_id>/", tournament_detail),
     path("<int:tournament_id>/register/", register),

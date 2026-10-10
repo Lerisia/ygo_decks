@@ -66,6 +66,7 @@ import EmailVerified from "./pages/EmailVerified";
 import Tracker from "./pages/Tracker";
 import NoticePopup from "./components/NoticePopup";
 import StaffInquiryAlert from "./components/StaffInquiryAlert";
+import TournamentNoticePopup from "./components/TournamentNoticePopup";
 
 function App() {
   const { pathname } = useLocation();
@@ -96,6 +97,7 @@ function App() {
       )}
       <NoticePopup disabled={drawingMode || inMultiplayerRoom} />
       <StaffInquiryAlert disabled={drawingMode || inMultiplayerRoom} />
+      <TournamentNoticePopup disabled={drawingMode || inMultiplayerRoom} />
       {keepDeckList && (
         <div hidden={!onDeckList}>
           <DatabasePage />
