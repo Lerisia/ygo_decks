@@ -1,4 +1,4 @@
-"""Seed DeckArchetype from the deck→EN theme map used for video selection, matched against Card.archetype.
+"""Seed DeckArchetype from the deck→EN theme map used for video selection, matched against the site's card themes.
 
 usage: manage.py seed_deck_archetypes [--map PATH] [--dry-run]
 Existing rows are kept; only missing (deck, name) pairs are added.
@@ -7,12 +7,12 @@ import json
 
 from django.core.management.base import BaseCommand
 
-from card.models import Card
+from cardsite.models import LegacyTheme
 from deck.models import Deck, DeckArchetype
 
 DEFAULT_MAP = "/home/elyss/.cache/deckwiki/deck_names_map.json"
 
-# deck name → [(archetype, weight)] for decks whose EN theme name isn't a Card.archetype value
+# deck name → [(archetype, weight)] for decks whose EN theme name isn't a card theme value
 MANUAL = {
     "천년 엑조디아": [("Exodia", 1.0)],
     "이빌트윈": [("Evil★Twin", 1.0), ("Live☆Twin", 1.0)],
@@ -26,7 +26,7 @@ MANUAL = {
 
 
 class Command(BaseCommand):
-    help = "Seed DeckArchetype rows from deck_names_map.json + Card.archetype"
+    help = "Seed DeckArchetype rows from deck_names_map.json + the site's card themes"
 
     def add_arguments(self, parser):
         parser.add_argument("--map", default=DEFAULT_MAP)
@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         name_map = json.load(open(opts["map"], encoding="utf-8"))
-        archetypes = set(Card.objects.exclude(archetype__isnull=True).exclude(archetype="").values_list("archetype", flat=True).distinct())
+        archetypes = set(LegacyTheme.objects.exclude(archetype="").values_list("archetype", flat=True).distinct())
         added, unmatched = [], []
         for deck in Deck.objects.all():
             pairs = list(MANUAL.get(deck.name, []))
@@ -50,7 +50,7 @@ class Command(BaseCommand):
                 continue
             for arch, w in pairs:
                 if arch not in archetypes:
-                    self.stderr.write(f"  ! {deck.name}: '{arch}' is not a Card.archetype value, skipped")
+                    self.stderr.write(f"  ! {deck.name}: '{arch}' is not a card theme value, skipped")
                     continue
                 if DeckArchetype.objects.filter(deck=deck, name=arch).exists():
                     continue
