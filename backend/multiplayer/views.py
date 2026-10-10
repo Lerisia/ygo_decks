@@ -4,10 +4,13 @@ import time
 from django.contrib.auth.hashers import make_password, check_password
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.response import Response
+
+from carddb.models import has_art
 
 from .models import Room, RoomPlayer, DuchMindWord
 from .serializers import (
@@ -998,7 +1001,7 @@ def _card_item(c):
 
 def _cards_with_art():
     from carddb.models import Card
-    return Card.objects.filter(md_prints__arts__isnull=False).distinct()
+    return Card.objects.filter(has_art())
 
 
 @api_view(["GET"])
@@ -1083,7 +1086,7 @@ def dm_list_words(request):
     """List a system pack's words (admin maintenance UI). Defaults to the
     default pack; pass ?pack_id= to target 중급/고급/etc."""
     pack = _admin_pack(request)
-    qs = DuchMindWord.objects.filter(pack=pack).exclude(new_card=None).select_related("new_card") if pack else DuchMindWord.objects.none()
+    qs = DuchMindWord.objects.filter(pack=pack).filter(has_art("new_card_id")).select_related("new_card") if pack else DuchMindWord.objects.none()
     items = [
         {
             **_card_item(w.new_card), "id": w.id, "card_pk": w.new_card_id,
@@ -1119,7 +1122,7 @@ def dm_add_word(request):
     if not card_pk:
         return Response({"error": "card_pk가 필요합니다."}, status=400)
     try:
-        card = Card.objects.get(pk=int(card_pk))
+        card = _cards_with_art().get(pk=int(card_pk))
     except (Card.DoesNotExist, ValueError, TypeError):
         return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
     word, created = DuchMindWord.objects.get_or_create(
@@ -1217,7 +1220,7 @@ def _pack_summary(p, request_user=None):
         "is_public": p.is_public,
         "is_mine": (request_user is not None and p.owner_id == getattr(request_user, "id", None)),
         "can_edit": (request_user is not None and _pack_can_edit(p, request_user)),
-        "entry_count": p.entries.count(),
+        "entry_count": p.entries.filter(Q(pokemon__isnull=False) | has_art("new_card_id")).count(),
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
 
@@ -1300,7 +1303,7 @@ def dm_pack_detail(request, pack_id):
             for w in entries
         ]
     else:
-        entries = pack.entries.select_related("new_card").exclude(new_card__isnull=True)
+        entries = pack.entries.select_related("new_card").filter(has_art("new_card_id"))
         items = [
             {**_card_item(w.new_card), "id": w.id, "card_pk": w.new_card_id, "enabled": w.enabled}
             for w in entries
@@ -1378,7 +1381,7 @@ def dm_pack_add_card(request, pack_id):
         }, status=201 if created else 200)
     else:
         try:
-            card = Card.objects.get(pk=int(card_pk))
+            card = _cards_with_art().get(pk=int(card_pk))
         except (Card.DoesNotExist, ValueError, TypeError):
             return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
         word, created = DuchMindWord.objects.get_or_create(
@@ -1456,7 +1459,7 @@ def dm_pack_import(request, pack_id):
     else:
         used = set(pack.entries.exclude(new_card__isnull=True).values_list("new_card_id", flat=True))
         for n in names:
-            c = Card.objects.filter(name_ko=n).first()
+            c = _cards_with_art().filter(name_ko=n).first()
             if not c:
                 not_found.append(n)
                 continue
@@ -1484,7 +1487,7 @@ def dm_pack_export(request, pack_id):
     if getattr(pack, "series", "yugioh") == "pokemon":
         names = list(pack.entries.select_related("pokemon").values_list("pokemon__name_ko", flat=True))
     else:
-        names = list(pack.entries.values_list("new_card__name_ko", flat=True))
+        names = list(pack.entries.filter(has_art("new_card_id")).values_list("new_card__name_ko", flat=True))
     return Response({
         "name": pack.name,
         "csv": ",".join(n for n in names if n),

@@ -1873,20 +1873,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 for c in chosen
             ]
         else:
-            # Dedupe by Korean name so two cards sharing a name don't get a double chance.
-            raw = (
-                DuchMindWord.objects.filter(pack=pack, enabled=True, new_card__isnull=False)
-                .order_by("new_card_id")
-                .values("new_card_id", "new_card__name_ko")
-            )
-            seen_names: set = set()
-            candidates: list = []
-            for r in raw:
-                kr = r["new_card__name_ko"]
-                if kr in seen_names:
-                    continue
-                seen_names.add(kr)
-                candidates.append(r)
+            candidates = dm.card_word_candidates(pack)
             if not candidates:
                 return None
             used = set(state.get("used_card_ids", []))

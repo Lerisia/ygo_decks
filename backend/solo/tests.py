@@ -192,3 +192,25 @@ class SoloDrawTest(FreshArtMixin, TestCase):
         self.client.force_authenticate(other)
         out = self.client.post(f"/api/solo/drawings/{drawing.id}/give_up/", {}, format="json").json()
         self.assertEqual((out["word"], out["card_image_url"]), (first["name"], first["image_url"]))
+
+
+class CardsOutsideMasterDuelTest(FreshArtMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.user = get_user_model().objects.create_user(email="ou@test.com", username="outsider", password="pass1234")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.pack = DuchMindWordPack.objects.create(name="중급")
+        for i, name in enumerate(("블랙 매지션", "푸른 눈의 백룡", "붉은 눈의 흑룡")):
+            DuchMindWord.objects.create(pack=self.pack, new_card=make_card(8000 + i, name))
+        DuchMindWord.objects.create(pack=self.pack, new_card=make_card(5392, "천재지변", art=False))
+
+    def test_twenty_pool_leaves_them_out(self):
+        self.assertEqual(_pool_card_ids("중급"), [8000, 8001, 8002])
+
+    def test_drawing_offer_leaves_them_out(self):
+        for _ in range(5):
+            from .models import SoloDailyPoints
+            SoloDailyPoints.objects.filter(user=self.user).update(pending_offer_cards=[], pending_offer_token="")
+            offer = self.client.post("/api/solo/start_draw/", {}, format="json").json()
+            self.assertEqual(sorted(c["card_id"] for c in offer["cards"]), [8000, 8001, 8002])

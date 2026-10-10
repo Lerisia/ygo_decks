@@ -160,3 +160,8 @@ class LegacyCard(models.Model):
     old_card_id = models.CharField(max_length=100, blank=True, help_text="옛 card_id (YGOPRODeck 패스코드×100+그림 번호)")
     card = models.ForeignKey(Card, null=True, blank=True, on_delete=models.SET_NULL, related_name="legacy_cards")
     how = models.CharField(max_length=8, choices=How.choices, default=How.NONE)
+
+
+def has_art(card_field="pk"):
+    """Filter for cards (or rows pointing at one) with Master Duel art — the site leaves out cards outside Master Duel."""
+    return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))

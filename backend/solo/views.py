@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from avatar.serializers import CardIconSerializer, BorderSerializer
 from avatar.views import _resolve_default_icon, _resolve_default_border
 from carddb.display import art_url, display_name
-from carddb.models import Card
+from carddb.models import Card, has_art
 from multiplayer.models import DuchMindWord, DuchMindWordPack
 from user.points import award_points
 
@@ -243,6 +243,7 @@ def start_draw(request):
         pool = sorted(set(
             DuchMindWord.objects
             .filter(pack=pack, enabled=True, new_card__isnull=False)
+            .filter(has_art("new_card_id"))
             .values_list("new_card_id", flat=True)
         ))
         if len(pool) < 3:

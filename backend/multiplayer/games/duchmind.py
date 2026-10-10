@@ -436,3 +436,22 @@ def is_round_complete(state):
 def is_game_over(state):
     """Whether all rounds are done (called after a turn ends)."""
     return state.get("round", 0) >= state.get("total_rounds", DEFAULT_TOTAL_ROUNDS) and is_round_complete(state)
+
+
+def card_word_candidates(pack):
+    """Enabled card words of the pack that can be drawn, one per Korean name."""
+    from carddb.models import has_art
+    from ..models import DuchMindWord
+    rows = (
+        DuchMindWord.objects.filter(pack=pack, enabled=True, new_card__isnull=False)
+        .filter(has_art("new_card_id"))
+        .order_by("new_card_id")
+        .values("new_card_id", "new_card__name_ko")
+    )
+    seen, out = set(), []
+    for r in rows:
+        if r["new_card__name_ko"] in seen:
+            continue
+        seen.add(r["new_card__name_ko"])
+        out.append(r)
+    return out

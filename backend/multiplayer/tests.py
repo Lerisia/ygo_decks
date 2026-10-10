@@ -62,3 +62,37 @@ class QuizQuestionNewCardTest(TestCase):
         self.assertNotIn("그림 없는 카드", public["choices"])
         self.assertEqual(url, f"/media/cards/art/common/{public['card_id']}.webp")
         self.assertTrue(os.path.exists(os.path.join(media, f"cards/quiz/8x8/{public['card_id']}.jpg")))
+
+
+class CardsOutsideMasterDuelTest(TestCase):
+    def setUp(self):
+        from carddb import display
+        display.forget_art()
+        self.addCleanup(display.forget_art)
+        self.user = get_user_model().objects.create_user(email="o@test.com", username="outside", password="pass1234")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.pack = DuchMindWordPack.objects.create(name="내 단어장", owner=self.user)
+        md = Card.objects.create(id=4041, category="monster", name_ja="ブラック・マジシャン", name_ko="블랙 매지션", frame="normal")
+        MdPrint.objects.create(md_id=4041, card=md)
+        MdArt.objects.create(md_print_id=4041, version="common", image="cards/art/common/4041.webp")
+        self.ocg_only = Card.objects.create(id=5392, category="spell", name_ja="天変地異", name_ko="천재지변", frame="spell")
+        DuchMindWord.objects.create(pack=self.pack, new_card=md)
+        DuchMindWord.objects.create(pack=self.pack, new_card=self.ocg_only)
+
+    def test_pack_shows_and_exports_only_master_duel_cards(self):
+        r = self.client.get(f"/api/multiplayer/duchmind/packs/{self.pack.id}/").json()
+        self.assertEqual([e["card_pk"] for e in r["entries"]], [4041])
+        self.assertEqual(r["pack"]["entry_count"], 1)
+        self.assertEqual(self.client.get(f"/api/multiplayer/duchmind/packs/{self.pack.id}/export/").json()["csv"], "블랙 매지션")
+
+    def test_cannot_add_a_card_outside_master_duel(self):
+        url = f"/api/multiplayer/duchmind/packs/{self.pack.id}"
+        r = self.client.post(f"{url}/import/", {"text": "천재지변"}, format="json").json()
+        self.assertEqual(r["not_found"], ["천재지변"])
+        DuchMindWord.objects.filter(new_card=self.ocg_only).delete()
+        self.assertEqual(self.client.post(f"{url}/add-card/", {"card_pk": 5392}, format="json").status_code, 404)
+
+    def test_word_options_skip_cards_outside_master_duel(self):
+        from .games.duchmind import card_word_candidates
+        self.assertEqual([c["new_card_id"] for c in card_word_candidates(self.pack)], [4041])
