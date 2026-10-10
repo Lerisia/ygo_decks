@@ -55,11 +55,11 @@ const winRateTint = (rate: number): { cls: string; mix?: string } => {
 
 // Slices are plain colours (metallic gold/silver/bronze, then rainbow for 4–10, near-black for the rest) and each deck's
 // picture sits in a small circle on the pie's edge, so ranks read at a glance (특이점 2026-10-10).
-// Metal: a darker base with one soft highlight band — enough to read as metal without a cheap shine.
+// Metal: a gentle highlight band on a near-flat base — the first, stronger sheen read as too flashy (특이점 2026-10-10).
 const PODIUM = [
-  { stops: ["#b8860b", "#e3b84a", "#f8e2a0", "#d9a93a", "#a87a12"], solid: "#d4a72c" },
-  { stops: ["#8e949c", "#c9cdd3", "#f4f5f7", "#bfc3c9", "#858b94"], solid: "#b4b9c0" },
-  { stops: ["#8f5228", "#c9874f", "#efc09a", "#bd7a45", "#7f4620"], solid: "#c07a46" },
+  { stops: ["#c79a2e", "#d6ab42", "#e4c063", "#d5a940", "#c4962c"], solid: "#d4a72c" },
+  { stops: ["#a5abb3", "#b8bdc4", "#cdd1d6", "#b6bbc2", "#a2a8b0"], solid: "#b4b9c0" },
+  { stops: ["#ad6a3c", "#bd7a4a", "#cf9266", "#bb7747", "#a9663a"], solid: "#c07a46" },
 ];
 const PODIUM_OFFSETS = ["0%", "38%", "52%", "68%", "100%"];
 const RAINBOW = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#4f46e5", "#9333ea"];
