@@ -287,7 +287,7 @@ class UploadRecord(models.Model):
 
 class CardDetection(models.Model):
     record = models.ForeignKey(UploadRecord, on_delete=models.CASCADE)
-    card = models.ForeignKey(Card, on_delete=models.CASCADE)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, null=True, blank=True)
     new_card = models.ForeignKey("carddb.Card", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     confidence = models.FloatField()
     illust_image = models.ImageField(upload_to='illusts/')

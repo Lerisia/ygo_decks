@@ -111,18 +111,30 @@ def predict_card_api(request):
     except Exception as e:
         return Response({"error": f"Prediction failed: {str(e)}"}, status=500)
 
+    from carddb.display import art_url, display_name
     card_id, confidence = predict_card_from_bytes(image_bytes)
-    card = Card.objects.filter(card_id=card_id).first()
+    card = _scanned_cards([card_id]).get(str(card_id))
 
     if not card:
         return Response({"error": f"Card ID {card_id} not found in DB."}, status=404)
 
     return Response({
-        "card_id": card.card_id,
-        "name": card.korean_name,
-        "image_url": request.build_absolute_uri(card.card_illust.url) if card.card_illust else None,
+        "card_id": card.id,
+        "name": display_name(card),
+        "image_url": request.build_absolute_uri(art_url(card.id)),
         "confidence": round(confidence, 4)
     })
+
+
+def _scanned_cards(labels):
+    """Classifier labels (old card_id) → new cards on the site, through the link table."""
+    from carddb.models import Card as NewCard, LegacyCard, has_art
+    links = dict(
+        LegacyCard.objects.filter(old_card_id__in={str(x) for x in labels}, card__isnull=False)
+        .filter(has_art("card_id")).values_list("old_card_id", "card_id")
+    )
+    cards = NewCard.objects.in_bulk(set(links.values()))
+    return {label: cards[cid] for label, cid in links.items()}
     
 from datetime import timedelta
 from django.utils import timezone
@@ -173,6 +185,7 @@ def classify_deck_image(request):
     )
 
     # 5. Classify
+    from carddb.display import display_name
     results = []
     illust_files = sorted([f for f in os.listdir(illust_dir) if f.startswith("illust")])
     for fname in illust_files:
@@ -184,24 +197,13 @@ def classify_deck_image(request):
             image_bytes = f.read()
 
         card_id, confidence = predict_card_from_bytes(image_bytes)
-
-        try:
-            card_obj = Card.objects.get(card_id=card_id)
-        except Card.DoesNotExist:
-            card_obj = None
-
-        card_name = (
-            card_obj.korean_name
-            if card_obj and card_obj.korean_name
-            else card_obj.name
-            if card_obj and card_obj.name
-            else "Unknown"
-        )
+        card_obj = _scanned_cards([card_id]).get(str(card_id))
+        card_name = display_name(card_obj) if card_obj else "Unknown"
 
         # Save the result
         CardDetection.objects.create(
             record=upload_record,
-            card=card_obj,
+            new_card=card_obj,
             confidence=confidence,
             illust_image=os.path.join(f"upload_{upload_record.id}", "illusts", fname)
         )

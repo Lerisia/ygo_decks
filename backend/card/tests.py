@@ -439,3 +439,49 @@ class CardSearchThumbTests(TestCase):
         self.assertEqual(rows["워터 걸"]["image_url"], "/media/cards/art/ocg/4441.webp")
         self.assertEqual(rows["워터 걸"]["thumb_url"], "/media/cards/thumb256/4441.webp")
         self.assertIsNone(rows["워터 걸 2"]["thumb_url"])
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DeckScannerTest(FreshArt, TestCase):
+    """The classifier still labels cards by their old card_id; results name the new card."""
+
+    def setUp(self):
+        super().setUp()
+        from carddb.models import Card as NewCard, LegacyCard
+        self.user = User.objects.create_user(email="scan@test.com", username="scanner", password="x", is_staff=True)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        LegacyCard.objects.create(old_id=1, old_card_id="4602257800", card=_create_card_with_art("블랙 매지션", 4041), how="konami")
+        ocg_only = NewCard.objects.create(id=5392, category="spell", name_ja="天変地異", name_ko="천재지변", frame="spell")
+        LegacyCard.objects.create(old_id=2, old_card_id="6296633200", card=ocg_only, how="konami")
+
+    @staticmethod
+    def fake_crop(image_path, card_output_dir, illust_output_dir, boxed_image_path, min_conf):
+        for i in range(3):
+            PILImage.new("RGB", (10, 10)).save(os.path.join(illust_output_dir, f"illust_{i}.jpg"))
+            PILImage.new("RGB", (10, 14)).save(os.path.join(card_output_dir, f"card_{i}.jpg"))
+        PILImage.new("RGB", (10, 10)).save(boxed_image_path)
+
+    def photo(self):
+        buf = BytesIO()
+        PILImage.new("RGB", (20, 20)).save(buf, "JPEG")
+        return SimpleUploadedFile("deck.jpg", buf.getvalue(), content_type="image/jpeg")
+
+    def test_deck_photo_names_cards_from_master_duel(self):
+        labels = iter([("4602257800", 0.97), ("6296633200", 0.9), ("999", 0.5)])
+        with patch("card.views.crop_cards_and_draw_boxes", side_effect=self.fake_crop), \
+                patch("card.views.predict_card_from_bytes", side_effect=lambda b: next(labels)):
+            r = self.client.post("/api/classify-deck/", {"image": self.photo()}, format="multipart")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([x["card_name"] for x in r.json()["result"]], ["블랙 매지션", "Unknown", "Unknown"])
+        from .models import CardDetection
+        self.assertEqual(list(CardDetection.objects.order_by("id").values_list("new_card_id", flat=True)), [4041, None, None])
+
+    def test_single_card(self):
+        with patch("card.views.predict_card_from_bytes", return_value=("4602257800", 0.9)):
+            r = self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart")
+        body = r.json()
+        self.assertEqual((body["card_id"], body["name"]), (4041, "블랙 매지션"))
+        self.assertTrue(body["image_url"].endswith("/media/cards/art/common/4041.webp"))
+        with patch("card.views.predict_card_from_bytes", return_value=("6296633200", 0.9)):
+            self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
