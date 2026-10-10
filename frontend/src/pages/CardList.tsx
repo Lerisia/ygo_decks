@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
 import PickerModal, { type PickerItem } from "@/components/PickerModal";
-import CardPickerModal from "@/components/CardPickerModal";
 import DexTabs from "@/components/DexTabs";
 import {
   type CardFilters, type CardListItem, type CardOptions,
@@ -52,6 +52,7 @@ export default function CardList() {
   const navigate = useNavigate();
   const onList = location.pathname === "/cards";
   const [filters, setFilters] = useState<CardFilters>(() => searchToFilters(location.search));
+  const [qInput, setQInput] = useState(filters.q);
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [items, setItems] = useState<CardListItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -61,7 +62,6 @@ export default function CardList() {
   const [error, setError] = useState("");
   const [filterOpen, setFilterOpen] = useState(() => hasFilter(filters));
   const [pickingGroup, setPickingGroup] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [groupQuery, setGroupQuery] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -74,6 +74,7 @@ export default function CardList() {
     const next = searchToFilters(location.search);
     if (filtersToSearch(next) !== key) {
       setFilters(next);
+      setQInput(next.q);
       if (hasFilter(next)) setFilterOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,6 +85,15 @@ export default function CardList() {
     setFilters(next);
     navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
   };
+
+  // The list follows the typing a moment after it stops (names in Korean, Japanese or English).
+  useEffect(() => {
+    const q = qInput.trim();
+    if (q === filters.q) return;
+    const t = setTimeout(() => update({ q }), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qInput]);
 
   useEffect(() => {
     getCardOptions().then(setOptions).catch(() => setOptions(null));
@@ -161,16 +171,13 @@ export default function CardList() {
   return (
     <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 py-4 text-center">
       <DexTabs />
-      {/* Same as the deck search: a picker of real cards, and choosing one opens its page. */}
-      <button
-        type="button"
-        onClick={() => setSearching(true)}
-        className="mb-4 flex items-center gap-2 w-full text-left border rounded-lg px-3 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-      >
-        <span aria-hidden="true">🔍</span>
-        <span className="flex-1">카드 이름으로 찾기</span>
-      </button>
-      <CardPickerModal open={searching} onClose={() => setSearching(false)} onPick={(id) => { setSearching(false); navigate(`/cards/${id}`); }} />
+      {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
+      <Input
+        placeholder="카드 이름 검색 (한국어·일본어·영어)"
+        value={qInput}
+        onChange={(e) => setQInput(e.target.value)}
+        className="mb-4"
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
         <button
@@ -226,7 +233,10 @@ export default function CardList() {
           <div className="flex justify-center">
             <button
               className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
-              onClick={() => update({ ...EMPTY_FILTERS })}
+              onClick={() => {
+                setQInput("");
+                update({ ...EMPTY_FILTERS });
+              }}
             >
               필터 초기화
             </button>
@@ -234,13 +244,8 @@ export default function CardList() {
         </div>
       )}
 
-      <div className="mb-3 h-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 text-left">
+      <div className="mb-3 h-6 flex items-center text-sm text-gray-600 dark:text-gray-300 text-left">
         {total !== null && <span>{hasFilter(filters) || filters.q ? `조건에 맞는 카드 ${total.toLocaleString()}장` : `카드 ${total.toLocaleString()}장`}</span>}
-        {filters.q && (
-          <button type="button" onClick={() => update({ q: "" })} className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold" aria-label="이름 검색 지우기">
-            이름: {filters.q} ✕
-          </button>
-        )}
       </div>
 
       {error && (
