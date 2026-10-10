@@ -33,6 +33,8 @@ class Tournament(models.Model):
     host_md_uid = models.CharField(max_length=9, blank=True, default="")
     # Optional join password, stored hashed; empty means anyone may register (특이점 2026-10-10).
     password = models.CharField(max_length=128, blank=True, default="")
+    # How many deck lists each entrant hands in when joining (0 = none); set by the host, the form suggests 1.
+    deck_count = models.PositiveSmallIntegerField(default=0)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="recruiting")
     current_round = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -190,13 +192,14 @@ class DeckSubmission(models.Model):
     entrant = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="deck_submissions")
     member = models.ForeignKey(TeamMember, null=True, blank=True, on_delete=models.CASCADE, related_name="deck_submissions")
     image = models.ImageField(upload_to="tournament_decks/", null=True, blank=True)
+    slot = models.PositiveSmallIntegerField(default=0)  # which of the tournament's deck_count lists this is
     unmatched_count = models.PositiveIntegerField(default=0)  # scanner crops with no DB match
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["entrant", "member"], name="unique_deck_per_member"),
+            models.UniqueConstraint(fields=["entrant", "member", "slot"], name="unique_deck_per_member_slot"),
         ]
 
     def __str__(self):

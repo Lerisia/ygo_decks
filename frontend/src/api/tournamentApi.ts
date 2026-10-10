@@ -88,6 +88,8 @@ export type TournamentListItem = {
   created_at: string;
   /** A join password is set (the password itself is never sent). */
   has_password?: boolean;
+  /** Deck lists each entrant hands in when joining (0 = none). */
+  deck_count?: number;
 };
 
 export type TournamentDetail = TournamentListItem & {
@@ -126,7 +128,7 @@ export const getTournament = (id: number) => req<TournamentDetail>(`/${id}/`);
 export const createTournament = (payload: {
   name: string; description?: string; format: TournamentFormat;
   capacity: number; team_size?: number; event_date: string; format_config?: Record<string, unknown>;
-  host_md_uid?: string; password?: string;
+  host_md_uid?: string; password?: string; deck_count?: number;
 }, coverFile?: File | null) => {
   if (!coverFile) {
     return req<TournamentDetail>("/create/", { method: "POST", body: JSON.stringify(payload) });
@@ -141,6 +143,7 @@ export const createTournament = (payload: {
   if (payload.format_config) form.append("format_config", JSON.stringify(payload.format_config));
   if (payload.host_md_uid) form.append("host_md_uid", payload.host_md_uid);
   if (payload.password) form.append("password", payload.password);
+  if (payload.deck_count !== undefined) form.append("deck_count", String(payload.deck_count));
   form.append("cover_image", coverFile);
   return req<TournamentDetail>("/create/", { method: "POST", body: form });
 };
@@ -162,6 +165,17 @@ export const registerTournament = (id: number, mdUid?: string, teamName?: string
     method: "POST",
     body: JSON.stringify({ ...(mdUid ? { md_uid: mdUid } : {}), ...(teamName ? { team_name: teamName } : {}), ...(password ? { password } : {}) }),
   });
+// 특이점 2026-10-10: password first, then UID + optional nickname + every deck list the host asked for.
+export const checkTournamentPassword = (id: number, password: string) =>
+  req<{ ok: boolean }>(`/${id}/check-password/`, { method: "POST", body: JSON.stringify({ password }) });
+export const joinTournament = (id: number, entry: { md_uid: string; nickname?: string; password?: string; decks: File[] }) => {
+  const form = new FormData();
+  form.append("md_uid", entry.md_uid);
+  if (entry.nickname) form.append("nickname", entry.nickname);
+  if (entry.password) form.append("password", entry.password);
+  entry.decks.forEach((f, i) => form.append(`deck_${i}`, f));
+  return req<Entrant>(`/${id}/register/`, { method: "POST", body: form });
+};
 export const joinTeam = (id: number, code: string, mdUid?: string) =>
   req<Entrant>(`/${id}/team/join/`, { method: "POST", body: JSON.stringify({ code, ...(mdUid ? { md_uid: mdUid } : {}) }) });
 export const leaveTeam = (id: number) => req<{ ok: boolean }>(`/${id}/team/leave/`, { method: "POST", body: "{}" });
@@ -218,15 +232,20 @@ export type ChatMessage = {
   avatar_icon: AvatarIcon | null; border: Border | null;
 };
 
-export const getDeck = (id: number, entrantId?: number, memberId?: number) =>
-  req<DeckSubmission>(`/${id}/deck/${memberId ? `?member_id=${memberId}` : entrantId ? `?entrant_id=${entrantId}` : ""}`);
-export const uploadDeck = (id: number, file: File) => {
+export const getDeck = (id: number, entrantId?: number, memberId?: number, slot = 0) => {
+  const q = new URLSearchParams({ slot: String(slot) });
+  if (memberId) q.set("member_id", String(memberId));
+  else if (entrantId) q.set("entrant_id", String(entrantId));
+  return req<DeckSubmission>(`/${id}/deck/?${q}`);
+};
+export const uploadDeck = (id: number, file: File, slot = 0) => {
   const form = new FormData();
   form.append("image", file);
+  form.append("slot", String(slot));
   return req<DeckSubmission>(`/${id}/deck/`, { method: "POST", body: form });
 };
-export const addDeckCard = (id: number, cardId: number, quantity: number) =>
-  req<DeckSubmission>(`/${id}/deck/cards/`, { method: "POST", body: JSON.stringify({ card_id: cardId, quantity }) });
+export const addDeckCard = (id: number, cardId: number, quantity: number, slot = 0) =>
+  req<DeckSubmission>(`/${id}/deck/cards/`, { method: "POST", body: JSON.stringify({ card_id: cardId, quantity, slot }) });
 export const removeDeckCard = (id: number, rowId: number) =>
   req<{ ok: boolean }>(`/${id}/deck/cards/${rowId}/`, { method: "DELETE" });
 

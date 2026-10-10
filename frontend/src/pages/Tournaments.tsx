@@ -27,8 +27,8 @@ type TabKey = (typeof TABS)[number]["key"];
 
 function Tournaments() {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
-  // "참여자로 참가하기" opens on the tournaments still taking entrants.
-  const [tab, setTab] = useState<TabKey>("recruiting");
+  // "참여자로 참가하기" lists only the tournaments still taking entrants (특이점 2026-10-10).
+  const [tab] = useState<TabKey>("recruiting");
   const navigate = useNavigate();
   const loggedIn = !!localStorage.getItem("access_token");
 
@@ -54,28 +54,10 @@ function Tournaments() {
       {!loggedIn && (
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">대회는 로그인한 회원만 참가할 수 있습니다.</p>
       )}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {TABS.map(({ key, label }) => {
-          const count = key === "all" ? tournaments.length : tournaments.filter((t) => t.status === key).length;
-          return (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`px-3 py-1.5 text-sm rounded-full font-semibold transition ${
-                tab === key
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-              }`}
-            >
-              {label} {count > 0 && <span className="opacity-70">{count}</span>}
-            </button>
-          );
-        })}
-      </div>
       {(() => {
         const visible = tab === "all" ? tournaments : tournaments.filter((t) => t.status === tab);
         if (visible.length === 0) {
-          return <p className="text-gray-500 dark:text-gray-400">해당 상태의 대회가 없습니다.</p>;
+          return <p className="text-gray-500 dark:text-gray-400">지금 참가 신청을 받는 대회가 없습니다.</p>;
         }
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

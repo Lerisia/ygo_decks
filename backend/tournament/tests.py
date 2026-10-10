@@ -1260,3 +1260,60 @@ class PasswordAndHostUidTest(TournamentApiTestBase):
         self.assertEqual(c.post(f"/api/tournaments/{t_id}/register/", {"md_uid": "100000003", "password": "new"}, format="json").status_code, 200)
         self.assertEqual(self.client.patch(f"/api/tournaments/{t_id}/", {"password": ""}, format="json").status_code, 200)
         self.assertFalse(self.client.get(f"/api/tournaments/{t_id}/").json()["has_password"])
+
+
+def _png(name="deck.png"):
+    from io import BytesIO
+    from PIL import Image
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), "white").save(buf, "PNG")
+    return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+
+class JoinFormTest(TournamentApiTestBase):
+    """특이점 2026-10-10: 비밀번호 확인 → UID·임시 닉네임·덱 리스트 n개를 내고 참가. n은 주최자가 정한다."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from django.test import override_settings
+        self._media = tempfile.TemporaryDirectory()
+        self._override = override_settings(MEDIA_ROOT=self._media.name)
+        self._override.enable()
+
+    def tearDown(self):
+        self._override.disable()
+        self._media.cleanup()
+
+    def test_host_sets_how_many_decks(self):
+        body = self.create(deck_count=3).json()
+        self.assertEqual(body["deck_count"], 3)
+        self.assertEqual(self.create(deck_count=9).status_code, 400)
+        self.assertEqual(self.create().json()["deck_count"], 0)
+
+    def test_check_password_endpoint(self):
+        t_id = self.create(password="pw").json()["id"]
+        c = _auth(_user("checker"))
+        self.assertEqual(c.post(f"/api/tournaments/{t_id}/check-password/", {"password": "no"}, format="json").status_code, 403)
+        self.assertEqual(c.post(f"/api/tournaments/{t_id}/check-password/", {"password": "pw"}, format="json").status_code, 200)
+
+    def test_register_needs_every_deck_and_keeps_the_nickname(self):
+        t_id = self.create(deck_count=2).json()["id"]
+        c = _auth(_user("acct_name"))
+        url = f"/api/tournaments/{t_id}/register/"
+        short = c.post(url, {"md_uid": "100000009", "deck_0": _png()}, format="multipart")
+        self.assertEqual(short.status_code, 400)
+        ok = c.post(url, {"md_uid": "100000009", "nickname": "임시닉", "deck_0": _png("a.png"), "deck_1": _png("b.png")}, format="multipart")
+        self.assertEqual(ok.status_code, 200, ok.content)
+        self.assertEqual(ok.json()["name"], "임시닉")
+        e = Entrant.objects.get(id=ok.json()["id"])
+        self.assertEqual(sorted(e.deck_submissions.values_list("slot", flat=True)), [0, 1])
+        self.assertEqual(c.get(f"/api/tournaments/{t_id}/deck/?slot=1").status_code, 200)
+
+    def test_nickname_defaults_to_account_name(self):
+        t_id = self.create(deck_count=0).json()["id"]
+        c = _auth(_user("plainname"))
+        res = c.post(f"/api/tournaments/{t_id}/register/", {"md_uid": "100000010"}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["name"], "plainname")

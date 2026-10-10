@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import (update_cover, cancel_tournament, team_join, team_leave, team_order,
+from .views import (update_cover, cancel_tournament, check_password, team_join, team_leave, team_order,
                     report_board, confirm_board, dispute_board, override_board, set_lineup,
                     deck_card_add, deck_card_remove, deck_submission,
                     announcements, chat, check_in, complete_tournament, confirm_match,
@@ -14,6 +14,7 @@ urlpatterns = [
     path("", list_tournaments),
     path("<int:tournament_id>/", tournament_detail),
     path("<int:tournament_id>/register/", register),
+    path("<int:tournament_id>/check-password/", check_password),
     path("<int:tournament_id>/withdraw/", withdraw),
     path("<int:tournament_id>/check-in/", check_in),
     path("<int:tournament_id>/kick/", kick),

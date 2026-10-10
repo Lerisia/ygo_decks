@@ -9,6 +9,7 @@ function CreateTournament() {
   const [name, setName] = useState("");
   const [hostUid, setHostUid] = useState("");
   const [usePassword, setUsePassword] = useState(false);
+  const [deckCount, setDeckCount] = useState(1);
   const [password, setPassword] = useState("");
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("single_elim");
@@ -58,6 +59,7 @@ function CreateTournament() {
         format_config: config,
         host_md_uid: hostUid,
         password: usePassword ? password.trim() : undefined,
+        deck_count: deckCount,
       }, coverFile);
       navigate(`/tournaments/${t.id}`);
     } catch (e) {
@@ -105,6 +107,14 @@ function CreateTournament() {
               placeholder="참가자에게 알려 줄 비밀번호 (30자 이하)"
             />
           )}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1">참가자가 제출할 덱 리스트 수</label>
+          <select className={inputCls} value={deckCount} onChange={(e) => setDeckCount(Number(e.target.value))}>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>{n === 0 ? "받지 않음" : `${n}개`}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1">설명</label>

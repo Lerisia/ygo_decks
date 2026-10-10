@@ -111,7 +111,8 @@ class TournamentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tournament
         fields = ["id", "name", "format", "status", "capacity", "team_size", "event_date",
-                  "current_round", "host_name", "entrant_count", "cover_image", "created_at", "has_password"]
+                  "current_round", "host_name", "entrant_count", "cover_image", "created_at", "has_password",
+                  "deck_count"]
 
     def get_entrant_count(self, obj):
         return obj.entrants.exclude(status__in=["withdrawn", "kicked"]).count()
@@ -194,7 +195,7 @@ class DeckSubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeckSubmission
-        fields = ["id", "entrant_id", "member", "image", "unmatched_count", "cards", "locked", "updated_at"]
+        fields = ["id", "entrant_id", "member", "slot", "image", "unmatched_count", "cards", "locked", "updated_at"]
 
     def get_cards(self, obj):
         qs = obj.cards.select_related("card").order_by("card__korean_name", "card__name")

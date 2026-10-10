@@ -4,6 +4,7 @@ import Avatar from "@/components/Avatar";
 import BracketTree, { ColumnBracket } from "@/components/tournament/BracketTree";
 import TeamAvatars from "@/components/tournament/TeamAvatars";
 import DeckTab from "@/components/tournament/DeckTab";
+import JoinForm from "@/components/tournament/JoinForm";
 import AnnouncementsTab from "@/components/tournament/AnnouncementsTab";
 import ChatTab from "@/components/tournament/ChatTab";
 import { getUserInfo } from "@/api/accountApi";
@@ -321,25 +322,7 @@ function TournamentDetailPage() {
       {/* 참가/운영 액션 */}
       <div className="flex gap-2 flex-wrap mb-6">
         {t.status === "recruiting" && me && !myEntrant && !teamMode && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <input
-              className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-56"
-              placeholder="MD UID 9자리 (저장돼 있으면 생략)"
-              value={uidInput}
-              maxLength={9}
-              onChange={(e) => setUidInput(e.target.value.replace(/\D/g, ""))}
-            />
-            {t.has_password && (
-              <input
-                type="password"
-                className="px-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white w-36"
-                placeholder="🔒 대회 비밀번호"
-                value={joinPassword}
-                onChange={(e) => setJoinPassword(e.target.value)}
-              />
-            )}
-            <button className={blueBtn} disabled={!!t.has_password && !joinPassword} onClick={() => act(() => registerTournament(t.id, uidInput || undefined, undefined, joinPassword || undefined))}>참가 신청</button>
-          </div>
+          <JoinForm tournamentId={t.id} hasPassword={!!t.has_password} deckCount={t.deck_count ?? 0} accountName={me} act={act} />
         )}
         {t.status === "recruiting" && me && !myEntrant && teamMode && (
           <div className="w-full flex flex-col sm:flex-row gap-2">
@@ -491,6 +474,7 @@ function TournamentDetailPage() {
         <section>
           <DeckTab
             tournamentId={t.id}
+            deckCount={t.deck_count ?? 1}
             myEntrant={myEntrant && (myEntrant.status === "registered" || myEntrant.status === "checked_in") ? myEntrant : undefined}
             myUserId={myUserId}
             isHost={isHost}

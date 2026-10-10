@@ -16,9 +16,13 @@ type Props = {
   isHost: boolean;
   entrants: Entrant[];
   recruiting: boolean;
+  /** How many deck lists each entrant hands in (특이점 2026-10-10). */
+  deckCount?: number;
 };
 
-export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, entrants, recruiting }: Props) {
+export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, entrants, recruiting, deckCount = 1 }: Props) {
+  const slots = Math.max(deckCount, 1);
+  const [slot, setSlot] = useState(0);
   const teamMode = !!myEntrant && myEntrant.user === null || entrants.some((e) => e.user === null);
   const myMember = myEntrant?.members.find((m) => m.user === myUserId);
   const isCaptain = !!myMember?.is_captain;
@@ -37,8 +41,8 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
     setError(""); setNotFound(false);
     if (entrantId === null) { setDeck(null); return; }
     try {
-      if (teamMode) setDeck(await getDeck(tournamentId, undefined, entrantId));
-      else setDeck(await getDeck(tournamentId, entrantId === myEntrant?.id ? undefined : entrantId));
+      if (teamMode) setDeck(await getDeck(tournamentId, undefined, entrantId, slot));
+      else setDeck(await getDeck(tournamentId, entrantId === myEntrant?.id ? undefined : entrantId, undefined, slot));
     } catch (e) {
       setDeck(null);
       if (e instanceof Error && e.message.includes("제출된 덱이 없습니다")) setNotFound(true);
@@ -46,7 +50,7 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
     }
   };
 
-  useEffect(() => { load(viewEntrantId); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [viewEntrantId, tournamentId]);
+  useEffect(() => { load(viewEntrantId); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [viewEntrantId, tournamentId, slot]);
 
   const act = async (fn: () => Promise<DeckSubmission | { ok: boolean }>) => {
     setBusy(true); setError("");
@@ -70,6 +74,24 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
 
   return (
     <div>
+      {slots > 1 && (
+        <div className="flex gap-1.5 mb-3" role="tablist" aria-label="덱 리스트">
+          {Array.from({ length: slots }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={slot === i}
+              onClick={() => setSlot(i)}
+              className={`px-3 py-1 text-sm rounded-full font-semibold transition ${
+                slot === i ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              덱 {i + 1}
+            </button>
+          ))}
+        </div>
+      )}
       {(isHost || (teamMode && isCaptain)) && (
         <div className="flex items-center gap-2 mb-3">
           <label className="text-sm text-gray-500 dark:text-gray-400">열람 대상</label>
@@ -101,7 +123,7 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
                   const f = e.target.files?.[0];
                   if (!f) return;
                   if (f.size > 10 * 1024 * 1024) { setError("이미지는 10MB 이하여야 합니다."); e.target.value = ""; return; }
-                  act(() => uploadDeck(tournamentId, f));
+                  act(() => uploadDeck(tournamentId, f, slot));
                   e.target.value = "";
                 }}
               />
@@ -145,12 +167,12 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
                     <div className="flex items-center justify-center gap-1 mt-1 text-xs">
                       {canEdit && (
                         <button className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700" disabled={busy || c.quantity <= 1}
-                          onClick={() => act(() => addDeckCard(tournamentId, c.card.id, c.quantity - 1))}>−</button>
+                          onClick={() => act(() => addDeckCard(tournamentId, c.card.id, c.quantity - 1, slot))}>−</button>
                       )}
                       <span className="font-semibold">×{c.quantity}</span>
                       {canEdit && (
                         <button className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700" disabled={busy || c.quantity >= 3}
-                          onClick={() => act(() => addDeckCard(tournamentId, c.card.id, c.quantity + 1))}>+</button>
+                          onClick={() => act(() => addDeckCard(tournamentId, c.card.id, c.quantity + 1, slot))}>+</button>
                       )}
                     </div>
                     {(low || c.source === "manual") && (
@@ -176,7 +198,7 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         onPick={() => {}}
-        onPickCard={(card: CardSearchResult) => act(() => addDeckCard(tournamentId, card.id, 1))}
+        onPickCard={(card: CardSearchResult) => act(() => addDeckCard(tournamentId, card.id, 1, slot))}
         copyTargetLabel="덱"
       />
     </div>

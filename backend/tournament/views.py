@@ -10,7 +10,7 @@ from rest_framework import status
 from . import engine
 import re
 
-from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.hashers import check_password as check_password_hash, make_password
 from django.db.models import Q
 
 from .models import Announcement, Board, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
@@ -202,6 +202,7 @@ def _forfeit_open_matches(tournament, entrant, actor):
 GROUP_COUNTS = (2, 4, 8)
 MAX_ADVANCE = 4
 MAX_TEAM_SIZE = 5
+MAX_DECKS = 5  # deck lists a host may ask each entrant for
 
 
 def _ctx(request, t, show_uid=None):
@@ -435,7 +436,14 @@ def create_tournament(request):
     password = str(data.get("password") or "").strip()
     if len(password) > 30:
         return _err("비밀번호는 30자 이하로 정해 주세요.")
+    try:
+        deck_count = int(data.get("deck_count", 0))
+    except (TypeError, ValueError):
+        return _err("deck_count가 올바르지 않습니다.")
+    if not (0 <= deck_count <= MAX_DECKS):
+        return _err(f"제출할 덱 리스트 수는 0~{MAX_DECKS}개입니다.")
     t = Tournament.objects.create(
+        deck_count=deck_count,
         name=data["name"],
         host_md_uid=host_md_uid,
         password=make_password(password) if password else "",
@@ -502,7 +510,7 @@ def _edit_tournament(request, t):
         if uid and not re.fullmatch(r"\d{9}", uid):
             return _err("주최자 마스터 듀얼 UID는 숫자 9자리입니다.")
         t.host_md_uid = uid; changed.append("host_md_uid")
-    locked = [k for k in ("capacity", "format", "format_config") if k in data]
+    locked = [k for k in ("capacity", "format", "format_config", "deck_count") if k in data]
     if locked and t.status != "recruiting":
         return _err("대회 시작 후에는 정원·형식을 바꿀 수 없습니다.")
     if "capacity" in data:
@@ -516,6 +524,14 @@ def _edit_tournament(request, t):
         if capacity < current:
             return _err(f"현재 참가자({current}명)보다 적게 줄일 수 없습니다.")
         t.capacity = capacity; changed.append("capacity")
+    if "deck_count" in data:
+        try:
+            deck_count = int(data["deck_count"])
+        except (TypeError, ValueError):
+            return _err("deck_count가 올바르지 않습니다.")
+        if not (0 <= deck_count <= MAX_DECKS):
+            return _err(f"제출할 덱 리스트 수는 0~{MAX_DECKS}개입니다.")
+        t.deck_count = deck_count; changed.append("deck_count")
     if "format" in data:
         if data["format"] not in VALID_FORMATS:
             return _err("지원하지 않는 대회 형식입니다.")
@@ -539,6 +555,18 @@ def _edit_tournament(request, t):
     if changed:
         t.save(update_fields=changed)
     return Response(TournamentDetailSerializer(t, context=_ctx(request, t, True)).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def check_password(request, tournament_id):
+    """First step of joining a locked tournament: is this the right password?"""
+    t, err = _get_tournament(tournament_id)
+    if err:
+        return err
+    if t.password and not check_password_hash(str(request.data.get("password") or ""), t.password):
+        return _err("대회 비밀번호가 맞지 않습니다.", status.HTTP_403_FORBIDDEN)
+    return Response({"ok": True})
 
 
 @api_view(["POST"])
@@ -571,7 +599,7 @@ def register(request, tournament_id):
         return err
     if t.status != "recruiting":
         return _err("모집 중인 대회가 아닙니다.")
-    if t.password and not check_password(str(request.data.get("password") or ""), t.password):
+    if t.password and not check_password_hash(str(request.data.get("password") or ""), t.password):
         return _err("대회 비밀번호가 맞지 않습니다.", status.HTTP_403_FORBIDDEN)
     if t.team_size > 1:
         return _register_team(request, t)
@@ -584,15 +612,30 @@ def register(request, tournament_id):
     md_uid = str(request.data.get("md_uid") or "").strip() or request.user.md_uid
     if not re.fullmatch(r"\d{9}", md_uid or ""):
         return _err("마스터 듀얼 UID(숫자 9자리)를 입력해 주세요.")
+    # Every deck list the host asked for comes in with the entry (특이점 2026-10-10).
+    decks = [request.FILES.get(f"deck_{i}") for i in range(t.deck_count)]
+    if not all(decks):
+        return _err(f"덱 리스트 {t.deck_count}개를 모두 올려 주세요.")
+    for f in decks:
+        bad = _cover_error(f)
+        if bad:
+            return _err(bad.replace("배너 이미지", "덱 리스트 이미지"))
+    name = str(request.data.get("nickname") or "").strip()[:30] or request.user.username
     if md_uid != request.user.md_uid:  # remember for the next tournament
         request.user.md_uid = md_uid
         request.user.save(update_fields=["md_uid"])
     if existing:  # withdrawn -> re-register on the same row
         existing.status = "registered"
         existing.md_uid = md_uid
-        existing.save(update_fields=["status", "md_uid"])
-        return Response(EntrantSerializer(existing, context=_ctx(request, t, True)).data)
-    entrant = Entrant.objects.create(tournament=t, user=request.user, name=request.user.username, md_uid=md_uid)
+        existing.name = name
+        existing.save(update_fields=["status", "md_uid", "name"])
+        entrant = existing
+    else:
+        entrant = Entrant.objects.create(tournament=t, user=request.user, name=name, md_uid=md_uid)
+    for slot, f in enumerate(decks):
+        sub, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=None, slot=slot)
+        sub.image = f
+        sub.save()
     return Response(EntrantSerializer(entrant, context=_ctx(request, t, True)).data)
 
 
@@ -1170,6 +1213,18 @@ from .serializers import DeckSubmissionSerializer
 MAX_COPIES = 3
 
 
+def _deck_slot(t, request):
+    """Which deck list (?slot / body slot, default 0) of the tournament's deck_count."""
+    raw = request.GET.get("slot", request.data.get("slot", 0) if hasattr(request, "data") else 0)
+    try:
+        slot = int(raw or 0)
+    except (TypeError, ValueError):
+        return None, _err("slot이 올바르지 않습니다.")
+    if not (0 <= slot < max(t.deck_count, 1)):
+        return None, _err("없는 덱 번호입니다.")
+    return slot, None
+
+
 def _deck_response(submission):
     return Response(DeckSubmissionSerializer(submission).data)
 
@@ -1217,7 +1272,10 @@ def deck_submission(request, tournament_id):
         entrant, member, err = _deck_target(t, request)
         if err:
             return err
-        submission = DeckSubmission.objects.filter(entrant=entrant, member=member).first()
+        slot, err = _deck_slot(t, request)
+        if err:
+            return err
+        submission = DeckSubmission.objects.filter(entrant=entrant, member=member, slot=slot).first()
         if not submission:
             return _err("제출된 덱이 없습니다.", status.HTTP_404_NOT_FOUND)
         return _deck_response(submission)
@@ -1233,7 +1291,10 @@ def deck_submission(request, tournament_id):
         return _err("image 파일이 필요합니다.")
 
     member = _membership(t, request.user) if entrant.is_team else None
-    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member)
+    slot, err = _deck_slot(t, request)
+    if err:
+        return err
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member, slot=slot)
     submission.image = image
     submission.save()
 
@@ -1291,7 +1352,10 @@ def deck_card_add(request, tournament_id):
     if not card:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
     member = _membership(t, request.user) if entrant.is_team else None
-    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member)
+    slot, err = _deck_slot(t, request)
+    if err:
+        return err
+    submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member, slot=slot)
     DeckSubmissionCard.objects.update_or_create(
         submission=submission, card=card,
         defaults={"quantity": quantity, "confidence": None, "source": "manual"},
