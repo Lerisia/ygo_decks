@@ -23,8 +23,12 @@ a {
   color: #646cff;
   text-decoration: inherit;
 }
-a:hover {
-  color: #535bf2;
+/* Mouse-only hover: a phone "hovers" whatever it touches and keeps it until the next tap, so scrolling past a link
+   left its text recoloured and looking selected (엘리스 2026-10-11). Buttons below are kept the same way. */
+@media (hover: hover) {
+  a:hover {
+    color: #535bf2;
+  }
 }
 
 body {
@@ -175,13 +179,16 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+@media (prefers-color-scheme: light) and (hover: hover) {
+  a:hover {
+    color: #747bff;
+  }
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
     background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
   }
   button {
     background-color: #f9f9f9;
