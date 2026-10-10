@@ -349,8 +349,15 @@ def answer_question(card, q_type: str, q_value) -> bool:
         # which lets a "list" group be safely migrated to multiselect.
         cluster_ids = [v.strip() for v in str(q_value).split(",") if v.strip()]
         return any(_yp.card_in_cluster(card, cid) for cid in cluster_ids)
+    if q_type == "group_in":
+        # 카드군 by CardGroup id, comma-separated; "__NONE__" matches a card in no 카드군.
+        wanted = {v.strip() for v in str(q_value).split(",") if v.strip()}
+        groups = getattr(card, "card_groups", {})
+        if "__NONE__" in wanted and not groups:
+            return True
+        return any(str(g) in wanted for g in groups)
     if q_type == "archetype_in":
-        # Yugipedia Archseries multi-match. q_value is comma-separated
+        # Yugipedia Archseries multi-match, asked before 카드군 (kept so older games still read back). q_value is comma-separated
         # archetype names (English, as stored on the card). True if any
         # listed archetype is in the card's yugipedia_archseries.
         # Special token "__NONE__" matches cards with NO archetypes at all
@@ -455,6 +462,13 @@ def build_question_text(q_type: str, q_value) -> str:
         # reads naturally as "A / B / C 중 하나에 해당하는 카드인가요?".
         parts = [_short_cluster_label(_yp.CLUSTER_LABELS.get(cid, cid)) for cid in cluster_ids]
         return f"{' / '.join(parts)} 중 하나에 해당하는 카드인가요?"
+    if q_type == "group_in":
+        ids = [v.strip() for v in str(q_value).split(",") if v.strip()]
+        names = _group_names([int(i) for i in ids if i.isdigit()])
+        labels = ["카드군 없음" if i == "__NONE__" else names.get(int(i), "?") if i.isdigit() else "?" for i in ids]
+        if len(labels) == 1:
+            return f"카드군: {labels[0]}?"
+        return f"카드군: {' / '.join(labels)} 중 하나?"
     if q_type == "archetype_in":
         names = [v.strip() for v in str(q_value).split(",") if v.strip()]
         labels = ["테마 없음" if n == "__NONE__" else _archetype_label(n) for n in names]
@@ -618,18 +632,12 @@ def build_guess_comparison(secret, guess) -> list[dict]:
     g_label = _frame_label(guess)
     rows.append({"label": "유형", "guess": g_label, "match": s_label == g_label})
 
-    # 테마 — intersection of archseries. Show shared archetype names if
-    # any, else just ✗ / ✓ based on whether at least one is shared.
-    s_archs = set(secret.yugipedia_archseries or [])
-    g_archs = set(guess.yugipedia_archseries or [])
-    shared = s_archs & g_archs
-    if g_archs:
-        if shared:
-            labels = [_archetype_label(a) for a in shared]
-            rows.append({"label": "테마", "guess": ", ".join(labels), "match": True})
-        else:
-            g_labels = [_archetype_label(a) for a in g_archs]
-            rows.append({"label": "테마", "guess": ", ".join(g_labels), "match": False})
+    # 카드군 — the closest 카드군 both cards share, else the guess's own.
+    s_groups = getattr(secret, "card_groups", {})
+    g_groups = getattr(guess, "card_groups", {})
+    if g_groups:
+        shared = {i: g for i, g in g_groups.items() if i in s_groups}
+        rows.append({"label": "카드군", "guess": ", ".join(_closest_groups(shared or g_groups)), "match": bool(shared)})
 
     monster_dims = s_ft not in {"spell", "trap"} and g_ft not in {"spell", "trap"}
     if monster_dims:
@@ -678,7 +686,56 @@ def _short_cluster_label(full: str) -> str:
     return s.strip()
 
 
-# ─────────────── archetype helpers ───────────────
+# ─────────────── 카드군 helpers ───────────────
+
+
+def _group_label(g) -> str:
+    return g.name_ko or g.text
+
+
+def _group_names(ids) -> dict:
+    from carddb.models import CardGroup
+    return {g.id: _group_label(g) for g in CardGroup.objects.filter(id__in=ids)}
+
+
+def _closest_groups(groups: dict) -> list[str]:
+    """Labels of the given {id: CardGroup}, leaving out any whose child is also there (엘리멘틀 히어로, not 히어로 too)."""
+    parents = {g.parent_id for g in groups.values()}
+    return sorted({_group_label(g) for i, g in groups.items() if i not in parents})
+
+
+def _group_items(difficulty: str = "중급", exclude_st: bool = False) -> list[dict]:
+    """{q_value, label} for the 카드군 menu: reviewed 카드군 that two or more pool cards belong to, in 가나다 order,
+    with 카드군 없음 first when two or more pool cards belong to none. One text written two ways with the same
+    cards (「オーパーツ」 and 「先史遺産」, both 오파츠) shows once."""
+    from collections import Counter, defaultdict
+    from carddb.models import CardGroupMember
+    from .twenty_views import _pool_card_ids
+    pool = set(_pool_card_ids(difficulty, exclude_st=exclude_st))
+    if not pool:
+        return []
+    members, labels, grouped = defaultdict(set), {}, set()
+    for cid, gid, name, text in (CardGroupMember.objects.filter(card_id__in=pool, group__needs_review=False)
+                                 .exclude(how=CardGroupMember.How.REMOVED)
+                                 .values_list("card_id", "group_id", "group__name_ko", "group__text")):
+        members[gid].add(cid)
+        labels[gid] = (name or text, text)
+        grouped.add(cid)
+    seen, shown = set(), []
+    for g in sorted(members):
+        key = (labels[g][0], frozenset(members[g]))
+        if len(members[g]) >= 2 and key not in seen:
+            seen.add(key)
+            shown.append(g)
+    dup = Counter(labels[g][0] for g in shown)
+    items = sorted(({"q_value": str(g), "label": labels[g][0] if dup[labels[g][0]] == 1 else f"{labels[g][0]} ({labels[g][1]})"}
+                    for g in shown), key=lambda x: x["label"])
+    if len(pool - grouped) >= 2:
+        items.insert(0, {"q_value": "__NONE__", "label": "카드군 없음"})
+    return items
+
+
+# ─────────────── archetype helpers (Yugipedia, before 카드군) ───────────────
 
 # Manual overrides for archetype display labels. Yugipedia tracks
 # parent/child archetypes (HERO ⊃ Elemental HERO / Destiny HERO / ...),
@@ -1293,6 +1350,7 @@ def build_menu(difficulty: str = "중급", exclude_st: bool = False) -> list[dic
     # When exclude_st is on, the four card-kind branch questions (몬스터/
     # 마법/함정/마함) are all trivially answerable so we drop them — the
     # player chose the monsters-only mode.
+    group_items = _group_items(difficulty, exclude_st=exclude_st)
     branch_items = (
         [] if exclude_st else [
             {"q_type": "is_monster", "q_value": "", "label": "몬스터 카드인가요?"},
@@ -1393,17 +1451,14 @@ def build_menu(difficulty: str = "중급", exclude_st: bool = False) -> list[dic
             "q_types": ["def_gte", "def_lte", "def_eq"],
             "min": 0, "max": 10000, "step": 100, "placeholder": "예: 2000",
         },
-        # 카드군 group is omitted entirely when the pool has no real
-        # archetype data (e.g. Yugipedia fetch hasn't completed) — showing
-        # only "테마 없음" confuses players. _archetype_items returns
-        # zero items in that case.
+        # 카드군 group is omitted when no pool card belongs to one.
         *([{
             "group": "카드군",
             "kind": "multiselect",
-            "multi_q_type": "archetype_in",
+            "multi_q_type": "group_in",
             "searchable": True,
-            "items": _archetype_items(difficulty, exclude_st=exclude_st),
-        }] if _archetype_items(difficulty, exclude_st=exclude_st) else []),
+            "items": group_items,
+        }] if group_items else []),
         {
             "group": "이름 길이",
             "kind": "number",

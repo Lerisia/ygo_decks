@@ -1,6 +1,8 @@
 """The new card DB seen through the field names and values the 딱무고개
 engine was written against (YGOPRODeck vocabulary), so its rules stay put."""
-from carddb.models import Card
+from django.db.models import Prefetch
+
+from carddb.models import Card, CardGroupMember
 
 from .twenty_engine import RACE_LABELS
 
@@ -43,13 +45,17 @@ class TwentyCard:
             s for s in (text.materials, text.effect, text.flavor) if s
         ) if text else ""
         self.effect_tag = getattr(card, "effect_tag", None)
+        # 카드군 the card belongs to, {id: CardGroup}; ones still under staff review don't count yet
+        self.card_groups = {m.group_id: m.group for m in card.group_memberships.all()
+                            if m.how != CardGroupMember.How.REMOVED and not m.group.needs_review}
         yp = getattr(card, "yugipedia", None)
         for f in YP_FIELDS:
             setattr(self, f"yugipedia_{f}", list(getattr(yp, f)) if yp else [])
 
 
 def twenty_cards():
-    return Card.objects.select_related("effect_tag", "yugipedia").prefetch_related("texts")
+    return Card.objects.select_related("effect_tag", "yugipedia").prefetch_related(
+        "texts", Prefetch("group_memberships", queryset=CardGroupMember.objects.select_related("group")))
 
 
 def load(card_id):

@@ -102,6 +102,42 @@ class TwentyCardTest(FreshArtMixin, TestCase):
         self.assertFalse(self.ask(bare, "tag_hand_trap"))
         self.assertTrue(self.ask(bare, "archetype_in", "__NONE__"))
 
+    def test_card_group_question(self):
+        from carddb.models import CardGroup, CardGroupMember
+        from .twenty_engine import build_question_text
+        hero = CardGroup.objects.create(text="HERO", reading="ヒーロー", name_ko="히어로")
+        held = CardGroup.objects.create(text="ヒーロ", reading="ヒーロ", name_ko="히로", needs_review=True)
+        airman = make_card(5013, "엘리멘틀 히어로 에어맨")
+        CardGroupMember.objects.create(group=hero, card=airman, how="name")
+        left_out = make_card(5014, "엣지 임프")
+        CardGroupMember.objects.create(group=hero, card=left_out, how="removed")
+        CardGroupMember.objects.create(group=held, card=left_out, how="name")
+        self.assertTrue(self.ask(airman, "group_in", str(hero.id)))
+        self.assertFalse(self.ask(left_out, "group_in", str(hero.id)))
+        self.assertTrue(self.ask(left_out, "group_in", "__NONE__"))   # a 카드군 still under review doesn't count
+        self.assertFalse(self.ask(airman, "group_in", "__NONE__"))
+        self.assertEqual(build_question_text("group_in", str(hero.id)), "카드군: 히어로?")
+        self.assertEqual(build_question_text("group_in", f"{hero.id},__NONE__"), "카드군: 히어로 / 카드군 없음 중 하나?")
+
+    def test_guess_comparison_names_the_closest_shared_card_group(self):
+        from carddb.models import CardGroup, CardGroupMember
+        hero = CardGroup.objects.create(text="HERO", reading="ヒーロー", name_ko="히어로")
+        ehero = CardGroup.objects.create(text="E・HERO", reading="エレメンタルヒーロー", name_ko="엘리멘틀 히어로", parent=hero)
+        a, b, d, plain = (make_card(i, n) for i, n in ((5015, "에어맨"), (5016, "클레이맨"), (5017, "디아볼릭 가이"), (5018, "그냥 카드")))
+        for c, gs in ((a, (hero, ehero)), (b, (hero, ehero)), (d, (hero,))):
+            for g in gs:
+                CardGroupMember.objects.create(group=g, card=c, how="name")
+
+        def row(secret, guess):
+            return {r["label"]: r for r in build_guess_comparison(self.load(secret), self.load(guess))}.get("카드군")
+        self.assertEqual(row(a, b), {"label": "카드군", "guess": "엘리멘틀 히어로", "match": True})
+        self.assertEqual(row(d, b), {"label": "카드군", "guess": "히어로", "match": True})
+        self.assertEqual(row(plain, b), {"label": "카드군", "guess": "엘리멘틀 히어로", "match": False})
+        self.assertIsNone(row(a, plain))
+
+    def load(self, card):
+        return TwentyCard(twenty_card.twenty_cards().get(id=card.id))
+
     def test_guess_comparison(self):
         a = make_card(5011, "가", race="dragon", attribute="light", level=8, atk=3000, def_value=2500)
         b = make_card(5012, "나", race="dragon", attribute="dark", level=8, atk=2500, def_value=2100)
@@ -156,13 +192,25 @@ class TwentyGameTest(FreshArtMixin, TestCase):
         self.assertEqual(game["status"], "won")
         self.assertEqual(game["answer"], {"card_id": 6010, "name": "블랙 매지션", "image_url": "/media/cards/art/common/6010.webp"})
 
-    def test_menu_lists_themes_from_the_pool(self):
+    def test_menu_lists_card_groups_from_the_pool(self):
+        from carddb.models import CardGroup, CardGroupMember
+        sky = CardGroup.objects.create(text="閃刀", reading="せんとう", name_ko="섬도")
+        held = CardGroup.objects.create(text="閃刀姫", reading="せんとうき", name_ko="섬도희", needs_review=True)
+        lone = CardGroup.objects.create(text="ロード", reading="ロード", name_ko="로드")
         for i in range(2):
-            c = self.add(make_card(6020 + i, f"섬도희 {i}", yp=None))
-            Yugipedia.objects.create(card=c, misc=["Effect Monster"], archseries=["Sky Striker"])
+            c = self.add(make_card(6020 + i, f"섬도희 {i}"))
+            CardGroupMember.objects.create(group=sky, card=c, how="name")
+            CardGroupMember.objects.create(group=held, card=c, how="name")
+        CardGroupMember.objects.create(group=lone, card_id=6020, how="name")
+        twin = CardGroup.objects.create(text="センとう", reading="せんとう", name_ko="섬도")   # same cards, written another way
+        for i in range(2):
+            CardGroupMember.objects.create(group=twin, card_id=6020 + i, how="name")
+        for i in range(2):
+            self.add(make_card(6022 + i, f"무소속 {i}"))
         menu = self.client.get("/api/solo/twenty/menu/?difficulty=중급").json()["menu"]
-        themes = next(g for g in menu if g["group"] == "카드군")["items"]
-        self.assertIn({"q_value": "Sky Striker", "label": "섬도희"}, themes)
+        group = next(g for g in menu if g["group"] == "카드군")
+        self.assertEqual(group["multi_q_type"], "group_in")
+        self.assertEqual(group["items"], [{"q_value": "__NONE__", "label": "카드군 없음"}, {"q_value": str(sky.id), "label": "섬도"}])
 
 
 class SoloDrawTest(FreshArtMixin, TestCase):
