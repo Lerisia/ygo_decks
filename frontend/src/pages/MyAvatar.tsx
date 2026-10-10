@@ -63,6 +63,19 @@ export default function MyAvatar() {
 
   // Theme list (filtered to whatever icons the user actually owns) — sorted
   // alphabetically, with the "no theme" bucket pinned to the end.
+  // Border picker (참혈 2026-10-11): owned borders, plus only the very next step of the earned series (기본 → 아이언 → …
+  // → 다이아), half-faded with its condition. Unowned shop borders live in the shop, and other unowned ones stay hidden.
+  const shownBorders = useMemo(() => {
+    const ranks = borders.filter((b) => b.tier_rank != null && !b.unlocked).map((b) => b.tier_rank as number);
+    const nextRank = ranks.length ? Math.min(...ranks) : null;
+    return borders.filter((b) => b.unlocked || (b.tier_rank != null && b.tier_rank === nextRank));
+  }, [borders]);
+  // Collected / collectable: the admin-only frame counts only for those who have it.
+  const borderCollection = useMemo(() => {
+    const collectable = borders.filter((b) => b.key !== "admin" || b.unlocked);
+    return { owned: collectable.filter((b) => b.unlocked).length, total: collectable.length };
+  }, [borders]);
+
   const allThemes = useMemo(() => {
     const set = new Set<string>();
     let hasNoTheme = false;
@@ -164,9 +177,14 @@ export default function MyAvatar() {
 
       {borders.length > 1 && (
         <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-4">
-          <h2 className="font-semibold mb-3 text-sm">테두리</h2>
+          <h2 className="font-semibold mb-3 text-sm">
+            테두리{" "}
+            <span className="font-normal text-gray-500 dark:text-gray-400 tabular-nums">
+              {borderCollection.owned} / {borderCollection.total}
+            </span>
+          </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {borders.map((b) => {
+            {shownBorders.map((b) => {
               const isSelected = currentBorder?.id === b.id;
               const isLocked = b.unlocked === false;
               return (
@@ -174,7 +192,7 @@ export default function MyAvatar() {
                   key={b.id}
                   onClick={() => !isLocked && handlePickBorder(b)}
                   disabled={savingBorder !== null || isLocked}
-                  title={isLocked ? `🔒 ${b.unlock_condition || "잠김"}` : b.name}
+                  title={isLocked ? b.unlock_condition || "잠김" : b.name}
                   className={`relative flex flex-col items-center p-2 rounded-lg border-2 transition ${
                     isLocked
                       ? "border-transparent cursor-not-allowed"
@@ -183,18 +201,13 @@ export default function MyAvatar() {
                         : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                   }`}
                 >
-                  <div className="relative">
+                  {/* The next step to earn: half-faded, labelled with how to get it rather than its name. */}
+                  <div className={isLocked ? "opacity-50" : ""}>
                     <Avatar icon={current} border={b} size={72} />
-                    {isLocked && (
-                      <span
-                        className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 text-white text-lg"
-                        aria-hidden
-                      >
-                        🔒
-                      </span>
-                    )}
                   </div>
-                  <span className="text-xs mt-1 truncate w-full text-center">{b.name}</span>
+                  <span className={`text-xs mt-1 w-full text-center ${isLocked ? "text-gray-500 dark:text-gray-400 leading-tight" : "truncate"}`}>
+                    {isLocked ? b.unlock_condition || "잠김" : b.name}
+                  </span>
                 </button>
               );
             })}

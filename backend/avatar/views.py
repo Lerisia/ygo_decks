@@ -359,10 +359,13 @@ def my_borders(request):
         UserBorderUnlock.objects.filter(user=user).values_list("border_id", flat=True)
     )
     threshold_by_key = {key: thr for thr, key in BORDER_TIERS}
+    # Step borders in order (기본 0, 아이언 1, … 다이아): My Page shows only the owned ones and the next step (참혈 2026-10-11).
+    rank_by_key = {key: i + 1 for i, (_thr, key) in enumerate(BORDER_TIERS)}
     out = []
     for b in Border.objects.all().order_by("sort_order", "id"):
         data = BorderSerializer(b).data
         data["unlocked"] = b.id in unlocked_ids
+        data["tier_rank"] = 0 if b.is_default else rank_by_key.get(b.key)
         thr = threshold_by_key.get(b.key)
         if b.is_default:
             data["unlock_condition"] = "기본 지급"

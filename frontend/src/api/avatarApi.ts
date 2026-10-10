@@ -59,6 +59,8 @@ export type Border = {
   price?: number;
   unlocked?: boolean;
   unlock_condition?: string;
+  /** My Page only: step order for the earned borders (기본 0, 아이언 1 … 다이아); null for the rest. */
+  tier_rank?: number | null;
   /** Made from an uploaded frame image (drawn over the icon); the built-in ones are drawn by the site. */
   uploaded?: boolean;
   /** Admin list only: how many users have it. */

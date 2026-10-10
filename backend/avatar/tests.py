@@ -326,3 +326,30 @@ class IconFitTest(TestCase):
         self.assertEqual(Image.open(icon.custom_illust.image.path).size, (750, 750))
         self.assertEqual(icon.new_card_id, 4049)
         self.assertIsNone(plain.custom_illust)
+
+
+class MyBordersTierRankTest(TestCase):
+    """참혈 2026-10-11: 마이페이지 테두리는 순차 지급 단계(기본→아이언→…→다이아) 중 바로 다음 단계만 보여 주므로
+    서버가 각 테두리의 단계 순서를 알려 준다."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from django.contrib.auth import get_user_model
+        from .models import Border
+        self.Border = Border
+        # migrations may already seed some of these
+        Border.objects.update_or_create(key="default", defaults={"name": "기본", "is_default": True, "category": "default"})
+        for i, key in enumerate(["iron", "bronze", "silver"]):
+            Border.objects.update_or_create(key=key, defaults={"name": key, "category": "exclusive", "sort_order": i + 1})
+        Border.objects.update_or_create(key="fire", defaults={"name": "화속성", "category": "shop", "rarity": "rare", "sort_order": 50})
+        self.user = get_user_model().objects.create_user(email="tier@t.com", username="tier", password="pass1234")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_tier_rank_marks_the_step_borders_only(self):
+        rows = {b["key"]: b for b in self.client.get("/api/avatar/borders/me/").json()["borders"]}
+        self.assertEqual(rows["default"]["tier_rank"], 0)
+        self.assertEqual(rows["iron"]["tier_rank"], 1)
+        self.assertEqual(rows["silver"]["tier_rank"], 3)
+        self.assertIsNone(rows["fire"]["tier_rank"])
+        self.assertEqual(rows["iron"]["unlock_condition"], "누적 포인트 10P 달성")
