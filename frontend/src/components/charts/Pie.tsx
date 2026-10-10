@@ -66,7 +66,7 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
   const top10 = data.slice(0, 10);
   const rest = Math.max(0, 100 - top10.reduce((sum, d) => sum + d.appearance_percent, 0));
   const items = [
-    ...top10.map((d, i) => ({ ...d, id: d.meta_deck_id, rank: i + 1, cover: d.cover_image_chart || deckCovers[d.meta_deck_id] || "" })),
+    ...top10.map((d, i) => ({ ...d, id: d.meta_deck_id, rank: i + 1, cover: d.cover_image || deckCovers[d.meta_deck_id] || "" })),
     { meta_deck_id: -1, meta_deck_name: "기타", appearance_percent: rest, win_rate: 0, is_upcoming: false, id: -1, rank: 0, cover: "" },
   ];
   const sum = items.reduce((a, d) => a + d.appearance_percent, 0) || 1;

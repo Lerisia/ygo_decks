@@ -1037,8 +1037,8 @@ class MetaDeckStatsTopThirtyTest(TestCase):
         pct = [d["appearance_percent"] for d in decks]
         self.assertEqual(pct, sorted(pct, reverse=True))
         self.assertIn("cover_image_small", decks[0])
-        self.assertIn("cover_image_chart", decks[0])
-        self.assertIsNone(decks[0]["cover_image_chart"])
+        self.assertIn("cover_image", decks[0])
+        self.assertIsNone(decks[0]["cover_image"])
 
     def test_marks_new_update_decks(self):
         # 신규 업데이트 덱 carry the same U mark as in the deck book (특이점 2026-10-10)
