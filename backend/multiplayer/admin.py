@@ -51,9 +51,9 @@ class PokemonCardAdmin(admin.ModelAdmin):
 class DuchMindWordInline(admin.TabularInline):
     model = DuchMindWord
     extra = 0
-    fields = ("card", "pokemon", "enabled", "note", "created_at")
+    fields = ("new_card", "pokemon", "enabled", "note", "created_at")
     readonly_fields = ("created_at",)
-    autocomplete_fields = ("card", "pokemon")
+    autocomplete_fields = ("new_card", "pokemon")
     show_change_link = True
 
 
@@ -71,10 +71,10 @@ class DuchMindWordPackAdmin(admin.ModelAdmin):
 
 @admin.register(DuchMindWord)
 class DuchMindWordAdmin(admin.ModelAdmin):
-    list_display = ("id", "pack", "card", "pokemon", "enabled", "created_at")
+    list_display = ("id", "pack", "new_card", "pokemon", "enabled", "created_at")
     list_filter = ("enabled", "pack")
-    search_fields = ("card__korean_name", "pokemon__name_ko", "note")
-    autocomplete_fields = ("pack", "card", "pokemon", "created_by")
+    search_fields = ("new_card__name_ko", "pokemon__name_ko", "note")
+    autocomplete_fields = ("pack", "new_card", "pokemon", "created_by")
 
 
 @admin.register(Room)

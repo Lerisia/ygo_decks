@@ -258,11 +258,16 @@ class DuchMindWord(models.Model):
                 condition=models.Q(pokemon__isnull=False),
                 name="unique_pack_pokemon",
             ),
+            models.UniqueConstraint(
+                fields=["pack", "new_card"],
+                condition=models.Q(new_card__isnull=False),
+                name="unique_pack_new_card",
+            ),
         ]
 
     def __str__(self):
-        if self.card_id:
-            return f"DM-Y:{self.card_id} {self.card.korean_name or self.card.name}"
+        if self.new_card_id:
+            return f"DM-Y:{self.new_card_id} {self.new_card.name_ko or self.new_card.name_ja}"
         if self.pokemon_id:
             return f"DM-P:{self.pokemon_id} {self.pokemon.name_ko}"
         return f"DM:(empty)"

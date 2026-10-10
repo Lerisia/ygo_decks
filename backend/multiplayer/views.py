@@ -991,6 +991,16 @@ def _admin_pack(request):
     return _default_pack()
 
 
+def _card_item(c):
+    from carddb.display import art_url, display_name
+    return {"id": c.id, "card_id": c.id, "name": display_name(c), "image_url": art_url(c.id)}
+
+
+def _cards_with_art():
+    from carddb.models import Card
+    return Card.objects.filter(md_prints__arts__isnull=False).distinct()
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dm_browse_cards(request):
@@ -998,7 +1008,7 @@ def dm_browse_cards(request):
     they're already in ?pack_id=. Powers both the admin tier-pack curator
     and user-owned pack editors — auth is per-pack: staff edits system
     packs (owner=None), users edit packs they own. Optional ?q= filters."""
-    from card.models import Card
+    from django.db.models import F
     from .models import DuchMindWordPack
     pid = request.query_params.get("pack_id")
     if pid:
@@ -1025,34 +1035,21 @@ def dm_browse_cards(request):
         page_size = 60
     q = (request.query_params.get("q") or "").strip()
 
-    qs = Card.objects.filter(card_illust__isnull=False).exclude(card_illust="")
+    qs = _cards_with_art()
     if q:
-        qs = qs.filter(korean_name__icontains=q)
-    # Newly scraped cards float to the top; pre-existing rows are all
-    # stamped 2020-01-01 by migration 0020 and stay in their historic id order.
-    qs = qs.order_by("-created_at", "id")
+        qs = qs.filter(name_ko__icontains=q)
+    # Newest releases first.
+    qs = qs.order_by(F("ocg_date").desc(nulls_first=True), "-id")
     total = qs.count()
     start = (page - 1) * page_size
-    chunk = list(qs[start:start + page_size].only("id", "card_id", "korean_name", "name", "card_illust"))
+    chunk = list(qs[start:start + page_size].only("id", "name_ko", "name_ja", "name_en"))
 
     in_pack = set(
-        DuchMindWord.objects.filter(pack=pack, card_id__in=[c.id for c in chunk])
-        .values_list("card_id", flat=True)
+        DuchMindWord.objects.filter(pack=pack, new_card_id__in=[c.id for c in chunk])
+        .values_list("new_card_id", flat=True)
     ) if pack else set()
 
-    items = []
-    for c in chunk:
-        try:
-            url = c.card_illust.url if c.card_illust else None
-        except Exception:
-            url = None
-        items.append({
-            "id": c.id,
-            "card_id": c.card_id,
-            "name": c.korean_name or c.name,
-            "image_url": url,
-            "in_pack": c.id in in_pack,
-        })
+    items = [{**_card_item(c), "in_pack": c.id in in_pack} for c in chunk]
     return Response({
         "items": items,
         "page": page,
@@ -1086,12 +1083,10 @@ def dm_list_words(request):
     """List a system pack's words (admin maintenance UI). Defaults to the
     default pack; pass ?pack_id= to target 중급/고급/etc."""
     pack = _admin_pack(request)
-    qs = DuchMindWord.objects.filter(pack=pack).select_related("card") if pack else DuchMindWord.objects.none()
+    qs = DuchMindWord.objects.filter(pack=pack).exclude(new_card=None).select_related("new_card") if pack else DuchMindWord.objects.none()
     items = [
         {
-            "id": w.id, "card_id": w.card.card_id, "card_pk": w.card_id,
-            "name": w.card.korean_name or w.card.name,
-            "image_url": w.card.card_illust.url if w.card.card_illust else None,
+            **_card_item(w.new_card), "id": w.id, "card_pk": w.new_card_id,
             "enabled": w.enabled, "note": w.note,
         }
         for w in qs
@@ -1103,25 +1098,20 @@ def dm_list_words(request):
 @permission_classes([IsAdminUser])
 def dm_search_cards(request):
     """Search cards by Korean name to add to the target pack. Excludes already-in-pack cards."""
-    from card.models import Card
     pack = _admin_pack(request)
     q = (request.query_params.get("q") or "").strip()
     if not q:
         return Response({"results": []})
-    used = set(DuchMindWord.objects.filter(pack=pack).values_list("card_id", flat=True)) if pack else set()
-    qs = Card.objects.filter(korean_name__icontains=q).exclude(id__in=used)[:50]
-    results = [
-        {"id": c.id, "card_id": c.card_id, "name": c.korean_name or c.name,
-         "image_url": c.card_illust.url if c.card_illust else None}
-        for c in qs
-    ]
+    used = set(DuchMindWord.objects.filter(pack=pack).values_list("new_card_id", flat=True)) if pack else set()
+    qs = _cards_with_art().filter(name_ko__icontains=q).exclude(id__in=used)[:50]
+    results = [_card_item(c) for c in qs]
     return Response({"results": results})
 
 
 @api_view(["POST"])
 @permission_classes([IsAdminUser])
 def dm_add_word(request):
-    from card.models import Card
+    from carddb.models import Card
     pack = _admin_pack(request)
     if pack is None:
         return Response({"error": "단어장을 찾을 수 없습니다."}, status=400)
@@ -1133,10 +1123,10 @@ def dm_add_word(request):
     except (Card.DoesNotExist, ValueError, TypeError):
         return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
     word, created = DuchMindWord.objects.get_or_create(
-        pack=pack, card=card,
+        pack=pack, new_card=card,
         defaults={"created_by": request.user, "note": (request.data.get("note") or "")[:120]},
     )
-    return Response({"id": word.id, "card_id": card.card_id, "name": card.korean_name, "created": created},
+    return Response({"id": word.id, "card_id": card.id, "name": card.name_ko, "created": created},
                     status=201 if created else 200)
 
 
@@ -1144,7 +1134,7 @@ def dm_add_word(request):
 @permission_classes([IsAdminUser])
 def dm_bulk_add_words(request):
     """Add many cards at once by Korean name match to the target pack."""
-    from card.models import Card
+    from carddb.models import Card
     pack = _admin_pack(request)
     if pack is None:
         return Response({"error": "단어장을 찾을 수 없습니다."}, status=400)
@@ -1154,19 +1144,19 @@ def dm_bulk_add_words(request):
     added = 0
     skipped = 0
     not_found = []
-    used = set(DuchMindWord.objects.filter(pack=pack).values_list("card_id", flat=True))
+    used = set(DuchMindWord.objects.filter(pack=pack).values_list("new_card_id", flat=True))
     for raw in names:
         n = (raw or "").strip()
         if not n:
             continue
-        c = Card.objects.filter(korean_name=n).first()
+        c = Card.objects.filter(name_ko=n).first()
         if not c:
             not_found.append(n)
             continue
         if c.id in used:
             skipped += 1
             continue
-        DuchMindWord.objects.create(pack=pack, card=c, created_by=request.user)
+        DuchMindWord.objects.create(pack=pack, new_card=c, created_by=request.user)
         used.add(c.id)
         added += 1
     return Response({"added": added, "skipped": skipped, "not_found": not_found})
@@ -1205,7 +1195,7 @@ def dm_remove_word_by_card(request):
     if not card_pk:
         return Response({"error": "card_pk가 필요합니다."}, status=400)
     try:
-        n, _ = DuchMindWord.objects.filter(pack=pack, card_id=int(card_pk)).delete()
+        n, _ = DuchMindWord.objects.filter(pack=pack, new_card_id=int(card_pk)).delete()
     except (TypeError, ValueError):
         return Response({"error": "card_pk가 유효하지 않습니다."}, status=400)
     return Response({"ok": True, "removed": n})
@@ -1310,16 +1300,9 @@ def dm_pack_detail(request, pack_id):
             for w in entries
         ]
     else:
-        entries = pack.entries.select_related("card").exclude(card__isnull=True)
+        entries = pack.entries.select_related("new_card").exclude(new_card__isnull=True)
         items = [
-            {
-                "id": w.id,
-                "card_id": w.card.card_id,
-                "card_pk": w.card_id,
-                "name": w.card.korean_name or w.card.name,
-                "image_url": w.card.card_illust.url if w.card.card_illust else None,
-                "enabled": w.enabled,
-            }
+            {**_card_item(w.new_card), "id": w.id, "card_pk": w.new_card_id, "enabled": w.enabled}
             for w in entries
         ]
     return Response({"pack": _pack_summary(pack, request.user), "entries": items})
@@ -1369,9 +1352,9 @@ def dm_pack_delete(request, pack_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def dm_pack_add_card(request, pack_id):
-    """Add a single entry to a pack. card_pk references Card.id for yugioh
+    """Add a single entry to a pack. card_pk references carddb Card.id for yugioh
     packs, PokemonCard.id for pokemon packs."""
-    from card.models import Card
+    from carddb.models import Card
     from .models import PokemonCard
     Pack = DuchMindWord._meta.get_field("pack").related_model
     pack = get_object_or_404(Pack, id=pack_id)
@@ -1399,11 +1382,11 @@ def dm_pack_add_card(request, pack_id):
         except (Card.DoesNotExist, ValueError, TypeError):
             return Response({"error": "카드를 찾을 수 없습니다."}, status=404)
         word, created = DuchMindWord.objects.get_or_create(
-            pack=pack, card=card,
+            pack=pack, new_card=card,
             defaults={"created_by": request.user},
         )
         return Response({
-            "id": word.id, "card_id": card.card_id, "name": card.korean_name, "created": created,
+            "id": word.id, "card_id": card.id, "name": card.name_ko, "created": created,
         }, status=201 if created else 200)
 
 
@@ -1433,7 +1416,7 @@ def dm_pack_remove_card(request, pack_id):
     if not card_pk:
         return Response({"error": "card_pk가 필요합니다."}, status=400)
     try:
-        removed, _ = DuchMindWord.objects.filter(pack=pack, card_id=int(card_pk)).delete()
+        removed, _ = DuchMindWord.objects.filter(pack=pack, new_card_id=int(card_pk)).delete()
     except (TypeError, ValueError):
         return Response({"error": "card_pk 형식 오류"}, status=400)
     return Response({"ok": True, "removed": removed})
@@ -1444,7 +1427,7 @@ def dm_pack_remove_card(request, pack_id):
 def dm_pack_import(request, pack_id):
     """Bulk add entries by exact Korean name match (skribbl-style CSV).
     Branches on pack.series."""
-    from card.models import Card
+    from carddb.models import Card
     from .models import PokemonCard
     Pack = DuchMindWord._meta.get_field("pack").related_model
     pack = get_object_or_404(Pack, id=pack_id)
@@ -1471,16 +1454,16 @@ def dm_pack_import(request, pack_id):
             used.add(p.id)
             added += 1
     else:
-        used = set(pack.entries.exclude(card__isnull=True).values_list("card_id", flat=True))
+        used = set(pack.entries.exclude(new_card__isnull=True).values_list("new_card_id", flat=True))
         for n in names:
-            c = Card.objects.filter(korean_name=n).first()
+            c = Card.objects.filter(name_ko=n).first()
             if not c:
                 not_found.append(n)
                 continue
             if c.id in used:
                 skipped += 1
                 continue
-            DuchMindWord.objects.create(pack=pack, card=c, created_by=request.user)
+            DuchMindWord.objects.create(pack=pack, new_card=c, created_by=request.user)
             used.add(c.id)
             added += 1
     return Response({"added": added, "skipped": skipped, "not_found": not_found})
@@ -1501,7 +1484,7 @@ def dm_pack_export(request, pack_id):
     if getattr(pack, "series", "yugioh") == "pokemon":
         names = list(pack.entries.select_related("pokemon").values_list("pokemon__name_ko", flat=True))
     else:
-        names = list(pack.entries.select_related("card").values_list("card__korean_name", flat=True))
+        names = list(pack.entries.values_list("new_card__name_ko", flat=True))
     return Response({
         "name": pack.name,
         "csv": ",".join(n for n in names if n),
@@ -1515,7 +1498,6 @@ def dm_pack_search_cards(request, pack_id):
     """Search cards by name to add to a specific pack (excludes already-in-pack
     cards). Branches on pack.series — yugioh searches Card, pokemon searches
     PokemonCard."""
-    from card.models import Card
     from .models import PokemonCard
     Pack = DuchMindWord._meta.get_field("pack").related_model
     pack = get_object_or_404(Pack, id=pack_id)
@@ -1538,16 +1520,9 @@ def dm_pack_search_cards(request, pack_id):
             for p in qs
         ]
     else:
-        used = set(pack.entries.exclude(card__isnull=True).values_list("card_id", flat=True))
-        qs = Card.objects.filter(korean_name__icontains=q).exclude(id__in=used)[:50]
-        results = [
-            {
-                "id": c.id, "card_id": c.card_id,
-                "name": c.korean_name or c.name,
-                "image_url": c.card_illust.url if c.card_illust else None,
-            }
-            for c in qs
-        ]
+        used = set(pack.entries.exclude(new_card__isnull=True).values_list("new_card_id", flat=True))
+        qs = _cards_with_art().filter(name_ko__icontains=q).exclude(id__in=used)[:50]
+        results = [_card_item(c) for c in qs]
     return Response({"results": results})
 
 
