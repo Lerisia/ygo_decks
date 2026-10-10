@@ -9,7 +9,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .display import art_url, display_name, thumb_url
-from .face import face_url
+from .face import face_thumb_url, face_url
 from .models import Card, CardGroup, CardGroupMember, CardText, MdPrint, has_art
 
 PAGE_SIZE = 60
@@ -105,8 +105,8 @@ def cards(request):
         page = 1
     chunk = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
     return Response({
-        "results": [{"id": r[0], "name": r[1] or r[2] or r[3], "thumb_url": thumb_url(r[0]), "image_url": art_url(r[0])}
-                    for r in chunk],
+        "results": [{"id": r[0], "name": r[1] or r[2] or r[3], "face_thumb_url": face_thumb_url(r[0]),
+                     "thumb_url": thumb_url(r[0]), "image_url": art_url(r[0])} for r in chunk],
         "total": len(rows), "page": page, "has_more": page * PAGE_SIZE < len(rows),
     })
 
@@ -191,8 +191,9 @@ def card(request, card_id):
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale,
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
         "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
-        "alt_arts": [u for u in (art_url(m) for m in MdPrint.objects.filter(card=c, is_alt_art=True)
-                                 .order_by("md_id").values_list("md_id", flat=True)) if u],
+        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m)}
+                  for m in [c.id] + list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id")
+                                         .values_list("md_id", flat=True)) if face_url(m)],
         "rarity": base.rarity if base else "",
         "dates": {"ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],

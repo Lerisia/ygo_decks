@@ -16,6 +16,8 @@ from .display import art_path
 
 W, H = 704, 1024
 FACE_DIR = "cards/face"
+THUMB_DIR = "cards/face_thumb"
+THUMB_W = 300
 
 FRAMES = {
     "normal": "00", "effect": "01", "ritual": "02", "fusion": "03", "spell": "07", "trap": "08", "token": "09",
@@ -220,10 +222,11 @@ def _link_markers(face, markers):
         face.alpha_composite(sprite, (round(cx - sprite.width / 2), round(cy - sprite.height / 2)))
 
 
-def draw_face(card, texts=None, with_text=False):
-    """The card face as a 704×1024 RGBA image. The effect boxes stay empty (at the size the card book shows a face,
-    card text can't be read, and the page prints it in full below, 엘리스 10/11); with_text=True fills them from
-    texts, the card's Korean CardText (fetched when not given)."""
+def draw_face(card, texts=None, with_text=False, art_id=None):
+    """The card face as a 704×1024 RGBA image, with the art of Master Duel print art_id (the card's own by default,
+    another id for an alternate art). The effect boxes stay empty (at the size the card book shows a face, card text
+    can't be read, and the page prints it in full below, 엘리스 10/11); with_text=True fills them from texts, the
+    card's Korean CardText (fetched when not given)."""
     if not with_text:
         texts = False
     elif texts is None:
@@ -234,7 +237,7 @@ def draw_face(card, texts=None, with_text=False):
     pendulum = frame_key.endswith("_pendulum")
     face = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 
-    path = art_path(card.id)
+    path = art_path(art_id or card.id)
     if path and os.path.exists(path):
         art = Image.open(path).convert("RGBA")
         x0, y0, x1, y1 = PEND_ART if pendulum else ART
@@ -269,6 +272,9 @@ def draw_face(card, texts=None, with_text=False):
     else:
         _spell_trap_line(face, draw, card)
         body_top, body_bottom = ty0 + 2, ty1
+    if pendulum and card.pendulum_scale is not None:
+        for x in PEND_SCALE_X:
+            draw.text((x, 735), str(card.pendulum_scale), font=stat_font(42), fill=(0, 0, 0, 255), anchor="mm")
 
     if texts:
         if pendulum and texts.pendulum_effect:
@@ -276,9 +282,6 @@ def draw_face(card, texts=None, with_text=False):
             px0, py0, px1, py1 = PEND_TEXT
             font, lines, lh = fit(pend, px1 - px0, py1 - py0, lambda s: sans(s), sizes=range(24, 9, -1))
             _draw_lines(draw, lines, font, px0, py0, lh)
-        if pendulum and card.pendulum_scale is not None:
-            for x in PEND_SCALE_X:
-                draw.text((x, 735), str(card.pendulum_scale), font=stat_font(42), fill=(0, 0, 0, 255), anchor="mm")
         normal_monster = card.category == "monster" and "normal" in card.types
         body = card_paragraphs(texts.flavor if normal_monster and texts.flavor else texts.effect)
         if texts.materials:
@@ -289,17 +292,40 @@ def draw_face(card, texts=None, with_text=False):
     return face
 
 
-def face_rel(card_id):
-    return f"{FACE_DIR}/{card_id}.webp"
+def face_rel(md_id):
+    return f"{FACE_DIR}/{md_id}.webp"
 
 
-def face_url(card_id):
-    rel = face_rel(card_id)
+def thumb_rel(md_id):
+    return f"{THUMB_DIR}/{md_id}.webp"
+
+
+def _url(rel):
     return settings.MEDIA_URL + rel if os.path.exists(os.path.join(settings.MEDIA_ROOT, rel)) else None
 
 
-def save_face(card, quality=86):
-    out = os.path.join(settings.MEDIA_ROOT, face_rel(card.id))
+def face_url(md_id):
+    return _url(face_rel(md_id))
+
+
+def face_thumb_url(md_id):
+    return _url(thumb_rel(md_id))
+
+
+def save_thumb(md_id, img=None, quality=80):
+    """The small face the card list shows (THUMB_W wide), from img or the saved face."""
+    img = img or Image.open(os.path.join(settings.MEDIA_ROOT, face_rel(md_id)))
+    out = os.path.join(settings.MEDIA_ROOT, thumb_rel(md_id))
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    draw_face(card).save(out, "WEBP", quality=quality, method=5)
+    img.resize((THUMB_W, round(H * THUMB_W / W)), Image.LANCZOS).save(out, "WEBP", quality=quality, method=5)
+
+
+def save_face(card, md_id=None, quality=86):
+    """Draw and save the face (and its list thumbnail) of a card's print md_id (its own by default)."""
+    md_id = md_id or card.id
+    out = os.path.join(settings.MEDIA_ROOT, face_rel(md_id))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    img = draw_face(card, art_id=md_id)
+    img.save(out, "WEBP", quality=quality, method=5)
+    save_thumb(md_id, img)
     return out

@@ -23,7 +23,13 @@ export const EMPTY_FILTERS: CardFilters = {
   q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", sort: "new",
 };
 
-export type CardListItem = { id: number; name: string; thumb_url: string | null; image_url: string | null };
+export type CardListItem = {
+  id: number;
+  name: string;
+  face_thumb_url: string | null;
+  thumb_url: string | null;
+  image_url: string | null;
+};
 export type CardListResponse = { results: CardListItem[]; total: number; page: number; has_more: boolean };
 
 export type Option = { value: string; label: string };
@@ -60,7 +66,8 @@ export type CardDoc = {
   thumb_url: string | null;
   /** The whole card in Korean, drawn from Master Duel's frame (null until drawn). */
   face_url: string | null;
-  alt_arts: string[];
+  /** The card's faces: its own print first, then Master Duel's alternate arts. */
+  faces: { id: number; face: string; thumb: string | null }[];
   rarity: string;
   dates: { ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];

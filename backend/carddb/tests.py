@@ -723,7 +723,13 @@ class CardDexApiTest(TestCase):
         return c
 
     def setUp(self):
+        from django.test import override_settings
         from . import display
+        media = tempfile.mkdtemp()   # never the live media folder
+        self.addCleanup(shutil.rmtree, media)
+        ctx = override_settings(MEDIA_ROOT=media)
+        ctx.enable()
+        self.addCleanup(ctx.disable)
         display.forget_art()
         self.addCleanup(display.forget_art)
         self.dm = self.card(1, "블랙 매지션", "ブラック・マジシャン", "Dark Magician", level=7, atk=2500, def_value=2100,
@@ -817,8 +823,7 @@ class CardDexApiTest(TestCase):
         self.assertEqual(body["groups"], [{"id": g.id, "name": "블랙 매지션", "parent_id": None}])
         self.assertEqual([d["name"] for d in body["decks"]], ["블랙 매지션"])
         self.assertEqual(body["rarity"], "SR")
-        self.assertEqual(body["alt_arts"], ["/media/cards/art/common/3901.webp"])
-        self.assertIsNone(body["face_url"])   # not drawn yet
+        self.assertEqual((body["face_url"], body["faces"]), (None, []))   # not drawn yet
         link = self.client.get("/api/carddb/cards/6/").json()
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()
@@ -883,10 +888,27 @@ class CardFaceTest(TestCase):
         self.assertEqual((img.size, img.mode), ((704, 1024), "RGBA"))
         self.assertEqual(img.getpixel((352, 450))[:3], (10, 200, 10))   # the art shows through the frame's window
         self.assertIsNone(face_url(7))
+        from .models import MdArt
+        alt = MdPrint.objects.create(md_id=3907, card=self.card, is_alt_art=True)
+        MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/7.webp")
+        from . import display
+        display.forget_art()
         call_command("draw_card_faces", "--workers", "1", stdout=io.StringIO())
-        self.assertTrue(os.path.exists(os.path.join(self.media, "cards/face/7.webp")))
+        for rel in ("cards/face/7.webp", "cards/face_thumb/7.webp", "cards/face/3907.webp"):
+            self.assertTrue(os.path.exists(os.path.join(self.media, rel)), rel)
         self.assertEqual(face_url(7), "/media/cards/face/7.webp")
-        self.assertEqual(self.client.get("/api/carddb/cards/7/").json()["face_url"], "/media/cards/face/7.webp")
+        body = self.client.get("/api/carddb/cards/7/").json()
+        self.assertEqual(body["face_url"], "/media/cards/face/7.webp")
+        self.assertEqual([f["id"] for f in body["faces"]], [7, 3907])
+        self.assertEqual(self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"], "/media/cards/face_thumb/7.webp")
+        os.remove(os.path.join(self.media, "cards/face_thumb/7.webp"))
         out = io.StringIO()
         call_command("draw_card_faces", "--workers", "1", stdout=out)
-        self.assertIn("0 faces drawn", out.getvalue())   # only missing ones by default
+        self.assertIn("0 faces drawn, 1 thumbnails made", out.getvalue())   # only what is missing
+
+    def test_pendulum_scale_is_drawn_with_the_text_boxes_empty(self):
+        from .face import PEND_SCALE_X, draw_face
+        self.card.frame, self.card.types, self.card.pendulum_scale = "effect_pendulum", ["pendulum", "effect"], 7
+        x = PEND_SCALE_X[0]
+        box = draw_face(self.card).crop((x - 15, 715, x + 15, 755)).convert("L")
+        self.assertLess(min(box.getdata()), 60)   # dark digit strokes on the light frame

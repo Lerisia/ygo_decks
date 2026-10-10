@@ -21,7 +21,7 @@ const hasFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute ||
 function TileSkeleton() {
   return (
     <div>
-      <div className="w-full aspect-square rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+      <div className="w-full aspect-[704/1024] rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
       <div className="mt-1 h-10 flex items-start justify-center">
         <div className="mt-1 h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
       </div>
@@ -35,9 +35,9 @@ function CardTile({ card }: { card: CardListItem }) {
       <img
         loading="lazy"
         decoding="async"
-        src={card.thumb_url || card.image_url || "/default_cover.png"}
+        src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
         alt={card.name}
-        className="w-full aspect-square object-cover rounded-lg bg-gray-100 dark:bg-gray-800 group-hover:opacity-90 transition"
+        className="w-full aspect-[704/1024] object-contain group-hover:opacity-90 transition"
       />
       <p className="mt-1 h-10 text-xs sm:text-sm leading-5 line-clamp-2 break-keep">{card.name}</p>
     </Link>

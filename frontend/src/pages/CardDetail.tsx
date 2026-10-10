@@ -74,27 +74,25 @@ function Skeleton() {
   );
 }
 
-/** 카드 도감 document: picture (the Korean card face, or the illustration and other Master Duel arts), names, stats, effect text,
+/** 카드 도감 document: the Korean card face (and its Master Duel alternate arts), names, stats, effect text,
  *  the card's 카드군 (each opens the card list filtered to it) and the decks those 카드군 are linked to. */
 export default function CardDetail() {
   const { cardId } = useParams();
   const [card, setCard] = useState<CardDoc | null>(null);
   const [error, setError] = useState("");
-  const [art, setArt] = useState<string | null>(null);
-  const [showFace, setShowFace] = useState(true);
+  const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setCard(null);
     setError("");
-    setShowFace(true);
     setJa(false);
     getCard(cardId ?? "")
       .then((c) => {
         if (!alive) return;
         setCard(c);
-        setArt(c.image_url || c.thumb_url);
+        setPicked(c.face_url);
       })
       .catch((e) => alive && setError(e.message));
     return () => {
@@ -116,44 +114,27 @@ export default function CardDetail() {
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
-  const arts = [card.image_url, ...card.alt_arts].filter((u): u is string => !!u);
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
       <div className="md:flex md:gap-6">
         <div className="md:w-80 shrink-0">
-          {showFace && card.face_url ? (
-            <img src={card.face_url} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
+          {picked ? (
+            <img src={picked} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
           ) : (
-            <img src={art || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
+            <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
-          {card.face_url && (
-            <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-gray-200 dark:bg-gray-700 p-1 text-sm font-semibold">
-              {([["카드", true], ["일러스트", false]] as const).map(([label, value]) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setShowFace(value)}
-                  className={`py-1.5 rounded-md transition ${
-                    showFace === value ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          {!(showFace && card.face_url) && arts.length > 1 && (
+          {card.faces.length > 1 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {arts.map((u, i) => (
+              {card.faces.map((f, i) => (
                 <button
-                  key={u}
+                  key={f.id}
                   type="button"
-                  onClick={() => setArt(u)}
-                  className={`w-12 h-12 rounded-md overflow-hidden ring-2 transition ${art === u ? "ring-blue-600" : "ring-transparent"}`}
+                  onClick={() => setPicked(f.face)}
+                  className={`w-12 rounded-sm overflow-hidden ring-2 transition ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
                   aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
                 >
-                  <img src={u} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />
                 </button>
               ))}
             </div>
