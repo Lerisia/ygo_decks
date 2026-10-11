@@ -1305,19 +1305,16 @@ def deck_submission(request, tournament_id):
                 f.write(chunk)
         detections = scan_deck_image(image_path, work_dir)
 
-    from carddb.models import LegacyCard, has_art
+    from carddb.models import Card as NewCard, has_art
     counts = {}
     best_conf = {}
     unmatched = 0
-    detections = [(str(cid), float(conf)) for cid, conf in detections]
-    # The scanner still labels cards by their old card_id; the link table leads to the new card.
-    card_by_scanner_id = dict(
-        LegacyCard.objects.filter(old_card_id__in={d[0] for d in detections}, card__isnull=False)
-        .filter(has_art("card_id")).values_list("old_card_id", "card_id")
-    )
-    for scanner_id, confidence in detections:
-        card_id = card_by_scanner_id.get(scanner_id)
-        if card_id is None:
+    # the scanner names the site's cards; a picture past knowing, or a card outside Master Duel, is unmatched
+    detections = [(int(cid) if cid is not None else None, float(conf)) for cid, conf in detections]
+    known = set(NewCard.objects.filter(id__in={c for c, _ in detections if c is not None}).filter(has_art())
+                .values_list("id", flat=True))
+    for card_id, confidence in detections:
+        if card_id not in known:
             unmatched += 1
             continue
         counts[card_id] = min(counts.get(card_id, 0) + 1, MAX_COPIES)

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from .models import UploadRecord, CardDetection, Card
 from rest_framework.parsers import MultiPartParser
 from rest_framework import permissions
-from .classify import predict_card_from_bytes
+from .identify import identify
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
@@ -102,39 +102,31 @@ def predict_card_api(request):
     if "image" not in request.FILES:
         return Response({"error": "No image uploaded."}, status=400)
 
-    image_file = request.FILES["image"]
-    image_bytes = image_file.read()
-
+    from io import BytesIO
     try:
-        top5_ids = predict_card_from_bytes(image_bytes)
+        image = Image.open(BytesIO(request.FILES["image"].read()))
+        match = identify([image])[0]
     except Exception as e:
         return Response({"error": f"Prediction failed: {str(e)}"}, status=500)
 
     from carddb.display import art_url, display_name
-    card_id, confidence = predict_card_from_bytes(image_bytes)
-    card = _scanned_cards([card_id]).get(str(card_id))
-
+    card = _scanned_cards([match.card_id]).get(match.card_id)
     if not card:
-        return Response({"error": f"Card ID {card_id} not found in DB."}, status=404)
+        return Response({"error": "카드를 알아보지 못했습니다."}, status=404)
 
     return Response({
         "card_id": card.id,
         "name": display_name(card),
         "image_url": request.build_absolute_uri(art_url(card.id)),
-        "confidence": round(confidence, 4)
+        "confidence": round(match.similarity, 4)
     })
 
 
-def _scanned_cards(labels):
-    """Classifier labels (old card_id) → new cards on the site, through the link table."""
-    from carddb.models import Card as NewCard, LegacyCard, has_art
-    links = dict(
-        LegacyCard.objects.filter(old_card_id__in={str(x) for x in labels}, card__isnull=False)
-        .filter(has_art("card_id")).values_list("old_card_id", "card_id")
-    )
-    cards = NewCard.objects.in_bulk(set(links.values()))
-    return {label: cards[cid] for label, cid in links.items()}
-    
+def _scanned_cards(card_ids):
+    """The site's cards the identifier named (those with Master Duel art), by id."""
+    from carddb.models import Card as NewCard, has_art
+    return NewCard.objects.filter(id__in={c for c in card_ids if c is not None}).filter(has_art()).in_bulk()
+
 from datetime import timedelta
 from django.utils import timezone
 
@@ -185,30 +177,27 @@ def classify_deck_image(request):
     # 5. Classify
     from carddb.display import display_name
     results = []
+    # the identifier reads each whole cut card (엘리스 10/12); the art crops stay with the record
     illust_files = sorted([f for f in os.listdir(illust_dir) if f.startswith("illust")])
-    for fname in illust_files:
-        fpath = os.path.join(illust_dir, fname)
-        card_fname = fname.replace("illust", "card")
+    card_files = [fname.replace("illust", "card") for fname in illust_files]
+    matches = identify([Image.open(os.path.join(card_dir, f)) for f in card_files])
+    cards = _scanned_cards([m.card_id for m in matches])
+    for fname, card_fname, match in zip(illust_files, card_files, matches):
         card_image_path = os.path.join(f"upload_{upload_record.id}", "cards", card_fname)
-
-        with open(fpath, "rb") as f:
-            image_bytes = f.read()
-
-        card_id, confidence = predict_card_from_bytes(image_bytes)
-        card_obj = _scanned_cards([card_id]).get(str(card_id))
+        card_obj = cards.get(match.card_id)
         card_name = display_name(card_obj) if card_obj else "Unknown"
 
         # Save the result
         CardDetection.objects.create(
             record=upload_record,
             new_card=card_obj,
-            confidence=confidence,
+            confidence=match.similarity,
             illust_image=os.path.join(f"upload_{upload_record.id}", "illusts", fname)
         )
 
         results.append({
             'card_name': card_name,
-            'confidence': round(float(confidence) * 100, 2),
+            'confidence': round(float(match.similarity) * 100, 2),
             'card_image': os.path.join(settings.MEDIA_URL, card_image_path)
         })
 

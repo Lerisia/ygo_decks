@@ -462,23 +462,23 @@ class CardSearchThumbTests(TestCase):
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class DeckScannerTest(FreshArt, TestCase):
-    """The classifier still labels cards by their old card_id; results name the new card."""
+    """The identifier names each cut card by its nearest print (card/identify.py); results name the site's card, and
+    a card outside Master Duel or a picture past knowing is Unknown."""
 
     def setUp(self):
         super().setUp()
-        from carddb.models import Card as NewCard, LegacyCard
+        from carddb.models import Card as NewCard
         self.user = User.objects.create_user(email="scan@test.com", username="scanner", password="x", is_staff=True)
         self.client = APIClient()
         self.client.force_authenticate(self.user)
-        LegacyCard.objects.create(old_id=1, old_card_id="4602257800", card=_create_card_with_art("블랙 매지션", 4041), how="konami")
-        ocg_only = NewCard.objects.create(id=5392, category="spell", name_ja="天変地異", name_ko="천재지변", frame="spell")
-        LegacyCard.objects.create(old_id=2, old_card_id="6296633200", card=ocg_only, how="konami")
+        _create_card_with_art("블랙 매지션", 4041)
+        NewCard.objects.create(id=5392, category="spell", name_ja="天変地異", name_ko="천재지변", frame="spell")
 
     @staticmethod
-    def fake_crop(image_path, card_output_dir, illust_output_dir, boxed_image_path, min_conf):
+    def fake_crop(image_path, card_output_dir, illust_output_dir, boxed_image_path, min_conf=None):
         for i in range(3):
-            PILImage.new("RGB", (10, 10)).save(os.path.join(illust_output_dir, f"illust_{i}.jpg"))
-            PILImage.new("RGB", (10, 14)).save(os.path.join(card_output_dir, f"card_{i}.jpg"))
+            PILImage.new("RGB", (10, 10)).save(os.path.join(illust_output_dir, f"illust_{i:02}.jpg"))
+            PILImage.new("RGB", (10, 14)).save(os.path.join(card_output_dir, f"card_{i:02}.jpg"))
         PILImage.new("RGB", (10, 10)).save(boxed_image_path)
 
     def photo(self):
@@ -487,23 +487,73 @@ class DeckScannerTest(FreshArt, TestCase):
         return SimpleUploadedFile("deck.jpg", buf.getvalue(), content_type="image/jpeg")
 
     def test_deck_photo_names_cards_from_master_duel(self):
-        labels = iter([("4602257800", 0.97), ("6296633200", 0.9), ("999", 0.5)])
+        from .identify import Match
+        found = [Match(4041, 4041, 0.93), Match(5392, 5392, 0.9), Match(None, None, 0.31)]
         with patch("card.views.crop_cards_and_draw_boxes", side_effect=self.fake_crop), \
-                patch("card.views.predict_card_from_bytes", side_effect=lambda b: next(labels)):
+                patch("card.views.identify", return_value=found) as identify:
             r = self.client.post("/api/classify-deck/", {"image": self.photo()}, format="multipart")
         self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(identify.call_args[0][0]), 3)   # the whole cut cards, in order
         self.assertEqual([x["card_name"] for x in r.json()["result"]], ["블랙 매지션", "Unknown", "Unknown"])
+        self.assertEqual([x["confidence"] for x in r.json()["result"]], [93.0, 90.0, 31.0])
         from .models import CardDetection
         self.assertEqual(list(CardDetection.objects.order_by("id").values_list("new_card_id", flat=True)), [4041, None, None])
 
     def test_single_card(self):
-        with patch("card.views.predict_card_from_bytes", return_value=("4602257800", 0.9)):
+        from .identify import Match
+        with patch("card.views.identify", return_value=[Match(4041, 4041, 0.9)]):
             r = self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart")
         body = r.json()
-        self.assertEqual((body["card_id"], body["name"]), (4041, "블랙 매지션"))
+        self.assertEqual((body["card_id"], body["name"], body["confidence"]), (4041, "블랙 매지션", 0.9))
         self.assertTrue(body["image_url"].endswith("/media/cards/art/common/4041.webp"))
-        with patch("card.views.predict_card_from_bytes", return_value=("6296633200", 0.9)):
-            self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
+        for miss in (Match(5392, 5392, 0.9), Match(None, None, 0.2)):
+            with patch("card.views.identify", return_value=[miss]):
+                self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
+
+
+class IdentifyTest(SimpleTestCase):
+    def test_nearest_print_and_unknown(self):
+        import torch
+        import torch.nn.functional as F
+        from .identify import UNKNOWN, nearest
+        emb = torch.eye(3, 512)                               # three prints, two of one card
+        q = torch.zeros(3, 512)
+        q[0, 0], q[0, 1] = 0.9, 0.1                           # close to the first print
+        q[1, 2], q[1, 0] = 0.95, 0.3                          # the third
+        q[2] = 1.0                                            # like none of them
+        m = nearest(F.normalize(q, dim=1), [10, 11, 12], [100, 100, 200], emb)
+        self.assertEqual([(x.card_id, x.md_id) for x in m], [(100, 10), (200, 12), (None, None)])
+        self.assertLess(m[2].similarity, UNKNOWN)
+        self.assertEqual(nearest(torch.zeros(0, 512), [10], [100], emb[:1]), [])
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class CardGalleryCommandTest(FreshArt, TestCase):
+    """build_card_gallery adds the prints the gallery lacks and drops those gone, in a gallery of its own here."""
+
+    def test_adds_missing_and_drops_gone(self):
+        import torch
+        import torch.nn.functional as F
+        from carddb.models import MdArt
+        from . import identify
+        base = tempfile.mkdtemp()
+        os.makedirs(os.path.join(base, "card"))
+        for name, cid in (("가", 4041), ("나", 4042)):
+            _create_card_with_art(name, cid)
+        fake = lambda faces: F.normalize(torch.rand(len(faces), 512), dim=1)
+        with override_settings(BASE_DIR=base), \
+                patch("card.management.commands.build_card_gallery.draw_face", return_value=PILImage.new("RGB", (704, 1024))), \
+                patch("card.identify.face_fingerprints", side_effect=fake) as fp:
+            call_command("build_card_gallery", stdout=StringIO())
+            g = torch.load(identify.gallery_path(), weights_only=True)
+            self.assertEqual((sorted(g["md_ids"]), g["emb"].shape), ([4041, 4042], torch.Size([2, 512])))
+            fp.reset_mock()
+            MdArt.objects.filter(md_print_id=4042).delete()
+            _create_card_with_art("다", 4043)
+            call_command("build_card_gallery", stdout=StringIO())
+            g = torch.load(identify.gallery_path(), weights_only=True)
+            self.assertEqual(sorted(g["md_ids"]), [4041, 4043])
+            self.assertEqual(sum(len(c.args[0]) for c in fp.call_args_list), 1)   # only the new print was drawn
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

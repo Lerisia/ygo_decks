@@ -485,7 +485,7 @@ class DeckSubmissionTest(TournamentApiTestBase):
         self.u, self.c = self.players[0]
 
     def test_cards_outside_master_duel_are_unmatched(self):
-        resp = self._upload(self.c, [("1", 0.9), ("4", 0.9)])
+        resp = self._upload(self.c, [(4007, 0.9), (5392, 0.9)])
         self.assertEqual(resp.json()["unmatched_count"], 1)
         self.assertEqual(resp.json()["cards"][0]["card"], {"id": 4007, "name": "푸른 눈의 백룡", "image_url": "/media/cards/art/common/4007.webp"})
         add = self.c.post(f"/api/tournaments/{self.t.id}/deck/cards/", {"card_id": self.ocg_only.id, "quantity": 1}, format="json")
@@ -506,7 +506,7 @@ class DeckSubmissionTest(TournamentApiTestBase):
         self.assertEqual(self._upload(_auth(_user("stranger")), []).status_code, 403)
 
     def test_upload_scans_and_aggregates_cards(self):
-        resp = self._upload(self.c, [("1", 0.99), ("1", 0.97), ("2", 0.55), ("NOPE", 0.9)])
+        resp = self._upload(self.c, [(4007, 0.99), (4007, 0.97), (4041, 0.55), (None, 0.3)])
         self.assertEqual(resp.status_code, 200, resp.content)
         data = resp.json()
         self.assertEqual(data["unmatched_count"], 1)
@@ -516,21 +516,21 @@ class DeckSubmissionTest(TournamentApiTestBase):
         self.assertEqual(by_name["푸른 눈의 백룡"]["source"], "auto")
         self.assertAlmostEqual(by_name["블랙 매지션"]["confidence"], 0.55, places=2)
 
-    def test_scanner_integer_ids_still_match(self):
-        # the real classifier returns numpy int64 ids, not strings
-        resp = self._upload(self.c, [(1, 0.95), (2, 0.9)])
+    def test_scanner_numpy_ids_still_match(self):
+        import numpy as np
+        resp = self._upload(self.c, [(np.int64(4007), 0.95), (np.int64(4041), 0.9)])
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.json()["unmatched_count"], 0)
         self.assertEqual({c["card"]["name"] for c in resp.json()["cards"]}, {"푸른 눈의 백룡", "블랙 매지션"})
 
     def test_reupload_replaces_previous_scan(self):
-        self._upload(self.c, [("1", 0.9)])
-        resp = self._upload(self.c, [("2", 0.8)])
+        self._upload(self.c, [(4007, 0.9)])
+        resp = self._upload(self.c, [(4041, 0.8)])
         names = [c["card"]["name"] for c in resp.json()["cards"]]
         self.assertEqual(names, ["블랙 매지션"])
 
     def test_manual_add_update_and_remove(self):
-        self._upload(self.c, [("1", 0.9)])
+        self._upload(self.c, [(4007, 0.9)])
         add = self.c.post(f"/api/tournaments/{self.t.id}/deck/cards/", {"card_id": self.c3.id, "quantity": 3}, format="json")
         self.assertEqual(add.status_code, 200, add.content)
         row = next(c for c in add.json()["cards"] if c["card"]["name"] == "욕망의 항아리")
@@ -546,15 +546,15 @@ class DeckSubmissionTest(TournamentApiTestBase):
         self.assertNotIn("욕망의 항아리", [c["card"]["name"] for c in self.c.get(f"/api/tournaments/{self.t.id}/deck/").json()["cards"]])
 
     def test_locked_after_start(self):
-        self._upload(self.c, [("1", 0.9)])
+        self._upload(self.c, [(4007, 0.9)])
         self.start(self.t)
-        self.assertEqual(self._upload(self.c, [("2", 0.9)]).status_code, 400)
+        self.assertEqual(self._upload(self.c, [(4041, 0.9)]).status_code, 400)
         self.assertEqual(self.c.post(f"/api/tournaments/{self.t.id}/deck/cards/", {"card_id": self.c3.id, "quantity": 1}, format="json").status_code, 400)
         detail = self.c.get(f"/api/tournaments/{self.t.id}/deck/").json()
         self.assertTrue(detail["locked"])
 
     def test_visibility_owner_and_host_only(self):
-        self._upload(self.c, [("1", 0.9)])
+        self._upload(self.c, [(4007, 0.9)])
         entrant_id = Entrant.objects.get(tournament=self.t, user=self.u).id
         self.assertEqual(self.c.get(f"/api/tournaments/{self.t.id}/deck/").status_code, 200)          # owner
         self.assertEqual(self.client.get(f"/api/tournaments/{self.t.id}/deck/", {"entrant_id": entrant_id}).status_code, 200)  # host
