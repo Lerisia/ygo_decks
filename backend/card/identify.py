@@ -71,16 +71,22 @@ def _model():
     return net.eval()
 
 
-@lru_cache(maxsize=1)
+_held = {}
+
+
 def _gallery():
-    g = torch.load(gallery_path(), map_location="cpu", weights_only=True)
-    return [int(x) for x in g["md_ids"]], [int(x) for x in g["card_ids"]], g["emb"]
+    """The gallery, read again whenever its file changes (build_card_gallery runs apart from the site's processes)."""
+    mtime = os.stat(gallery_path()).st_mtime_ns
+    if _held.get("mtime") != mtime:
+        g = torch.load(gallery_path(), map_location="cpu", weights_only=True)
+        _held.update(mtime=mtime, gallery=([int(x) for x in g["md_ids"]], [int(x) for x in g["card_ids"]], g["emb"]))
+    return _held["gallery"]
 
 
 def forget():
-    """Read the model and the gallery again on next use (after either file changes)."""
+    """Read the model and the gallery again on next use."""
     _model.cache_clear()
-    _gallery.cache_clear()
+    _held.clear()
 
 
 @torch.no_grad()

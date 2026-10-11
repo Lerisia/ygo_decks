@@ -1222,11 +1222,15 @@ class CardFaceTest(TestCase):
         from django.test import override_settings
         from unittest.mock import patch
         from . import md_release
+        import tempfile
         out = io.StringIO()
-        with override_settings(MD_NAMED_PATH=""), patch.object(md_release, "fetch_releases", lambda **kw: {}):
+        # BASE_DIR elsewhere: the identifier's gallery step must never reach the site's own files
+        with override_settings(MD_NAMED_PATH="", BASE_DIR=tempfile.mkdtemp()), \
+                patch.object(md_release, "fetch_releases", lambda **kw: {}):
             call_command("refresh_card_book", "--workers", "1", stdout=out)
         self.assertIn("md release", out.getvalue())
         self.assertIn("faces drawn", out.getvalue())
+        self.assertIn("gallery: no identifier model here", out.getvalue())
         self.assertIn("thumbnails made", out.getvalue())
 
 

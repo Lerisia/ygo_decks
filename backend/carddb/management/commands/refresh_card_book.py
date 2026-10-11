@@ -24,4 +24,5 @@ class Command(BaseCommand):
             call_command("build_card_groups", stdout=self.stdout)
         call_command("build_card_supports", stdout=self.stdout)
         call_command("draw_card_faces", workers=opts["workers"], stdout=self.stdout)
+        call_command("build_card_gallery", stdout=self.stdout)   # new prints for the deck scanner's identifier
         call_command("make_card_thumbs", stdout=self.stdout)

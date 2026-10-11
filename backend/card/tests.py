@@ -541,6 +541,7 @@ class CardGalleryCommandTest(FreshArt, TestCase):
         for name, cid in (("가", 4041), ("나", 4042)):
             _create_card_with_art(name, cid)
         fake = lambda faces: F.normalize(torch.rand(len(faces), 512), dim=1)
+        open(os.path.join(base, "card", "card_id.pt"), "wb").close()   # a model is there (never read: fingerprints are faked)
         with override_settings(BASE_DIR=base), \
                 patch("card.management.commands.build_card_gallery.draw_face", return_value=PILImage.new("RGB", (704, 1024))), \
                 patch("card.identify.face_fingerprints", side_effect=fake) as fp:
@@ -554,6 +555,14 @@ class CardGalleryCommandTest(FreshArt, TestCase):
             g = torch.load(identify.gallery_path(), weights_only=True)
             self.assertEqual(sorted(g["md_ids"]), [4041, 4043])
             self.assertEqual(sum(len(c.args[0]) for c in fp.call_args_list), 1)   # only the new print was drawn
+            # the site's processes see the new gallery without a restart; nothing new leaves the file as it is
+            self.assertEqual(sorted(identify._gallery()[0]), [4041, 4043])
+            before = os.stat(identify.gallery_path()).st_mtime_ns
+            out = StringIO()
+            call_command("build_card_gallery", stdout=out)
+            self.assertIn("nothing new", out.getvalue())
+            self.assertEqual(os.stat(identify.gallery_path()).st_mtime_ns, before)
+            identify.forget()
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

@@ -21,6 +21,9 @@ class Command(BaseCommand):
         parser.add_argument("--all", action="store_true", help="every print again (after a new model)")
 
     def handle(self, *args, **opts):
+        if not os.path.exists(identify.model_path()):
+            self.stdout.write("gallery: no identifier model here, left alone")
+            return
         path = identify.gallery_path()
         have = {"md_ids": [], "card_ids": [], "emb": torch.zeros(0, 512)}
         if os.path.exists(path) and not opts["all"]:
@@ -39,9 +42,13 @@ class Command(BaseCommand):
             md_ids += chunk
             card_ids += [cards[m].id for m in chunk]
             self.stdout.write(f"{min(i + BATCH, len(todo))}/{len(todo)}")
+        gone = len(have["md_ids"]) - len(keep)
+        if not todo and not gone and not opts["all"] and os.path.exists(path) and card_ids == [int(c) for c in have["card_ids"]]:
+            self.stdout.write(f"gallery: {len(md_ids)} prints, nothing new")
+            return
         emb = torch.cat(embs) if embs else torch.zeros(0, 512)
         tmp = path + ".tmp"
         torch.save({"md_ids": md_ids, "card_ids": card_ids, "emb": emb}, tmp)
         os.replace(tmp, path)
         identify.forget()
-        self.stdout.write(f"gallery: {len(md_ids)} prints ({len(todo)} added, {len(have['md_ids']) - len(keep)} gone)")
+        self.stdout.write(f"gallery: {len(md_ids)} prints ({len(todo)} added, {gone} gone)")
