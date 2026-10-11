@@ -967,6 +967,7 @@ class CardDexApiTest(TestCase):
             json.dump({"2": {"anim": "animation", "view": None}, "3901": {"anim": "animation", "view": None}}, f)
         self.assertEqual(self.ids(has="alt"), [3])
         self.assertEqual(self.ids(has="cutin"), [3, 2])
+        self.assertEqual(self.ids(has="alt,cutin"), [3])
 
     def test_dex_counts(self):
         from deck.models import Deck

@@ -151,10 +151,12 @@ def _keep(p):
     category, _, kind = str(p.get("st", "")).partition(":")
     if category in ("spell", "trap") and kind:
         tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
-    # cards with another art (다른 일러스트) or with a monster cut-in (엘리스 2026-10-11)
-    if p.get("has") == "alt":
+    # cards with another art (다른 일러스트), with a monster cut-in (소환 연출), or with both: has=alt,cutin
+    # (엘리스 2026-10-11)
+    has = set(str(p.get("has", "")).split(","))
+    if "alt" in has:
         tests.append(lambda r: r.alt)
-    elif p.get("has") == "cutin":
+    if "cutin" in has:
         tests.append(lambda r: r.cutin)
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)

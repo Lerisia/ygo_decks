@@ -22,7 +22,8 @@ const hasFilter = (f: CardFilters) =>
 // The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
 // page shows its name and ✕ above the list instead (엘리스 2026-10-11).
 const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.has);
-// cards with another art or a monster cut-in (엘리스 2026-10-11)
+// cards with another art, a monster cut-in, or both: chosen together they narrow to cards with both (엘리스 2026-10-11)
+const hasSet = (has: string) => new Set(has.split(",").filter(Boolean));
 const HAS = [
   { value: "alt", label: "다른 일러스트 있음" },
   { value: "cutin", label: "소환 연출 있음" },
@@ -230,19 +231,28 @@ export default function CardList() {
           <div className="text-left">
             <span className="block text-sm font-semibold mb-1">일러스트·소환 연출</span>
             <div className="flex flex-wrap items-center gap-2">
-              {HAS.map((h) => (
-                <button
-                  key={h.value}
-                  type="button"
-                  aria-pressed={filters.has === h.value}
-                  onClick={() => update({ has: filters.has === h.value ? "" : h.value })}
-                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                    filters.has === h.value ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  {h.label}
-                </button>
-              ))}
+              {HAS.map((h) => {
+                const on = hasSet(filters.has).has(h.value);
+                const toggle = () => {
+                  const next = hasSet(filters.has);
+                  if (on) next.delete(h.value);
+                  else next.add(h.value);
+                  update({ has: HAS.map((x) => x.value).filter((v) => next.has(v)).join(",") });
+                };
+                return (
+                  <button
+                    key={h.value}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={toggle}
+                    className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                      on ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    {h.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="text-left">
