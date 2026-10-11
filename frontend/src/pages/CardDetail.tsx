@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 
-const LABEL = "p-2 text-left font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
+const LABEL = "p-2 text-left break-keep font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
 const MARKERS = ["top_left", "top", "top_right", "left", "", "right", "bottom_left", "bottom", "bottom_right"];
 const ARROWS: Record<string, string> = {
   top_left: "↖", top: "↑", top_right: "↗", left: "←", right: "→", bottom_left: "↙", bottom: "↓", bottom_right: "↘",
@@ -212,7 +212,7 @@ export default function CardDetail() {
           <tbody>
             {stats.map(([label, value]) => (
               <tr key={label} className={ROW}>
-                <th scope="row" className="p-1.5 md:p-2 w-14 md:w-28 align-top text-left text-xs leading-5 md:text-sm font-semibold bg-gray-200 dark:bg-gray-700">{label}</th>
+                <th scope="row" className="p-1.5 md:p-2 w-14 md:w-28 align-top text-left break-keep text-xs leading-5 md:text-sm font-semibold bg-gray-200 dark:bg-gray-700">{label}</th>
                 <td className="p-1.5 md:p-2 tabular-nums break-keep">{value}</td>
               </tr>
             ))}
