@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
+import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
 // Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
@@ -103,22 +104,6 @@ function PlayGlyph() {
   );
 }
 
-/** The attribute's cut-in sound, started muted within the tap so that browsers allow it to play once the cut-in has
- *  loaded. */
-function cutinSound(attribute: string): HTMLAudioElement | null {
-  if (!attribute) return null;
-  const a = new Audio(`/media/md_ui/cutin/sound/${attribute}.wav`);
-  a.muted = true;
-  a.play()
-    .then(() => {
-      a.pause();
-      a.currentTime = 0;
-      a.muted = false;
-    })
-    .catch(() => {});
-  return a;
-}
-
 function ZoomGlyph() {
   return (
     <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -162,7 +147,7 @@ export default function CardDetail() {
   const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
   const [zoomed, setZoomed] = useState(false);
-  const [cutin, setCutin] = useState<{ id: number; info: CutinInfo; sound: HTMLAudioElement | null } | null>(null);
+  const [cutin, setCutin] = useState<{ id: number; info: CutinInfo; sound: CutinSound | null } | null>(null);
   const closeCutin = useCallback(() => setCutin(null), []);
   const [finish, setFinish] = useState<"normal" | FinishStyle>("normal");
   const [canFinish] = useState(finishSupported);
@@ -305,7 +290,7 @@ export default function CardDetail() {
               {pickedFace?.cutin ? (
                 <button
                   type="button"
-                  onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: cutinSound(card.cutin_sound) })}
+                  onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: primeCutinSound(card.cutin_sound) })}
                   className="absolute left-1 bottom-1 h-7 px-2.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1"
                   aria-label="컷인 재생"
                 >

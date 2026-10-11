@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CutinSound } from "@/lib/cutinSound";
 import { SpinePlayer } from "@/lib/spine";
 
 export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number };
@@ -21,7 +22,7 @@ function wantsSmall(info: CutinInfo): boolean {
  *  attribute's sound (엘리스 2026-10-11). The figure is fitted to the screen: what the game's camera shows of it, as
  *  large as the screen allows in either orientation. A tap or Escape closes it early. */
 export default function CutinOverlay({ id, info, sound, alt, onClose }: {
-  id: number; info: CutinInfo; sound: HTMLAudioElement | null; alt: string; onClose: () => void;
+  id: number; info: CutinInfo; sound: CutinSound | null; alt: string; onClose: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<"loading" | "playing" | "failed">("loading");
@@ -44,6 +45,8 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
     canvas.height = Math.round(window.innerHeight * dpr);
     let alive = true, raf = 0, player: SpinePlayer | null = null;
     SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`)
+      // the sound is let loose first (at most a moment's wait), so that both start together
+      .then((p) => Promise.race([sound?.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => p))
       .then((p) => {
         player = p;
         if (!alive) return p.dispose();
@@ -68,7 +71,7 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
         const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
         p.restart();
         setState("playing");
-        sound?.play().catch(() => {});
+        sound?.audio.play().catch(() => {});
         let start = -1, last = 0;
         const frame = (now: number) => {
           if (!alive) return;
