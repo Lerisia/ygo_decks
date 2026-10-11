@@ -24,12 +24,13 @@ type Bundle = { config: Record<FinishStyle, StyleConfig>; shaders: Record<Finish
 
 let bundle: Promise<Bundle> | null = null;
 
-/** finish.json and the translated shaders, fetched once per visit. */
+/** finish.json and the translated shaders, fetched once per visit; media is cached for years, so they are
+ *  revalidated, as a rebuilt bundle keeps their names. */
 function loadBundle(): Promise<Bundle> {
   bundle ??= (async () => {
-    const config = await (await fetch(`${BASE}/finish.json`)).json();
+    const config = await (await fetch(`${BASE}/finish.json`, { cache: "no-cache" })).json();
     const shaders = Object.fromEntries(
-      await Promise.all(STYLES.map(async (s) => [s, await (await fetch(`${BASE}/${s}.frag`)).text()] as const)),
+      await Promise.all(STYLES.map(async (s) => [s, await (await fetch(`${BASE}/${s}.frag`, { cache: "no-cache" })).text()] as const)),
     ) as Record<FinishStyle, string>;
     return { config, shaders };
   })().catch((e) => {
