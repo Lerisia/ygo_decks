@@ -6,6 +6,12 @@ export type CutinInfo = { anim: string; view: [number, number, number] | null };
 const BASE = "/media/md_ui/cutin";
 const SCREEN = 16 / 9;   // the game's screen the camera view is made for
 
+/** Phones get the small pictures (a quarter of the pixels): the large ones can run past what a phone's browser keeps. */
+function smallDevice(): boolean {
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return Math.min(window.screen.width, window.screen.height) < 600 || (memory !== undefined && memory <= 4);
+}
+
 /** A monster's cut-in played once over the whole screen, as Master Duel plays it when the monster is summoned, with the
  *  attribute's sound (엘리스 2026-10-11). The figure is fitted to the screen: what the game's camera shows of it, as
  *  large as the screen allows in either orientation. A tap or Escape closes it early. */
@@ -32,7 +38,7 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
     let alive = true, raf = 0, player: SpinePlayer | null = null;
-    SpinePlayer.load(canvas, `${BASE}/${id}`)
+    SpinePlayer.load(canvas, `${BASE}/${id}${smallDevice() ? "/sd" : ""}`)
       .then((p) => {
         player = p;
         if (!alive) return p.dispose();
@@ -44,7 +50,8 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
           const b = p.bounds(anim, anim.duration * f);
           x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]);
         }
-        if (info.view) {
+        // (a view far smaller than the figure is one the export misread: the figure alone then)
+        if (info.view && 4 * info.view[2] * info.view[2] * SCREEN > 0.3 * (x1 - x0) * (y1 - y0)) {
           const [vx, vy, vh] = info.view, vw = vh * SCREEN;
           x0 = Math.max(x0, vx - vw); x1 = Math.min(x1, vx + vw); y0 = Math.max(y0, vy - vh); y1 = Math.min(y1, vy + vh);
         }

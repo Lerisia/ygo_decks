@@ -16,13 +16,14 @@ export class SpinePlayer {
     ]);
     const atlas = readAtlas(atlasText);
     const renderer = new SpineRenderer(canvas, atlas.regions);
-    await Promise.all(atlas.pages.map(async (page) => {
+    // one page at a time: several 4096² pages decoded at once can run a browser out of memory
+    for (const page of atlas.pages) {
       const im = new Image();
       im.crossOrigin = "anonymous";
       im.src = `${base}/${page.name}`;
       await im.decode();
       renderer.addPage(page, im);
-    }));
+    }
     return new SpinePlayer(renderer, new Skeleton(readSkeleton(json)));
   }
 

@@ -22,9 +22,10 @@ ANIMS = ("animation", "animation_kde")
 
 
 def view_of(prefab_bundle, card):
-    """[cx, cy, half height] from the prefab's camera setting and its transforms, None when the prefab has none."""
+    """[cx, cy, half height] from the prefab's camera setting and the transforms above its Spine object, None when the
+    prefab has no camera setting."""
     env = UnityPy.load(prefab_bundle)
-    cam, scales = None, {}
+    cam, spine_go, transforms = None, None, {}
     for obj in env.objects:
         if obj.type.name == "MonoBehaviour":
             try:
@@ -33,25 +34,21 @@ def view_of(prefab_bundle, card):
                 continue
             if "camera2DSize" in tt:
                 cam = tt
+            if "skeletonDataAsset" in tt:
+                spine_go = tt["m_GameObject"]["m_PathID"]
         elif obj.type.name == "Transform":
-            tt = obj.read_typetree()
-            scales[obj.path_id] = tt
+            transforms[obj.path_id] = obj.read_typetree()
     if not cam:
         return None
-    # the chain from the prefab root down: every transform's scale and position count
-    by_child = {}
-    for pid, tt in scales.items():
-        for ch in tt.get("m_Children", []):
-            by_child[ch["m_PathID"]] = pid
-    leaves = [pid for pid, tt in scales.items() if not tt.get("m_Children")]
-    leaf = leaves[0] if leaves else next(iter(scales))
-    chain, p = [], leaf
-    while p in scales:
-        chain.append(scales[p])
-        p = by_child.get(p)
-    chain.reverse()
+    t = next((tt for tt in transforms.values() if tt["m_GameObject"]["m_PathID"] == spine_go), None)
+    if t is None:
+        return None
+    chain = []
+    while t is not None:
+        chain.append(t)
+        t = transforms.get(t["m_Father"]["m_PathID"])
     s, ox, oy = 1.0, 0.0, 0.0
-    for tt in chain:
+    for tt in reversed(chain):   # from the prefab root down to the Spine object
         pos, sc = tt["m_LocalPosition"], tt["m_LocalScale"]
         ox += pos["x"] * s
         oy += pos["y"] * s
@@ -85,6 +82,7 @@ def main():
     ap.add_argument("containers")
     ap.add_argument("out")
     ap.add_argument("--quality", type=int, default=88)
+    ap.add_argument("--source", default="highend_hd", help="highend_hd, or sd for phones (pages a quarter the size)")
     args = ap.parse_args()
     bundles = json.load(open(args.containers))
     prefab = {}
@@ -93,7 +91,7 @@ def main():
             m = re.search(r"monstercutin/tcg/p(\d+)/highend_hd/p\d+\.prefab$", n)
             if m:
                 prefab[m.group(1)] = os.path.join(args.local, f)
-    src_root = os.path.join(args.cutin, "highend_hd")
+    src_root = os.path.join(args.cutin, args.source)
     # a few cut-ins are layered pictures, not Spine (no skeleton or atlas): the player can't show those
     cards = [c for c in sorted(os.listdir(src_root), key=int)
              if all(os.path.exists(os.path.join(src_root, c, f)) for f in ("skeleton.json", "atlas.txt"))]
