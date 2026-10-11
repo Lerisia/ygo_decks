@@ -900,7 +900,7 @@ class CardDexApiTest(TestCase):
 
 
 class CardFaceTest(TestCase):
-    """Korean card faces drawn from Master Duel's pictures (stand-ins here) with free fonts (Pretendard, Noto)."""
+    """Korean card faces drawn from Master Duel's pictures (stand-ins here) with free fonts (마루 부리, Noto)."""
 
     def setUp(self):
         import os
@@ -909,7 +909,7 @@ class CardFaceTest(TestCase):
         from PIL import Image
         from . import display, face
         fonts = getattr(settings, "CARD_FACE_ASSETS", "")
-        font_files = ("NotoSansKR.ttf", "NotoSerifKR.ttf", "Pretendard-Bold.otf")
+        font_files = ("NotoSansKR.ttf", "NotoSerifKR.ttf", "MaruBuri-Bold.otf")
         if not all(os.path.exists(os.path.join(fonts, f)) for f in font_files):
             self.skipTest("free fonts not installed")
         self.assets, self.media = tempfile.mkdtemp(), tempfile.mkdtemp()

@@ -1,7 +1,7 @@
 """Korean card faces: a Master Duel card drawn whole — frame, art, name, attribute, stars, Korean text, ATK/DEF —
 from the client's own pictures (frames, icons, link markers). Every letter is set in free (OFL) Noto fonts: no
-commercial font, the game's own included, is ever used: Pretendard (the site's own face) for the name and the
-type lines, Noto Serif KR for ATK/DEF and the card text.
+commercial font, the game's own included, is ever used: 마루 부리 (Naver's open-licence serif, 엘리스 10/11) for the
+name, the type lines, ATK/DEF and the scales; Noto for card text when it is drawn.
 
 The pieces live outside the repo in settings.CARD_FACE_ASSETS; the faces are saved as media/cards/face/<id>.webp.
 Coordinates are on Master Duel's 704×1024 frame.
@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .display import art_name, art_path
 
 W, H = 704, 1024
-FACE_VERSION = 3          # raise after any change to how faces are drawn: every face is drawn again
+FACE_VERSION = 4          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
@@ -83,8 +83,8 @@ def _font(name, size, variation=None):
 
 
 def title(size, weight="Bold"):
-    """Pretendard, the face the site itself is set in, for names and type lines."""
-    return _font(f"Pretendard-{weight}.otf", size)
+    """마루 부리 for names and type lines."""
+    return _font(f"MaruBuri-{weight}.otf", size)
 
 
 def sans(size, weight="Medium"):
@@ -96,7 +96,7 @@ def serif(size, weight="Regular"):
 
 
 def stat_font(size):
-    return serif(size, "Bold")
+    return title(size)
 
 
 def type_line(card):
