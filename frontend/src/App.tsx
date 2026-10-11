@@ -56,6 +56,7 @@ import AdminCardIcons from "./pages/AdminCardIcons";
 import AdminBorders from "./pages/AdminBorders";
 import AdminEffectTags from "./pages/AdminEffectTags";
 import AdminCardGroups from "./pages/AdminCardGroups";
+import AdminScanLabels from "./pages/AdminScanLabels";
 import AdminDuchMindWords from "./pages/AdminDuchMindWords";
 import DuchMindWordPacks from "./pages/DuchMindWordPacks";
 import DuchMindWordPackDetail from "./pages/DuchMindWordPackDetail";
@@ -169,6 +170,7 @@ function App() {
           <Route path="/manage/borders" element={<AdminBorders />} />
           <Route path="/manage/effect-tags" element={<AdminEffectTags />} />
           <Route path="/manage/card-groups" element={<AdminCardGroups />} />
+          <Route path="/manage/scan-labels" element={<AdminScanLabels />} />
           <Route path="/manage/duchmind-words" element={<AdminDuchMindWords />} />
           <Route path="/manage/points-grant" element={<AdminPointsGrant />} />
           <Route path="/manage/analytics" element={<AdminAnalytics />} />

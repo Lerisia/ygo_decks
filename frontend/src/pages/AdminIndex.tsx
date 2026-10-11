@@ -56,6 +56,13 @@ const tiles = [
     description: "효과문에서 뽑은 카드군의 한국어 이름과 회원 확인",
   },
   {
+    to: "/manage/scan-labels",
+    icon: "🎯",
+    label: "스캐너 시험지",
+    description: "실제 업로드에 카드·덱 칸·머리글 상자를 바로잡아 스캐너 재학습의 기준을 만들기",
+  },
+
+  {
     to: "/manage/effect-tags",
     icon: "🏷️",
     label: "카드 효과 태그 검수",

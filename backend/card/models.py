@@ -324,3 +324,32 @@ class CardArchetypeOverride(models.Model):
 
     def __str__(self):
         return f"{self.konami_id} → {self.archetype or '(투표 제외)'}"
+
+
+class ScanSample(models.Model):
+    """A picture for the deck scanner's detector, with the boxes staff checked on it: the test set comes from real
+    uploads (엘리스 2026-10-11), cards plus the deck panel and the main / extra / side headings. Boxes are
+    [{"c": class, "x", "y", "w", "h"}] in fractions of the picture, x and y at the top left."""
+
+    class Status(models.TextChoices):
+        TODO = "todo", "확인 전"
+        DONE = "done", "확인함"
+        SKIP = "skip", "건너뜀"
+
+    image = models.ImageField(upload_to="scanner/samples/")
+    source = models.CharField(max_length=40, unique=True, help_text="upload:<id> …")
+    digest = models.CharField(max_length=16, blank=True, db_index=True, help_text="the same picture uploaded twice is taken once")
+    kind = models.CharField(max_length=10, db_index=True)
+    split = models.CharField(max_length=10, default="test")
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+    boxes = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=4, choices=Status.choices, default=Status.TODO, db_index=True)
+    note = models.CharField(max_length=200, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["kind", "id"]
+        verbose_name = "스캐너 시험 그림"
+        verbose_name_plural = "스캐너 시험 그림"

@@ -4,11 +4,15 @@ from .quiz_views import quiz_next_card, quiz_check_answer, quiz_submit_score, qu
 from .effect_tag_admin_views import effect_tags_list, effect_tag_update
 from .thumb_views import card_thumb
 
+from . import scan_samples
+
 urlpatterns = [
     path("card-thumb/<int:konami_id>/", card_thumb, name="card_thumb"),
     path("get_csv/", export_cards_csv, name="export_cards_csv"),
     path("mosaic-quiz/", get_quiz_card, name="get_mosaic-quiz"),
     path("predict-card/", predict_card_api, name="predict_card_api"),
+    path("scanner/samples/", scan_samples.samples),
+    path("scanner/samples/<int:sample_id>/", scan_samples.sample),
     path("classify-deck/", classify_deck_image, name="classify_deck_image"),
     path("search/", search_cards_by_name, name="search_cards_by_name"),
     path("quiz/next/", quiz_next_card, name="quiz_next_card"),

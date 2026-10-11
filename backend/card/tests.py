@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from PIL import Image as PILImage
-from io import BytesIO
+from io import BytesIO, StringIO
 from django.core.files.base import ContentFile
 from .models import Card, UploadRecord, QuizHighScore, QuizAllTimeBest, QuizMonthlyAward, QuizWeeklyAward
 from user.models import User
@@ -523,3 +523,75 @@ class EffectTagAdminTest(FreshArt, TestCase):
         self.assertEqual(r.status_code, 200)
         tag = EffectTag.objects.get(card_id=4041)
         self.assertEqual((tag.cat_destroy_monster, tag.manually_reviewed), (True, True))
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ScanSampleApiTest(TestCase):
+    """Scanner test set: staff check the boxes on real uploads (카드, 덱 칸, 머리글) through /api/scanner/samples/."""
+
+    def setUp(self):
+        from .models import ScanSample
+        self.staff = User.objects.create_user(username="staff", email="staff@x.com", password="pw", is_staff=True)
+        self.user = User.objects.create_user(username="user", email="user@x.com", password="pw")
+        buf = BytesIO()
+        PILImage.new("RGB", (400, 200), "white").save(buf, "JPEG")
+        self.sample = ScanSample.objects.create(source="upload:1", kind="wide", width=400, height=200,
+                                                boxes=[{"c": "card", "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.5}])
+        self.sample.image.save("1.jpg", ContentFile(buf.getvalue()))
+        self.client = APIClient()
+
+    def test_staff_only(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.get("/api/scanner/samples/").status_code, 403)
+
+    def test_list_and_counts(self):
+        self.client.force_authenticate(self.staff)
+        body = self.client.get("/api/scanner/samples/").json()
+        self.assertEqual((len(body["results"]), body["counts"]["todo"], body["results"][0]["boxes"]), (1, 1, 1))
+        self.assertEqual([c["key"] for c in body["classes"]], ["card", "deck_panel", "head_main", "head_extra", "head_side"])
+        self.assertEqual(self.client.get("/api/scanner/samples/?status=done").json()["results"], [])
+
+    def test_save_boxes(self):
+        self.client.force_authenticate(self.staff)
+        boxes = [{"c": "deck_panel", "x": 0, "y": 0, "w": 1, "h": 1}, {"c": "card", "x": 0.5, "y": 0.5, "w": 0.1, "h": 0.2}]
+        body = self.client.put(f"/api/scanner/samples/{self.sample.id}/", {"boxes": boxes, "status": "done"}, format="json").json()
+        self.assertEqual((body["status"], len(body["boxes"]), body["reviewed_by"]), ("done", 2, "staff"))
+        # boxes are clipped to the picture and anything else is refused
+        body = self.client.put(f"/api/scanner/samples/{self.sample.id}/",
+                               {"boxes": [{"c": "card", "x": 0.9, "y": -0.1, "w": 0.3, "h": 0.5}]}, format="json").json()
+        self.assertEqual(body["boxes"], [{"c": "card", "x": 0.9, "y": 0.0, "w": 0.1, "h": 0.4}])
+        for bad in ([{"c": "dragon", "x": 0, "y": 0, "w": 0.1, "h": 0.1}], [{"c": "card", "x": 0, "y": 0, "w": 0, "h": 0.1}], "x"):
+            self.assertEqual(self.client.put(f"/api/scanner/samples/{self.sample.id}/", {"boxes": bad}, format="json").status_code, 400)
+        self.assertEqual(self.client.put(f"/api/scanner/samples/{self.sample.id}/", {"status": "nope"}, format="json").status_code, 400)
+
+    def test_kind_of(self):
+        from .scan_samples import kind_of
+        self.assertEqual([kind_of(w, h, n) for w, h, n in ((850, 392, 30), (1080, 2340, 70), (400, 580, 0), (850, 814, 0),
+                                                            (850, 659, 15), (850, 935, 55), (850, 478, 89))],
+                         ["wide", "tall", "single", "none", "few", "deck", "many"])
+
+
+class MakeScanTestsetTest(TestCase):
+    def test_picks_each_kind_and_fills_in_cards(self):
+        from .models import ScanSample
+        media = tempfile.mkdtemp()
+        for i, size, found in ((1, (850, 392), 30), (2, (400, 580), 0), (3, (850, 935), 55), (4, (850, 935), 55)):
+            os.makedirs(os.path.join(media, f"upload_{i}", "cards"))
+            for k in range(found):
+                open(os.path.join(media, f"upload_{i}", "cards", f"card_{k}.jpg"), "w").close()
+            PILImage.new("RGB", size, (i, 0, 0)).save(os.path.join(media, f"upload_{i}", "input.jpg"))
+        os.makedirs(os.path.join(media, "upload_5"))
+        with open(os.path.join(media, "upload_5", "input.jpg"), "wb") as f:   # a truncated upload
+            buf = BytesIO()
+            PILImage.new("RGB", (850, 392)).save(buf, "JPEG")
+            f.write(buf.getvalue()[:300])
+        box = [{"c": "card", "x": 0.1, "y": 0.1, "w": 0.1, "h": 0.2}]
+        with override_settings(MEDIA_ROOT=media), patch("card.scan_samples.load_detector", return_value=None), \
+                patch("card.scan_samples.detect_cards", return_value=box):
+            out = StringIO()
+            call_command("make_scan_testset", per_kind='{"wide": 5, "single": 5, "deck": 1}', stdout=out)
+            self.assertEqual(sorted(ScanSample.objects.values_list("kind", flat=True)), ["deck", "single", "wide"])
+            self.assertEqual(ScanSample.objects.get(kind="wide").boxes, box)
+            self.assertFalse(ScanSample.objects.filter(source="upload:5").exists())
+            call_command("make_scan_testset", per_kind='{"wide": 5}', stdout=StringIO())   # nothing picked twice
+            self.assertEqual(ScanSample.objects.count(), 3)
