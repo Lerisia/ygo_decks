@@ -289,31 +289,32 @@ export default function CardDetail() {
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
         </div>
 
-        <div className={`${AREA.card} relative`}>
+        <div className={AREA.card}>
           {picked ? (
-            <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
-              {shown === "normal" ? (
-                <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
-              ) : (
-                <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
-              )}
-              <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
-                <ZoomGlyph />
-              </span>
-            </button>
-          ) : null}
-          {picked && pickedFace?.cutin ? (
-            <button
-              type="button"
-              onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: cutinSound(card.cutin_sound) })}
-              className="absolute left-1 top-1 h-7 px-2.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1"
-              aria-label="컷인 재생"
-            >
-              <PlayGlyph />
-              컷인
-            </button>
-          ) : null}
-          {picked ? null : (
+            <div className="relative">
+              <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
+                {shown === "normal" ? (
+                  <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
+                ) : (
+                  <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+                )}
+                <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                  <ZoomGlyph />
+                </span>
+              </button>
+              {pickedFace?.cutin ? (
+                <button
+                  type="button"
+                  onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: cutinSound(card.cutin_sound) })}
+                  className="absolute left-1 bottom-1 h-7 px-2.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1"
+                  aria-label="컷인 재생"
+                >
+                  <PlayGlyph />
+                  컷인
+                </button>
+              ) : null}
+            </div>
+          ) : (
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {picked && canFinish && (
