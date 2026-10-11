@@ -7,12 +7,13 @@ from collections import defaultdict
 
 from django.db import transaction
 
-from .groups import CHAIN, N, QUOTE_JA, RENAMED_WHILE, TREATED
+from .groups import CHAIN, N, QUOTE_JA, RENAMED_WHILE, TREATED, treated
 
 
 def mentions(text, own_name):
     """(group texts, card names) a Japanese text names, without its own name, tokens, quoted effects (they match no
-    card) and the 「X」 of "treated as" phrases, which make the card one of X rather than its support."""
+    card), cards named only to be left out (「X」以外) and the 「X」 of "treated as" phrases, which make the card one
+    of X rather than its support."""
     t = N(text)
     for rx in (TREATED, RENAMED_WHILE):
         t = rx.sub("", t)
@@ -23,7 +24,8 @@ def mentions(text, own_name):
     own, cards = N(own_name), set()
     for m in QUOTE_JA.finditer(t):
         x = N(m.group(1))
-        if not any(a <= m.start() < b for a, b in spans) and x != own and not x.endswith("トークン"):
+        if (not any(a <= m.start() < b for a, b in spans) and x != own and not x.endswith("トークン")
+                and not t.startswith("以外", m.end())):
             cards.add(x)
     return groups, cards
 
@@ -56,7 +58,8 @@ def compute():
     rows = {}
     for cid, mat, eff, pend in CardText.objects.filter(lang="ja", card_id__in=names).values_list(
             "card_id", "materials", "effect", "pendulum_effect"):
-        texts, cards = mentions("\n".join(s for s in (mat, eff, pend) if s), names[cid])
+        text = "\n".join(s for s in (mat, eff, pend) if s)
+        texts, cards = mentions(text, names[cid])
         mine, spelled = member_of[cid], N(names[cid]) + N(rubies.get(cid, ""))
         named = set()
         for x in texts:
@@ -66,7 +69,11 @@ def compute():
         # a member naming its own group talks about its own: nothing reaches the groups under it either (a D-HERO
         # naming 「HERO」 is no E・HERO support)
         named -= mine
-        found = [(("g", g), How.GROUP) for g in named]
+        # a card bearing another card's name counts as that card (decks built on a card take it in full)
+        _, also, renamed = treated(text)
+        borne = {by_name.get(N(x)) for x in also | ({renamed} if renamed else set())} - {None, cid}
+        found = [(("c", t), How.NAMED) for t in borne]
+        found += [(("g", g), How.GROUP) for g in named]
         found += [(("g", g), How.PARENT) for n in named for g in under(n)]
         for x in cards:
             target = by_name.get(x)
@@ -76,6 +83,12 @@ def compute():
         for key, how in found:   # strongest first: a group named outright stays "group"
             if not (key[0] == "g" and key[1] in mine):
                 rows.setdefault((cid, key), how)
+    # A card naming a fellow member of every 카드군 the other is in (엑소시스터 에리스 → 스텔라) is no support: their
+    # 카드군 already ties them (엘리스 2026-10-11). Two cards of different groups naming each other (의식 몬스터 ↔
+    # 의식 마법) stay each other's support; the card page marks them ⇄.
+    for (cid, key), how in list(rows.items()):
+        if how == How.CARD and member_of[key[1]] and member_of[key[1]] <= member_of[cid]:
+            del rows[(cid, key)]
     return rows
 
 

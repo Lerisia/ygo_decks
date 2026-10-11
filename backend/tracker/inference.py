@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from card.models import CardIdAlias
 from carddb.display import display_name
-from carddb.models import Card, CardGroupMember, MdPrint
-from deck.models import CardDeckOverride, Deck, DeckCardGroup, DeckInferencePriority
+from carddb.models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint
+from deck.models import CardDeckOverride, Deck, DeckCard, DeckCardGroup, DeckInferencePriority
 from .learned import learned_decks
 
 # 지엽적인 카드에 더 큰 표를 준다 (특이점 2026-09-29). 기록된 듀얼에서 그 카드가 보였을 때 실제로 자기 테마 덱이었던
@@ -30,6 +30,9 @@ ENGINE_ALWAYS_TOP = {"낙인"}
 # 1순위 근거가 엑스트라 덱 카드뿐이거나(다른 덱 카드가 묘지로 보낸 것일 수 있음) 1순위 표가 전체의 절반 미만이면
 # 이용자가 다른 덱으로 고친 비율이 약 20%였고, 그 밖은 3.6%였다.
 OPP_MIN_SHARE = 0.5
+
+# 서포트 카드(이름에 그 카드군이 없는데 효과문이 언급하는 카드, 엘리스 2026-10-11)의 표는 구성원 표에 이 비율을 곱한다.
+SUPPORT_WEIGHT = 1.0
 
 RANK_NAMES = {1: "rookie", 2: "bronze", 3: "silver", 4: "gold", 5: "platinum", 6: "diamond", 7: "master"}
 
@@ -62,17 +65,55 @@ def _cards(kids):
 
 
 def card_decks(kids):
-    """{konami id: {deck id: weight}} for the cards that vote: the decks each card's 카드군 link to, once per deck at
-    its strongest link, or the decks a CardDeckOverride sets instead. A card in no linked 카드군 still votes, for
-    no deck (its deck isn't on the site); a card in no 카드군, or overridden to no deck (a generic card), doesn't."""
+    """{konami id: {deck id: weight}} for the cards that vote: the decks linked to the 카드군 each card is in and, at
+    SUPPORT_WEIGHT, to the ones it supports (서포트), each with the groups above it (a group under another is part of
+    it); and the decks built on a card (DeckCard) — the card itself and cards bearing its name in full, cards naming
+    it at SUPPORT_WEIGHT. Once per deck at its strongest link. A CardDeckOverride sets a card's decks instead. A card
+    in or supporting no linked 카드군 still votes, for no deck (its deck isn't on the site); a card touching no
+    카드군, or overridden to no deck (a generic card), doesn't."""
     ids = [int(k) for k in kids if str(k).isdigit()]
-    out, groups = {}, defaultdict(set)
+    member, support = defaultdict(set), defaultdict(set)
+    as_card, backs = defaultdict(set), defaultdict(set)   # the cards each counts as / names
+    for cid in ids:
+        as_card[cid].add(cid)
     for cid, gid in CardGroupMember.objects.filter(card_id__in=ids).exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
-        groups[gid].add(cid)
-        out.setdefault(str(cid), {})
-    for gid, deck_id, weight in DeckCardGroup.objects.filter(group_id__in=groups).values_list("group_id", "deck_id", "weight"):
-        for cid in groups[gid]:
-            out[str(cid)][deck_id] = max(weight, out[str(cid)].get(deck_id, 0.0))
+        member[cid].add(gid)
+    for cid, gid, target, how in CardSupport.objects.filter(card_id__in=ids).values_list("card_id", "group_id", "target_id", "how"):
+        if gid:
+            support[cid].add(gid)
+        elif how == CardSupport.How.NAMED:
+            as_card[cid].add(target)
+        else:
+            backs[cid].add(target)
+    parent = dict(CardGroup.objects.values_list("id", "parent_id"))
+
+    def with_above(gids):
+        out = set()
+        for gid in gids:
+            while gid and gid not in out:
+                out.add(gid)
+                gid = parent.get(gid)
+        return out
+
+    reach = {cid: (with_above(member[cid]), with_above(support[cid])) for cid in ids}
+    links, card_links = defaultdict(list), defaultdict(list)
+    for gid, deck_id, weight in DeckCardGroup.objects.filter(
+            group_id__in={g for m, s in reach.values() for g in m | s}).values_list("group_id", "deck_id", "weight"):
+        links[gid].append((deck_id, weight))
+    for card_id, deck_id, weight in DeckCard.objects.filter(
+            in_recorder=True, card_id__in={c for cs in (*as_card.values(), *backs.values()) for c in cs}).values_list("card_id", "deck_id", "weight"):
+        card_links[card_id].append((deck_id, weight))
+    out = {}
+    for cid, (mine, backed) in reach.items():
+        sources = [(links[g], 1.0) for g in mine] + [(links[g], SUPPORT_WEIGHT) for g in backed]
+        sources += [(card_links[c], 1.0) for c in as_card[cid]] + [(card_links[c], SUPPORT_WEIGHT) for c in backs[cid]]
+        if not (mine or backed or any(ls for ls, _ in sources)):
+            continue   # touches no 카드군 and no deck's card: no vote at all
+        votes = {}
+        for decks, scale in sources:
+            for deck_id, weight in decks:
+                votes[deck_id] = max(votes.get(deck_id, 0.0), weight * scale)
+        out[str(cid)] = votes
     overrides = defaultdict(dict)
     for cid, deck_id, weight in CardDeckOverride.objects.filter(card_id__in=ids).values_list("card_id", "deck_id", "weight"):
         overrides[str(cid)].update({deck_id: weight} if deck_id else {})

@@ -827,6 +827,51 @@ class TrackerCardGroupVoteTest(TestCase):
         self.assertEqual(infer_decks([403])[0], [])
 
 
+class TrackerSupportVoteTest(TestCase):
+    """서포트 (엘리스 2026-10-11): a card supporting a deck's 카드군 (or a group under it) votes for the deck at
+    SUPPORT_WEIGHT; a deck built on a card gets the card's vote, its supporters' at SUPPORT_WEIGHT and the votes of
+    cards bearing its name in full."""
+
+    def setUp(self):
+        from carddb.models import CardGroup, CardSupport
+        from deck.models import DeckCard
+        self.hero = _create_deck("히어로")
+        link_group(self.hero, "HERO")
+        old_style_card(konami_id="501", name="E・HERO エアーマン", archetype="E・HERO")
+        ehero = CardGroup.objects.get(text="E・HERO")
+        CardGroup.objects.filter(id=ehero.id).update(parent=CardGroup.objects.get(text="HERO"))
+        old_style_card(konami_id="502", name="ミラクル・フュージョン")
+        CardSupport.objects.create(card_id=502, group=ehero, how="group")
+        self.ark = _create_deck("빛의 황금궤")
+        ark = old_style_card(konami_id="503", name="光の黄金櫃")
+        DeckCard.objects.create(deck=self.ark, card=ark)
+        old_style_card(konami_id="504", name="マシマシュマロン")
+        CardSupport.objects.create(card_id=504, target=ark, how="card")
+        old_style_card(konami_id="505", name="ワイト夫人")
+        CardSupport.objects.create(card_id=505, target=ark, how="named")
+
+    def scores(self, *ids):
+        return [(c["name"], c["score"]) for c in infer_decks(list(ids))[0]]
+
+    def test_a_group_under_a_linked_one_leads_to_its_deck(self):
+        self.assertEqual(self.scores(501), [("히어로", 1.0)])
+
+    def test_support_votes_at_the_support_weight(self):
+        with patch("tracker.inference.SUPPORT_WEIGHT", 0.5):
+            self.assertEqual(self.scores(502), [("히어로", 0.5)])
+            self.assertEqual(self.scores(504), [("빛의 황금궤", 0.5)])
+
+    def test_a_card_link_left_out_of_the_recorder(self):
+        from deck.models import DeckCard
+        DeckCard.objects.filter(deck=self.ark).update(in_recorder=False)
+        self.assertEqual(self.scores(503, 504), [])   # no vote, and no share taken either
+
+    def test_a_deck_built_on_a_card(self):
+        with patch("tracker.inference.SUPPORT_WEIGHT", 0.5):
+            self.assertEqual(self.scores(503), [("빛의 황금궤", 1.0)])
+            self.assertEqual(self.scores(505), [("빛의 황금궤", 1.0)])   # bears the card's name: counts as it
+
+
 class TrackerDeckPriorityTest(TestCase):
     """DeckInferencePriority: 혼용 덱은 지정한 쪽으로 (특이점 2026-09-15, 십이수현람 → 현람)."""
 

@@ -219,6 +219,7 @@ class CardSupport(models.Model):
         PARENT = "parent", "상위 카드군 언급"
         CARD = "card", "카드 언급"
         CARD_GROUP = "card_group", "언급한 카드의 카드군"
+        NAMED = "named", "카드명 취급"   # bears the target's name ("…「X」として扱う"): one of it, not its support
 
     card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="supports")
     group = models.ForeignKey(CardGroup, null=True, blank=True, on_delete=models.CASCADE, related_name="supporters")

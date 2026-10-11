@@ -18,11 +18,13 @@ export type CardFilters = {
   group: string;
   /** With a group: "" its members, "support" the cards supporting it. */
   role: string;
+  /** A card's own support list: the card, cards bearing its name and cards naming it. */
+  card: string;
   sort: string;
 };
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", sort: "new",
+  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", sort: "new",
 };
 
 export type CardListItem = {
@@ -39,6 +41,8 @@ export type CardListResponse = {
   has_more: boolean;
   /** With a group filter: how many of its members and of the cards supporting it match. */
   group_counts?: { member: number; support: number };
+  /** With a card filter: the card whose support list this is. */
+  card_filter?: { id: number; name: string } | null;
 };
 
 export type Option = { value: string; label: string };
@@ -82,7 +86,10 @@ export type CardDoc = {
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];
   /** 서포트: the 카드군 and cards its text names outright without being one of them. */
-  supports: { kind: "group" | "card"; id: number; name: string }[];
+  /** mutual: the card names this one back (의식 몬스터 ↔ 의식 마법): they support each other. */
+  supports: { kind: "group" | "card"; id: number; name: string; mutual: boolean }[];
+  /** How many cards its own support list holds (itself included); 0 when no other card names it. */
+  supporters: number;
   /** Decks of its own groups ("member") first, then of the groups it supports. */
   decks: { id: number; name: string; cover: string | null; via: "member" | "support" }[];
 };

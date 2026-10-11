@@ -17,7 +17,7 @@ const SORTS = [
 ];
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
-const hasFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group);
+const hasFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card);
 
 function TileSkeleton() {
   return (
@@ -57,6 +57,7 @@ export default function CardList() {
   const [items, setItems] = useState<CardListItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [groupCounts, setGroupCounts] = useState<{ member: number; support: number } | null>(null);
+  const [cardFilter, setCardFilter] = useState<{ id: number; name: string } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,7 @@ export default function CardList() {
         setItems(r.results);
         setTotal(r.total);
         setGroupCounts(r.group_counts ?? null);
+        setCardFilter(r.card_filter ?? null);
         setHasMore(r.has_more);
       })
       .catch((e) => id === request.current && e.name !== "AbortError" && setError(e.message))
@@ -273,6 +275,19 @@ export default function CardList() {
                 {label} {n.toLocaleString()}장
               </button>
             ))}
+          </div>
+        ) : filters.card && cardFilter && total !== null ? (
+          // a card's own support list, from its page (엘리스 2026-10-11)
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="truncate">'{cardFilter.name}' 서포트 카드 {total.toLocaleString()}장</span>
+            <button
+              type="button"
+              onClick={() => update({ card: "" })}
+              aria-label="서포트 카드 보기 끝내기"
+              className="shrink-0 w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs"
+            >
+              ✕
+            </button>
           </div>
         ) : (
           total !== null && <span>{hasFilter(filters) || filters.q ? `조건에 맞는 카드 ${total.toLocaleString()}장` : `카드 ${total.toLocaleString()}장`}</span>

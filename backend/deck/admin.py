@@ -137,6 +137,18 @@ class DeckCardGroupAdmin(admin.ModelAdmin):
     autocomplete_fields = ("deck", "group")
 
 
+from .models import DeckCard
+
+
+@admin.register(DeckCard)
+class DeckCardAdmin(admin.ModelAdmin):
+    list_display = ("deck", "card", "weight", "in_recorder")
+    list_editable = ("weight", "in_recorder")
+    search_fields = ("deck__name", "card__name_ko", "card__name_ja")
+    raw_id_fields = ("card",)
+    autocomplete_fields = ("deck",)
+
+
 from .models import CardDeckOverride
 
 

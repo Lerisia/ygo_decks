@@ -701,6 +701,12 @@ class CardSupportTest(CardGroupCase):
         self.card(80, "EMヒーロー・フェス", "EM 히어로 페스", ruby="$REM(エンタメイト)ヒーロー・フェス", ja_text="「EM」又は「HERO」モンスター１体")
         self.card(81, "鎖の宴", "사슬의 연회", ja_text="「C」モンスター１体を対象とする。")
         self.card(82, "D-HERO ドグマガイ", "데스티니 히어로 도그마 가이", ja_text="自分フィールドの「HERO」モンスター３体をリリースした場合のみ特殊召喚できる。")
+        self.card(83, "E・HERO フェザーマン", "엘리멘틀 히어로 페더맨", ja_text="「E・HERO バーストレディ」が存在する場合に発動できる。")
+        self.card(84, "E・HERO バーストレディ", "엘리멘틀 히어로 버스트 레이디")
+        self.card(85, "ブラック・フレア・ナイト", "블랙 플레어 나이트", ja_text="デッキから「ミラージュ・ナイト」１体を特殊召喚する。")
+        self.card(86, "ミラージュ・ナイト", "미라지 나이트", ja_text="「ブラック・フレア・ナイト」の効果でのみ特殊召喚できる。")
+        self.card(87, "ロード・シンクロン", "로드 싱크론", ja_text="「ロード・ウォリアー」以外のシンクロ召喚には使用できない。")
+        self.card(88, "ロード・ウォリアー", "로드 워리어")
 
     def supports(self, cid):
         from .models import CardSupport
@@ -744,13 +750,23 @@ class CardSupportTest(CardGroupCase):
         self.assertEqual(self.supports(76), {})
         self.assertEqual(self.supports(78), {})
         self.assertEqual(self.supports(9), {})    # ルール上「ギャラクシーアイズ」カードとしても扱う: a member
-        self.assertEqual(self.supports(79), {})
+        # a card bearing another's name is recorded as such ("named"), apart from what it supports
+        self.assertEqual(self.supports(79), {("c", 73): "named"})
         # "while on the field its name is 「ブラック・マジシャン」" makes it one of them
         self.assertIn(79, self.members(g["ブラック・マジシャン"]))
 
     def test_a_chain_of_groups(self):
         self.build()
         self.assertEqual(self.supports(80), {("g", "HERO", "HERO"): "group", ("g", "E・HERO", "E・HERO"): "parent"})   # EM: a member
+
+    def test_mentions_that_are_no_support(self):
+        self.build()
+        # one of a group naming a fellow member: their 카드군 already ties them, no support
+        self.assertEqual(self.supports(83), {})
+        # two cards naming each other (의식 몬스터 ↔ 의식 마법 …) support each other
+        self.assertEqual((self.supports(85), self.supports(86)), ({("c", 86): "card"}, {("c", 85): "card"}))
+        # named only to be left out ("「X」以外")
+        self.assertEqual(self.supports(87), {})
 
     def test_a_text_read_two_ways(self):
         self.build()
@@ -998,10 +1014,28 @@ class CardDexApiTest(TestCase):
         CardSupport.objects.create(card=self.quick, target=self.dm, how="card")
         CardSupport.objects.create(card=self.quick, group=g, how="card_group")
         CardSupport.objects.create(card=self.link, group=g, how="group")
+        # a deck built on a card (빛의 황금궤 …): the card, cards bearing its name and the cards naming it
+        from deck.models import DeckCard
+        ark = Deck.objects.create(name="빛의 황금궤", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCard.objects.create(deck=ark, card=self.bewd)
+        CardSupport.objects.create(card=self.scale, target=self.bewd, how="card")
+        CardSupport.objects.create(card=self.girl, target=self.bewd, how="named")
+        self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/2/").json()["decks"]], [("빛의 황금궤", "member")])
+        self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/5/").json()["decks"]], [("빛의 황금궤", "support")])
+        girl = self.client.get("/api/carddb/cards/3/").json()
+        self.assertEqual(([(d["name"], d["via"]) for d in girl["decks"]], girl["supports"]),
+                         ([("블랙 매지션", "member"), ("빛의 황금궤", "member")], []))
+        # a card's own support list: the card itself, cards bearing its name, cards naming it (엘리스 2026-10-11)
+        self.assertEqual(self.client.get("/api/carddb/cards/2/").json()["supporters"], 3)
+        body = self.get(card=2)
+        self.assertEqual(([r["id"] for r in body["results"]], body["card_filter"]), ([5, 3, 2], {"id": 2, "name": "푸른 눈의 백룡"}))
+        self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supporters"], 0)   # nobody names it: no list
+        CardSupport.objects.filter(how="named").delete()
         body = self.client.get("/api/carddb/cards/4/").json()
-        self.assertEqual(body["supports"], [{"kind": "card", "id": 1, "name": "블랙 매지션"}])   # what it names outright
+        self.assertEqual(body["supports"], [{"kind": "card", "id": 1, "name": "블랙 매지션", "mutual": False}])   # what it names outright
+        self.assertEqual(self.client.get("/api/carddb/cards/1/").json()["supporters"], 2)   # itself and 속공
         self.assertEqual([(d["name"], d["via"]) for d in body["decks"]], [("블랙 매지션", "support")])
-        self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supports"], [{"kind": "group", "id": g.id, "name": "블랙 매지션"}])
+        self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supports"], [{"kind": "group", "id": g.id, "name": "블랙 매지션", "mutual": False}])
         self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/3/").json()["decks"]], [("블랙 매지션", "member")])
         # a group's list: its members, or the cards supporting it, with both counts
         body = self.get(group=g.id)
@@ -1016,6 +1050,12 @@ class CardDexApiTest(TestCase):
         DeckCardGroup.objects.create(deck=family, group=top)
         self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/6/").json()["decks"]],
                          [("블랙 매지션", "support"), ("매지션 일가", "support")])
+        # two cards naming each other: each one's support, marked as mutual (⇄)
+        CardSupport.objects.create(card=self.link, target=self.scale, how="card")
+        CardSupport.objects.filter(card=self.scale, target=self.bewd).update(target=self.link)
+        scale = self.client.get("/api/carddb/cards/5/").json()
+        self.assertEqual(([s for s in scale["supports"] if s["kind"] == "card"], scale["supporters"]),
+                         ([{"kind": "card", "id": 6, "name": "링크 몬스터", "mutual": True}], 2))
 
 
 class CardFaceTest(TestCase):

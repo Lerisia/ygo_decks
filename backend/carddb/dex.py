@@ -50,7 +50,7 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups", "supports")
+                 "groups", "supports", "as_cards")
 
 
 _index = {"key": None, "at": 0.0, "new": [], "name": [], "face_thumbs": set(), "thumbs": set()}
@@ -86,9 +86,12 @@ def _card_index():
     key = _fingerprint()
     if _index["key"] == key and time.monotonic() - _index["at"] < INDEX_MAX_AGE:
         return _index
-    supports = defaultdict(set)
-    for cid, gid in CardSupport.objects.exclude(group=None).values_list("card_id", "group_id"):
-        supports[cid].add(gid)
+    supports, as_cards = defaultdict(set), defaultdict(set)   # groups it supports / cards whose list it is in
+    for cid, gid, target, how in CardSupport.objects.values_list("card_id", "group_id", "target_id", "how"):
+        if gid:
+            supports[cid].add(gid)
+        else:
+            as_cards[cid].add(target)
     groups = defaultdict(set)
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
         groups[cid].add(gid)
@@ -108,6 +111,7 @@ def _card_index():
         r.numbers = {n for n in (level, rank, link) if n is not None}
         r.groups = groups.get(cid, set())
         r.supports = supports.get(cid, set())
+        r.as_cards = as_cards.get(cid, set()) | {cid}
         rows.append(r)
     _index.update(
         key=key, at=time.monotonic(),
@@ -137,6 +141,9 @@ def _keep(p):
     category, _, kind = str(p.get("st", "")).partition(":")
     if category in ("spell", "trap") and kind:
         tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
+    if str(p.get("card", "")).isdigit():
+        # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
+        tests.append(lambda r, v=int(p["card"]): v in r.as_cards)
     if str(p.get("group", "")).isdigit():
         # a group's members, or with role=support the cards supporting it (서포트, 엘리스 2026-10-11)
         if p.get("role") == "support":
@@ -192,6 +199,9 @@ def cards(request):
     if str(p.get("group", "")).isdigit():   # a group's list tells how many members and supporters it has
         base = {k: p.get(k) for k in p.keys()}
         extra["group_counts"] = {role: len(found({**base, "role": role})) for role in ("member", "support")}
+    if str(p.get("card", "")).isdigit():
+        named = Card.objects.filter(id=int(p["card"])).first()
+        extra["card_filter"] = {"id": named.id, "name": display_name(named)} if named else None
     return Response({**extra,
         "results": [{"id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
@@ -254,7 +264,7 @@ def _texts(card, lang):
 def card(request, card_id):
     """Card document: names, stats, Korean and Japanese text, 카드군, the decks those 카드군 are linked to, release dates
     and Master Duel prints."""
-    from deck.models import DeckCardGroup
+    from deck.models import DeckCard, DeckCardGroup
     from deck.views import _phone_cover_url
 
     c = Card.objects.filter(has_art(), id=card_id).prefetch_related("texts").first()
@@ -278,11 +288,13 @@ def card(request, card_id):
     supports = list(CardSupport.objects.filter(card=c).select_related("group", "target"))
     shown_cards = set(Card.objects.filter(has_art(), id__in=[s.target_id for s in supports if s.target_id])
                       .values_list("id", flat=True))
+    # a card naming this one back supports it too: the pair is marked as mutual (의식 몬스터 ↔ 의식 마법)
+    back = set(CardSupport.objects.filter(target=c, how=CardSupport.How.CARD).values_list("card_id", flat=True))
     named = sorted(
-        [{"kind": "group", "id": s.group_id, "name": s.group.name_ko or s.group.text} for s in supports
+        [{"kind": "group", "id": s.group_id, "name": s.group.name_ko or s.group.text, "mutual": False} for s in supports
          if s.how == CardSupport.How.GROUP and not s.group.needs_review]
-        + [{"kind": "card", "id": s.target_id, "name": display_name(s.target)} for s in supports
-           if s.how == CardSupport.How.CARD and s.target_id in shown_cards],
+        + [{"kind": "card", "id": s.target_id, "name": display_name(s.target), "mutual": s.target_id in back}
+           for s in supports if s.how == CardSupport.How.CARD and s.target_id in shown_cards],
         key=lambda x: (x["kind"] != "group", x["name"]))
     # A group under another is part of it, so the decks linked to the groups above come next (HERO's deck for a card
     # supporting E・HERO).
@@ -298,10 +310,15 @@ def card(request, card_id):
         return out
 
     mine, backed = [g.id for g in groups], [s.group_id for s in supports if s.group_id]
+    # decks built on a card (빛의 황금궤 …): this card or a card whose name it bears, then a card it names
+    as_card = [c.id] + [s.target_id for s in supports if s.how == CardSupport.How.NAMED]
+    names_card = [s.target_id for s in supports if s.how == CardSupport.How.CARD]
     decks, seen = [], set()
-    for via, gids in (("member", mine), ("member", above(mine)), ("support", backed), ("support", above(backed))):
-        for link in (DeckCardGroup.objects.filter(group_id__in=gids).select_related("deck")
-                     .order_by("-weight", "deck__name")):
+    for via, model, field, ids in (("member", DeckCardGroup, "group_id", mine), ("member", DeckCardGroup, "group_id", above(mine)),
+                                   ("member", DeckCard, "card_id", as_card),
+                                   ("support", DeckCardGroup, "group_id", backed), ("support", DeckCardGroup, "group_id", above(backed)),
+                                   ("support", DeckCard, "card_id", names_card)):
+        for link in model.objects.filter(**{f"{field}__in": ids}).select_related("deck").order_by("-weight", "deck__name"):
             if link.deck_id not in seen:
                 seen.add(link.deck_id)
                 decks.append({"id": link.deck_id, "name": link.deck.name, "cover": _phone_cover_url(link.deck), "via": via})
@@ -321,5 +338,9 @@ def card(request, card_id):
         "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
         "supports": named,
+        # how many cards its own support list holds (itself included), or 0 when no other card names it
+        "supporters": (lambda n: n + 1 if n else 0)(
+            CardSupport.objects.filter(target=c, card__in=Card.objects.filter(has_art()))
+            .exclude(card=c).count()),
         "decks": decks,
     })

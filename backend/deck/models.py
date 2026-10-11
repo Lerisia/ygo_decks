@@ -245,6 +245,27 @@ class DeckCardGroup(models.Model):
         return f"{self.deck.name}: {self.group}"
 
 
+class DeckCard(models.Model):
+    """A card a site deck is built on, for decks that have no 카드군 of their own (빛의 황금궤, 라의 익신룡 …,
+    엘리스 2026-10-11): the card, the cards bearing its name and the cards naming it in their text (서포트) count for
+    the deck, as a 카드군's members and supporters do through DeckCardGroup."""
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="key_cards")
+    card = models.ForeignKey("carddb.Card", on_delete=models.CASCADE, related_name="deck_links")
+    weight = models.FloatField(default=1.0)
+    # off for a card splashed into many decks as an engine (알바스의 낙윤): the site still shows the deck on its
+    # supporters' pages, but the recorder leaves the link out — weighed down it only drags the deck's share under the
+    # bar, at full weight it pulls every deck using the engine to this one (replay of 16,337 duels, 2026-10-11)
+    in_recorder = models.BooleanField(default=True, verbose_name="레코더에 쓰기")
+
+    class Meta:
+        verbose_name = "덱 중심 카드"
+        verbose_name_plural = "덱 중심 카드"
+        constraints = [models.UniqueConstraint(fields=["deck", "card"], name="uniq_deck_card")]
+
+    def __str__(self):
+        return f"{self.deck.name}: {self.card_id}"
+
+
 class CardDeckOverride(models.Model):
     """A card whose recorder vote is set by hand instead of through its 카드군: it votes only for the decks its rows
     name (at their weight), and for no deck at all when its row leaves the deck empty (a generic card)."""
