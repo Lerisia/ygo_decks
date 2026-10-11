@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 
-const LABEL = "p-2 font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
+const LABEL = "p-2 text-left font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
 const MARKERS = ["top_left", "top", "top_right", "left", "", "right", "bottom_left", "bottom", "bottom_right"];
 const ARROWS: Record<string, string> = {
   top_left: "↖", top: "↑", top_right: "↗", left: "←", right: "→", bottom_left: "↙", bottom: "↓", bottom_right: "↘",
@@ -53,23 +53,64 @@ function TextBlock({ t, pendulum }: { t: CardTexts; pendulum: boolean }) {
   );
 }
 
+// As the official card database lays it out: names on top, then the card small beside its stats and the effect text
+// right under them, so a phone shows the card and what it does together (엘리스 2026-10-11, the face carries no
+// effect text); a tap shows the card large. Wider screens keep the card in its own column beside all of it.
+const LAYOUT =
+  "grid grid-cols-[40%_1fr] gap-x-3 items-start md:grid-cols-[20rem_1fr] md:grid-rows-[auto_auto_auto_1fr] md:gap-x-6";
+const AREA = {
+  names: "col-span-2 md:col-span-1 md:col-start-2 md:row-start-1",
+  card: "mt-3 md:mt-0 md:col-start-1 md:row-start-1 md:row-span-4",
+  stats: "mt-3 md:col-start-2 md:row-start-2",
+  effect: "col-span-2 mt-5 md:col-span-1 md:col-start-2 md:row-start-3",
+  more: "col-span-2 mt-4 md:col-span-1 md:col-start-2 md:row-start-4",
+};
+const ROW = "border-b last:border-b-0 border-gray-300 dark:border-gray-600";
+
 function Skeleton() {
   const bar = "rounded bg-gray-200 dark:bg-gray-700 animate-pulse";
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
-      <div className="md:flex md:gap-6">
-        <div className="md:w-80 shrink-0">
-          <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
-        </div>
-        <div className="flex-1 mt-4 md:mt-0 flex flex-col gap-2">
-          <div className={`h-8 w-2/3 ${bar}`} />
+      <div className={LAYOUT}>
+        <div className={`${AREA.names} flex flex-col gap-2`}>
+          <div className={`h-7 w-2/3 ${bar}`} />
           <div className={`h-4 w-1/2 ${bar}`} />
           <div className={`h-4 w-1/3 ${bar}`} />
-          <div className={`mt-2 h-48 w-full ${bar}`} />
         </div>
+        <div className={AREA.card}>
+          <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
+        </div>
+        <div className={`${AREA.stats} h-40 w-full ${bar}`} />
+        <div className={`${AREA.effect} h-32 w-full ${bar}`} />
       </div>
-      <div className={`mt-6 h-6 w-20 ${bar}`} />
-      <div className={`mt-3 h-24 w-full ${bar}`} />
+    </div>
+  );
+}
+
+function ZoomGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="8.5" cy="8.5" r="5.5" />
+      <path d="M12.5 12.5 17 17M8.5 6v5M6 8.5h5" />
+    </svg>
+  );
+}
+
+/** The card face over the whole screen; a tap anywhere or Escape closes it. */
+function CardZoom({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 cursor-zoom-out" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
+      <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
@@ -82,12 +123,14 @@ export default function CardDetail() {
   const [error, setError] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setCard(null);
     setError("");
     setJa(false);
+    setZoomed(false);
     getCard(cardId ?? "")
       .then((c) => {
         if (!alive) return;
@@ -114,13 +157,37 @@ export default function CardDetail() {
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
+  const [levelName, levelValue] = (card.level_label || "").split(" ");
+  const stats: [string, ReactNode][] = [["종류", card.type_line]];
+  if (card.category === "monster") {
+    stats.push(["속성", card.attribute || "-"]);
+    if (card.level_label) stats.push([levelName, levelValue]);
+    stats.push(["공격력", card.atk ?? "-"]);
+    if (!isLink) stats.push(["수비력", card.def ?? "-"]);
+    if (pendulum) stats.push(["스케일", card.pendulum_scale]);
+    if (isLink) stats.push(["링크 마커", <LinkMarkers on={card.link_markers} />]);
+  }
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
-      <div className="md:flex md:gap-6">
-        <div className="md:w-80 shrink-0">
+      <div className={LAYOUT}>
+        <div className={AREA.names}>
+          <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
+          {card.name_ja && <p className="mt-0.5 text-sm md:text-base text-gray-700 dark:text-gray-200">{card.name_ja}</p>}
+          {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">{card.name_ja_ruby}</p>
+          )}
+          {card.name_en && <p className="text-sm text-gray-500 dark:text-gray-400">{card.name_en}</p>}
+        </div>
+
+        <div className={AREA.card}>
           {picked ? (
-            <img src={picked} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
+            <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
+              <img src={picked} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
+              <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                <ZoomGlyph />
+              </span>
+            </button>
           ) : (
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
@@ -131,7 +198,7 @@ export default function CardDetail() {
                   key={f.id}
                   type="button"
                   onClick={() => setPicked(f.face)}
-                  className={`w-12 rounded-sm overflow-hidden ring-2 transition ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
+                  className={`w-10 md:w-12 rounded-sm overflow-hidden ring-2 transition ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
                   aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
                 >
                   <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />
@@ -141,59 +208,47 @@ export default function CardDetail() {
           )}
         </div>
 
-        <div className="flex-1 mt-4 md:mt-0">
-          <h1 className="text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
-          {card.name_ja && <p className="mt-1 text-gray-700 dark:text-gray-200">{card.name_ja}</p>}
-          {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{card.name_ja_ruby}</p>
-          )}
-          {card.name_en && <p className="text-sm text-gray-500 dark:text-gray-400">{card.name_en}</p>}
-
-          <table className="mt-3 w-full border border-gray-300 dark:border-gray-600 text-left text-sm">
-            <tbody>
-              <tr className="border-b border-gray-300 dark:border-gray-600">
-                <td className={LABEL}>종류</td>
-                <td className="p-2">{card.type_line}</td>
+        <table className={`${AREA.stats} w-full border border-gray-300 dark:border-gray-600 text-left text-sm`}>
+          <tbody>
+            {stats.map(([label, value]) => (
+              <tr key={label} className={ROW}>
+                <th scope="row" className="p-1.5 md:p-2 w-14 md:w-28 align-top text-left text-xs leading-5 md:text-sm font-semibold bg-gray-200 dark:bg-gray-700">{label}</th>
+                <td className="p-1.5 md:p-2 tabular-nums break-keep">{value}</td>
               </tr>
-              {card.category === "monster" && (
-                <>
-                  <tr className="border-b border-gray-300 dark:border-gray-600">
-                    <td className={LABEL}>속성</td>
-                    <td className="p-2">{card.attribute || "-"}</td>
-                  </tr>
-                  {card.level_label && (
-                    <tr className="border-b border-gray-300 dark:border-gray-600">
-                      <td className={LABEL}>{card.level_label.split(" ")[0]}</td>
-                      <td className="p-2">{card.level_label.split(" ")[1]}</td>
-                    </tr>
-                  )}
-                  <tr className="border-b border-gray-300 dark:border-gray-600">
-                    <td className={LABEL}>{isLink ? "공격력" : "공격력 / 수비력"}</td>
-                    <td className="p-2 tabular-nums">{isLink ? card.atk ?? "-" : `${card.atk ?? "-"} / ${card.def ?? "-"}`}</td>
-                  </tr>
-                  {pendulum && (
-                    <tr className="border-b border-gray-300 dark:border-gray-600">
-                      <td className={LABEL}>펜듈럼 스케일</td>
-                      <td className="p-2">{card.pendulum_scale}</td>
-                    </tr>
-                  )}
-                  {isLink && (
-                    <tr className="border-b border-gray-300 dark:border-gray-600">
-                      <td className={LABEL}>링크 마커</td>
-                      <td className="p-2"><LinkMarkers on={card.link_markers} /></td>
-                    </tr>
-                  )}
-                </>
-              )}
+            ))}
+          </tbody>
+        </table>
+
+        <section className={AREA.effect}>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold">효과</h2>
+            {card.texts.ja && (
+              <button
+                type="button"
+                onClick={() => setJa(!ja)}
+                className="px-3 py-1 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+              >
+                {ja ? "한국어" : "일본어 원문"}
+              </button>
+            )}
+          </div>
+          <div className="rounded-lg border border-gray-300 dark:border-gray-600 p-3">
+            <TextBlock t={texts} pendulum={pendulum} />
+          </div>
+        </section>
+
+        {(card.rarity || dates.length > 0) && (
+          <table className={`${AREA.more} w-full border border-gray-300 dark:border-gray-600 text-left text-sm`}>
+            <tbody>
               {card.rarity && (
-                <tr className="border-b border-gray-300 dark:border-gray-600">
-                  <td className={LABEL}>마듀 레어도</td>
+                <tr className={ROW}>
+                  <th scope="row" className={LABEL}>마듀 레어도</th>
                   <td className="p-2">{card.rarity}</td>
                 </tr>
               )}
               {dates.length > 0 && (
-                <tr>
-                  <td className={LABEL}>출시일</td>
+                <tr className={ROW}>
+                  <th scope="row" className={LABEL}>출시일</th>
                   <td className="p-2 tabular-nums">
                     {dates.map(([label, d]) => <div key={label}>{label} {day(d)}</div>)}
                   </td>
@@ -201,26 +256,10 @@ export default function CardDetail() {
               )}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
 
-      <section className="mt-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-bold">효과</h2>
-          {card.texts.ja && (
-            <button
-              type="button"
-              onClick={() => setJa(!ja)}
-              className="px-3 py-1 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-            >
-              {ja ? "한국어" : "일본어 원문"}
-            </button>
-          )}
-        </div>
-        <div className="rounded-lg border border-gray-300 dark:border-gray-600 p-3">
-          <TextBlock t={texts} pendulum={pendulum} />
-        </div>
-      </section>
+      {zoomed && picked && <CardZoom src={picked} alt={`${card.name} 카드`} onClose={() => setZoomed(false)} />}
 
       <section className="mt-6">
         <h2 className="text-lg font-bold mb-2">카드군</h2>
