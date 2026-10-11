@@ -30,7 +30,12 @@ export type Particle = {
   r: number[];
   /** The StableRandom vertex stream: four numbers that stay with the particle. */
   sr: number[];
+  /** Where it has been (oldest first), when the trail module gives it a trail, and how long a point of it lasts. */
+  trail?: TrailPoint[];
+  trailLife?: number;
 };
+
+export type TrailPoint = { pos: Vec3; t: number };
 
 /** Rotation of a vector by Euler angles in degrees, in Unity's order (z, then x, then y). */
 export function euler(v: Vec3, e: { x: number; y: number; z: number }): Vec3 {
@@ -46,12 +51,15 @@ export function euler(v: Vec3, e: { x: number; y: number; z: number }): Vec3 {
 
 export class Emitter {
   particles: Particle[] = [];
+  /** Dead particles whose trails stay until their points expire (the trail module's dieWithParticles off). */
+  ghosts: Particle[] = [];
   private t = 0;
   private delay = 0;
   private carry = 0;
   private random: () => number;
 
-  constructor(readonly ps: Json, seed: number) {
+  /** `world`: the system's matrix (column-major), for velocities the module gives in world space. */
+  constructor(readonly ps: Json, seed: number, private world: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) {
     this.random = rng(seed);
     this.reset(seed);
   }
@@ -59,6 +67,7 @@ export class Emitter {
   reset(seed: number) {
     this.random = rng(seed);
     this.particles = [];
+    this.ghosts = [];
     this.t = 0;
     this.carry = 0;
     this.delay = minMax(this.ps.startDelay, 0, this.random());
@@ -111,10 +120,16 @@ export class Emitter {
       : [0, 0, minMax(ini.startRotation, e, R()) * flip];
     const color0 = minMaxColor(ini.startColor, e, R());
     const [pos, dir] = this.shape();
-    this.particles.push({
+    const p: Particle = {
       pos, vel: [dir[0] * speed, dir[1] * speed, dir[2] * speed], age: 0, life, size0, rot, color0,
       r: [R(), R(), R(), R(), R(), R(), R(), R()], sr: [R(), R(), R(), R()],
-    });
+    };
+    const tm = ps.TrailModule;
+    if (tm && R() < (tm.ratio ?? 1)) {
+      p.trail = [{ pos: [...pos], t: this.t }];
+      p.trailLife = minMax(tm.lifetime, e, R()) * life;
+    }
+    this.particles.push(p);
   }
 
   /** Where a new particle starts and which way it goes, in the system's space. */
@@ -169,10 +184,20 @@ export class Emitter {
     const ps = this.ps, ini = ps.InitialModule;
     const gravity = minMax(ini.gravityModifier, 0, 0.5) * 9.81;
     const clamp = ps.ClampVelocityModule, vel = ps.VelocityModule;
+    const tm = ps.TrailModule;
     const live: Particle[] = [];
+    // a trail's points last trailLife seconds
+    const expire = (p: Particle) => {
+      const trail = p.trail!;
+      while (trail.length && trail[0].t < this.t - p.trailLife!) trail.shift();
+    };
+    this.ghosts = this.ghosts.filter((g) => (expire(g), g.trail!.length > 1));
     for (const p of this.particles) {
       p.age += dt;
-      if (p.age >= p.life) continue;
+      if (p.age >= p.life) {
+        if (p.trail && tm && !tm.dieWithParticles) this.ghosts.push(p);
+        continue;
+      }
       const u = p.age / p.life;
       p.vel[1] -= gravity * dt;
       if (clamp) {
@@ -190,9 +215,33 @@ export class Emitter {
           p.vel = [p.vel[0] * k, p.vel[1] * k, p.vel[2] * k];
         }
       }
+      // the velocity module: a velocity added on top (in world space turned into the system's), the particle's own
+      // velocity scaled by the speed modifier, then a turn round the orbit's centre and a push away from it
       let add: Vec3 = [0, 0, 0];
-      if (vel) add = [minMax(vel.x, u, p.r[3]), minMax(vel.y, u, p.r[3]), minMax(vel.z, u, p.r[3])];
-      p.pos = [p.pos[0] + (p.vel[0] + add[0]) * dt, p.pos[1] + (p.vel[1] + add[1]) * dt, p.pos[2] + (p.vel[2] + add[2]) * dt];
+      if (vel) {
+        add = [minMax(vel.x, u, p.r[3]), minMax(vel.y, u, p.r[3]), minMax(vel.z, u, p.r[3])];
+        if (vel.inWorldSpace) add = this.fromWorld(add);
+      }
+      const k = vel?.speedModifier ? minMax(vel.speedModifier, u, p.r[3]) : 1;
+      p.pos = [p.pos[0] + (p.vel[0] * k + add[0]) * dt, p.pos[1] + (p.vel[1] * k + add[1]) * dt, p.pos[2] + (p.vel[2] * k + add[2]) * dt];
+      if (vel) {
+        const o = { x: minMax(vel.orbitalX, u, p.r[3]) * dt, y: minMax(vel.orbitalY, u, p.r[3]) * dt, z: minMax(vel.orbitalZ, u, p.r[3]) * dt };
+        const radial = minMax(vel.radial, u, p.r[3]);
+        if (o.x || o.y || o.z || radial) {
+          const c: Vec3 = [minMax(vel.orbitalOffsetX, u, p.r[3]), minMax(vel.orbitalOffsetY, u, p.r[3]), minMax(vel.orbitalOffsetZ, u, p.r[3])];
+          let rel: Vec3 = [p.pos[0] - c[0], p.pos[1] - c[1], p.pos[2] - c[2]];
+          rel = euler(rel, { x: o.x / RAD, y: o.y / RAD, z: o.z / RAD });
+          const d = norm(rel);
+          p.pos = [c[0] + rel[0] + d[0] * radial * dt, c[1] + rel[1] + d[1] * radial * dt, c[2] + rel[2] + d[2] * radial * dt];
+        }
+      }
+      if (p.trail) {
+        const last = p.trail[p.trail.length - 1].pos;
+        if (Math.hypot(p.pos[0] - last[0], p.pos[1] - last[1], p.pos[2] - last[2]) >= (tm.minVertexDistance ?? 0.1)) {
+          p.trail.push({ pos: [...p.pos], t: this.t });
+        }
+        expire(p);
+      }
       const rm = ps.RotationModule;
       if (rm) {
         p.rot[2] += minMax(rm.curve, u, p.r[4]) * dt;
@@ -204,6 +253,18 @@ export class Emitter {
       live.push(p);
     }
     this.particles = live;
+  }
+
+  /** A direction in the world as the system's own (the inverse of its matrix's 3×3). */
+  private fromWorld(v: Vec3): Vec3 {
+    const m = this.world;
+    const a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
+    const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g) || 1;
+    return [
+      ((e * i - f * h) * v[0] - (b * i - c * h) * v[1] + (b * f - c * e) * v[2]) / det,
+      (-(d * i - f * g) * v[0] + (a * i - c * g) * v[1] - (a * f - c * d) * v[2]) / det,
+      ((d * h - e * g) * v[0] - (a * h - b * g) * v[1] + (a * e - b * d) * v[2]) / det,
+    ];
   }
 
   /** What a particle looks like now: its size, colour, texture frame and custom data. */

@@ -3,8 +3,8 @@ translated (dxbc2glsl.py), wired to each other by the semantics in their DXBC si
 fill in — which attribute each vertex input is (POSITION, COLOR, TEXCOORD0 …), what each constant buffer holds
 (names at their vec4 slots), which texture each t<N> is — and how the pass blends.
 
-export(tree, vkd3d) -> dict, for a Shader's typetree; the first vertex and pixel programs of the shader (the main
-pass, without keywords) are the ones taken.
+export(tree, vkd3d, keywords) -> dict, for a Shader's typetree: the colour pass's vertex and pixel programs, the
+variants for the material's keywords.
 """
 import os
 import re
@@ -106,11 +106,18 @@ def main_pass(tree):
     raise ValueError("no colour pass")
 
 
-def program(tree, entries, prog, names):
-    """The program without keywords, its DXBC and everything it binds: {"cb": {N: {name, params}}, "t": {N: name}}."""
+def program(tree, entries, prog, names, keywords=()):
+    """The variant for the material's keywords (the one with the most of them and none it lacks; without keywords, the
+    plain one), its DXBC and everything it binds: {"cb": {N: {name, params}}, "t": {N: name}}."""
     subs = next(sp for sp in prog["m_PlayerSubPrograms"] if sp)
     blobs = next(b for b in prog["m_ParameterBlobIndices"] if b)
-    k = next(i for i, e in enumerate(subs) if not e["m_KeywordIndices"] and not e.get("m_LocalKeywordIndices"))
+    known = tree["m_ParsedForm"].get("m_KeywordNames", [])
+    want = set(keywords)
+
+    def kw(e):
+        return {known[i] if i < len(known) else i for i in e["m_KeywordIndices"]} | set(e.get("m_LocalKeywordIndices") or [])
+
+    k = max((i for i, e in enumerate(subs) if kw(e) <= want), key=lambda i: len(kw(subs[i])))
     cbs, bindings, textures = common_params(prog, names)
     own_cbs, own_bindings, own_textures = program_params(entries[blobs[k]])
     for name, cb in own_cbs.items():
@@ -161,12 +168,12 @@ def disassemble(dxbc, vkd3d):
         return open(asm).read()
 
 
-def export(tree, vkd3d):
+def export(tree, vkd3d, keywords=()):
     entries = blob_entries(tree)
     pass0 = main_pass(tree)
     names = {idx: n for n, idx in pass0["m_NameIndices"]}
-    vdx, vbind = program(tree, entries, pass0["progVertex"], names)
-    pdx, pbind = program(tree, entries, pass0["progFragment"], names)
+    vdx, vbind = program(tree, entries, pass0["progVertex"], names, keywords)
+    pdx, pbind = program(tree, entries, pass0["progFragment"], names, keywords)
     vs, ps = translate(disassemble(vdx, vkd3d)), translate(disassemble(pdx, vkd3d))
     # wire the vertex outputs to the pixel inputs by semantic: both name them vary_<SEMANTIC><index>
     vout, pin = signature(vdx, b"OSGN"), signature(pdx, b"ISGN")

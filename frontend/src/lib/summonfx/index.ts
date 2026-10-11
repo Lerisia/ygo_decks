@@ -2,7 +2,11 @@
  *  load a background (fx.json, its shaders, textures and meshes) and draw any moment of it. The timeline's control
  *  clips say when each particle system plays; each is simulated from its start in steps of a 60th of a second. */
 import { Emitter } from "./particles";
+export { vignetteAlpha } from "./post";
 import { FxRenderer, type Mesh, type Shader, type Sprite, type System, type Texture } from "./render";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Json = any;
 
 const STEP = 1 / 60;
 
@@ -13,7 +17,7 @@ export class SummonFx {
 
   /** `version` goes on every file's address, so that browsers holding an older export (media is cached for years)
    *  fetch the new one. */
-  static async load(canvas: HTMLCanvasElement, base: string, version = 0): Promise<SummonFx> {
+  static async load(canvas: HTMLCanvasElement, base: string, version = 0, { vignette = true } = {}): Promise<SummonFx> {
     const url = (path: string) => `${base}/${path}${version ? `?v=${version}` : ""}`;
     const json = async (path: string) => {
       const r = await fetch(url(path));
@@ -21,12 +25,12 @@ export class SummonFx {
       return r.json();
     };
     const fx = await json("fx.json");
-    const renderer = new FxRenderer(canvas);
+    const renderer = new FxRenderer(canvas, vignette);
     const textures = new Map<string, Texture>(), meshes = new Map<string, Mesh>(), shaders = new Map<string, Shader>();
     const systems: System[] = [];
-    for (const data of fx.systems) {
+    const material = async (m: Json) => {
       const own: Record<string, Texture> = {};
-      for (const [name, t] of Object.entries<{ file: string; wrap: [number, number] }>(data.material.textures)) {
+      for (const [name, t] of Object.entries<{ file: string; wrap: [number, number] }>(m.textures)) {
         if (!textures.has(t.file)) {
           const im = new Image();
           im.src = url(`tex/${t.file}.png`);
@@ -35,12 +39,16 @@ export class SummonFx {
         }
         own[name] = textures.get(t.file)!;
       }
-      const program = data.material.program;
-      if (!shaders.has(program)) shaders.set(program, await json(`shader/${program}.json`));
+      if (!shaders.has(m.program)) shaders.set(m.program, await json(`shader/${m.program}.json`));
+      return { shader: shaders.get(m.program)!, textures: own };
+    };
+    for (const data of fx.systems) {
+      const particles = data.material ? await material(data.material) : null;
+      const trail = data.trail ? await material(data.trail) : null;
       const meshName = data.renderer.mesh;
       if (meshName && !meshes.has(meshName)) meshes.set(meshName, await json(`mesh/${meshName}.json`));
-      systems.push({ data, emitter: new Emitter(data.ps, data.seed), shader: shaders.get(program)!, textures: own,
-                     mesh: meshName ? meshes.get(meshName)! : null });
+      systems.push({ data, emitter: new Emitter(data.ps, data.seed, data.world), shader: particles?.shader ?? null,
+                     textures: particles?.textures ?? {}, mesh: meshName ? meshes.get(meshName)! : null, trail });
     }
     const sprites: Sprite[] = [];
     for (const data of fx.sprites ?? []) {

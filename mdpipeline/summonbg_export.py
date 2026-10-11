@@ -11,6 +11,7 @@ usage: summonbg_export.py <data.unity3d> <dump.json> <out dir> [vkd3d-compiler]
 import json
 import math
 import os
+import shutil
 import struct
 import sys
 import zlib
@@ -22,7 +23,9 @@ from shader_web import export as export_shader
 VKD3D = "/home/elyss/storage/vkd3d/vkd3d-compiler"
 
 MODULES = ("InitialModule", "ShapeModule", "EmissionModule", "SizeModule", "RotationModule", "ColorModule", "UVModule",
-           "VelocityModule", "ClampVelocityModule", "CustomDataModule", "TrailModule", "NoiseModule", "ForceModule")
+           "VelocityModule", "ClampVelocityModule", "CustomDataModule", "TrailModule", "NoiseModule", "ForceModule",
+           "SizeBySpeedModule", "RotationBySpeedModule", "ColorBySpeedModule", "InheritVelocityModule", "SubModule",
+           "ExternalForcesModule", "CollisionModule", "LifetimeByEmitterSpeedModule")
 RENDERER = ("m_RenderMode", "m_RenderAlignment", "m_SortingFudge", "m_VelocityScale", "m_LengthScale",
             "m_CameraVelocityScale", "m_MinParticleSize", "m_MaxParticleSize", "m_Pivot", "m_Flip", "m_VertexStreams",
             "m_UseCustomVertexStreams", "m_SortingOrder", "m_SortMode")
@@ -114,8 +117,9 @@ def mul(a, b):
 def main():
     data, dump, out = sys.argv[1:4]
     vkd3d = sys.argv[4] if len(sys.argv) > 4 else VKD3D
-    for sub in ("tex", "mesh", "shader"):
-        os.makedirs(os.path.join(out, sub), exist_ok=True)
+    for sub in ("tex", "mesh", "shader"):   # afresh: nothing left over from an earlier export
+        shutil.rmtree(os.path.join(out, sub), ignore_errors=True)
+        os.makedirs(os.path.join(out, sub))
     d = json.load(open(dump))
     O = d["objects"]
     file = d["root"].split(":")[0]
@@ -184,13 +188,15 @@ def main():
             t.image.save(os.path.join(out, "tex", t.m_Name + ".png"))
         return textures[pid]
 
-    def program(pid):
-        if pid not in shaders:
+    def program(pid, keywords):
+        """The shader's colour pass for the material's keywords, written once a shader and keyword set."""
+        key = (pid, tuple(sorted(keywords)))
+        if key not in shaders:
             tree = unity().objs[(file, pid)].read_typetree()
-            sh = export_shader(tree, vkd3d)
-            shaders[pid] = sh["name"].replace("/", "_")
-            json.dump(sh, open(os.path.join(out, "shader", shaders[pid] + ".json"), "w"), separators=(",", ":"))
-        return shaders[pid]
+            sh = export_shader(tree, vkd3d, keywords)
+            shaders[key] = "+".join([sh["name"].replace("/", "_").replace(" ", "_"), *key[1]])
+            json.dump(sh, open(os.path.join(out, "shader", shaders[key] + ".json"), "w"), separators=(",", ":"))
+        return shaders[key]
 
     def mesh(pid):
         if pid not in meshes:
@@ -221,8 +227,26 @@ def main():
             if obj(child)["data"]["m_IsActive"]:
                 yield from under(child)
 
+    def material(mat):
+        """A material as the page needs it: its shader's colour pass, render queue and saved values."""
+        shader = obj(mat["m_Shader"]["m_PathID"])
+        props = mat["m_SavedProperties"]
+        return {
+            "name": mat["m_Name"],
+            "shader": shader["data"]["m_ParsedForm"]["m_Name"] if shader else None,
+            "program": shader_file(mat),
+            "queue": mat["m_CustomRenderQueue"],
+            "floats": dict(props["m_Floats"]),
+            "colors": {k: [v["r"], v["g"], v["b"], v["a"]] for k, v in props["m_Colors"]},
+            "textures": {k: {"file": texture(v["m_Texture"]["m_PathID"]),
+                             "wrap": wraps[v["m_Texture"]["m_PathID"]],
+                             "scale": [v["m_Scale"]["x"], v["m_Scale"]["y"]],
+                             "offset": [v["m_Offset"]["x"], v["m_Offset"]["y"]]}
+                         for k, v in props["m_TexEnvs"] if v["m_Texture"]["m_PathID"]},
+        }
+
     def shader_file(mat):
-        return program(mat["m_Shader"]["m_PathID"]) if mat else None
+        return program(mat["m_Shader"]["m_PathID"], mat.get("m_ValidKeywords") or []) if mat else None
 
     for play in plays:
         for go in under(play["go"]):
@@ -232,11 +256,15 @@ def main():
                 continue
             r = next(v["data"] for v in O.values() if v["type"] == "ParticleSystemRenderer"
                      and v["data"]["m_GameObject"]["m_PathID"] == go)
-            if r["m_RenderMode"] == 5 or not r.get("m_Enabled", 1):   # nothing drawn
+            if not r.get("m_Enabled", 1):
                 continue
-            mat = obj(r["m_Materials"][0]["m_PathID"])["data"] if r["m_Materials"] else None
-            shader = obj(mat["m_Shader"]["m_PathID"]) if mat else None
-            props = mat["m_SavedProperties"] if mat else {"m_Floats": [], "m_Colors": [], "m_TexEnvs": []}
+            mats = [obj(m["m_PathID"]) if m["m_PathID"] else None for m in r["m_Materials"]]
+            # the particles with the first material (unless the renderer draws none), their trails with the second
+            particles = material(mats[0]["data"]) if r["m_RenderMode"] != 5 and mats and mats[0] else None
+            trail = (material(mats[1]["data"]) if ps.get("TrailModule", {}).get("enabled") and len(mats) > 1 and mats[1]
+                     else None)
+            if not particles and not trail:
+                continue
             m = world(go)
             systems.append({
                 "name": name(go), "start": play["start"], "duration": play["duration"], "seed": play["seed"],
@@ -246,19 +274,8 @@ def main():
                       | {k: ps[k] for k in MODULES if k in ps and ps[k].get("enabled")},
                 "renderer": {k: r[k] for k in RENDERER if k in r}
                             | {"mesh": mesh(r["m_Mesh"]["m_PathID"]) if r["m_RenderMode"] == 4 and r["m_Mesh"]["m_PathID"] else None},
-                "material": {
-                    "name": mat["m_Name"] if mat else None,
-                    "shader": shader["data"]["m_ParsedForm"]["m_Name"] if shader else None,
-                    "program": shader_file(mat),
-                    "queue": mat["m_CustomRenderQueue"] if mat else -1,
-                    "floats": dict(props["m_Floats"]),
-                    "colors": {k: [v["r"], v["g"], v["b"], v["a"]] for k, v in props["m_Colors"]},
-                    "textures": {k: {"file": texture(v["m_Texture"]["m_PathID"]),
-                                     "wrap": wraps[v["m_Texture"]["m_PathID"]],
-                                     "scale": [v["m_Scale"]["x"], v["m_Scale"]["y"]],
-                                     "offset": [v["m_Offset"]["x"], v["m_Offset"]["y"]]}
-                                 for k, v in props["m_TexEnvs"] if v["m_Texture"]["m_PathID"]},
-                },
+                "material": particles,
+                "trail": trail,
             })
     # the sprites over the whole screen (the dark veil, the glow round the edges), their colour as the timeline's
     # recorded clips animate it, sampled 60 times a second

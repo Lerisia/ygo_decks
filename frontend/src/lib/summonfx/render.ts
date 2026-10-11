@@ -2,6 +2,7 @@
  *  translates them): billboards, stretched billboards and meshes built in world space as Unity's particle renderer
  *  builds them, the renderer's vertex streams packed into TEXCOORD0..2 in its order, the constant buffers filled by
  *  name (the camera's matrices, the material's values) and the systems sorted as Unity sorts transparent renderers. */
+import { minMax, minMaxColor } from "./curves";
 import type { Emitter, Particle, Vec3 } from "./particles";
 import { Post } from "./post";
 
@@ -17,7 +18,11 @@ export type Shader = {
   blend: { src: Factor; dst: Factor; srcAlpha: Factor; dstAlpha: Factor };
 };
 export type Texture = { tex: WebGLTexture; w: number; h: number };
-export type System = { data: Json; emitter: Emitter; shader: Shader; textures: Record<string, Texture>; mesh: Mesh | null };
+/** A particle system: its particles through `shader` (none when its renderer draws only trails) and its trails. */
+export type System = {
+  data: Json; emitter: Emitter; shader: Shader | null; textures: Record<string, Texture>; mesh: Mesh | null;
+  trail: { shader: Shader; textures: Record<string, Texture> } | null;
+};
 /** A sprite over the whole screen (Sprites-Default: texture × colour, premultiplied), its colour animated. */
 export type Sprite = { data: Json; texture: Texture };
 
@@ -38,6 +43,8 @@ void main() {
   vec4 c = texture(tex, uv) * color;
   o = vec4(c.rgb * c.a, c.a);
 }`;
+
+const queueOf = (material: Json) => (material?.queue >= 0 ? material.queue : 3000);
 
 /** A sprite's colour at a time: the recorded curves where the timeline animates a channel, its own colour elsewhere. */
 export function spriteColor(data: Json, time: number): number[] {
@@ -104,7 +111,7 @@ export class FxRenderer {
   private sprite: WebGLProgram;
   private made: WebGLTexture[] = [];
 
-  constructor(private canvas: HTMLCanvasElement) {
+  constructor(private canvas: HTMLCanvasElement, vignette = true) {
     const gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
     if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
     this.gl = gl;
@@ -112,7 +119,7 @@ export class FxRenderer {
     this.vbo = gl.createBuffer()!;
     this.white = this.pixel([255, 255, 255, 255]);
     this.depth = this.pixel([0, 0, 0, 0]);   // reversed depth: 0 is as far as it goes, so nothing fades a particle
-    this.post = new Post(gl);
+    this.post = new Post(gl, vignette);
     this.sprite = this.program({ name: "Sprites-Default", vs: SPRITE_VS, fs: SPRITE_FS, attributes: {}, vertex: { cb: {}, t: {} },
                                  pixel: { cb: {}, t: {} }, blend: null as never }).pr;
   }
@@ -216,7 +223,7 @@ export class FxRenderer {
     type Item = { order: number; queue: number; distance: number; draw: () => void };
     const items: Item[] = [
       ...systems.filter(playing).map((s) => ({
-        order: s.data.renderer.m_SortingOrder ?? 0, queue: s.data.material.queue >= 0 ? s.data.material.queue : 3000,
+        order: s.data.renderer.m_SortingOrder ?? 0, queue: queueOf(s.data.material ?? s.data.trail),
         distance: s.data.world[14] - CAMERA_Z + (s.data.renderer.m_SortingFudge ?? 0), draw: () => this.drawSystem(s, globals, halfH),
       })),
       ...sprites.map((s) => ({ order: s.data.order, queue: 3000, distance: s.data.z - CAMERA_Z, draw: () => this.drawSprite(s, time) })),
@@ -242,13 +249,17 @@ export class FxRenderer {
   }
 
   private drawSystem(s: System, globals: Record<string, number[]>, halfH: number) {
+    if (s.shader && s.data.material) this.drawMesh(s.data.material, s.shader, s.textures, this.geometry(s, halfH), globals);
+    if (s.trail && s.data.trail) this.drawMesh(s.data.trail, s.trail.shader, s.trail.textures, this.trails(s), globals);
+  }
+
+  /** Triangles (FLOATS a vertex) through a material's shader. */
+  private drawMesh(m: Json, shader: Shader, textures: Record<string, Texture>, verts: number[], globals: Record<string, number[]>) {
     const gl = this.gl;
     const BL = GL_BLEND(gl);
-    const verts = this.geometry(s, halfH);
     if (!verts.length) return;
-    const prog = this.program(s.shader);
+    const prog = this.program(shader);
     gl.useProgram(prog.pr);
-    const m = s.data.material;
     const value = (name: string): number[] | undefined => {
       if (name in globals) return globals[name];
       if (name in m.floats) return [m.floats[name]];
@@ -256,12 +267,12 @@ export class FxRenderer {
       const tex = name.replace(/_(ST|TexelSize)$/, "");
       const t = m.textures[tex];
       if (t && name.endsWith("_ST")) return [t.scale[0], t.scale[1], t.offset[0], t.offset[1]];
-      const T = s.textures[tex];
+      const T = textures[tex];
       if (T && name.endsWith("_TexelSize")) return [1 / T.w, 1 / T.h, T.w, T.h];
       return undefined;
     };
     for (const a of prog.arrays) {
-      const bind = (a.pixel ? s.shader.pixel : s.shader.vertex).cb[a.cb];
+      const bind = (a.pixel ? shader.pixel : shader.vertex).cb[a.cb];
       const data = new Float32Array(a.size * 4);
       for (const p of bind?.params ?? []) {
         const v = value(p.name);
@@ -272,18 +283,18 @@ export class FxRenderer {
       gl.uniform4fv(gl.getUniformLocation(prog.pr, a.name), data);
     }
     let unit = 0;
-    for (const [binds, prefix] of [[s.shader.vertex, "t"], [s.shader.pixel, "pt"]] as const) {
+    for (const [binds, prefix] of [[shader.vertex, "t"], [shader.pixel, "pt"]] as const) {
       for (const [reg, name] of Object.entries(binds.t)) {
         const loc = gl.getUniformLocation(prog.pr, `${prefix}${reg}`);
         if (!loc) continue;
-        const T = s.textures[name] ?? (name === "_CameraDepthTexture" ? this.depth : this.white);
+        const T = textures[name] ?? (name === "_CameraDepthTexture" ? this.depth : this.white);
         gl.activeTexture(gl.TEXTURE0 + unit);
         gl.bindTexture(gl.TEXTURE_2D, T.tex);
         gl.uniform1i(loc, unit++);
       }
     }
     const factor = (f: Factor) => BL[f.name && f.name !== "<noninit>" ? m.floats[f.name] ?? f.value : f.value] ?? gl.ONE;
-    const b = s.shader.blend;
+    const b = shader.blend;
     gl.blendFuncSeparate(factor(b.src), factor(b.dst), factor(b.srcAlpha), factor(b.dstAlpha));
 
     gl.bindVertexArray(this.vao);
@@ -305,6 +316,56 @@ export class FxRenderer {
       else gl.vertexAttrib4f(loc, 0, 0, 0, 0);
     }
     gl.drawArrays(gl.TRIANGLES, 0, verts.length / FLOATS);
+  }
+
+  /** The trails as ribbons facing the camera, from each particle (u 0) back along where it has been (u 1): their width
+   *  over the trail times the particle's size, their colour the particle's times the colour over its life and over the
+   *  trail. The UV is the only stream a trail gets. */
+  private trails(s: System): number[] {
+    const out: number[] = [];
+    const tm = s.data.ps.TrailModule;
+    const W = s.data.world as number[];
+    const toWorld = (p: Vec3): Vec3 => [W[0] * p[0] + W[4] * p[1] + W[8] * p[2] + W[12], W[1] * p[0] + W[5] * p[1] + W[9] * p[2] + W[13],
+                                        W[2] * p[0] + W[6] * p[1] + W[10] * p[2] + W[14]];
+    const ribbon = (p: Particle, alive: boolean) => {
+      const pts: Vec3[] = alive ? [toWorld(p.pos)] : [];
+      for (let i = p.trail!.length - 1; i >= 0; i--) {
+        const q = toWorld(p.trail![i].pos), prev = pts[pts.length - 1];
+        if (!prev || Math.hypot(q[0] - prev[0], q[1] - prev[1], q[2] - prev[2]) > 1e-5) pts.push(q);
+      }
+      if (pts.length < 2) return;
+      const along = [0];
+      for (let i = 1; i < pts.length; i++) {
+        along.push(along[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]));
+      }
+      const total = along[along.length - 1];
+      if (total <= 0) return;
+      const look = s.emitter.look(p);
+      const life = minMaxColor(tm.colorOverLifetime, Math.min(1, p.age / p.life), p.r[6]);
+      const base = tm.inheritParticleColor ? look.color : [1, 1, 1, 1];
+      const size = tm.sizeAffectsWidth ? look.size[0] : 1;
+      const edges = pts.map((q, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const tx = (b[0] - a[0]) / l, ty = (b[1] - a[1]) / l;
+        const x = along[i] / total;
+        const w = (minMax(tm.widthOverTrail, x, p.r[6]) * size) / 2;
+        const c = minMaxColor(tm.colorOverTrail, x, p.r[6]);
+        return {
+          x, color: [base[0] * life[0] * c[0], base[1] * life[1] * c[1], base[2] * life[2] * c[2], base[3] * life[3] * c[3]],
+          left: [q[0] - ty * w, q[1] + tx * w, q[2]] as Vec3, right: [q[0] + ty * w, q[1] - tx * w, q[2]] as Vec3,
+        };
+      });
+      const vert = (q: Vec3, c: number[], u: number, v: number) => out.push(q[0], q[1], q[2], c[0], c[1], c[2], c[3], u, v, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      for (let i = 0; i + 1 < edges.length; i++) {
+        const e0 = edges[i], e1 = edges[i + 1];
+        vert(e0.left, e0.color, e0.x, 1); vert(e0.right, e0.color, e0.x, 0); vert(e1.right, e1.color, e1.x, 0);
+        vert(e0.left, e0.color, e0.x, 1); vert(e1.right, e1.color, e1.x, 0); vert(e1.left, e1.color, e1.x, 1);
+      }
+    };
+    for (const p of s.emitter.particles) if (p.trail) ribbon(p, true);
+    for (const g of s.emitter.ghosts) ribbon(g, false);
+    return out;
   }
 
   /** Triangles (FLOATS a vertex) for every particle of a system, in the world. */

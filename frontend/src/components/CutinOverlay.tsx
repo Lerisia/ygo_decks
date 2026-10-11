@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CutinSound } from "@/lib/cutinSound";
 import { SpinePlayer } from "@/lib/spine";
-import { SummonFx } from "@/lib/summonfx";
+import { SummonFx, vignetteAlpha } from "@/lib/summonfx";
 
 export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number; v?: number };
 
@@ -9,7 +9,7 @@ const BASE = "/media/md_ui/cutin";
 const SCREEN = 16 / 9;   // the game's screen the camera view is made for
 // the attribute's background behind the summon (summonbg_export.py), one folder an attribute (엘리스 2026-10-11)
 const BG_BASE = "/media/md_ui/summonbg";
-const BG_VERSION = 1;
+const BG_VERSION = 2;
 const BG_ATTRIBUTES = new Set(["light", "dark", "water", "fire", "earth", "wind", "divine"]);
 const CAMERA_SIZE = 5;   // half the height the game's camera shows, in world units: the backgrounds are made for it
 
@@ -33,6 +33,7 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
+  const vignetteRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<"loading" | "playing" | "failed">("loading");
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
     let alive = true, raf = 0, player: SpinePlayer | null = null, bg: SummonFx | null = null;
     // the background is a bonus: without it (no WebGL2, a failed file) the cut-in plays alone
     const bgLoad = BG_ATTRIBUTES.has(attribute)
-      ? SummonFx.load(bgCanvas, `${BG_BASE}/${attribute}`, BG_VERSION).catch(() => null)
+      ? SummonFx.load(bgCanvas, `${BG_BASE}/${attribute}`, BG_VERSION, { vignette: false }).catch(() => null)
       : Promise.resolve(null);
     Promise.all([SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`, info.v), bgLoad])
       // the sound is let loose first (at most a moment's wait), so that all start together
@@ -65,6 +66,17 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
         let fx = loadedFx;
         player = p;
         bg = fx;
+        // the game's vignette darkens the corners of the whole picture, the cut-in too: a small black layer, stretched
+        if (fx) {
+          const v = vignetteRef.current!, ctx = v.getContext("2d")!;
+          const img = ctx.createImageData(v.width, v.height);
+          for (let y = 0; y < v.height; y++) {
+            for (let x = 0; x < v.width; x++) {
+              img.data[(y * v.width + x) * 4 + 3] = Math.round(255 * vignetteAlpha((x + 0.5) / v.width, (y + 0.5) / v.height));
+            }
+          }
+          ctx.putImageData(img, 0, 0);
+        }
         if (!alive) {
           fx?.dispose();
           return p.dispose();
@@ -128,6 +140,7 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
     <div className="fixed inset-0 z-[60] bg-black/85 cursor-pointer" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
       <canvas ref={bgRef} className={`absolute inset-0 w-full h-full ${state === "playing" ? "" : "invisible"}`} />
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+      <canvas ref={vignetteRef} width={64} height={64} className={`absolute inset-0 w-full h-full ${state === "playing" ? "" : "invisible"}`} />
       {state !== "playing" && (
         <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-white/80" aria-live="polite">
           {state === "loading" ? "소환 연출을 불러오는 중…" : "소환 연출을 재생하지 못했습니다."}

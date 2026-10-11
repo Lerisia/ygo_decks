@@ -79,6 +79,15 @@ void main() {
 const BLOOM = { threshold: 1.1, intensity: 5.5, scatter: 0.4, clamp: 65472, skipIterations: 1, maxIterations: 6 };
 const VIGNETTE = { intensity: 0.3, smoothness: 0.4 };
 
+/** The vignette's darkening at a point of the screen (u, v in 0..1), as a black layer's opacity over the finished
+ *  picture: URP multiplies the linear colour by f, which in sRGB is close to multiplying by f^(1/2.2). For a page that
+ *  lays the vignette over more than the background (the cut-in drawn on top of it). */
+export function vignetteAlpha(u: number, v: number): number {
+  const dx = Math.abs(u - 0.5) * VIGNETTE.intensity * 3, dy = Math.abs(v - 0.5) * VIGNETTE.intensity * 3;
+  const f = Math.pow(Math.min(Math.max(1 - (dx * dx + dy * dy), 0), 1), VIGNETTE.smoothness * 5);
+  return 1 - Math.pow(f, 1 / 2.2);
+}
+
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 export class Post {
@@ -90,7 +99,8 @@ export class Post {
   private up: Target[] = [];
   private tmp: Target[] = [];
 
-  constructor(private gl: WebGL2RenderingContext) {
+  /** `vignette` off when the page lays it over the whole picture itself (vignetteAlpha). */
+  constructor(private gl: WebGL2RenderingContext, private vignette = true) {
     this.hdr = !!gl.getExtension("EXT_color_buffer_float");
     const compile = (type: number, src: string) => {
       const s = gl.createShader(type)!;
@@ -201,7 +211,7 @@ export class Post {
     const bloom = this.down.length > 1 ? this.up[0] : this.down[0];
     this.pass(P.final, null, w, h, [["src", scene.tex], ["bloom", bloom.tex]], (pr) => {
       gl.uniform1f(gl.getUniformLocation(pr, "intensity"), BLOOM.intensity);
-      gl.uniform4f(gl.getUniformLocation(pr, "vignette"), 0.5, 0.5, VIGNETTE.intensity * 3, VIGNETTE.smoothness * 5);
+      gl.uniform4f(gl.getUniformLocation(pr, "vignette"), 0.5, 0.5, this.vignette ? VIGNETTE.intensity * 3 : 0, VIGNETTE.smoothness * 5);
     });
   }
 }
