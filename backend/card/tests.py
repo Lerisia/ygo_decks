@@ -2,7 +2,7 @@ import os
 import tempfile
 from datetime import timedelta
 from unittest.mock import patch
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, SimpleTestCase
 from django.utils import timezone
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,6 +12,25 @@ from io import BytesIO, StringIO
 from django.core.files.base import ContentFile
 from .models import Card, UploadRecord, QuizHighScore, QuizAllTimeBest, QuizMonthlyAward, QuizWeeklyAward
 from user.models import User
+
+
+class CardBoxTest(SimpleTestCase):
+    """Which boxes the deck scanner's detector finds are cropped as cards (detector v2, 엘리스 10/11)."""
+
+    def test_keep_card_box(self):
+        from card.crop import CARD_CONF, keep_card_box
+        self.assertTrue(keep_card_box((0, 0, 70, 100), 0.93))
+        self.assertFalse(keep_card_box((0, 0, 70, 100), CARD_CONF - 0.01))   # other games' cards, badges
+        self.assertFalse(keep_card_box((0, 0, 10, 14), 0.99))               # too small to cut the art from
+        self.assertFalse(keep_card_box((0, 0, 20, 100), 0.99))              # a sliver at the screen's edge
+        self.assertTrue(keep_card_box((0, 0, 70, 100), 0.85, min_conf=0.8))
+
+    def test_detector_settings(self):
+        from card.crop import detector_settings
+        self.assertEqual(detector_settings({0: "card"}, {"imgsz": 640}), (0, 640))
+        names = {0: "card", 1: "deck_panel", 2: "head_main", 3: "head_extra", 4: "head_side"}
+        self.assertEqual(detector_settings(names, {"imgsz": 1024}), (0, 1024))
+        self.assertEqual(detector_settings({0: "deck_panel", 1: "card"}, {}), (1, 640))
 
 
 class CleanupUploadsTest(TestCase):

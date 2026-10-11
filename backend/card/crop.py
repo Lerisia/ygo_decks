@@ -8,6 +8,25 @@ from django.conf import settings
 
 model_path = os.path.join(settings.BASE_DIR, "card", "best.pt")
 
+# detector v2 (엘리스 10/11): the cards it finds sit at 0.93 and up; below 0.75 come other games' cards, number badges
+# and boxes round several small cards
+CARD_CONF = 0.75
+
+
+def detector_settings(names, train_args):
+    """The class index of "card" (the v2 detector also finds the deck panel and the main / extra / side headings) and
+    the image size the model was trained at."""
+    card = next((i for i, n in names.items() if n == "card"), 0)
+    return card, (train_args or {}).get("imgsz", 640)
+
+
+def keep_card_box(box, conf, min_conf=CARD_CONF):
+    """A detected card worth cropping: confident enough, big enough to cut its art from, and not a sliver (a card less
+    than half on screen, which the detector is taught to leave)."""
+    x1, y1, x2, y2 = box
+    w, h = x2 - x1, y2 - y1
+    return conf >= min_conf and w >= 16 and h >= 24 and w / h >= 0.35
+
 def crop_illust_from_card(card_img: Image.Image) -> Image.Image:
     def is_pendulum_card(card_img: Image.Image) -> bool:
         np_img = np.array(card_img)
@@ -81,7 +100,7 @@ def crop_cards_and_draw_boxes(
     card_output_dir="cropped_cards",
     illust_output_dir="cropped_illusts",
     boxed_image_path="boxed.jpg",
-    min_conf=0.9
+    min_conf=CARD_CONF
 ):
     os.makedirs(card_output_dir, exist_ok=True)
     os.makedirs(illust_output_dir, exist_ok=True)
@@ -93,7 +112,8 @@ def crop_cards_and_draw_boxes(
         return
 
     model = YOLO(model_path)
-    results = model.predict(image, verbose=False)[0]  # inference only
+    card, imgsz = detector_settings(model.names, (model.ckpt or {}).get("train_args"))
+    results = model.predict(image, imgsz=imgsz, classes=[card], verbose=False)[0]  # inference only
 
     # Get detection results
     boxes = results.boxes.xyxy.cpu().numpy()
@@ -108,7 +128,7 @@ def crop_cards_and_draw_boxes(
     count = 0
 
     for i, (box, conf) in enumerate(zip(boxes, confs)):
-        if conf < min_conf:
+        if not keep_card_box(box, conf, min_conf):
             continue
 
         x1, y1, x2, y2 = map(int, box)

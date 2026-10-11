@@ -15,7 +15,6 @@ def scan_deck_image(image_path, work_dir):
         card_output_dir=card_dir,
         illust_output_dir=illust_dir,
         boxed_image_path=os.path.join(work_dir, "boxed.jpg"),
-        min_conf=0.9,
     )
     results = []
     for fname in sorted(f for f in os.listdir(illust_dir) if f.startswith("illust")):

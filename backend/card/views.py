@@ -180,7 +180,6 @@ def classify_deck_image(request):
         card_output_dir=card_dir,
         illust_output_dir=illust_dir,
         boxed_image_path=boxed_path,
-        min_conf=0.9
     )
 
     # 5. Classify
