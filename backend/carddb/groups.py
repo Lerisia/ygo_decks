@@ -17,6 +17,8 @@ RUBY = re.compile(r"\$R(.+?)\((.+?)\)")
 KIND = r"(?:カード|モンスター|魔法|罠|通常|速攻|永続|装備|フィールド|カウンター|儀式|融合|シンクロ|エクシーズ|X|リンク|L|P|S|ペンデュラム|チューナー|トークン|効果|と名のついた)"
 CHAIN = re.compile(r"((?:「[^」]{1,30}」(?:又は|及び|、|・|と|や|か|もしくは))*「[^」]{1,30}」)(?=" + KIND + ")")
 TREATED = re.compile(r"ルール上([^。]*?)扱う")
+# "このカードのカード名は、フィールド・墓地に存在する限り「X」として扱う": the card also bears X's name where it plays
+RENAMED_WHILE = re.compile(r"カード名(?:は|を)[^。「」]*?((?:「[^」]+」)+)として扱う")
 QUOTE_JA = re.compile(r"「([^」]{1,40})」")
 QUOTE_KO = re.compile(r"[\"“]([^\"”]{1,60})[\"”]")
 LATIN = re.compile(r"[A-Za-z]")
@@ -72,8 +74,12 @@ def readings_at(seg, x):
 
 
 def treated(text):
-    """(groups the card also counts as, names it also bears, the name that replaces its own or None)."""
+    """(groups the card also counts as, names it also bears — by the rule or while it is on the field —, the name
+    that replaces its own or None)."""
     also_groups, also_names, renamed = set(), set(), None
+    for m in RENAMED_WHILE.finditer(N(text)):
+        if "ルール上" not in m.group(0):
+            also_names.update(re.findall(r"「([^」]*)」", m.group(1)))
     for m in TREATED.finditer(N(text)):
         body = m.group(1)
         xs = re.findall(r"「([^」]*)」", body)

@@ -210,6 +210,30 @@ class CardGroupMember(models.Model):
         constraints = [models.UniqueConstraint(fields=["group", "card"], name="carddb_group_card")]
 
 
+class CardSupport(models.Model):
+    """서포트: `card` names a 카드군 (`group`) or a card (`target`) in its Japanese text without being one of them.
+    Built from the texts with the groups (carddb/support.py), so every row is replaced on a rebuild."""
+
+    class How(models.TextChoices):
+        GROUP = "group", "카드군 언급"
+        PARENT = "parent", "상위 카드군 언급"
+        CARD = "card", "카드 언급"
+        CARD_GROUP = "card_group", "언급한 카드의 카드군"
+
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="supports")
+    group = models.ForeignKey(CardGroup, null=True, blank=True, on_delete=models.CASCADE, related_name="supporters")
+    target = models.ForeignKey(Card, null=True, blank=True, on_delete=models.CASCADE, related_name="supporters")
+    how = models.CharField(max_length=10, choices=How.choices)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["card", "group"], name="carddb_support_card_group"),
+            models.UniqueConstraint(fields=["card", "target"], name="carddb_support_card_target"),
+            models.CheckConstraint(condition=models.Q(group__isnull=True) ^ models.Q(target__isnull=True),
+                                   name="carddb_support_one_target"),
+        ]
+
+
 def has_art(card_field="pk"):
     """Filter for cards (or rows pointing at one) with Master Duel art — the site leaves out cards outside Master Duel."""
     return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))

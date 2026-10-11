@@ -503,8 +503,8 @@ class SwapStepsTest(TestCase):
         self.assertEqual(self.game.card_name_snapshot, "블랙매지션")
 
 
-class CardGroupTest(TestCase):
-    """카드군 by the rule, on cards that show each case."""
+class CardGroupCase(TestCase):
+    """Cards that show each 카드군 case, and building the groups from them."""
 
     def card(self, cid, name, ko="", ruby="", ja_text="", ko_text="", md=True):
         from .models import CardText, MdPrint, SrcMd
@@ -560,6 +560,10 @@ class CardGroupTest(TestCase):
 
     def members(self, group):
         return sorted(group.members.exclude(how="removed").values_list("card_id", flat=True))
+
+
+class CardGroupTest(CardGroupCase):
+    """카드군 by the rule, on cards that show each case."""
 
     def test_members_by_written_name_and_reading(self):
         g = self.build()
@@ -675,6 +679,90 @@ class CardGroupTest(TestCase):
         from .models import CardGroup
         save(compute(lists))
         self.assertEqual(sorted(CardGroup.objects.filter(md_list=True).values_list("text", flat=True)), ["EM", "HERO"])
+
+
+class CardSupportTest(CardGroupCase):
+    """서포트: a card that names a 카드군 or a card in its Japanese text without being one of them (엘리스 2026-10-11)."""
+
+    def setUp(self):
+        super().setUp()
+        self.card(70, "ヒーロー・ブラスト", "히어로 블라스트", ja_text="自分の墓地の「E・HERO」通常モンスター１体を対象として発動できる。")
+        self.card(71, "ミラクル・フュージョン", "미라클 퓨전", ja_text="「HERO」融合モンスターを融合召喚する。")
+        self.card(73, "ブラック・マジシャン", "블랙 매지션")
+        self.card(75, "ブラック・マジシャン・ガール", "블랙 매지션 걸", ja_text="デッキから「ブラック・マジシャン」カード１枚を手札に加える。")
+        self.card(72, "黒・魔・導", "흑·마·도", ja_text="自分フィールドに「ブラック・マジシャン」が存在する場合に発動できる。")
+        self.card(74, "マジシャンズ・ロッド", "매지션즈 로드",
+                  ja_text="「マジシャンズ・ロッド」の①の効果は１ターンに１度しか使用できない。①：「ブラック・マジシャン」のカード名が記された魔法・罠カード１枚を手札に加える。")
+        self.card(76, "スケープ・ゴート", "스케이프 고트", ja_text="「羊トークン」（獣族・地・星１・攻／守０）４体を特殊召喚する。")
+        self.card(77, "羊トークン", "양 토큰")
+        self.card(78, "アンノウン・シンクロン", "언노운 싱크론", ja_text="「相手の手札をランダムに１枚捨てる」効果を発動する。")
+        self.card(79, "マジシャン・オブ・ブラックイリュージョン", "매지션 오브 블랙 일루전",
+                  ja_text="②：このカードはモンスターゾーンに存在する限り、カード名を「ブラック・マジシャン」として扱う。")
+        self.card(80, "EMヒーロー・フェス", "EM 히어로 페스", ruby="$REM(エンタメイト)ヒーロー・フェス", ja_text="「EM」又は「HERO」モンスター１体")
+        self.card(81, "鎖の宴", "사슬의 연회", ja_text="「C」モンスター１体を対象とする。")
+        self.card(82, "D-HERO ドグマガイ", "데스티니 히어로 도그마 가이", ja_text="自分フィールドの「HERO」モンスター３体をリリースした場合のみ特殊召喚できる。")
+
+    def supports(self, cid):
+        from .models import CardSupport
+        out = {}
+        for s in CardSupport.objects.filter(card_id=cid).select_related("group"):
+            key = ("g", s.group.text, s.group.reading) if s.group_id else ("c", s.target_id)
+            out[key] = s.how
+        return out
+
+    def build(self):
+        g = super().build()
+        from .support import compute, save
+        save(compute())
+        return g
+
+    def test_a_group_named_by_a_card_outside_it(self):
+        self.build()
+        self.assertEqual(self.supports(70), {("g", "E・HERO", "E・HERO"): "group"})
+        # D-HERO is a HERO but not an E・HERO: naming E・HERO supports it
+        self.assertEqual(self.supports(3), {("g", "E・HERO", "E・HERO"): "group"})
+
+    def test_members_naming_their_own_group_are_members_not_support(self):
+        self.build()
+        self.assertEqual(self.supports(1), {})   # E・HERO エアーマン naming 「HERO」
+        self.assertEqual(self.supports(4), {})   # EM naming 「EM」
+        # a D-HERO naming 「HERO」 is a HERO talking about its own: nothing reaches E・HERO under it either
+        self.assertEqual(self.supports(82), {})
+
+    def test_support_of_a_group_reaches_the_groups_under_it(self):
+        self.build()
+        self.assertEqual(self.supports(71), {("g", "HERO", "HERO"): "group", ("g", "E・HERO", "E・HERO"): "parent"})
+
+    def test_a_named_card_and_the_groups_it_is_in(self):
+        self.build()
+        self.assertEqual(self.supports(72), {("c", 73): "card", ("g", "ブラック・マジシャン", "ブラック・マジシャン"): "card_group"})
+        # cards that name a card ("のカード名が記された") support it too; its own name is not a mention
+        self.assertEqual(self.supports(74), {("c", 73): "card", ("g", "ブラック・マジシャン", "ブラック・マジシャン"): "card_group"})
+
+    def test_tokens_quoted_effects_and_treated_as_are_not_support(self):
+        g = self.build()
+        self.assertEqual(self.supports(76), {})
+        self.assertEqual(self.supports(78), {})
+        self.assertEqual(self.supports(9), {})    # ルール上「ギャラクシーアイズ」カードとしても扱う: a member
+        self.assertEqual(self.supports(79), {})
+        # "while on the field its name is 「ブラック・マジシャン」" makes it one of them
+        self.assertIn(79, self.members(g["ブラック・マジシャン"]))
+
+    def test_a_chain_of_groups(self):
+        self.build()
+        self.assertEqual(self.supports(80), {("g", "HERO", "HERO"): "group", ("g", "E・HERO", "E・HERO"): "parent"})   # EM: a member
+
+    def test_a_text_read_two_ways(self):
+        self.build()
+        self.assertEqual(self.supports(26), {("g", "C", "コクーン"): "group"})   # コクーン・パーティ spells out its C
+        self.assertEqual(self.supports(81), {("g", "C", "コクーン"): "group", ("g", "C", "チェーン"): "group"})   # can't tell: both
+
+    def test_a_rebuild_replaces_the_rows(self):
+        from .models import CardSupport
+        self.build()
+        n = CardSupport.objects.count()
+        self.build()
+        self.assertEqual(CardSupport.objects.count(), n)
 
 
 class CardGroupReviewApiTest(CardGroupTest):
