@@ -179,21 +179,22 @@ export default function CardDetail() {
     if (isLink) stats.push(["링크 마커", <LinkMarkers on={card.link_markers} />]);
   }
   // The card's 카드군 sit with its stats, near the top (엘리스 2026-10-11: "카드군도 중요한 정보"); each opens its cards.
-  if (card.groups.length) {
-    stats.splice(1, 0, ["카드군", (
-      <div className="flex flex-wrap gap-1">
-        {card.groups.map((g) => (
-          <Link
-            key={g.id}
-            to={`/cards?group=${g.id}`}
-            className="px-2 py-0.5 rounded-full text-xs md:text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition"
-          >
-            {g.name}
-          </Link>
-        ))}
-      </div>
-    )]);
-  }
+  // The row stays when there are none, so it is always in the same place and "none" reads as an answer (44% of cards).
+  stats.splice(1, 0, ["카드군", card.groups.length ? (
+    <div className="flex flex-wrap gap-1">
+      {card.groups.map((g) => (
+        <Link
+          key={g.id}
+          to={`/cards?group=${g.id}`}
+          className="px-2 py-0.5 rounded-full text-xs md:text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition"
+        >
+          {g.name}
+        </Link>
+      ))}
+    </div>
+  ) : (
+    <span className="text-gray-400 dark:text-gray-500">없음</span>
+  )]);
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
