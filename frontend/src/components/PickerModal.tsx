@@ -234,7 +234,7 @@ export function PickerPanel({
           {view !== "list" ? (
             <div className={`grid ${GRID_COLS[view][inline ? "inline" : "modal"]}`}>
               {drawn.map((it) => (
-                <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className={`flex flex-col justify-start text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition ${view === "small" ? "p-0.5" : "p-1"}`} title={it.name}>
+                <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className={`self-start text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition ${view === "small" ? "p-0.5" : "p-1"}`} title={it.name}>
                   {thumb(it, `w-full ${imageAspect}`)}
                   {view === "small" ? (
                     <p className="text-[10px] mt-0.5 leading-tight line-clamp-2 break-keep [overflow-wrap:anywhere]">{it.name}</p>
