@@ -8,11 +8,13 @@ import { Skeleton } from "./skeleton";
 export class SpinePlayer {
   private constructor(private renderer: SpineRenderer, readonly skeleton: Skeleton) {}
 
-  /** The cut-in under `base` (skeleton.json, atlas.txt and its pages) on the canvas. */
-  static async load(canvas: HTMLCanvasElement, base: string): Promise<SpinePlayer> {
+  /** The cut-in under `base` (skeleton.json, atlas.txt and its pages) on the canvas; `version` goes on every address,
+   *  so that pictures made again reach browsers that keep the old ones. */
+  static async load(canvas: HTMLCanvasElement, base: string, version = 0): Promise<SpinePlayer> {
+    const q = version ? `?v=${version}` : "";
     const [json, atlasText] = await Promise.all([
-      fetch(`${base}/skeleton.json`).then((r) => r.json()),
-      fetch(`${base}/atlas.txt`).then((r) => r.text()),
+      fetch(`${base}/skeleton.json${q}`).then((r) => r.json()),
+      fetch(`${base}/atlas.txt${q}`).then((r) => r.text()),
     ]);
     const atlas = readAtlas(atlasText);
     const renderer = new SpineRenderer(canvas, atlas.regions);
@@ -20,7 +22,7 @@ export class SpinePlayer {
     for (const page of atlas.pages) {
       const im = new Image();
       im.crossOrigin = "anonymous";
-      im.src = `${base}/${page.name}`;
+      im.src = `${base}/${page.name}${q}`;
       await im.decode();
       renderer.addPage(page, im);
     }

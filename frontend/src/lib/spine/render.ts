@@ -12,7 +12,9 @@ void main() {
   gl_Position = vec4((a_pos - u_view.xy) / u_view.zw, 0., 1.);
 }`;
 
-// textures are premultiplied; a dark colour (two-colour tint) lifts the shadows, black leaves the light tint alone
+// textures are premultiplied, so no colour may exceed its alpha: the pages' lossy compression leaves colour noise under
+// clear pixels, which would otherwise add a faint box around every image; a dark colour (two-colour tint) lifts the
+// shadows, black leaves the light tint alone
 const FS = `#version 300 es
 precision mediump float;
 uniform sampler2D u_tex;
@@ -20,6 +22,7 @@ in vec2 v_uv; in vec4 v_light; in vec3 v_dark;
 out vec4 o;
 void main() {
   vec4 t = texture(u_tex, v_uv);
+  t.rgb = min(t.rgb, vec3(t.a));
   o.a = t.a * v_light.a;
   o.rgb = (t.a - t.rgb) * v_dark + t.rgb * v_light.rgb;
 }`;

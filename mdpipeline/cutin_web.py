@@ -19,6 +19,8 @@ import UnityPy
 from PIL import Image
 
 SKELETON_SCALE = 0.01   # SkeletonDataAsset.scale of every cut-in
+# raised whenever the pictures are made again: the page asks for ?v= this, past the copies browsers keep for years
+REVISION = 2
 ANIMS = ("animation", "animation_kde")
 
 
@@ -78,7 +80,9 @@ def _card(job):
     for page in re.findall(r"^(\S+)\.png\s*$", atlas, re.M):
         out = os.path.join(dst, page + ".webp")
         if not os.path.exists(out):
-            Image.open(os.path.join(src, page + ".png")).save(out, quality=quality, method=4)
+            # exact: the colour under clear pixels stays as it is (nothing, on premultiplied pages); left to itself the
+            # encoder fills it with whatever packs best, and premultiplied blending then adds that as a box round the image
+            Image.open(os.path.join(src, page + ".png")).save(out, quality=quality, method=4, exact=True)
     open(os.path.join(dst, "atlas.txt"), "w").write(re.sub(r"^(\S+)\.png(\s*)$", r"\1.webp\2", atlas, flags=re.M))
     return anim
 
@@ -105,7 +109,8 @@ def main():
              if all(os.path.exists(os.path.join(src_root, c, f)) for f in ("skeleton.json", "atlas.txt"))]
     with multiprocessing.Pool(12) as pool:
         anims = pool.map(_card, [(os.path.join(src_root, c), os.path.join(args.out, c), args.quality) for c in cards])
-    index = {c: {"anim": a, "view": view_of(prefab[c], c) if c in prefab else None, "mp": megapixels(os.path.join(src_root, c))}
+    index = {c: {"anim": a, "view": view_of(prefab[c], c) if c in prefab else None, "mp": megapixels(os.path.join(src_root, c)),
+                 "v": REVISION}
              for c, a in zip(cards, anims)}
     json.dump(index, open(os.path.join(args.out, "index.json"), "w"), separators=(",", ":"))
     print(len(index), "cut-ins")

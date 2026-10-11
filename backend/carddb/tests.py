@@ -953,6 +953,20 @@ class CardDexApiTest(TestCase):
             CardGroupMember.objects.create(group=g, card=c, how="name")
         CardGroupMember.objects.create(group=g, card=self.quick, how="removed")
         self.assertEqual(self.ids(group=g.id), [3, 1])
+        # cards with another art, or with a monster cut-in (from the cut-in index on media; an alt art's counts for its card)
+        import json
+        import os
+        from django.conf import settings
+        from . import display
+        from .models import MdArt
+        alt = MdPrint.objects.create(md_id=3901, card=self.girl, is_alt_art=True, rarity="UR")
+        MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/3901.webp")
+        display.forget_art()
+        os.makedirs(os.path.join(settings.MEDIA_ROOT, "md_ui/cutin"))
+        with open(os.path.join(settings.MEDIA_ROOT, "md_ui/cutin/index.json"), "w") as f:
+            json.dump({"2": {"anim": "animation", "view": None}, "3901": {"anim": "animation", "view": None}}, f)
+        self.assertEqual(self.ids(has="alt"), [3])
+        self.assertEqual(self.ids(has="cutin"), [3, 2])
 
     def test_dex_counts(self):
         from deck.models import Deck

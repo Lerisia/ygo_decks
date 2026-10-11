@@ -17,10 +17,16 @@ const SORTS = [
 ];
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
-const hasFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card);
+const hasFilter = (f: CardFilters) =>
+  !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.has);
 // The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
 // page shows its name and ✕ above the list instead (엘리스 2026-10-11).
-const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st);
+const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.has);
+// cards with another art or a monster cut-in (엘리스 2026-10-11)
+const HAS = [
+  { value: "alt", label: "다른 일러스트 있음" },
+  { value: "cutin", label: "컷인 있음" },
+];
 
 function TileSkeleton() {
   return (
@@ -220,6 +226,24 @@ export default function CardList() {
             {select("종족", "race", options?.races ?? [], monsterOnly)}
             {select("레벨·랭크·링크", "level", (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })), monsterOnly)}
             {select("마법·함정 종류", "st", options?.spell_trap_kinds ?? [], filters.category === "monster")}
+          </div>
+          <div className="text-left">
+            <span className="block text-sm font-semibold mb-1">일러스트·컷인</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {HAS.map((h) => (
+                <button
+                  key={h.value}
+                  type="button"
+                  aria-pressed={filters.has === h.value}
+                  onClick={() => update({ has: filters.has === h.value ? "" : h.value })}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    filters.has === h.value ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {h.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="text-left">
             <span className="block text-sm font-semibold mb-1">카드군</span>

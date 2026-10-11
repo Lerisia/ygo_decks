@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CutinSound } from "@/lib/cutinSound";
 import { SpinePlayer } from "@/lib/spine";
 
-export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number };
+export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number; v?: number };
 
 const BASE = "/media/md_ui/cutin";
 const SCREEN = 16 / 9;   // the game's screen the camera view is made for
@@ -44,7 +44,7 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
     let alive = true, raf = 0, player: SpinePlayer | null = null;
-    SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`)
+    SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`, info.v)
       // the sound is let loose first (at most a moment's wait), so that both start together
       .then((p) => Promise.race([sound?.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => p))
       .then((p) => {

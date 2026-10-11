@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from PIL import Image
 
-from .display import THUMB_DIR as CARD_THUMB_DIR, art_path, art_url, display_name, thumb_url
+from .display import THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
 from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
@@ -55,7 +55,7 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups", "supports", "as_cards")
+                 "groups", "supports", "as_cards", "alt", "cutin")
 
 
 _index = {"key": None, "at": 0.0, "new": [], "name": [], "face_thumbs": set(), "thumbs": set()}
@@ -72,7 +72,7 @@ def _files(rel_dir):
 def _fingerprint():
     from .models import MdArt
     dirs = []
-    for d in (FACE_THUMB_DIR, CARD_THUMB_DIR):
+    for d in (FACE_THUMB_DIR, CARD_THUMB_DIR, "md_ui/cutin/index.json"):
         try:
             dirs.append(os.stat(os.path.join(settings.MEDIA_ROOT, d)).st_mtime)
         except OSError:
@@ -101,6 +101,10 @@ def _card_index():
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
         groups[cid].add(gid)
     md_release = dict(MdPrint.objects.filter(is_alt_art=False).exclude(first_seen=None).values_list("md_id", "first_seen"))
+    with_art = art_names()
+    alt_of = dict(MdPrint.objects.filter(is_alt_art=True).values_list("md_id", "card_id"))
+    alt_cards = {cid for md_id, cid in alt_of.items() if md_id in with_art}
+    cutin_cards = {alt_of.get(md_id, md_id) for md_id in _cutins()}
     rows = []
     for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
          st) in Card.objects.filter(has_art()).values_list(
@@ -117,6 +121,7 @@ def _card_index():
         r.groups = groups.get(cid, set())
         r.supports = supports.get(cid, set())
         r.as_cards = as_cards.get(cid, set()) | {cid}
+        r.alt, r.cutin = cid in alt_cards, cid in cutin_cards
         rows.append(r)
     _index.update(
         key=key, at=time.monotonic(),
@@ -146,6 +151,11 @@ def _keep(p):
     category, _, kind = str(p.get("st", "")).partition(":")
     if category in ("spell", "trap") and kind:
         tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
+    # cards with another art (다른 일러스트) or with a monster cut-in (엘리스 2026-10-11)
+    if p.get("has") == "alt":
+        tests.append(lambda r: r.alt)
+    elif p.get("has") == "cutin":
+        tests.append(lambda r: r.cutin)
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)

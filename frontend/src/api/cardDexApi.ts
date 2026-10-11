@@ -20,11 +20,14 @@ export type CardFilters = {
   role: string;
   /** A card's own support list: the card, cards bearing its name and cards naming it. */
   card: string;
+  /** "alt": cards with another art (다른 일러스트), "cutin": cards with a monster cut-in. */
+  has: string;
   sort: string;
 };
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", sort: "new",
+  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", has: "",
+  sort: "new",
 };
 
 export type CardListItem = {
@@ -88,7 +91,7 @@ export type CardDoc = {
     /** The card name alone (white on black over the card's top sixth), for the finishes to paint. */
     name_mask: string | null;
     /** Master Duel's monster cut-in for this print: the animation and the game's camera view. */
-    cutin: { anim: string; view: [number, number, number] | null; mp?: number } | null;
+    cutin: { anim: string; view: [number, number, number] | null; mp?: number; v?: number } | null;
   }[];
   /** The attribute whose sound goes with a cut-in. */
   cutin_sound: string;
