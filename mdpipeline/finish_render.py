@@ -4,7 +4,8 @@ it in the browser (frontend/src/lib/cardFinish.ts): the scanner learns finished 
 usage: finish_render.py <bundle dir> <jobs.jsonl> <out dir> [--size 256x372] [--background 24,24,28]
 
 A job: {"face": path, "out": name, "style": "shine" | "royal", "time": seconds, "light": [x, y, z] (toward the light),
-"intensity": k, "attribute": tile, "level": stars, "frame": "normal" | "link" | "pendulum" | "overframe"}. Jobs of one
+"intensity": k, "attribute": tile, "level": stars, "frame": "normal" | "link" | "pendulum" | "overframe", "name": the
+name mask's path (optional: without it no name is painted)}. Jobs of one
 face should come together: its texture is loaded once for them. Each picture is saved as <out dir>/<out> (webp), the
 finish laid over the background colour.
 """
@@ -20,6 +21,7 @@ from PIL import Image
 
 SOLID = {"@white": (255, 255, 255, 255), "@black": (0, 0, 0, 0), "@gray": (128, 128, 128, 255),
          "@bump": (128, 128, 255, 255), "@overframe": (0, 62, 0, 255)}
+NO_NAME = (0, 0, 0, 255)   # the name slot without a mask: no name painted (as the renders before name masks)
 STYLES = ("shine", "royal")
 VERTEX_VALUES = {
     "tangent": "vec4(1., 0., 0., 1.)",
@@ -55,11 +57,12 @@ class FinishRenderer:
             for i in self.cfg[s]["textures"]:
                 for frame in ("normal", "link", "pendulum", "overframe"):
                     file = self.file_at(s, i, frame)
-                    if file != "@card" and file not in self.textures:
+                    if file not in ("@card", "@name") and file not in self.textures:
                         self.textures[file] = self.solid(SOLID[file]) if file in SOLID else \
                             self.image(Image.open(os.path.join(bundle, f"{file}.png")), repeat=True)
         self.fbo = self.ctx.simple_framebuffer(size, components=4)
         self.card = None
+        self.no_name = self.name = self.solid(NO_NAME)
 
     def file_at(self, style, i, frame):
         return self.cfg[style].get("frames", {}).get(frame, {}).get(i) or self.cfg[style]["textures"][i]["file"]
@@ -82,11 +85,17 @@ class FinishRenderer:
             self.card.release()
         self.card = self.image(Image.open(path), repeat=False)
 
+    def set_name(self, path):
+        """The card's name mask (face.py's draw_name_mask: the shaders paint the name in gold or white), or none."""
+        if self.name is not self.no_name:
+            self.name.release()
+        self.name = self.image(Image.open(path), repeat=False) if path else self.no_name
+
     def draw(self, style, time, light, intensity, attribute, level, frame):
         cfg, pr = self.cfg[style], self.programs[style]
         for i in cfg["textures"]:
             file = self.file_at(style, i, frame)
-            (self.card if file == "@card" else self.textures[file]).use(location=int(i))
+            (self.card if file == "@card" else self.name if file == "@name" else self.textures[file]).use(location=int(i))
             if f"t{i}" in pr:
                 pr[f"t{i}"].value = int(i)
         glob = np.zeros((134, 4), "f4")
@@ -143,6 +152,7 @@ def main():
             continue
         if job["face"] != face:
             r.set_face(job["face"])
+            r.set_name(job.get("name"))
             face = job["face"]
         px = r.draw(job["style"], job["time"], job["light"], job.get("intensity", 1.0), job.get("attribute", 0),
                     job.get("level", 0), job.get("frame", "normal"))
