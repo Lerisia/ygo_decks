@@ -670,6 +670,7 @@ class ScanDatasetTest(TestCase):
         from .scan_dataset import yolo_lines
         self.assertEqual(yolo_lines([("head_side", (0, 0, 50, 20)), ("card", (10, 10, 10, 30))], 100, 200),
                          ["4 0.250000 0.050000 0.500000 0.100000"])
+        self.assertEqual(yolo_lines([("card", (90, -2, 100.4, 20))], 100, 200), ["0 0.950000 0.050000 0.100000 0.100000"])
 
     def test_composed_cards_sit_inside_the_picture(self):
         import random

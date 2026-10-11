@@ -43,6 +43,8 @@ def window_labels(labels, window):
 def yolo_lines(labels, width, height):
     lines = []
     for cls, (x0, y0, x1, y1) in labels:
+        # rounding the crop can leave a box a hair past the edge, and YOLO drops the whole picture for it
+        x0, y0, x1, y1 = max(0, x0), max(0, y0), min(width, x1), min(height, y1)
         w, h = (x1 - x0) / width, (y1 - y0) / height
         if w <= 0 or h <= 0:
             continue
