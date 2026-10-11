@@ -350,6 +350,9 @@ def card(request, card_id):
                 seen.add(link.deck_id)
                 decks.append({"id": link.deck_id, "name": link.deck.name, "cover": _phone_cover_url(link.deck), "via": via})
     base = MdPrint.objects.filter(md_id=c.id).first()
+    # each print has its own rarity: an alternate art or 오버프레임 of an N / R card can be UR (and then comes in 로얄)
+    alts = list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id").values_list("md_id", "rarity"))
+    rarity = {c.id: base.rarity if base else ""} | {m: r or (base.rarity if base else "") for m, r in alts}
     return Response({
         "id": c.id, "name": display_name(c), "name_ko": c.name_ko, "name_ja": c.name_ja, "name_ja_ruby": c.name_ja_ruby,
         "name_en": c.name_en, "category": c.category, "frame": c.frame, "type_line": type_line,
@@ -358,9 +361,8 @@ def card(request, card_id):
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale, "finish": _finish(c),
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
         "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
-        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m)}
-                  for m in [c.id] + list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id")
-                                         .values_list("md_id", flat=True)) if face_url(m)],
+        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m), "rarity": r}
+                  for m, r in rarity.items() if face_url(m)],
         "rarity": base.rarity if base else "",
         "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],

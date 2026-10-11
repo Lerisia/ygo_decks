@@ -4,7 +4,8 @@ import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
-// Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11)
+// Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
+const ROYAL_RARITIES = new Set(["SR", "UR", ""]);   // "" for a print whose rarity is not known
 const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
   { key: "normal", label: "일반" },
   { key: "shine", label: "샤인" },
@@ -173,10 +174,11 @@ export default function CardDetail() {
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
-  const finishParams: FinishParams = {
-    ...card.finish,
-    frame: card.faces.find((f) => f.face === picked)?.overframe ? "overframe" : card.finish.frame,
-  };
+  const pickedFace = card.faces.find((f) => f.face === picked);
+  const finishParams: FinishParams = { ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame };
+  // the print picked decides: an N / R card's UR 오버프레임 comes in 로얄, the card itself does not
+  const finishes = FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
+  const shown = finishes.some((f) => f.key === finish) ? finish : "normal";
   const [levelName, levelValue] = (card.level_label || "").split(" ");
   // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
   // after a 150KB download with the old picture still up (엘리스 2026-10-11: "반응이 느리고 가끔 안 눌림").
@@ -261,10 +263,10 @@ export default function CardDetail() {
         <div className={AREA.card}>
           {picked ? (
             <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
-              {finish === "normal" ? (
+              {shown === "normal" ? (
                 <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
               ) : (
-                <CardFinishCanvas faceUrl={picked} style={finish} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${finish === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+                <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
               )}
               <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                 <ZoomGlyph />
@@ -274,16 +276,16 @@ export default function CardDetail() {
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {picked && canFinish && (
-            <div role="radiogroup" aria-label="가공" className="mt-2 grid grid-cols-3 rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
-              {FINISHES.map((f) => (
+            <div role="radiogroup" aria-label="가공" className={`mt-2 grid ${finishes.length === 3 ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold`}>
+              {finishes.map((f) => (
                 <button
                   key={f.key}
                   type="button"
                   role="radio"
-                  aria-checked={finish === f.key}
+                  aria-checked={shown === f.key}
                   onClick={() => setFinish(f.key)}
                   className={`py-1 rounded-md transition ${
-                    finish === f.key ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
+                    shown === f.key ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
                   }`}
                 >
                   {f.label}
@@ -382,7 +384,7 @@ export default function CardDetail() {
       </div>
 
       {zoomed && picked && (
-        <CardZoom src={picked} alt={`${card.name} 카드`} finish={finish} params={finishParams} onClose={() => setZoomed(false)} />
+        <CardZoom src={picked} alt={`${card.name} 카드`} finish={shown} params={finishParams} onClose={() => setZoomed(false)} />
       )}
 
       {card.decks.length > 0 && (

@@ -1125,7 +1125,8 @@ class CardFaceTest(TestCase):
         self.assertIsNone(face_url(7))
         from PIL import Image
         from .models import MdArt
-        alt = MdPrint.objects.create(md_id=3907, card=self.card, is_alt_art=True)
+        MdPrint.objects.filter(md_id=7).update(rarity="R")
+        alt = MdPrint.objects.create(md_id=3907, card=self.card, is_alt_art=True, rarity="UR")
         Image.new("RGB", (512, 1024), (10, 200, 10)).save(os.path.join(self.media, "cards/art/common/3907.webp"), "WEBP")
         MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/3907.webp")   # in 오버프레임
         from . import display
@@ -1138,7 +1139,8 @@ class CardFaceTest(TestCase):
         self.assertRegex(first, r"^/media/cards/face/7\.webp\?v=\w+$")
         body = self.client.get("/api/carddb/cards/7/").json()
         self.assertEqual(body["face_url"], first)
-        self.assertEqual([(f["id"], f["overframe"]) for f in body["faces"]], [(7, False), (3907, True)])
+        # an R card's 오버프레임 print is UR: each face carries its own rarity (로얄 comes in SR and UR only)
+        self.assertEqual([(f["id"], f["overframe"], f["rarity"]) for f in body["faces"]], [(7, False, "R"), (3907, True, "UR")])
         self.assertEqual(body["faces"][0]["face"], first)
         first_thumb = self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"]
         self.assertRegex(first_thumb, r"^/media/cards/face_thumb/7\.webp\?v=\w+$")

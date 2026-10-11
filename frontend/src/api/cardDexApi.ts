@@ -83,7 +83,7 @@ export type CardDoc = {
   /** The whole card in Korean, drawn from Master Duel's frame (null until drawn). */
   face_url: string | null;
   /** The card's faces: its own print first, then Master Duel's alternate arts. */
-  faces: { id: number; face: string; thumb: string | null; overframe: boolean }[];
+  faces: { id: number; face: string; thumb: string | null; overframe: boolean; rarity: string }[];
   rarity: string;
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
