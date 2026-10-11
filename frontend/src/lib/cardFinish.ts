@@ -92,35 +92,61 @@ export class CardFinish {
   private textures: Record<string, WebGLTexture> = {};
   private quad: WebGLBuffer;
   private cfg!: Record<FinishStyle, StyleConfig>;
+  private frame: FinishFrame = "normal";
+  private faceCalls = 0;
+  private disposed = false;
 
-  private constructor(private canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, private frame: FinishFrame) {
+  private constructor(private canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
     this.gl = gl;
     this.quad = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   }
 
-  static async create(canvas: HTMLCanvasElement, faceUrl: string, frame: FinishFrame): Promise<CardFinish> {
+  /** A renderer for the canvas with the shaders compiled, made once: a face is put on it with setFace, and changing
+   *  the face later swaps only its texture (no compiling again, and never two renderers on one canvas). */
+  static async create(canvas: HTMLCanvasElement): Promise<CardFinish> {
     const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
-    const f = new CardFinish(canvas, gl, frame);
+    const f = new CardFinish(canvas, gl);
     const { config, shaders } = await loadBundle();
     f.cfg = config;
     for (const s of STYLES) f.programs[s] = f.compile(vertexSource(config[s].inputs), shaders[s]);
-    const files = new Set(STYLES.flatMap((s) => Object.keys(config[s].textures).map((i) => f.fileAt(s, i))));
-    await Promise.all(
-      [...files].map(async (file) => {
-        if (file === "@card") f.upload(file, await loadImage(faceUrl), gl.CLAMP_TO_EDGE);
-        else if (SOLID[file]) f.uploadSolid(file, SOLID[file]);
-        else f.upload(file, await loadImage(`${BASE}/${file}.png`), gl.REPEAT);
-      }),
-    );
     return f;
   }
 
-  /** What texture slot i of the style samples for this card's frame. */
-  private fileAt(style: FinishStyle, i: string): string {
-    return this.cfg[style].frames?.[this.frame]?.[i] ?? this.cfg[style].textures[i].file;
+  /** Put a face, and its frame, on the card; false when a later call has taken its place meanwhile. */
+  async setFace(faceUrl: string, frame: FinishFrame): Promise<boolean> {
+    const call = ++this.faceCalls;
+    const gl = this.gl;
+    const files = new Set(STYLES.flatMap((s) => Object.keys(this.cfg[s].textures).map((i) => this.fileAt(s, i, frame))));
+    const [face] = await Promise.all([
+      loadImage(faceUrl),
+      ...[...files].filter((file) => file !== "@card" && !this.textures[file]).map(async (file) => {
+        if (SOLID[file]) this.uploadSolid(file, SOLID[file]);
+        else {
+          const im = await loadImage(`${BASE}/${file}.png`);
+          if (!this.textures[file] && !this.disposed) this.upload(file, im, gl.REPEAT);
+        }
+      }),
+    ]);
+    if (call !== this.faceCalls || this.disposed) return false;
+    if (this.textures["@card"]) gl.deleteTexture(this.textures["@card"]);
+    this.upload("@card", face, gl.CLAMP_TO_EDGE);
+    this.frame = frame;
+    return true;
+  }
+
+  /** Leave the canvas empty, so the plain face behind it shows until the next draw. */
+  clear() {
+    const gl = this.gl;
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  /** What texture slot i of the style samples for a card of this frame. */
+  private fileAt(style: FinishStyle, i: string, frame: FinishFrame = this.frame): string {
+    return this.cfg[style].frames?.[frame]?.[i] ?? this.cfg[style].textures[i].file;
   }
 
   private compile(vs: string, fs: string) {
@@ -170,6 +196,7 @@ export class CardFinish {
 
   /** Draw one moment (seconds) of the style's animation. */
   draw(style: FinishStyle, time: number, params: FinishParams) {
+    if (this.disposed || !this.textures["@card"]) return;
     const gl = this.gl;
     const cfg = this.cfg[style];
     const prog = this.programs[style]!;
@@ -207,6 +234,7 @@ export class CardFinish {
   }
 
   dispose() {
+    this.disposed = true;
     const gl = this.gl;
     Object.values(this.textures).forEach((t) => gl.deleteTexture(t));
     Object.values(this.programs).forEach((p) => p && gl.deleteProgram(p.pr));
