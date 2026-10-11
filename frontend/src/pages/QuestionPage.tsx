@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import QuestionItem from "../components/QuestionItem";
 import StrengthRangePicker from "../components/StrengthRangePicker";
@@ -14,6 +14,10 @@ type Step = { key: string; candidateCount: number; available: Available };
 // (최상위~상위 … 하위~최하위) are kept: set this to "choices" to bring them back; the server still takes both answers.
 const STRENGTH_PICKER: "bar" | "choices" = "bar";
 
+// Moving between questions fades the current one out, swaps, then fades the next in (특이점 2026-10-11),
+// the same rhythm as the deck power notes.
+const FADE_MS = 180;
+
 function QuestionPage() {
   const [requiredQuestions, setRequiredQuestions] = useState<Question[]>([]);
   const [optionalQuestions, setOptionalQuestions] = useState<Question[]>([]);
@@ -22,6 +26,20 @@ function QuestionPage() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [step, setStep] = useState<Step | null>(null);
   const [stepError, setStepError] = useState(false);
+
+  const [fading, setFading] = useState(false);
+  const fadeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(fadeTimer.current), []);
+  // Run a change once the current screen has faded out; presses during the fade are ignored, so a double tap
+  // can no longer answer twice.
+  const afterFade = (change: () => void) => {
+    if (fading) return;
+    setFading(true);
+    fadeTimer.current = window.setTimeout(() => {
+      change();
+      setFading(false);
+    }, FADE_MS);
+  };
 
   const navigate = useNavigate();
   const answerKey = buildAnswerKey(answers);
@@ -63,19 +81,23 @@ function QuestionPage() {
 
   const handleSelectOptionalQuestion = (question: Question) => {
     if (!answers.some((a) => a.key === question.key)) {
-      setSelectedOptionalQuestions([question]);
+      afterFade(() => setSelectedOptionalQuestions([question]));
     }
   };
 
-  const handleAnswer = (questionKey: string, value: number | string | null) => {
-    setAnswers((prev) => [...prev, { key: questionKey, value }]);
-    setCurrentIndex((prev) => prev + 1);
-    setSelectedOptionalQuestions([]);
-  };
+  const handleAnswer = (questionKey: string, value: number | string | null) =>
+    afterFade(() => {
+      setAnswers((prev) => [...prev, { key: questionKey, value }]);
+      setCurrentIndex((prev) => prev + 1);
+      setSelectedOptionalQuestions([]);
+    });
 
   const handleGoBack = () => {
     if (answers.length === 0) return;
+    afterFade(goBack);
+  };
 
+  const goBack = () => {
     const lastAnswer = answers[answers.length - 1];
     const isRequired = requiredQuestions.some((q) => q.key === lastAnswer.key);
     const isOptional = optionalQuestions.some((q) => q.key === lastAnswer.key);
@@ -198,7 +220,14 @@ function QuestionPage() {
 
   return (
     <div className="mb-4 p-4 text-left h-auto min-h-screen flex flex-col items-center">
-      <div className="mt-6 w-full max-w-lg">{renderBody()}</div>
+      {/* Hidden while fading, and while the next step is on its way after an answer (instead of flashing 로딩 중). */}
+      <div
+        className={`mt-6 w-full max-w-lg transition-opacity duration-200 motion-reduce:transition-none ${
+          fading || (answers.length > 0 && !stepReady && !stepError) ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        {renderBody()}
+      </div>
       <button
         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
         onClick={handleGoBack}
