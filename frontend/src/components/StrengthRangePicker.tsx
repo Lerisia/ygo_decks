@@ -4,6 +4,16 @@ import { STRENGTH_TIERS, countInRange, moveHandle, pickHandle } from "../utils/r
 const LAST = STRENGTH_TIERS.length - 1;
 const pct = (step: number) => `${(step / LAST) * 100}%`;
 
+// What each tier means, shown under the bar for the tier under the cursor or the one just chosen (특이점 2026-10-11).
+const TIER_NOTES = [
+  "현재 기준으로 마스터 듀얼에서 맹활약중인, 가장 강력한 최상위 티어 덱",
+  "티어 덱만큼은 아니지만, 분명한 강점이 존재해 티어 게임에서 고를 가치가 있는 덱",
+  "티어 게임에서는 다소 보기 힘들지만, 강점이 뚜렷하고 준수한 성능을 보여주는 덱",
+  "체급이 다소 부족하지만, 무난하고 자신만의 개성이 존재하는 덱",
+  "덱 파워가 약하여 애정이 없다면 플레이하기 어려운 덱",
+  "사용에 도전 정신이 필요할 정도로 매우 약한 덱",
+];
+
 // Deck power as a bar (특이점 2026-10-11): stronger to the left, two points mark the tiers the result may come from.
 // "한 단계만" leaves a single point. Each tier label shows whether any candidate is left there.
 export default function StrengthRangePicker({
@@ -18,6 +28,8 @@ export default function StrengthRangePicker({
   const [lo, setLo] = useState(0);
   const [hi, setHi] = useState(LAST);
   const [single, setSingle] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [chosen, setChosen] = useState<number | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   // "either": both points sit on the pressed tier, so the first move decides which one follows
   const dragging = useRef<"lo" | "hi" | "either" | null>(null);
@@ -28,6 +40,7 @@ export default function StrengthRangePicker({
     return Math.round(ratio * LAST);
   };
   const place = (handle: "lo" | "hi", step: number) => {
+    setChosen(step);
     if (single) {
       setLo(step);
       setHi(step);
@@ -38,18 +51,24 @@ export default function StrengthRangePicker({
     setHi(nhi);
   };
 
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    const step = stepAt(e.clientX);
-    e.currentTarget.setPointerCapture(e.pointerId);
+  const press = (step: number) => {
     if (!single && lo === hi && step === lo) {
-      dragging.current = "either";
-      return;
+      setChosen(step);
+      return "either" as const;
     }
-    dragging.current = pickHandle(step, lo, hi);
-    place(dragging.current, step);
+    const which = pickHandle(step, lo, hi);
+    place(which, step);
+    return which;
+  };
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragging.current = press(stepAt(e.clientX));
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) return;
+    if (!dragging.current) {
+      if (e.pointerType === "mouse") setHovered(stepAt(e.clientX));
+      return;
+    }
     const step = stepAt(e.clientX);
     if (dragging.current === "either") {
       if (step === lo) return;
@@ -73,6 +92,7 @@ export default function StrengthRangePicker({
   };
 
   const count = tierCounts ? countInRange(tierCounts, lo, hi) : null;
+  const note = hovered ?? chosen;
   const whole = lo === 0 && hi === LAST;
   const rangeLabel = lo === hi ? STRENGTH_TIERS[lo] : `${STRENGTH_TIERS[lo]} ~ ${STRENGTH_TIERS[hi]}`;
 
@@ -106,6 +126,7 @@ export default function StrengthRangePicker({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onPointerLeave={() => setHovered(null)}
         >
           <div ref={trackRef} className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gray-300 dark:bg-gray-600" />
           <div
@@ -129,7 +150,10 @@ export default function StrengthRangePicker({
             return (
               <span
                 key={label}
-                className={`${inRange ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-gray-400"} ${empty ? "opacity-40" : ""}`}
+                onMouseEnter={() => setHovered(i)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={() => press(i)}
+                className={`cursor-pointer ${inRange ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-gray-400"} ${empty ? "opacity-40" : ""}`}
                 title={empty ? "남은 덱 없음" : undefined}
               >
                 {label}
@@ -137,6 +161,17 @@ export default function StrengthRangePicker({
             );
           })}
         </div>
+        {/* Room for two lines (the longest note on a narrow phone), so nothing moves as the notes change. */}
+        <p className="mt-3 px-1 min-h-[2.5rem] text-xs leading-5 break-keep text-gray-600 dark:text-gray-300" aria-live="polite">
+          {note !== null ? (
+            <>
+              <span className="font-semibold text-gray-900 dark:text-white mr-1.5">{STRENGTH_TIERS[note]}권</span>
+              {TIER_NOTES[note]}
+            </>
+          ) : (
+            <span className="text-gray-400 dark:text-gray-500">단계를 누르거나 점을 움직이면 그 단계의 설명이 여기에 나옵니다.</span>
+          )}
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-3">
