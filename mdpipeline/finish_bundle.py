@@ -2,8 +2,9 @@
 pulls each shader's pixel program out of data.unity3d, disassembles it with vkd3d-compiler, translates it to GLSL
 (dxbc2glsl.py) and writes, next to the textures it samples, a finish.json the page's renderer reads:
 
-  per style: material — the UnityPerMaterial values (the UI shader's own defaults; the fake light / view / normal
-             vectors it would divide by zero with come from the 3D style material, as the game fills them in),
+  per style: material — the UnityPerMaterial values, from the style's material (RoyalStyle / ShineStyle: it also
+             carries the UI shader's own properties — _ClipRect, _Stencil … — so the game draws the deck screen's
+             cards with it), else the shader's defaults, which leave the rainbow off,
              bindings — which cbN each constant buffer is, inputs — which varying carries uv / colour / normal …,
              textures — what each t<N> samples (@card = the card face), params — where the per-card values go
              (the attribute icon's tile).
@@ -30,7 +31,6 @@ INPUTS = {   # read off each vertex program: which output varying carries what
     "shine": {"tangent": 1, "uv": 2, "color": 4, "pos": 5, "normal": 6},
     "royal": {"tangent": 1, "uv": 2, "color": 4, "pos": 5, "normal": 6},
 }
-FAKE_VECTORS = ("_FakeLightDirection", "_FakeViewDirection", "_FakeNormalDirection")
 # The shader embosses the attribute glyph from its atlas over the icon the face already shows: the tile goes where
 # carddb/face.py draws the icon (the atlas glyphs match ours as a 64 px tile at 597, 48 on the 704×1024 face).
 ICON_X, ICON_Y, ICON_SIZE = 597, 48, 64
@@ -96,7 +96,7 @@ def main():
         pf = tree["m_ParsedForm"]
         props = {p["m_Name"]: p for p in pf["m_PropInfo"]["m_Props"]}
         mat3d = materials[MATERIAL_3D[style]]["m_SavedProperties"]
-        colours3d = dict(mat3d["m_Colors"])
+        values3d = {k: [v[c] for c in "rgba"] for k, v in mat3d["m_Colors"]} | {k: [v] * 4 for k, v in mat3d["m_Floats"]}
         textures3d = {k: textures.get(v["m_Texture"]["m_PathID"], (None, None))[0] for k, v in mat3d["m_TexEnvs"]}
         p = pf["m_SubShaders"][0]["m_Passes"][0]
         names = {idx: n for n, idx in p["m_NameIndices"]}
@@ -112,11 +112,11 @@ def main():
                     vals = [1 / 16, 1 / 16, 16, 16]
                 elif nm in OVERRIDES:
                     vals = OVERRIDES[nm]
+                elif nm in values3d:
+                    vals = values3d[nm]
                 else:
                     pr = props[nm]
                     vals = [pr[f"m_DefValue[{i}]"] for i in range(4)]
-                    if nm in FAKE_VECTORS and not any(vals[:3]):
-                        vals = [colours3d[nm][c] for c in "rgba"]
                 for i in range(v["m_Dim"]):
                     material[base + i] = float(vals[i])
                 for key, prop in PARAMS.items():

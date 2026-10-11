@@ -8,6 +8,9 @@ export type FinishStyle = "shine" | "royal";
 export type FinishParams = { attribute: number; level: number };
 
 const BASE = "/media/md_ui/finish";
+// Toward the light: from the upper left, 15° off the card — the light under which both finishes look most like a
+// deck screen screenshot (upload 12017: Royal bright with rainbow shards, Shine dark with a grey text box)
+const LIGHT = [-0.483, 0.837, -0.259, 0];
 const STYLES: FinishStyle[] = ["shine", "royal"];
 
 type StyleConfig = {
@@ -171,7 +174,7 @@ export class CardFinish {
     }
     const put = (a: Float32Array, row: number, vals: number[]) => vals.forEach((v, k) => { a[row * 4 + k] = v; });
     const globals = new Float32Array(134 * 4);
-    put(globals, 5, [0, 0, -1, 0]);              // _MainLightPosition: the light comes from the camera
+    put(globals, 5, LIGHT);                      // _MainLightPosition
     put(globals, 6, [1, 1, 1, 1]);               // _MainLightColor
     put(globals, 19, [time, Math.sin(time), Math.cos(time), 0]);   // _TimeParameters drives the sweep
     put(globals, 21, [0, 0, -30, 0]);            // _WorldSpaceCameraPos, in front of the card
