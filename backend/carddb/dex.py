@@ -18,6 +18,8 @@ from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_
 PAGE_SIZE = 60
 
 ATTRIBUTES = {"light": "빛", "dark": "어둠", "water": "물", "fire": "화염", "earth": "땅", "wind": "바람", "divine": "신"}
+# Master Duel's finish shaders draw the attribute icon from an atlas: 光 闇 水 炎 / 地 風 神 魔 / 罠
+FINISH_TILES = {"light": 0, "dark": 1, "water": 2, "fire": 3, "earth": 4, "wind": 5, "divine": 6, "spell": 7, "trap": 8}
 RACES = {
     "dragon": "드래곤족", "spellcaster": "마법사족", "warrior": "전사족", "beast": "야수족", "beast_warrior": "야수전사족",
     "winged_beast": "비행야수족", "dinosaur": "공룡족", "fish": "어류족", "sea_serpent": "해룡족", "reptile": "파충류족",
@@ -254,6 +256,19 @@ def _stat(v):
     return None if v is None else "?" if v < 0 else str(v)
 
 
+def _finish(c):
+    """The per-card values the Shine / Royal shaders need: the attribute icon's tile and the stars (a rank counts
+    negative, its stars on the left)."""
+    tile = FINISH_TILES.get(c.category if c.category in ("spell", "trap") else c.attribute, 0)
+    if c.category != "monster" or c.frame == "link":
+        stars = 0
+    elif c.frame.startswith("xyz"):
+        stars = -(c.rank or 0)
+    else:
+        stars = c.level or 0
+    return {"attribute": tile, "level": stars}
+
+
 def _texts(card, lang):
     t = next((t for t in card.texts.all() if t.lang == lang), None)
     return {f: getattr(t, f) for f in ("materials", "effect", "pendulum_effect", "flavor")} if t else None
@@ -328,7 +343,7 @@ def card(request, card_id):
         "name_en": c.name_en, "category": c.category, "frame": c.frame, "type_line": type_line,
         "attribute": ATTRIBUTES.get(c.attribute, ""), "level_label": level_label,
         "atk": _stat(c.atk), "def": None if c.frame == "link" else _stat(c.def_value),
-        "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale,
+        "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale, "finish": _finish(c),
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
         "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
         "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m)}

@@ -999,6 +999,10 @@ class CardDexApiTest(TestCase):
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()
         self.assertEqual((spell["type_line"], spell["attribute"]), ("속공 마법", ""))
+        # what Master Duel's finish shaders draw themselves: the attribute icon's tile (光 闇 水 炎 地 風 神 魔 罠) and
+        # the level stars (a rank as a negative count, its stars sitting on the left)
+        self.assertEqual(body["finish"], {"attribute": 1, "level": 6})
+        self.assertEqual((spell["finish"], link["finish"]), ({"attribute": 7, "level": 0}, {"attribute": 1, "level": 0}))
         self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
         self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel
 

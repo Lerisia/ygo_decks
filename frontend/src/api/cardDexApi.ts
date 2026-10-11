@@ -74,6 +74,8 @@ export type CardDoc = {
   def: string | null;
   link_markers: string[];
   pendulum_scale: number | null;
+  /** What Master Duel's Shine / Royal shaders draw themselves: the attribute icon's tile and the stars. */
+  finish: { attribute: number; level: number };
   texts: { ko: CardTexts; ja: CardTexts };
   image_url: string | null;
   thumb_url: string | null;

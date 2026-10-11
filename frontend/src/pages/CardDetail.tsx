@@ -1,6 +1,15 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
+import CardFinishCanvas from "@/components/CardFinishCanvas";
+import { type FinishStyle, finishSupported } from "@/lib/cardFinish";
+
+// Master Duel's finishes, drawn with the game's own shaders (엘리스 2026-10-11)
+const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
+  { key: "normal", label: "일반" },
+  { key: "shine", label: "샤인" },
+  { key: "royal", label: "로열" },
+];
 
 const LABEL = "p-2 text-left break-keep font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
 const MARKERS = ["top_left", "top", "top_right", "left", "", "right", "bottom_left", "bottom", "bottom_right"];
@@ -75,6 +84,7 @@ function Skeleton() {
         <div className={`${AREA.names} h-7 w-2/3 ${bar}`} />
         <div className={AREA.card}>
           <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
+          {finishSupported() && <div className={`mt-2 h-7 md:h-8 w-full ${bar} rounded-lg`} />}
         </div>
         <div className={`${AREA.stats} h-40 w-full ${bar}`} />
         <div className={`${AREA.effect} h-32 w-full ${bar}`} />
@@ -120,6 +130,8 @@ export default function CardDetail() {
   const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [finish, setFinish] = useState<"normal" | FinishStyle>("normal");
+  const [canFinish] = useState(finishSupported);
   const preloaded = useRef<{ card: number; images: HTMLImageElement[] }>({ card: 0, images: [] });
 
   useEffect(() => {
@@ -128,6 +140,7 @@ export default function CardDetail() {
     setError("");
     setJa(false);
     setZoomed(false);
+    setFinish("normal");
     getCard(cardId ?? "")
       .then((c) => {
         if (!alive) return;
@@ -238,13 +251,35 @@ export default function CardDetail() {
         <div className={AREA.card}>
           {picked ? (
             <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
-              <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
+              {finish === "normal" ? (
+                <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
+              ) : (
+                <CardFinishCanvas faceUrl={picked} style={finish} params={card.finish} alt={`${card.name} 카드 (${finish === "royal" ? "로열" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+              )}
               <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                 <ZoomGlyph />
               </span>
             </button>
           ) : (
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
+          )}
+          {picked && canFinish && (
+            <div role="radiogroup" aria-label="마감" className="mt-2 grid grid-cols-3 rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
+              {FINISHES.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={finish === f.key}
+                  onClick={() => setFinish(f.key)}
+                  className={`py-1 rounded-md transition ${
+                    finish === f.key ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           )}
           {card.faces.length > 1 && (
             <div className="mt-2 grid grid-cols-3 gap-1 md:flex md:flex-wrap md:gap-1.5">
