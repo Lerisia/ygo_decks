@@ -62,6 +62,51 @@ def view_of(prefab_bundle, card):
     return [round(cx, 2), round(cy, 2), round(cam["camera2DSize"] / unit, 2)]
 
 
+def game_animations(bundles, local):
+    """{card: the animation the game plays}: the card's timeline has a Spine clip pointing at an AnimationReferenceAsset
+    (a bundle of its own, often not named after the animation: p7253animation, animation2 …) whose animationName is
+    the one (엘리스 10/11: 데스피아의 도화 알베르 stood still in its setup pose, its "animation" being empty). The OCG
+    version's timeline, when there is one; the earliest clip, when a track has several."""
+    timelines, refs = {}, {}
+    for f, names in bundles.items():
+        for n in names:
+            m = re.search(r"monstercutin/(tcg|ocg)/p(\d+)/p\d+timeline\.playable$", n)
+            if m and (m.group(1) == "ocg" or m.group(2) not in timelines):
+                timelines[m.group(2)] = os.path.join(local, f)
+            if re.search(r"monstercutin/(tcg|ocg)/p\d+/[^/]+\.asset$", n):
+                refs[f] = os.path.join(local, f)
+    names = {}   # (CAB file name, path id) → animationName, over every reference asset
+    for path in refs.values():
+        for o in UnityPy.load(path).objects:
+            if o.type.name == "MonoBehaviour":
+                try:
+                    t = o.read_typetree()
+                except Exception:
+                    continue
+                if "animationName" in t:
+                    names[(o.assets_file.name.lower(), o.path_id)] = t["animationName"]
+    out = {}
+    for card, path in timelines.items():
+        clips, starts = {}, {}
+        for o in UnityPy.load(path).objects:
+            if o.type.name != "MonoBehaviour":
+                continue
+            try:
+                t = o.read_typetree()
+            except Exception:
+                continue
+            ref = (t.get("template") or {}).get("animationReference")
+            if ref and ref["m_FileID"]:
+                cab = os.path.basename(o.assets_file.externals[ref["m_FileID"] - 1].path).lower()
+                clips[o.path_id] = names.get((cab, ref["m_PathID"]))
+            for c in t.get("m_Clips", []):
+                starts[c["m_Asset"]["m_PathID"]] = c["m_Start"]
+        played = sorted((starts.get(pid, 0), name) for pid, name in clips.items() if name)
+        if played:
+            out[card] = played[0][1]
+    return out
+
+
 def megapixels(folder):
     """Pixels of all the atlas pages of a cut-in, in millions (the GPU memory it takes is four bytes each)."""
     atlas = open(os.path.join(folder, "atlas.txt")).read()
@@ -70,11 +115,16 @@ def megapixels(folder):
 
 
 def _card(job):
-    """One cut-in written out; its animation's name (the view is read separately, from the prefab)."""
-    src, dst, quality = job
+    """One cut-in written out; its animation's name: the one the game plays, or else the usual name that has keys in
+    it, or else the fullest (the view is read separately, from the prefab)."""
+    src, dst, quality, played = job
     os.makedirs(dst, exist_ok=True)
     skel = json.load(open(os.path.join(src, "skeleton.json")))
-    anim = next((a for a in ANIMS if a in skel.get("animations", {})), next(iter(skel.get("animations", {})), None))
+    anims = {a: v for a, v in skel.get("animations", {}).items() if v}
+    if played in anims:
+        anim = played
+    else:
+        anim = next((a for a in ANIMS if a in anims), max(anims, key=lambda a: len(json.dumps(anims[a])), default=None))
     json.dump(skel, open(os.path.join(dst, "skeleton.json"), "w"), separators=(",", ":"))
     atlas = open(os.path.join(src, "atlas.txt")).read()
     for page in re.findall(r"^(\S+)\.png\s*$", atlas, re.M):
@@ -107,8 +157,10 @@ def main():
     # a few cut-ins are layered pictures, not Spine (no skeleton or atlas): the player can't show those
     cards = [c for c in sorted(os.listdir(src_root), key=int)
              if all(os.path.exists(os.path.join(src_root, c, f)) for f in ("skeleton.json", "atlas.txt"))]
+    played = game_animations(bundles, args.local)
     with multiprocessing.Pool(12) as pool:
-        anims = pool.map(_card, [(os.path.join(src_root, c), os.path.join(args.out, c), args.quality) for c in cards])
+        anims = pool.map(_card, [(os.path.join(src_root, c), os.path.join(args.out, c), args.quality, played.get(c))
+                                 for c in cards])
     index = {c: {"anim": a, "view": view_of(prefab[c], c) if c in prefab else None, "mp": megapixels(os.path.join(src_root, c)),
                  "v": REVISION}
              for c, a in zip(cards, anims)}
