@@ -9,7 +9,7 @@ import SearchForm from "./SearchForm";
 
 export type PickerItem = { key: string | number; name: string; image?: string | null; sub?: string };
 export type PickerStatus = "idle" | "loading" | "empty" | "ready";
-type View = "grid" | "list";
+type View = "grid" | "small" | "list";
 
 interface PickerPanelProps {
   onClose: () => void;
@@ -25,8 +25,9 @@ interface PickerPanelProps {
   idleText?: string;
   emptyText?: string;
   onPick: (item: PickerItem) => void;
-  /** Remembers grid/list for this use (localStorage key suffix). */
+  /** Remembers the viewer's view for this use (localStorage key suffix). */
   viewKey: string;
+  /** Until the viewer picks one: small pictures on a phone, big ones on a wider screen (엘리스 2026-10-11). */
   defaultView?: View;
   imageFit?: "contain" | "cover";
   /** Tailwind aspect class of a grid picture (cards are taller than they are wide). */
@@ -43,6 +44,22 @@ interface PickerModalProps extends PickerPanelProps {
 }
 
 const PAGE = 60;
+const GRID_COLS = {
+  grid: { modal: "gap-2 grid-cols-3 sm:grid-cols-4", inline: "gap-2 grid-cols-5 lg:grid-cols-8" },
+  small: { modal: "gap-1 grid-cols-5 sm:grid-cols-6", inline: "gap-1 grid-cols-8 lg:grid-cols-10" },
+};
+
+/** n×n little squares: the big (2) and small (3) picture views. */
+function GridGlyph({ n }: { n: number }) {
+  const cell = 12 / n;
+  return (
+    <svg viewBox="0 0 14 14" className="w-3.5 h-3.5" aria-hidden="true" fill="currentColor">
+      {Array.from({ length: n * n }, (_, i) => (
+        <rect key={i} x={1 + (i % n) * cell} y={1 + Math.floor(i / n) * cell} width={cell - 1.5} height={cell - 1.5} rx={0.5} />
+      ))}
+    </svg>
+  );
+}
 // Pictures already drawn stay in the page (hidden while filtered out), up to this many, so typing or searching again
 // shows them at once instead of building and decoding each picture anew (엘리스 2026-10-06).
 const KEEP_MAX = 400;
@@ -60,7 +77,7 @@ function onImgErrorRetry(e: React.SyntheticEvent<HTMLImageElement>) {
 function readView(key: string, fallback: View): View {
   try {
     const v = localStorage.getItem(`picker_view_${key}`);
-    return v === "grid" || v === "list" ? v : fallback;
+    return v === "grid" || v === "small" || v === "list" ? v : fallback;
   } catch {
     return fallback;
   }
@@ -95,11 +112,13 @@ export default function PickerModal({ open, ...panel }: PickerModalProps) {
  *  in place (the home page's deck search on desktop opens out like this, 특이점 2026-10-08). */
 export function PickerPanel({
   onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
-  idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView = "grid", imageFit = "contain",
+  idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView, imageFit = "contain",
   imageAspect = "aspect-square",
   variant = "modal", allResults,
 }: PickerPanelProps) {
-  const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
+  const [view, setView] = useState<View>(() =>
+    readView(viewKey, defaultView ?? (window.matchMedia("(max-width: 639px)").matches ? "small" : "grid")),
+  );
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const inputRef = useRef<HTMLInputElement>(null);
   const keptRef = useRef(new Map<PickerItem["key"], PickerItem>());
@@ -132,14 +151,14 @@ export function PickerPanel({
     if (!position.has(key)) kept.delete(key);
   }
   const drawn = [...kept.values()];
-  const viewBtn = (v: View, label: string, glyph: string) => (
+  const viewBtn = (v: View, label: string, glyph: React.ReactNode) => (
     <button
       type="button"
       onClick={() => chooseView(v)}
       aria-pressed={view === v}
       aria-label={label}
       title={label}
-      className={`w-7 h-7 rounded text-sm leading-none ${view === v ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+      className={`w-7 h-7 rounded text-sm leading-none flex items-center justify-center ${view === v ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
     >
       {glyph}
     </button>
@@ -162,7 +181,8 @@ export function PickerPanel({
             {hint && <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{hint}</span>}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {viewBtn("grid", "그림으로 보기", "▦")}
+            {viewBtn("grid", "큰 그림으로 보기", <GridGlyph n={2} />)}
+            {viewBtn("small", "작은 그림으로 보기", <GridGlyph n={3} />)}
             {viewBtn("list", "목록으로 보기", "☰")}
             <button type="button" onClick={onClose} className="text-gray-400 text-lg px-2" aria-label="닫기">✕</button>
           </div>
@@ -211,12 +231,16 @@ export function PickerPanel({
           )}
           {status === "idle" && <p className="text-xs text-gray-400 text-center py-3">{idleText}</p>}
           {status === "empty" && <p className="text-xs text-gray-400 text-center py-3">{emptyText}</p>}
-          {view === "grid" ? (
-            <div className={`grid gap-2 ${inline ? "grid-cols-5 lg:grid-cols-8" : "grid-cols-3 sm:grid-cols-4"}`}>
+          {view !== "list" ? (
+            <div className={`grid ${GRID_COLS[view][inline ? "inline" : "modal"]}`}>
               {drawn.map((it) => (
-                <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className="text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition" title={it.name}>
+                <button key={it.key} type="button" hidden={!position.has(it.key)} style={{ order: position.get(it.key) }} onClick={() => pick(it)} className={`flex flex-col justify-start text-center hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition ${view === "small" ? "p-0.5" : "p-1"}`} title={it.name}>
                   {thumb(it, `w-full ${imageAspect}`)}
-                  <p className="text-[10px] sm:text-xs mt-0.5 break-words leading-tight">{it.name}</p>
+                  {view === "small" ? (
+                    <p className="text-[10px] mt-0.5 leading-tight line-clamp-2 break-keep [overflow-wrap:anywhere]">{it.name}</p>
+                  ) : (
+                    <p className="text-[10px] sm:text-xs mt-0.5 break-words leading-tight">{it.name}</p>
+                  )}
                 </button>
               ))}
             </div>
