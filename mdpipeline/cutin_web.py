@@ -20,7 +20,7 @@ from PIL import Image
 
 SKELETON_SCALE = 0.01   # SkeletonDataAsset.scale of every cut-in
 # raised whenever the pictures are made again: the page asks for ?v= this, past the copies browsers keep for years
-REVISION = 2
+REVISION = 3
 ANIMS = ("animation", "animation_kde")
 
 
@@ -100,9 +100,9 @@ def main():
     prefab = {}
     for f, names in bundles.items():
         for n in names:
-            m = re.search(r"monstercutin/tcg/p(\d+)/highend_hd/p\d+\.prefab$", n)
-            if m:
-                prefab[m.group(1)] = os.path.join(args.local, f)
+            m = re.search(r"monstercutin/(tcg|ocg)/p(\d+)/highend_hd/p\d+\.prefab$", n)
+            if m and (m.group(1) == "ocg" or m.group(2) not in prefab):   # the OCG version's own, when there is one
+                prefab[m.group(2)] = os.path.join(args.local, f)
     src_root = os.path.join(args.cutin, args.source)
     # a few cut-ins are layered pictures, not Spine (no skeleton or atlas): the player can't show those
     cards = [c for c in sorted(os.listdir(src_root), key=int)

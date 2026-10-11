@@ -13,19 +13,23 @@ from collections import defaultdict
 
 import UnityPy
 
-PATH = re.compile(r"duel/timeline/duel/monstercutin/tcg/p(\d+)/(highend_hd|sd)/(?:(?:[\d.]+|img)/)?([^/]+)$")
+PATH = re.compile(r"duel/timeline/duel/monstercutin/(tcg|ocg)/p(\d+)/(highend_hd|sd)/(?:(?:[\d.]+|img|image)/)?([^/]+)$")
 
 
 def main():
     local, containers, out = sys.argv[1:4]
     only = set(sys.argv[4:])
     bundles = json.load(open(containers))
+    # the Japanese client keeps an OCG version of some cut-ins (ocg/) next to the TCG one: that one wins (엘리스 10/11)
+    ocg = {m.group(2) for names in bundles.values() for n in names if (m := PATH.search(n)) and m.group(1) == "ocg"}
     want = defaultdict(list)
     for f, names in bundles.items():
         for n in names:
             m = PATH.search(n)
-            if m and (not only or m.group(1) in only) and (n.endswith(".json") or n.endswith(".atlas.txt") or n.endswith(".png")):
-                want[f].append((n, m.group(1), m.group(2), m.group(3)))
+            if not m or (m.group(1) == "tcg" and m.group(2) in ocg):
+                continue
+            if (not only or m.group(2) in only) and (n.endswith(".json") or n.endswith(".atlas.txt") or n.endswith(".png")):
+                want[f].append((n, m.group(2), m.group(3), m.group(4)))
     done = 0
     for f, items in want.items():
         env = UnityPy.load(os.path.join(local, f))
