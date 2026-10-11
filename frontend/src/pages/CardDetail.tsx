@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
-import { type FinishStyle, finishSupported } from "@/lib/cardFinish";
+import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
 // Master Duel's finishes, drawn with the game's own shaders (엘리스 2026-10-11)
 const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
@@ -102,8 +102,10 @@ function ZoomGlyph() {
   );
 }
 
-/** The card face over the whole screen; a tap anywhere or Escape closes it. */
-function CardZoom({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+/** The card face over the whole screen, in the finish picked on the page; a tap anywhere or Escape closes it. */
+function CardZoom({ src, alt, finish, params, onClose }: {
+  src: string; alt: string; finish: "normal" | FinishStyle; params: FinishParams; onClose: () => void;
+}) {
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -116,7 +118,11 @@ function CardZoom({ src, alt, onClose }: { src: string; alt: string; onClose: ()
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 cursor-zoom-out" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
-      <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
+      {finish === "normal" ? (
+        <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
+      ) : (
+        <CardFinishCanvas faceUrl={src} style={finish} params={params} alt={alt} className="block aspect-[704/1024] w-[min(100%,704px,calc((100svh_-_2rem)*0.6875))]" />
+      )}
     </div>
   );
 }
@@ -254,7 +260,7 @@ export default function CardDetail() {
               {finish === "normal" ? (
                 <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
               ) : (
-                <CardFinishCanvas faceUrl={picked} style={finish} params={card.finish} alt={`${card.name} 카드 (${finish === "royal" ? "로열" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+                <CardFinishCanvas faceUrl={picked} style={finish} params={card.finish} paused={zoomed} alt={`${card.name} 카드 (${finish === "royal" ? "로열" : "샤인"})`} className="block w-full aspect-[704/1024]" />
               )}
               <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                 <ZoomGlyph />
@@ -371,7 +377,9 @@ export default function CardDetail() {
         )}
       </div>
 
-      {zoomed && picked && <CardZoom src={picked} alt={`${card.name} 카드`} onClose={() => setZoomed(false)} />}
+      {zoomed && picked && (
+        <CardZoom src={picked} alt={`${card.name} 카드`} finish={finish} params={card.finish} onClose={() => setZoomed(false)} />
+      )}
 
       {card.decks.length > 0 && (
         <section className="mt-6">
