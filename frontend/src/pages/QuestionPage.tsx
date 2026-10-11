@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import QuestionItem from "../components/QuestionItem";
+import StrengthRangePicker from "../components/StrengthRangePicker";
 import { fetchQuestions, fetchRecommendStep } from "../api/questionApi";
 import {
-  buildAnswerKey, visibleOptions, hiddenOptionalCount, isFinished,
+  buildAnswerKey, visibleOptions, hiddenOptionalCount, isFinished, strengthRangeValue,
   type Question, type Answer, type Available,
 } from "../utils/recommendFlow";
 
 type Step = { key: string; candidateCount: number; available: Available };
+
+// Deck power is asked on a bar with two points (특이점 2026-10-11). The earlier five fixed choices
+// (최상위~상위 … 하위~최하위) are kept: set this to "choices" to bring them back; the server still takes both answers.
+const STRENGTH_PICKER: "bar" | "choices" = "bar";
 
 function QuestionPage() {
   const [requiredQuestions, setRequiredQuestions] = useState<Question[]>([]);
@@ -62,7 +67,7 @@ function QuestionPage() {
     }
   };
 
-  const handleAnswer = (questionKey: string, value: number) => {
+  const handleAnswer = (questionKey: string, value: number | string | null) => {
     setAnswers((prev) => [...prev, { key: questionKey, value }]);
     setCurrentIndex((prev) => prev + 1);
     setSelectedOptionalQuestions([]);
@@ -126,6 +131,16 @@ function QuestionPage() {
     }
     if (currentIndex < requiredQuestions.length) {
       const q = requiredQuestions[currentIndex];
+      if (q.key === "s" && STRENGTH_PICKER === "bar") {
+        return (
+          <StrengthRangePicker
+            key={q.key}
+            question={q.question}
+            tierCounts={available?.s_tiers ?? null}
+            onConfirm={(lo, hi) => handleAnswer(q.key, strengthRangeValue(lo, hi))}
+          />
+        );
+      }
       return (
         <QuestionItem
           key={q.key}

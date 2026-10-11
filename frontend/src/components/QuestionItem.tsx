@@ -1,7 +1,7 @@
 type QuestionProps = {
   question: string;
   options: { value: number; label: string }[];
-  selectedValue?: number | number[];
+  selectedValue?: number | string | number[];
   onSelect: (value: number) => void;
 };
 

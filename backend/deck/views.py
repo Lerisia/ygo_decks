@@ -14,6 +14,17 @@ from rest_framework.response import Response
 from .permissions import CanEditDeckBook
 from user.models import User
 
+def parse_tier_range(raw):
+    """Deck power bar (특이점 2026-10-11): "lo-hi" tiers, 0=최상위 … 5=최하위, lo<=hi (equal = one tier)."""
+    parts = raw.split("-")
+    if len(parts) != 2:
+        raise ValueError(raw)
+    lo, hi = int(parts[0]), int(parts[1])
+    if not 0 <= lo <= hi <= 5:
+        raise ValueError(raw)
+    return [lo, hi]
+
+
 def parse_answer_key(answer_key):
     """ Convert answer_key to dictionary form """
     criteria = {}
@@ -26,6 +37,8 @@ def parse_answer_key(answer_key):
                 criteria[key] = [int(v) for v in value.split(",")]
             elif key in ["performance_tags", "aesthetic_tags"]:
                 criteria[key] = value.split(",")
+            elif key == "strength" and "-" in value:
+                criteria["strength_range"] = parse_tier_range(value)
             else:
                 criteria[key] = int(value)
     
@@ -53,6 +66,9 @@ def parse_short_answer_key(answer_key):
         if short not in SHORT_TO_FIELD:
             raise ValueError(short)
         field = SHORT_TO_FIELD[short]
+        if field == "strength" and "-" in raw.lstrip("-"):
+            criteria["strength_range"] = parse_tier_range(raw)
+            continue
         value = int(raw)  # ValueError propagates
         if field in M2M_FIELDS:
             criteria.setdefault(field, []).append(value)
@@ -76,6 +92,9 @@ def filter_decks(criteria, user=None):
         # Unknown band -> empty tuple -> __in matches nothing.
         tiers = STRENGTH_BAND_TO_TIERS.get(criteria["strength"], ())
         query &= Q(strength__in=tiers)
+    if criteria.get("strength_range") is not None:
+        lo, hi = criteria["strength_range"]
+        query &= Q(strength__gte=lo, strength__lte=hi)
     if criteria.get("summoning_methods"):
         query &= Q(summoning_methods__id__in=criteria["summoning_methods"])
     if criteria.get("performance_tags"):
@@ -103,8 +122,15 @@ def available_options(decks):
     def m2m(field):
         return sorted({v for v in Deck.objects.filter(id__in=ids).values_list(f"{field}__id", flat=True) if v is not None})
 
+    tier_counts = [0] * 6
+    for r in rows:
+        if r["strength"] is not None and 0 <= r["strength"] <= 5:
+            tier_counts[r["strength"]] += 1
+
     return {
         "s": sorted(bands),
+        # how many candidates sit at each tier, for the deck power bar
+        "s_tiers": tier_counts,
         "d": sorted({r["difficulty"] for r in rows}),
         "t": sorted({r["deck_type"] for r in rows}),
         "a": sorted({r["art_style"] for r in rows}),

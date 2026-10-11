@@ -25,6 +25,11 @@ class ParseAnswerKeyTest(TestCase):
         self.assertEqual(result["performance_tags"], ["원턴킬", "묘지소환"])
         self.assertEqual(result["aesthetic_tags"], ["드래곤"])
 
+    def test_strength_range(self):
+        # 특이점 2026-10-11: 덱 파워 막대 — "높은 쪽-낮은 쪽" 단계 범위 (0=최상위 … 5=최하위)
+        self.assertEqual(parse_answer_key("strength=1-3|difficulty=2"), {"strength_range": [1, 3], "difficulty": 2})
+        self.assertEqual(parse_answer_key("strength=4-4"), {"strength_range": [4, 4]})
+
     def test_empty_pairs_ignored(self):
         result = parse_answer_key("strength=1||difficulty=2")
         self.assertEqual(result["strength"], 1)
@@ -294,6 +299,23 @@ class RecommendStepTest(TestCase):
         self.assertEqual(self.step("s=3")["candidate_count"], 1)   # band 3 = tiers 3,4 -> D3
         self.assertEqual(self.step("s=4")["candidate_count"], 0)   # band 4 = tiers 4,5 -> none
 
+    def test_strength_range(self):
+        # 특이점 2026-10-11: 막대의 두 점 사이 단계만 (0=최상위 … 5=최하위, 같은 점이면 한 단계)
+        self.assertEqual(self.step("s=0-1")["candidate_count"], 2)   # D1(0), D2(1)
+        self.assertEqual(self.step("s=1-3")["candidate_count"], 2)   # D2(1), D3(3)
+        self.assertEqual(self.step("s=3-3")["candidate_count"], 1)
+        self.assertEqual(self.step("s=2-2")["candidate_count"], 0)
+        self.assertEqual(self.step("s=4-5")["candidate_count"], 0)
+        self.assertEqual(self.step("s=0-5")["candidate_count"], 3)
+
+    def test_strength_tier_counts_for_the_bar(self):
+        self.assertEqual(self.step()["available"]["s_tiers"], [1, 1, 0, 1, 0, 0])
+        self.assertEqual(self.step("t=0")["available"]["s_tiers"], [1, 1, 0, 0, 0, 0])
+
+    def test_bad_strength_range_returns_400(self):
+        for key in ("s=3-1", "s=0-6", "s=-1-2", "s=1-", "s=a-b"):
+            self.assertEqual(self.client.get(self.STEP_URL, {"key": key}).status_code, 400, key)
+
     def test_summoning_method_and_tags(self):
         self.assertTrue(self.step("sm=6")["resolved"])
         self.assertEqual(self.step(f"ptag={self.p1.id}")["candidate_count"], 2)
@@ -303,7 +325,7 @@ class RecommendStepTest(TestCase):
         data = self.step("d=2|t=0")
         self.assertEqual(data["candidate_count"], 0)
         self.assertFalse(data["resolved"])
-        self.assertTrue(all(v == [] for v in data["available"].values()))
+        self.assertTrue(all(not any(v) for v in data["available"].values()))
 
     def test_key_order_does_not_matter(self):
         self.assertEqual(self.step("t=0|d=1"), self.step("d=1|t=0"))
@@ -334,7 +356,7 @@ class RecommendStepTest(TestCase):
         """Whatever the step endpoint calls resolved must be servable by /deck/result."""
         mapping = {"s": "strength", "d": "difficulty", "t": "deck_type", "a": "art_style",
                    "sm": "summoning_methods", "ptag": "performance_tags", "atag": "aesthetic_tags"}
-        for key, expected in (("d=1|t=0", "D2"), ("s=1", "D2"), ("sm=6", "D2"), (f"atag={self.a2.id}", "D2")):
+        for key, expected in (("d=1|t=0", "D2"), ("s=1", "D2"), ("s=3-3", "D3"), ("sm=6", "D2"), (f"atag={self.a2.id}", "D2")):
             self.assertTrue(self.step(key)["resolved"], key)
             long_key = "|".join(f"{mapping[k]}={v}" for k, v in (p.split("=") for p in key.split("|")))
             resp = self.client.get("/api/deck/result", {"key": long_key})

@@ -4,6 +4,10 @@ import {
   visibleOptions,
   hiddenOptionalCount,
   isFinished,
+  strengthRangeValue,
+  countInRange,
+  pickHandle,
+  moveHandle,
   type Question,
   type Available,
 } from "./recommendFlow";
@@ -69,5 +73,34 @@ describe("isFinished", () => {
   });
   it("does not finish on zero candidates (caller routes to no-results)", () => {
     expect(isFinished({ answered: 0, hidden: 0, total: 7, candidateCount: 0 })).toBe(false);
+  });
+});
+
+describe("deck power bar (특이점 2026-10-11)", () => {
+  it("encodes the chosen tiers, the whole bar meaning 상관 없음", () => {
+    expect(strengthRangeValue(1, 3)).toBe("1-3");
+    expect(strengthRangeValue(2, 2)).toBe("2-2");
+    expect(strengthRangeValue(0, 5)).toBeNull();
+    expect(buildAnswerKey([{ key: "s", value: strengthRangeValue(0, 1) }, { key: "d", value: 1 }])).toBe("d=1|s=0-1");
+  });
+  it("counts the candidates between the two points", () => {
+    const counts = [3, 0, 5, 1, 0, 2];
+    expect(countInRange(counts, 0, 5)).toBe(11);
+    expect(countInRange(counts, 1, 1)).toBe(0);
+    expect(countInRange(counts, 2, 3)).toBe(6);
+  });
+  it("grabs the point the press is nearest to", () => {
+    expect(pickHandle(0, 1, 4)).toBe("lo");
+    expect(pickHandle(5, 1, 4)).toBe("hi");
+    expect(pickHandle(2, 1, 4)).toBe("lo");
+    expect(pickHandle(3, 1, 4)).toBe("hi");
+    expect(pickHandle(1, 2, 2)).toBe("lo");
+    expect(pickHandle(3, 2, 2)).toBe("hi");
+  });
+  it("moves one point without passing the other", () => {
+    expect(moveHandle("lo", 4, 1, 3)).toEqual([3, 3]);
+    expect(moveHandle("hi", 0, 2, 4)).toEqual([2, 2]);
+    expect(moveHandle("lo", 0, 2, 4)).toEqual([0, 4]);
+    expect(moveHandle("hi", 5, 2, 4)).toEqual([2, 5]);
   });
 });
