@@ -1,10 +1,13 @@
-"""Translate a Shader Model 4 pixel program, as vkd3d-compiler prints it (-b d3d-asm), into a GLSL ES 3.00 fragment
+"""Translate a Shader Model 4 pixel or vertex program, as vkd3d-compiler prints it (-b d3d-asm), into a GLSL ES 3.00
 shader, instruction by instruction — so the card page can run Master Duel's own Royal / Shine finish (엘리스
-2026-10-11: "마듀의 로얄 코드를 한 번 확인해보시죠").
+2026-10-11: "마듀의 로얄 코드를 한 번 확인해보시죠") and the particle shaders of its summon backgrounds.
 
 The registers stay as they are: vec4 r0..rN, the constant buffers as uniform vec4 arrays cb0[], cb1[], cb2[], the
-textures t0..tN as sampler2D uniforms and the inputs v1..vN as vec4 varyings. Comparisons give 1.0 / 0.0 instead of
-all-ones bit masks; the "and" that turns such a mask into a float (and r, mask, l(bits)) is handled as a select.
+textures t0..tN as sampler2D uniforms. A pixel program's inputs v1..vN are vec4 varyings (v0, the position, is
+gl_FragCoord); a vertex program reads its inputs as attributes a0..aN and writes its outputs oN to the varyings vN the
+pixel program reads, the position to gl_Position. Comparisons give 1.0 / 0.0 instead of all-ones bit masks; the "and"
+that turns such a mask into a float (and r, mask, l(bits)) is handled as a select. Integers live in the float
+registers as their values (loop counters and the like).
 
 usage: python dxbc2glsl.py program.asm > program.frag
 """
@@ -18,6 +21,11 @@ COMPS = "xyzw"
 def float_of(token):
     """A literal as GLSL float text: decimal floats as they are, integers as the float with those bits."""
     token = token.strip()
+    if token.lower().startswith("0x"):
+        bits = int(token, 16)
+        if bits == 0xFFFFFFFF:
+            return "1.0"   # an all-ones mask: "true", as comparisons give it here
+        return repr(struct.unpack("<f", struct.pack("<I", bits))[0])
     if re.fullmatch(r"-?\d+", token) and abs(int(token)) > 1 << 16:
         return repr(struct.unpack("<f", struct.pack("<I", int(token) & 0xFFFFFFFF))[0])
     v = float(token)
@@ -92,10 +100,40 @@ def vec(n):
 
 def translate(asm):
     lines = [l.strip() for l in asm.splitlines() if l.strip()]
-    body, decl = [], {"cb": {}, "t": set(), "v": set(), "temps": 0}
+    body, decl = [], {"cb": {}, "t": set(), "v": set(), "temps": 0, "out": set(), "pos_out": None, "pos_in": None}
+    vertex = lines[0].startswith("vs_")
+
+    def operand(text):
+        o = Operand(text)
+        if vertex and o.base and re.fullmatch(r"v\d+", o.base):
+            o.base = "a" + o.base[1:]   # a vertex program's inputs are its attributes
+        return o
+
     for line in lines:
         op, _, rest = line.partition(" ")
-        if op.startswith("ps_") or op in ("ret",) or op.startswith("dcl_sampler") or op == "dcl_output":
+        if op.startswith(("ps_", "vs_")) or op in ("ret",) or op.startswith("dcl_sampler"):
+            continue
+        if op == "dcl_output":
+            if vertex:
+                decl["out"].add(int(re.search(r"o(\d+)", rest).group(1)))
+            continue
+        if op == "dcl_output_siv":
+            decl["pos_out"] = int(re.search(r"o(\d+)", rest).group(1))
+            continue
+        if op == "dcl_input":
+            decl["v"].add(int(re.search(r"v(\d+)", rest).group(1)))
+            continue
+        if op == "dcl_input_ps_siv":
+            decl["pos_in"] = int(re.search(r"v(\d+)", rest).group(1))
+            continue
+        flow = {"else": "  } else {", "endif": "  }", "loop": "  for (;;) {", "endloop": "  }"}
+        if op in flow:
+            body.append(flow[op])
+            continue
+        if op in ("if_nz", "if_z", "breakc_nz", "breakp_nz", "breakc_z", "breakp_z", "discard_nz", "discard_z"):
+            x = operand(rest).pick([0])
+            test = f"{x} != 0.0" if op.endswith("_nz") else f"{x} == 0.0"
+            body.append(f"  if ({test}) {{" if op.startswith("if") else f"  if ({test}) {'break' if op.startswith('break') else 'discard'};")
             continue
         if op == "dcl_constantBuffer":
             m = re.match(r"cb(\d+)\[(\d+)\]", rest)
@@ -117,7 +155,7 @@ def translate(asm):
         ops = split_operands(rest)
         body.append(f"  // {line}")
         if base == "sincos":
-            src = Operand(ops[2])
+            src = operand(ops[2])
             for d, fn in ((ops[0], "sin"), (ops[1], "cos")):
                 if d == "null":
                     continue
@@ -127,13 +165,16 @@ def translate(asm):
             continue
         name, mask, pos = dest(ops[0])
         n = len(pos)
-        srcs = [Operand(o) for o in ops[1:]]
+        srcs = [operand(o) for o in ops[1:]]
         if base in ("sample", "sample_b", "sample_l"):
             uv, res = srcs[0], srcs[1]
             tex_idx = int(res.base[1:])
-            call = {"sample": f"texture(t{tex_idx}, {uv.pick([0, 1])})",
-                    "sample_b": f"texture(t{tex_idx}, {uv.pick([0, 1])}, {srcs[3].pick([0])})",
-                    "sample_l": f"textureLod(t{tex_idx}, {uv.pick([0, 1])}, {srcs[3].pick([0])})"}[base]
+            if base == "sample":
+                call = f"texture(t{tex_idx}, {uv.pick([0, 1])})"
+            elif base == "sample_b":
+                call = f"texture(t{tex_idx}, {uv.pick([0, 1])}, {srcs[3].pick([0])})"
+            else:
+                call = f"textureLod(t{tex_idx}, {uv.pick([0, 1])}, {srcs[3].pick([0])})"
             swz = res.swz if len(res.swz) == 4 else (res.swz * 4)[:4]
             e = f"{call}.{''.join(swz[p] for p in pos)}"
         elif base in ("dp2", "dp3", "dp4"):
@@ -145,10 +186,10 @@ def translate(asm):
             V = vec(n)
             one = "1.0" if n == 1 else f"{V}(1.0)"
             zero = "0.0" if n == 1 else f"{V}(0.0)"
-            cmp = {"ge": ">=", "lt": "<", "eq": "==", "ne": "!="}
-            if base == "mov":
+            cmp = {"ge": ">=", "lt": "<", "eq": "==", "ne": "!=", "ige": ">=", "ilt": "<", "ieq": "==", "ine": "!="}
+            if base in ("mov", "itof", "ftoi", "utof", "ftou"):
                 e = a[0]
-            elif base == "add":
+            elif base in ("add", "iadd"):
                 e = f"({a[0]} + {a[1]})"
             elif base == "mul":
                 e = f"({a[0]} * {a[1]})"
@@ -184,7 +225,7 @@ def translate(asm):
                 if n == 1:
                     e = f"(({a[0]}) {cmp[base]} ({a[1]}) ? 1.0 : 0.0)"
                 else:
-                    fn = {"ge": "greaterThanEqual", "lt": "lessThan", "eq": "equal", "ne": "notEqual"}[base]
+                    fn = {"ge": "greaterThanEqual", "lt": "lessThan", "eq": "equal", "ne": "notEqual"}[base.lstrip("i")]
                     e = f"{V}({fn}({a[0]}, {a[1]}))"
             elif base == "and":
                 # mask & bits: the bits where the mask is set; mask & mask: both set
@@ -204,16 +245,28 @@ def translate(asm):
             del one
         if sat:
             e = f"clamp({e}, 0.0, 1.0)"
-        target = "fragColor" if name == "o0" else name
+        if vertex:
+            target = "pos" if name == f"o{decl['pos_out']}" else re.sub(r"^o(\d+)$", r"v\1", name)
+        else:
+            target = "fragColor" if name == "o0" else name
         body.append(f"  {target}.{mask} = {e};")
     head = ["#version 300 es", "precision highp float;", "precision highp int;"]
     head += [f"uniform vec4 cb{i}[{n}];" for i, n in sorted(decl["cb"].items())]
     head += [f"uniform sampler2D t{i};" for i in sorted(decl["t"])]
-    head += [f"in vec4 v{i};" for i in sorted(decl["v"])]
-    head += ["out vec4 fragColor;", "void main() {"]
+    if vertex:
+        head += [f"in vec4 a{i};" for i in sorted(decl["v"])]
+        head += [f"out vec4 v{i};" for i in sorted(decl["out"])]
+        head += ["void main() {", "  vec4 pos = vec4(0.0);"]
+        head += [f"  v{i} = vec4(0.0);" for i in sorted(decl["out"])]
+    else:
+        head += [f"in vec4 v{i};" for i in sorted(decl["v"])]
+        head += ["out vec4 fragColor;", "void main() {"]
+        if decl["pos_in"] is not None:
+            head += [f"  vec4 v{decl['pos_in']} = gl_FragCoord;"]
+        head += ["  fragColor = vec4(0.0);"]
     head += [f"  vec4 r{i} = vec4(0.0);" for i in range(decl["temps"])]
-    head += ["  fragColor = vec4(0.0);"]
-    return "\n".join(head + body + ["}"]) + "\n"
+    tail = ["  gl_Position = pos;"] if vertex else []
+    return "\n".join(head + body + tail + ["}"]) + "\n"
 
 
 if __name__ == "__main__":

@@ -411,7 +411,7 @@ export default function CardDetail() {
       </div>
 
       {cutin && (
-        <CutinOverlay id={cutin.id} info={cutin.info} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />
+        <CutinOverlay id={cutin.id} info={cutin.info} attribute={card.cutin_sound} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />
       )}
       {zoomed && picked && (
         <CardZoom src={picked} alt={`${card.name} 카드`} finish={shown} params={finishParams} onClose={() => setZoomed(false)} />

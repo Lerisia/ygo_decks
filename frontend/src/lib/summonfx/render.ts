@@ -1,0 +1,402 @@
+/** Draws the particle systems of a summon background with WebGL2 through the game's own shaders (shader_web.py
+ *  translates them): billboards, stretched billboards and meshes built in world space as Unity's particle renderer
+ *  builds them, the renderer's vertex streams packed into TEXCOORD0..2 in its order, the constant buffers filled by
+ *  name (the camera's matrices, the material's values) and the systems sorted as Unity sorts transparent renderers. */
+import type { Emitter, Particle, Vec3 } from "./particles";
+import { Post } from "./post";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Json = any;
+
+export type Mesh = { pos: number[][]; uv: number[][]; tri: number[][] };
+type Param = { name: string; offset: number; dim: number; matrix: boolean };
+type Binds = { cb: Record<string, { name: string; params: Param[] }>; t: Record<string, string> };
+type Factor = { name: string; value: number };
+export type Shader = {
+  name: string; vs: string; fs: string; attributes: Record<string, string>; vertex: Binds; pixel: Binds;
+  blend: { src: Factor; dst: Factor; srcAlpha: Factor; dstAlpha: Factor };
+};
+export type Texture = { tex: WebGLTexture; w: number; h: number };
+export type System = { data: Json; emitter: Emitter; shader: Shader; textures: Record<string, Texture>; mesh: Mesh | null };
+/** A sprite over the whole screen (Sprites-Default: texture × colour, premultiplied), its colour animated. */
+export type Sprite = { data: Json; texture: Texture };
+
+const SPRITE_VS = `#version 300 es
+out vec2 uv;
+void main() {
+  vec2 p = vec2(gl_VertexID % 2 == 1 ? 1. : -1., gl_VertexID / 2 == 1 ? 1. : -1.);
+  uv = p * .5 + .5;
+  gl_Position = vec4(p, 0., 1.);
+}`;
+const SPRITE_FS = `#version 300 es
+precision mediump float;
+uniform sampler2D tex;
+uniform vec4 color;
+in vec2 uv;
+out vec4 o;
+void main() {
+  vec4 c = texture(tex, uv) * color;
+  o = vec4(c.rgb * c.a, c.a);
+}`;
+
+/** A sprite's colour at a time: the recorded curves where the timeline animates a channel, its own colour elsewhere. */
+export function spriteColor(data: Json, time: number): number[] {
+  const k = Math.min(Math.max(0, Math.round(time * data.rate)), Number.MAX_SAFE_INTEGER);
+  return ["r", "g", "b", "a"].map((c, i) => {
+    const curve: number[] | undefined = data.curves[c];
+    return curve ? curve[Math.min(k, curve.length - 1)] : data.color[i];
+  });
+}
+
+const FLOATS = 19;   // position 3, colour 4, TEXCOORD0..2
+const NEAR = 0.3, FAR = 1000, CAMERA_Z = -10;
+
+/** Floats each vertex stream (ParticleSystemVertexStream) takes in the TEXCOORDs; Position (0), Normal (1),
+ *  Tangent (2) and Color (3) have attributes of their own. */
+const STREAM_SIZE: Record<number, number> = {
+  4: 2, 5: 2, 6: 2, 7: 2, 8: 1, 9: 1, 10: 3, 11: 1, 12: 1, 13: 2, 14: 3, 15: 1, 16: 3, 17: 1, 18: 3, 19: 3, 20: 1,
+  21: 1, 22: 1, 23: 1, 24: 2, 25: 3, 26: 4, 27: 1, 28: 2, 29: 3, 30: 4, 31: 1, 32: 2, 33: 3, 34: 4, 35: 1, 36: 2,
+  37: 3, 38: 4,
+};
+const UV_STREAM = 4;
+
+type Slot = { stream: number; at: number; n: number };
+
+/** Where each stream lands in the 12 TEXCOORD floats: packed in order, a stream may run on into the next TEXCOORD. */
+function layout(renderer: Json): Slot[] {
+  const streams: number[] = renderer.m_UseCustomVertexStreams ? renderer.m_VertexStreams : [0, 1, 3, UV_STREAM];
+  const out: Slot[] = [];
+  let at = 0;
+  for (const s of streams) {
+    const n = STREAM_SIZE[s];
+    if (!n) continue;
+    out.push({ stream: s, at, n });
+    at += n;
+  }
+  return out;
+}
+
+type Mat4 = number[];   // column-major
+const mul = (a: Mat4, b: Mat4): Mat4 => {
+  const o = new Array(16).fill(0);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  return o;
+};
+const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+const GL_BLEND = (gl: WebGL2RenderingContext) => [gl.ZERO, gl.ONE, gl.DST_COLOR, gl.SRC_COLOR, gl.ONE_MINUS_DST_COLOR,
+  gl.SRC_ALPHA, gl.ONE_MINUS_SRC_COLOR, gl.DST_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.SRC_ALPHA_SATURATE, gl.ONE_MINUS_SRC_ALPHA];
+
+type Program = {
+  pr: WebGLProgram;
+  arrays: { name: string; size: number; cb: number; pixel: boolean }[];
+  attrs: { loc: number; sem: string }[];
+};
+
+export class FxRenderer {
+  private gl: WebGL2RenderingContext;
+  private programs = new Map<string, Program>();
+  private vao: WebGLVertexArrayObject;
+  private vbo: WebGLBuffer;
+  private white: Texture;
+  private depth: Texture;
+  private post: Post;
+  private sprite: WebGLProgram;
+  private made: WebGLTexture[] = [];
+
+  constructor(private canvas: HTMLCanvasElement) {
+    const gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
+    if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
+    this.gl = gl;
+    this.vao = gl.createVertexArray()!;
+    this.vbo = gl.createBuffer()!;
+    this.white = this.pixel([255, 255, 255, 255]);
+    this.depth = this.pixel([0, 0, 0, 0]);   // reversed depth: 0 is as far as it goes, so nothing fades a particle
+    this.post = new Post(gl);
+    this.sprite = this.program({ name: "Sprites-Default", vs: SPRITE_VS, fs: SPRITE_FS, attributes: {}, vertex: { cb: {}, t: {} },
+                                 pixel: { cb: {}, t: {} }, blend: null as never }).pr;
+  }
+
+  /** Delete what this renderer made (not the context: a canvas's context is shared by whoever asks it). */
+  dispose() {
+    const gl = this.gl;
+    for (const t of this.made) gl.deleteTexture(t);
+    for (const p of this.programs.values()) gl.deleteProgram(p.pr);
+    gl.deleteBuffer(this.vbo);
+    gl.deleteVertexArray(this.vao);
+    this.post.dispose();
+  }
+
+  private pixel(rgba: number[]): Texture {
+    const gl = this.gl;
+    const tex = gl.createTexture()!;
+    this.made.push(tex);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(rgba));
+    return { tex, w: 1, h: 1 };
+  }
+
+  texture(image: HTMLImageElement, wrap: [number, number]): Texture {
+    const gl = this.gl;
+    const t = gl.createTexture()!;
+    this.made.push(t);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);   // Unity's v runs up
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const mode = (w: number) => [gl.REPEAT, gl.CLAMP_TO_EDGE, gl.MIRRORED_REPEAT][w] ?? gl.CLAMP_TO_EDGE;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, mode(wrap[0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, mode(wrap[1]));
+    return { tex: t, w: image.naturalWidth, h: image.naturalHeight };
+  }
+
+  private program(sh: Shader): Program {
+    const have = this.programs.get(sh.name);
+    if (have) return have;
+    const gl = this.gl;
+    const compile = (type: number, src: string) => {
+      const s = gl.createShader(type)!;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(`${sh.name}: ${gl.getShaderInfoLog(s)}`);
+      return s;
+    };
+    const pr = gl.createProgram()!;
+    gl.attachShader(pr, compile(gl.VERTEX_SHADER, sh.vs));
+    gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, sh.fs));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(`${sh.name}: ${gl.getProgramInfoLog(pr)}`);
+    const arrays: Program["arrays"] = [];
+    for (const [src, pixel] of [[sh.vs, false], [sh.fs, true]] as const) {
+      for (const m of src.matchAll(/uniform vec4 (p?cb)(\d+)\[(\d+)\];/g)) {
+        arrays.push({ name: `${m[1]}${m[2]}`, cb: +m[2], size: +m[3], pixel });
+      }
+    }
+    const attrs = Object.entries(sh.attributes).map(([a, sem]) => ({ loc: gl.getAttribLocation(pr, a), sem }));
+    const p = { pr, arrays, attrs };
+    this.programs.set(sh.name, p);
+    return p;
+  }
+
+  /** Draw the systems (those playing) and the sprites at `time` through the view: centre (cx, cy), half width / height
+   *  in world units; then the game's bloom and vignette. */
+  draw(systems: System[], sprites: Sprite[], playing: (s: System) => boolean, time: number, cx: number, cy: number, halfW: number, halfH: number) {
+    const gl = this.gl;
+    const W = this.canvas.width, H = this.canvas.height;
+    this.post.begin(W, H);
+    gl.enable(gl.BLEND);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.DEPTH_TEST);
+
+    // the camera: orthographic, at (cx, cy, -10) looking along +z, as Unity's view space (looking down -z) has it
+    const V: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, -cx, -cy, CAMERA_Z, 1];
+    const P: Mat4 = [1 / halfW, 0, 0, 0, 0, 1 / halfH, 0, 0, 0, 0, -2 / (FAR - NEAR), 0, 0, 0, -(FAR + NEAR) / (FAR - NEAR), 1];
+    const invV: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, cx, cy, CAMERA_Z, 1];
+    const invP: Mat4 = [halfW, 0, 0, 0, 0, halfH, 0, 0, 0, 0, -(FAR - NEAR) / 2, 0, 0, 0, -(FAR + NEAR) / 2, 1];
+    const zb = -1 + FAR / NEAR;
+    const globals: Record<string, number[]> = {
+      unity_MatrixV: V, unity_MatrixInvV: invV, glstate_matrix_projection: P, unity_MatrixP: P,
+      unity_MatrixVP: mul(P, V), unity_MatrixInvVP: mul(invV, invP), unity_MatrixInvP: invP,
+      unity_ObjectToWorld: IDENTITY, unity_WorldToObject: IDENTITY, unity_WorldTransformParams: [0, 0, 0, 1],
+      _WorldSpaceCameraPos: [cx, cy, CAMERA_Z], unity_OrthoParams: [halfW, halfH, 0, 1],
+      _ProjectionParams: [1, NEAR, FAR, 1 / FAR], _ZBufferParams: [zb, 1, zb / FAR, 1 / FAR],
+      _ScreenParams: [W, H, 1 + 1 / W, 1 + 1 / H], _ScaledScreenParams: [W, H, 1 + 1 / W, 1 + 1 / H],
+      _Time: [time / 20, time, time * 2, time * 3], _TimeParameters: [time, Math.sin(time), Math.cos(time), 0],
+      _SinTime: [Math.sin(time / 8), Math.sin(time / 4), Math.sin(time / 2), Math.sin(time)],
+      _CosTime: [Math.cos(time / 8), Math.cos(time / 4), Math.cos(time / 2), Math.cos(time)],
+      unity_DeltaTime: [1 / 60, 60, 1 / 60, 60], _GlobalMipBias: [0, 0], _RTHandleScale: [1, 1, 1, 1],
+      _CameraDepthTexture_TexelSize: [1 / W, 1 / H, W, H],
+    };
+
+    // Unity's order for transparent renderers: sorting order, render queue, then further first (a particle system's
+    // sorting fudge counts as distance)
+    type Item = { order: number; queue: number; distance: number; draw: () => void };
+    const items: Item[] = [
+      ...systems.filter(playing).map((s) => ({
+        order: s.data.renderer.m_SortingOrder ?? 0, queue: s.data.material.queue >= 0 ? s.data.material.queue : 3000,
+        distance: s.data.world[14] - CAMERA_Z + (s.data.renderer.m_SortingFudge ?? 0), draw: () => this.drawSystem(s, globals, halfH),
+      })),
+      ...sprites.map((s) => ({ order: s.data.order, queue: 3000, distance: s.data.z - CAMERA_Z, draw: () => this.drawSprite(s, time) })),
+    ];
+    items.sort((a, b) => a.order - b.order || a.queue - b.queue || b.distance - a.distance);
+    for (const it of items) it.draw();
+    this.post.end(W, H);
+  }
+
+  private drawSprite(s: Sprite, time: number) {
+    const gl = this.gl;
+    const c = spriteColor(s.data, time);
+    if (c[3] <= 0) return;
+    gl.useProgram(this.sprite);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, s.texture.tex);
+    gl.uniform1i(gl.getUniformLocation(this.sprite, "tex"), 0);
+    gl.uniform4f(gl.getUniformLocation(this.sprite, "color"), c[0], c[1], c[2], c[3]);
+    gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindVertexArray(this.vao);
+    for (let i = 0; i < 8; i++) gl.disableVertexAttribArray(i);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  private drawSystem(s: System, globals: Record<string, number[]>, halfH: number) {
+    const gl = this.gl;
+    const BL = GL_BLEND(gl);
+    const verts = this.geometry(s, halfH);
+    if (!verts.length) return;
+    const prog = this.program(s.shader);
+    gl.useProgram(prog.pr);
+    const m = s.data.material;
+    const value = (name: string): number[] | undefined => {
+      if (name in globals) return globals[name];
+      if (name in m.floats) return [m.floats[name]];
+      if (name in m.colors) return m.colors[name];
+      const tex = name.replace(/_(ST|TexelSize)$/, "");
+      const t = m.textures[tex];
+      if (t && name.endsWith("_ST")) return [t.scale[0], t.scale[1], t.offset[0], t.offset[1]];
+      const T = s.textures[tex];
+      if (T && name.endsWith("_TexelSize")) return [1 / T.w, 1 / T.h, T.w, T.h];
+      return undefined;
+    };
+    for (const a of prog.arrays) {
+      const bind = (a.pixel ? s.shader.pixel : s.shader.vertex).cb[a.cb];
+      const data = new Float32Array(a.size * 4);
+      for (const p of bind?.params ?? []) {
+        const v = value(p.name);
+        if (!v) continue;
+        const at = p.offset / 4;
+        for (let i = 0; i < Math.min(v.length, p.dim) && at + i < data.length; i++) data[at + i] = v[i];
+      }
+      gl.uniform4fv(gl.getUniformLocation(prog.pr, a.name), data);
+    }
+    let unit = 0;
+    for (const [binds, prefix] of [[s.shader.vertex, "t"], [s.shader.pixel, "pt"]] as const) {
+      for (const [reg, name] of Object.entries(binds.t)) {
+        const loc = gl.getUniformLocation(prog.pr, `${prefix}${reg}`);
+        if (!loc) continue;
+        const T = s.textures[name] ?? (name === "_CameraDepthTexture" ? this.depth : this.white);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, T.tex);
+        gl.uniform1i(loc, unit++);
+      }
+    }
+    const factor = (f: Factor) => BL[f.name && f.name !== "<noninit>" ? m.floats[f.name] ?? f.value : f.value] ?? gl.ONE;
+    const b = s.shader.blend;
+    gl.blendFuncSeparate(factor(b.src), factor(b.dst), factor(b.srcAlpha), factor(b.dstAlpha));
+
+    gl.bindVertexArray(this.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
+    for (let i = 0; i < 8; i++) gl.disableVertexAttribArray(i);
+    for (const { loc, sem } of prog.attrs) {
+      if (loc < 0) continue;
+      const tc = /^TEXCOORD(\d)$/.exec(sem);
+      const pointer = (size: number, off: number) => {
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, size, gl.FLOAT, false, FLOATS * 4, off * 4);
+      };
+      if (sem === "POSITION0") pointer(3, 0);
+      else if (sem === "COLOR0") pointer(4, 3);
+      else if (tc && +tc[1] < 3) pointer(4, 7 + 4 * +tc[1]);
+      else if (sem === "NORMAL0") gl.vertexAttrib4f(loc, 0, 0, -1, 0);
+      else if (sem === "TANGENT0") gl.vertexAttrib4f(loc, 1, 0, 0, 1);
+      else gl.vertexAttrib4f(loc, 0, 0, 0, 0);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, verts.length / FLOATS);
+  }
+
+  /** Triangles (FLOATS a vertex) for every particle of a system, in the world. */
+  private geometry(s: System, halfH: number): number[] {
+    const out: number[] = [];
+    const W = s.data.world as number[];
+    const toWorld = (p: Vec3): Vec3 => [W[0] * p[0] + W[4] * p[1] + W[8] * p[2] + W[12], W[1] * p[0] + W[5] * p[1] + W[9] * p[2] + W[13],
+                                        W[2] * p[0] + W[6] * p[1] + W[10] * p[2] + W[14]];
+    const dirWorld = (p: Vec3): Vec3 => [W[0] * p[0] + W[4] * p[1] + W[8] * p[2], W[1] * p[0] + W[5] * p[1] + W[9] * p[2],
+                                         W[2] * p[0] + W[6] * p[1] + W[10] * p[2]];
+    const r = s.data.renderer, mode = r.m_RenderMode;
+    const slots = (s.data._slots ??= layout(r)) as Slot[];
+    const uvSlot = slots.find((x) => x.stream === UV_STREAM);
+    const maxSize = (r.m_MaxParticleSize ?? 10) * halfH * 2;   // a fraction of the screen's height
+    for (const p of s.emitter.particles) {
+      const look = s.emitter.look(p);
+      const c = look.color;
+      const [tx, ty] = look.tiles;
+      const col = look.frame % tx, row = Math.floor(look.frame / tx);
+      const u0 = col / tx, u1 = (col + 1) / tx, v1 = 1 - row / ty, v0 = 1 - (row + 1) / ty;
+      const centre = toWorld(p.pos);
+      const tc = streams(slots, p, look, centre, dirWorld(p.vel));
+      const vert = (q: Vec3, u: number, v: number) => {
+        if (uvSlot) { tc[uvSlot.at] = u; tc[uvSlot.at + 1] = v; }
+        out.push(q[0], q[1], q[2], c[0], c[1], c[2], c[3], ...tc);
+      };
+      const quad = (right: Vec3, up: Vec3) => {
+        const corner = (a: number, b: number): Vec3 => [centre[0] + right[0] * a + up[0] * b, centre[1] + right[1] * a + up[1] * b, centre[2] + right[2] * a + up[2] * b];
+        const A = corner(-.5, -.5), B = corner(.5, -.5), C = corner(.5, .5), D = corner(-.5, .5);
+        vert(A, u0, v0); vert(B, u1, v0); vert(C, u1, v1);
+        vert(A, u0, v0); vert(C, u1, v1); vert(D, u0, v1);
+      };
+      if (mode === 0) {
+        const w = Math.min(look.size[0], maxSize), h = Math.min(look.size[1], maxSize);
+        let right: Vec3 = [1, 0, 0], up: Vec3 = [0, 1, 0];
+        if (r.m_RenderAlignment === 2) { right = dirWorld([1, 0, 0]); up = dirWorld([0, 1, 0]); }
+        const a = -p.rot[2], ca = Math.cos(a), sa = Math.sin(a);
+        const R: Vec3 = [(right[0] * ca + up[0] * sa) * w, (right[1] * ca + up[1] * sa) * w, (right[2] * ca + up[2] * sa) * w];
+        const U: Vec3 = [(up[0] * ca - right[0] * sa) * h, (up[1] * ca - right[1] * sa) * h, (up[2] * ca - right[2] * sa) * h];
+        quad(R, U);
+      } else if (mode === 1) {
+        const v = dirWorld(p.vel);
+        const speed = Math.hypot(v[0], v[1]);
+        const dir: Vec3 = speed > 1e-6 ? [v[0] / speed, v[1] / speed, 0] : [1, 0, 0];
+        // the width is the size's x; the length its y (the same, unless the size is 3D) by the length scale, plus the speed
+        const len = look.size[1] * (r.m_LengthScale ?? 1) + Math.hypot(...v) * (r.m_VelocityScale ?? 0);
+        const w = Math.min(look.size[0], maxSize);
+        quad([dir[0] * len, dir[1] * len, 0], [-dir[1] * w, dir[0] * w, 0]);
+      } else if (mode === 4 && s.mesh) {
+        const m = s.mesh;
+        const [ax, ay, az] = p.rot;
+        const rot = (q: Vec3): Vec3 => {
+          let [x, y, z] = q;
+          let cc = Math.cos(az), ss = Math.sin(az);
+          [x, y] = [x * cc - y * ss, x * ss + y * cc];
+          cc = Math.cos(ax); ss = Math.sin(ax);
+          [y, z] = [y * cc - z * ss, y * ss + z * cc];
+          cc = Math.cos(ay); ss = Math.sin(ay);
+          [x, z] = [x * cc + z * ss, -x * ss + z * cc];
+          return [x, y, z];
+        };
+        for (const t of m.tri) {
+          for (const i of t) {
+            const q = rot([m.pos[i][0] * look.size[0], m.pos[i][1] * look.size[1], m.pos[i][2] * look.size[2]]);
+            const w = r.m_RenderAlignment === 2 ? dirWorld(q) : q;
+            vert([centre[0] + w[0], centre[1] + w[1], centre[2] + w[2]], m.uv[i]?.[0] ?? 0, m.uv[i]?.[1] ?? 0);
+          }
+        }
+      }
+    }
+    return out;
+  }
+}
+
+/** The particle's values for the renderer's vertex streams, in their TEXCOORD places (the UV is filled per vertex). */
+function streams(slots: Slot[], p: Particle, look: ReturnType<Emitter["look"]>, centre: Vec3, vel: Vec3): number[] {
+  const tc = new Array(12).fill(0);
+  for (const { stream: st, at, n } of slots) {
+    let v: number[] = [];
+    if (st === 9) v = [look.frame];
+    else if (st === 10) v = centre;
+    else if (st >= 12 && st <= 14) v = look.size;
+    else if (st === 15) v = [p.rot[2]];
+    else if (st === 16) v = p.rot;
+    else if (st === 19) v = vel;
+    else if (st === 20) v = [Math.hypot(...vel)];
+    else if (st === 21) v = [look.agePercent];
+    else if (st === 22) v = [1 / p.life];
+    else if (st >= 23 && st <= 30) v = p.sr;
+    else if (st >= 31 && st <= 34) v = look.custom[0];
+    else if (st >= 35 && st <= 38) v = look.custom[1];
+    for (let i = 0; i < n && at + i < 12; i++) tc[at + i] = v[i] ?? 0;
+  }
+  return tc;
+}
