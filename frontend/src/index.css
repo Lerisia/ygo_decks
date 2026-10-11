@@ -172,6 +172,19 @@ button {
     border-color: #646cff;
   }
 }
+/* A card that opens below its header button (My Page 닉네임·비밀번호 변경): the hover outline goes round the
+   whole card, so once it is open it follows the open card's edge instead of only the header (참혈 2026-10-11). */
+.fold-card {
+  border: 1px solid transparent;
+}
+@media (hover: hover) {
+  .fold-card:has(> button:hover) {
+    border-color: #646cff;
+  }
+  .fold-card > button:hover {
+    border-color: transparent;
+  }
+}
 /* Outline only for keyboard focus, not for click. Without this, mobile
    clicks left a 4px ring on the last-pressed button — looked like the
    user had "selected" something they only tapped through. */

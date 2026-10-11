@@ -207,7 +207,7 @@ const Mypage = () => {
           🎨 듀치마인드 단어장
         </button>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
+        <div className="fold-card bg-white dark:bg-gray-800 rounded-xl shadow">
           <button
             onClick={() => toggle("username")}
             className="w-full px-4 py-3 text-left font-semibold flex justify-between items-center"
@@ -252,7 +252,7 @@ const Mypage = () => {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow">
+        <div className="fold-card bg-white dark:bg-gray-800 rounded-xl shadow">
           <button
             onClick={() => toggle("password")}
             className="w-full px-4 py-3 text-left font-semibold flex justify-between items-center"
