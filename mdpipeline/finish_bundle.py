@@ -6,8 +6,10 @@ pulls each shader's pixel program out of data.unity3d, disassembles it with vkd3
              carries the UI shader's own properties — _ClipRect, _Stencil … — so the game draws the deck screen's
              cards with it), else the shader's defaults, which leave the rainbow off,
              bindings — which cbN each constant buffer is, inputs — which varying carries uv / colour / normal …,
-             textures — what each t<N> samples (@card = the card face), params — where the per-card values go
-             (the attribute icon's tile, the level / rank stars).
+             textures — what each t<N> samples (@card = the card face), frames — what a link / pendulum card
+             samples instead (the game's own frame mask and relief for them) and a print in 오버프레임 (no frame lines,
+             all art, flat), params — where the per-card values go (the attribute icon's tile, the level / rank
+             stars).
 
 Everything written is Konami's (textures, translated shaders): it goes to media, never to the public repository.
 
@@ -37,6 +39,11 @@ ICON_X, ICON_Y, ICON_SIZE = 597, 48, 64
 SX, SY = 704 / ICON_SIZE, 1024 / ICON_SIZE
 OVERRIDES = {"_AttributeSize_Pos": [SX, SY, SX / 2 - 0.5 - ICON_X / ICON_SIZE, (ICON_Y + ICON_SIZE) / ICON_SIZE - SY / 2 - 0.5]}
 PARAMS = {"attribute": "_AttributeTile", "level": "_LevelRankValue"}
+FRAMES = {
+    "link": {"_CardMask": "CardMask_L", "_MainNormal": "CardNormal_Link"},
+    "pendulum": {"_CardMask": "CardMask_P", "_MainNormal": "CardNormal_Pen"},
+    "overframe": {"_CardMask": "@overframe", "_MainNormal": "@bump"},
+}
 DEFAULT_TEX = {0: "@white", 1: "@black", 2: "@gray", 3: "@bump"}
 
 
@@ -132,10 +139,16 @@ def main():
                 default = props.get(nm, {}).get("m_DefTexture", {}).get("m_DefaultName", 0)
                 file = DEFAULT_TEX.get(default, f"@{default}" if isinstance(default, str) and default else "@white")
             slots[tp["m_Index"]] = {"name": nm, "file": file}
+        frames = {}
+        for frame, swaps in FRAMES.items():
+            frames[frame] = {i: swaps[t["name"]] for i, t in slots.items() if t["name"] in swaps}
+            for file in frames[frame].values():
+                if not file.startswith("@"):
+                    wanted[file] = next(o for n, o in textures.values() if n == file)
         config[style] = {
             "material": material,
             "bindings": {names[b["m_NameIndex"]]: b["m_Index"] for b in cp["m_ConstantBufferBindings"]},
-            "inputs": INPUTS[style], "textures": slots, "params": params,
+            "inputs": INPUTS[style], "textures": slots, "frames": frames, "params": params,
         }
     for name, obj in wanted.items():
         obj.read().image.save(os.path.join(args.out, f"{name}.png"))

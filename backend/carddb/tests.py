@@ -999,10 +999,14 @@ class CardDexApiTest(TestCase):
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()
         self.assertEqual((spell["type_line"], spell["attribute"]), ("속공 마법", ""))
-        # what Master Duel's finish shaders draw themselves: the attribute icon's tile (光 闇 水 炎 地 風 神 魔 罠) and
-        # the level stars (a rank as a negative count, its stars sitting on the left)
-        self.assertEqual(body["finish"], {"attribute": 1, "level": 6})
-        self.assertEqual((spell["finish"], link["finish"]), ({"attribute": 7, "level": 0}, {"attribute": 1, "level": 0}))
+        # what Master Duel's finish shaders draw themselves: the attribute icon's tile (光 闇 水 炎 地 風 神 魔 罠), the
+        # level stars (a rank as a negative count, its stars sitting on the left) and the frame they light
+        self.assertEqual(body["finish"], {"attribute": 1, "level": 6, "frame": "normal"})
+        self.assertEqual((spell["finish"], link["finish"]), ({"attribute": 7, "level": 0, "frame": "normal"},
+                                                             {"attribute": 1, "level": 0, "frame": "link"}))
+        from .dex import _finish
+        pendulum = Card(category="monster", frame="effect_pendulum", attribute="dark", level=4)
+        self.assertEqual(_finish(pendulum), {"attribute": 1, "level": 4, "frame": "pendulum"})
         self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
         self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel
 
@@ -1119,9 +1123,11 @@ class CardFaceTest(TestCase):
         self.assertEqual((img.size, img.mode), ((704, 1024), "RGBA"))
         self.assertEqual(img.getpixel((352, 450))[:3], (10, 200, 10))   # the art shows through the frame's window
         self.assertIsNone(face_url(7))
+        from PIL import Image
         from .models import MdArt
         alt = MdPrint.objects.create(md_id=3907, card=self.card, is_alt_art=True)
-        MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/7.webp")
+        Image.new("RGB", (512, 1024), (10, 200, 10)).save(os.path.join(self.media, "cards/art/common/3907.webp"), "WEBP")
+        MdArt.objects.create(md_print=alt, version="common", image="cards/art/common/3907.webp")   # in 오버프레임
         from . import display
         display.forget_art()
         call_command("draw_card_faces", "--workers", "1", stdout=io.StringIO())
@@ -1132,7 +1138,7 @@ class CardFaceTest(TestCase):
         self.assertRegex(first, r"^/media/cards/face/7\.webp\?v=\w+$")
         body = self.client.get("/api/carddb/cards/7/").json()
         self.assertEqual(body["face_url"], first)
-        self.assertEqual([f["id"] for f in body["faces"]], [7, 3907])
+        self.assertEqual([(f["id"], f["overframe"]) for f in body["faces"]], [(7, False), (3907, True)])
         self.assertEqual(body["faces"][0]["face"], first)
         first_thumb = self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"]
         self.assertRegex(first_thumb, r"^/media/cards/face_thumb/7\.webp\?v=\w+$")

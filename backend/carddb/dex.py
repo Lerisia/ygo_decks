@@ -11,8 +11,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .display import THUMB_DIR as CARD_THUMB_DIR, art_url, display_name, thumb_url
-from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url
+from PIL import Image
+
+from .display import THUMB_DIR as CARD_THUMB_DIR, art_path, art_url, display_name, thumb_url
+from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe
 from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
 PAGE_SIZE = 60
@@ -257,8 +259,9 @@ def _stat(v):
 
 
 def _finish(c):
-    """The per-card values the Shine / Royal shaders need: the attribute icon's tile and the stars (a rank counts
-    negative, its stars on the left)."""
+    """The per-card values the Shine / Royal shaders need: the attribute icon's tile, the stars (a rank counts
+    negative, its stars on the left) and the frame, whose lines and relief the shaders light (a print in
+    오버프레임 has none: that is per face)."""
     tile = FINISH_TILES.get(c.category if c.category in ("spell", "trap") else c.attribute, 0)
     if c.category != "monster" or c.frame == "link":
         stars = 0
@@ -266,7 +269,16 @@ def _finish(c):
         stars = -(c.rank or 0)
     else:
         stars = c.level or 0
-    return {"attribute": tile, "level": stars}
+    frame = "link" if c.frame == "link" else "pendulum" if c.frame.endswith("_pendulum") else "normal"
+    return {"attribute": tile, "level": stars, "frame": frame}
+
+
+def _overframe(md_id):
+    path = art_path(md_id)
+    if not path or not os.path.exists(path):
+        return False
+    with Image.open(path) as art:   # reads the header only
+        return is_overframe(art)
 
 
 def _texts(card, lang):
@@ -346,7 +358,7 @@ def card(request, card_id):
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale, "finish": _finish(c),
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
         "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
-        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m)}
+        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m)}
                   for m in [c.id] + list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id")
                                          .values_list("md_id", flat=True)) if face_url(m)],
         "rarity": base.rarity if base else "",

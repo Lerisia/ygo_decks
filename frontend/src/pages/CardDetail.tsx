@@ -4,11 +4,11 @@ import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
-// Master Duel's finishes, drawn with the game's own shaders (엘리스 2026-10-11)
+// Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11)
 const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
   { key: "normal", label: "일반" },
   { key: "shine", label: "샤인" },
-  { key: "royal", label: "로열" },
+  { key: "royal", label: "로얄" },
 ];
 
 const LABEL = "p-2 text-left break-keep font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
@@ -173,6 +173,10 @@ export default function CardDetail() {
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
+  const finishParams: FinishParams = {
+    ...card.finish,
+    frame: card.faces.find((f) => f.face === picked)?.overframe ? "overframe" : card.finish.frame,
+  };
   const [levelName, levelValue] = (card.level_label || "").split(" ");
   // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
   // after a 150KB download with the old picture still up (엘리스 2026-10-11: "반응이 느리고 가끔 안 눌림").
@@ -260,7 +264,7 @@ export default function CardDetail() {
               {finish === "normal" ? (
                 <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
               ) : (
-                <CardFinishCanvas faceUrl={picked} style={finish} params={card.finish} paused={zoomed} alt={`${card.name} 카드 (${finish === "royal" ? "로열" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+                <CardFinishCanvas faceUrl={picked} style={finish} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${finish === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
               )}
               <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                 <ZoomGlyph />
@@ -270,7 +274,7 @@ export default function CardDetail() {
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {picked && canFinish && (
-            <div role="radiogroup" aria-label="마감" className="mt-2 grid grid-cols-3 rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
+            <div role="radiogroup" aria-label="가공" className="mt-2 grid grid-cols-3 rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
               {FINISHES.map((f) => (
                 <button
                   key={f.key}
@@ -378,7 +382,7 @@ export default function CardDetail() {
       </div>
 
       {zoomed && picked && (
-        <CardZoom src={picked} alt={`${card.name} 카드`} finish={finish} params={card.finish} onClose={() => setZoomed(false)} />
+        <CardZoom src={picked} alt={`${card.name} 카드`} finish={finish} params={finishParams} onClose={() => setZoomed(false)} />
       )}
 
       {card.decks.length > 0 && (

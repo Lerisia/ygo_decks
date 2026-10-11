@@ -74,15 +74,16 @@ export type CardDoc = {
   def: string | null;
   link_markers: string[];
   pendulum_scale: number | null;
-  /** What Master Duel's Shine / Royal shaders draw themselves: the attribute icon's tile and the stars. */
-  finish: { attribute: number; level: number };
+  /** What Master Duel's Shine / Royal shaders draw themselves: the attribute icon's tile, the stars and the frame
+   *  (a print in 오버프레임 is marked on its face). */
+  finish: { attribute: number; level: number; frame: "normal" | "link" | "pendulum" };
   texts: { ko: CardTexts; ja: CardTexts };
   image_url: string | null;
   thumb_url: string | null;
   /** The whole card in Korean, drawn from Master Duel's frame (null until drawn). */
   face_url: string | null;
   /** The card's faces: its own print first, then Master Duel's alternate arts. */
-  faces: { id: number; face: string; thumb: string | null }[];
+  faces: { id: number; face: string; thumb: string | null; overframe: boolean }[];
   rarity: string;
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };

@@ -4,8 +4,11 @@
  *  than kept in this repository. */
 
 export type FinishStyle = "shine" | "royal";
-/** Per card: the attribute icon's tile in the shader's atlas and the level stars (a rank as a negative count). */
-export type FinishParams = { attribute: number; level: number };
+/** The frame whose lines and relief the finish lights: a print in 오버프레임 has none. */
+export type FinishFrame = "normal" | "link" | "pendulum" | "overframe";
+/** Per card: the attribute icon's tile in the shader's atlas, the level stars (a rank as a negative count) and the
+ *  frame. */
+export type FinishParams = { attribute: number; level: number; frame: FinishFrame };
 
 const BASE = "/media/md_ui/finish";
 // Toward the light: straight from the viewer, the brightest (엘리스 10/11; a low light from the upper left matched a
@@ -18,6 +21,7 @@ type StyleConfig = {
   bindings: Record<string, number>;
   inputs: Record<string, number>;
   textures: Record<string, { name: string; file: string }>;
+  frames: Partial<Record<FinishFrame, Record<string, string>>>;
   params: { attribute?: number; level?: number };
 };
 type Bundle = { config: Record<FinishStyle, StyleConfig>; shaders: Record<FinishStyle, string> };
@@ -79,6 +83,7 @@ const SOLID: Record<string, [number, number, number, number]> = {
   "@black": [0, 0, 0, 0],
   "@gray": [128, 128, 128, 255],
   "@bump": [128, 128, 255, 255],
+  "@overframe": [0, 62, 0, 255],   // a frame mask with no lines, all art
 };
 
 export class CardFinish {
@@ -88,21 +93,21 @@ export class CardFinish {
   private quad: WebGLBuffer;
   private cfg!: Record<FinishStyle, StyleConfig>;
 
-  private constructor(private canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
+  private constructor(private canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, private frame: FinishFrame) {
     this.gl = gl;
     this.quad = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   }
 
-  static async create(canvas: HTMLCanvasElement, faceUrl: string): Promise<CardFinish> {
+  static async create(canvas: HTMLCanvasElement, faceUrl: string, frame: FinishFrame): Promise<CardFinish> {
     const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
-    const f = new CardFinish(canvas, gl);
+    const f = new CardFinish(canvas, gl, frame);
     const { config, shaders } = await loadBundle();
     f.cfg = config;
     for (const s of STYLES) f.programs[s] = f.compile(vertexSource(config[s].inputs), shaders[s]);
-    const files = new Set(STYLES.flatMap((s) => Object.values(config[s].textures).map((t) => t.file)));
+    const files = new Set(STYLES.flatMap((s) => Object.keys(config[s].textures).map((i) => f.fileAt(s, i))));
     await Promise.all(
       [...files].map(async (file) => {
         if (file === "@card") f.upload(file, await loadImage(faceUrl), gl.CLAMP_TO_EDGE);
@@ -111,6 +116,11 @@ export class CardFinish {
       }),
     );
     return f;
+  }
+
+  /** What texture slot i of the style samples for this card's frame. */
+  private fileAt(style: FinishStyle, i: string): string {
+    return this.cfg[style].frames?.[this.frame]?.[i] ?? this.cfg[style].textures[i].file;
   }
 
   private compile(vs: string, fs: string) {
@@ -168,9 +178,9 @@ export class CardFinish {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    for (const [i, s] of Object.entries(cfg.textures)) {
+    for (const i of Object.keys(cfg.textures)) {
       gl.activeTexture(gl.TEXTURE0 + Number(i));
-      gl.bindTexture(gl.TEXTURE_2D, this.textures[s.file]);
+      gl.bindTexture(gl.TEXTURE_2D, this.textures[this.fileAt(style, i)]);
       gl.uniform1i(gl.getUniformLocation(prog.pr, `t${i}`), Number(i));
     }
     const put = (a: Float32Array, row: number, vals: number[]) => vals.forEach((v, k) => { a[row * 4 + k] = v; });

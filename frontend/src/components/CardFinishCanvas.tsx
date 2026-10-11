@@ -21,7 +21,7 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
     canvas.height = Math.round(box.height * dpr);
     let alive = true;
     let made: CardFinish | null = null;
-    CardFinish.create(canvas, faceUrl)
+    CardFinish.create(canvas, faceUrl, params.frame)
       .then((f) => {
         made = f;
         if (alive) setFinish(f);
@@ -33,7 +33,7 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
       made?.dispose();
       setFinish(null);
     };
-  }, [faceUrl]);
+  }, [faceUrl, params.frame]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!finish || paused) return;
