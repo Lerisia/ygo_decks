@@ -53,7 +53,7 @@ function TextBlock({ t, pendulum }: { t: CardTexts; pendulum: boolean }) {
   );
 }
 
-// As the official card database lays it out: names on top, then the card small beside its stats and the effect text
+// As the official card database lays it out: the name on top, then the card small beside its stats and the effect text
 // right under them, so a phone shows the card and what it does together (엘리스 2026-10-11, the face carries no
 // effect text); a tap shows the card large. Wider screens keep the card in its own column beside all of it.
 const LAYOUT =
@@ -72,11 +72,7 @@ function Skeleton() {
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
       <div className={LAYOUT}>
-        <div className={`${AREA.names} flex flex-col gap-2`}>
-          <div className={`h-7 w-2/3 ${bar}`} />
-          <div className={`h-4 w-1/2 ${bar}`} />
-          <div className={`h-4 w-1/3 ${bar}`} />
-        </div>
+        <div className={`${AREA.names} h-7 w-2/3 ${bar}`} />
         <div className={AREA.card}>
           <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
         </div>
@@ -182,17 +178,28 @@ export default function CardDetail() {
     if (pendulum) stats.push(["스케일", card.pendulum_scale]);
     if (isLink) stats.push(["링크 마커", <LinkMarkers on={card.link_markers} />]);
   }
+  // The card's 카드군 sit with its stats, near the top (엘리스 2026-10-11: "카드군도 중요한 정보"); each opens its cards.
+  if (card.groups.length) {
+    stats.splice(1, 0, ["카드군", (
+      <div className="flex flex-wrap gap-1">
+        {card.groups.map((g) => (
+          <Link
+            key={g.id}
+            to={`/cards?group=${g.id}`}
+            className="px-2 py-0.5 rounded-full text-xs md:text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition"
+          >
+            {g.name}
+          </Link>
+        ))}
+      </div>
+    )]);
+  }
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
       <div className={LAYOUT}>
         <div className={AREA.names}>
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
-          {card.name_ja && <p className="mt-0.5 text-sm md:text-base text-gray-700 dark:text-gray-200">{card.name_ja}</p>}
-          {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{card.name_ja_ruby}</p>
-          )}
-          {card.name_en && <p className="text-sm text-gray-500 dark:text-gray-400">{card.name_en}</p>}
         </div>
 
         <div className={AREA.card}>
@@ -252,13 +259,35 @@ export default function CardDetail() {
           </div>
         </section>
 
-        {(card.rarity || dates.length > 0) && (
+        {/* The Japanese and English names are reference, like the dates: down here, so the top holds the Korean name
+            alone (엘리스 2026-10-11: three lines of names were wasted space). */}
+        {(card.name_ja || card.name_en || card.rarity || dates.length > 0) && (
           <table className={`${AREA.more} w-full border border-gray-300 dark:border-gray-600 text-left text-sm`}>
             <tbody>
+              {card.name_ja && (
+                <tr className={ROW}>
+                  <th scope="row" className={LABEL}>일본어 이름</th>
+                  <td className="p-2">
+                    {card.name_ja}
+                    {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{card.name_ja_ruby}</div>
+                    )}
+                  </td>
+                </tr>
+              )}
+              {card.name_en && (
+                <tr className={ROW}>
+                  <th scope="row" className={LABEL}>영어 이름</th>
+                  <td className="p-2">{card.name_en}</td>
+                </tr>
+              )}
               {card.rarity && (
                 <tr className={ROW}>
                   <th scope="row" className={LABEL}>마듀 레어도</th>
-                  <td className="p-2">{card.rarity}</td>
+                  <td className="p-2">
+                    {/* Master Duel's own badge (GUI_Icon_Rarity_Deck0~3 from the game, served from media: the repo is public). */}
+                    <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}.png`} alt={card.rarity} title={card.rarity} className="h-5 w-auto" />
+                  </td>
                 </tr>
               )}
               {dates.length > 0 && (
@@ -275,25 +304,6 @@ export default function CardDetail() {
       </div>
 
       {zoomed && picked && <CardZoom src={picked} alt={`${card.name} 카드`} onClose={() => setZoomed(false)} />}
-
-      <section className="mt-6">
-        <h2 className="text-lg font-bold mb-2">카드군</h2>
-        {card.groups.length ? (
-          <div className="flex flex-wrap gap-2">
-            {card.groups.map((g) => (
-              <Link
-                key={g.id}
-                to={`/cards?group=${g.id}`}
-                className="px-3 py-1.5 rounded-full text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition"
-              >
-                {g.name}
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">속한 카드군이 없습니다.</p>
-        )}
-      </section>
 
       {card.decks.length > 0 && (
         <section className="mt-6">
