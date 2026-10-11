@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { STRENGTH_TIERS, countInRange, moveHandle, pickHandle } from "../utils/recommendFlow";
 
 const LAST = STRENGTH_TIERS.length - 1;
@@ -14,8 +14,8 @@ const TIER_NOTES = [
   "사용에 도전 정신이 필요할 정도로 매우 약한 덱",
 ];
 
-// Deck power as a bar (특이점 2026-10-11): stronger to the left, two points mark the tiers the result may come from.
-// "한 단계만" leaves a single point. Each tier label shows whether any candidate is left there.
+// Deck power as a bar (특이점 2026-10-11): stronger to the left, two points mark the tiers the result may come from;
+// both on one tier picks just that tier. Each tier label shows whether any candidate is left there.
 export default function StrengthRangePicker({
   question,
   tierCounts,
@@ -27,7 +27,6 @@ export default function StrengthRangePicker({
 }) {
   const [lo, setLo] = useState(0);
   const [hi, setHi] = useState(LAST);
-  const [single, setSingle] = useState(false);
   const [hovered, setHovered] = useState<number | null>(null);
   const [chosen, setChosen] = useState<number | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -41,18 +40,13 @@ export default function StrengthRangePicker({
   };
   const place = (handle: "lo" | "hi", step: number) => {
     setChosen(step);
-    if (single) {
-      setLo(step);
-      setHi(step);
-      return;
-    }
     const [nlo, nhi] = moveHandle(handle, step, lo, hi);
     setLo(nlo);
     setHi(nhi);
   };
 
   const press = (step: number) => {
-    if (!single && lo === hi && step === lo) {
+    if (lo === hi && step === lo) {
       setChosen(step);
       return "either" as const;
     }
@@ -62,6 +56,7 @@ export default function StrengthRangePicker({
   };
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    setHovered(null); // while a point is held, the note follows it, not the tier hovered before
     dragging.current = press(stepAt(e.clientX));
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -86,13 +81,25 @@ export default function StrengthRangePicker({
     const from = handle === "lo" ? lo : hi;
     place(handle, Math.min(LAST, Math.max(0, from + delta)));
   };
-  const toggleSingle = () => {
-    if (!single) setHi(lo);
-    setSingle(!single);
-  };
 
   const count = tierCounts ? countInRange(tierCounts, lo, hi) : null;
   const note = hovered ?? chosen;
+
+  // The note fades out, changes, and fades back in, so sweeping across the bar doesn't flicker through every tier.
+  const [shownNote, setShownNote] = useState(note);
+  const [noteVisible, setNoteVisible] = useState(true);
+  useEffect(() => {
+    if (note === shownNote) {
+      setNoteVisible(true);
+      return;
+    }
+    setNoteVisible(false);
+    const timer = setTimeout(() => {
+      setShownNote(note);
+      setNoteVisible(true);
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [note, shownNote]);
   const whole = lo === 0 && hi === LAST;
   const rangeLabel = lo === hi ? STRENGTH_TIERS[lo] : `${STRENGTH_TIERS[lo]} ~ ${STRENGTH_TIERS[hi]}`;
 
@@ -100,7 +107,7 @@ export default function StrengthRangePicker({
     <span
       role="slider"
       tabIndex={0}
-      aria-label={single ? "덱 파워" : which === "lo" ? "가장 강한 쪽" : "가장 약한 쪽"}
+      aria-label={which === "lo" ? "가장 강한 쪽" : "가장 약한 쪽"}
       aria-valuemin={0}
       aria-valuemax={LAST}
       aria-valuenow={step}
@@ -115,7 +122,7 @@ export default function StrengthRangePicker({
     <div className="mb-6 space-y-4">
       <h2 className="text-lg font-bold text-gray-900 dark:text-white">{question}</h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 break-keep">
-        {single ? "점을 움직여 원하는 덱 파워를 고르세요." : "두 점을 움직여 원하는 덱 파워의 범위를 정하세요."} 왼쪽일수록 강한 덱입니다.
+        두 점을 움직여 원하는 덱 파워의 범위를 정하세요. 왼쪽일수록 강한 덱이고, 두 점을 겹치면 그 단계만 고릅니다.
       </p>
 
       <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-2 pt-4 pb-3">
@@ -141,7 +148,7 @@ export default function StrengthRangePicker({
             />
           ))}
           {handle("lo", lo)}
-          {!single && handle("hi", hi)}
+          {handle("hi", hi)}
         </div>
         <div className="grid grid-cols-6 mt-1 text-center text-xs sm:text-sm break-keep">
           {STRENGTH_TIERS.map((label, i) => {
@@ -163,22 +170,20 @@ export default function StrengthRangePicker({
         </div>
         {/* Room for two lines (the longest note on a narrow phone), so nothing moves as the notes change. */}
         <p className="mt-3 px-1 min-h-[2.5rem] text-xs leading-5 break-keep text-gray-600 dark:text-gray-300" aria-live="polite">
-          {note !== null ? (
-            <>
-              <span className="font-semibold text-gray-900 dark:text-white mr-1.5">{STRENGTH_TIERS[note]}권</span>
-              {TIER_NOTES[note]}
-            </>
-          ) : (
-            <span className="text-gray-400 dark:text-gray-500">단계를 누르거나 점을 움직이면 그 단계의 설명이 여기에 나옵니다.</span>
-          )}
+          <span className={`transition-opacity duration-200 motion-reduce:transition-none ${noteVisible ? "opacity-100" : "opacity-0"}`}>
+            {shownNote !== null ? (
+              <>
+                <span className="font-semibold text-gray-900 dark:text-white mr-1.5">{STRENGTH_TIERS[shownNote]}권</span>
+                {TIER_NOTES[shownNote]}
+              </>
+            ) : (
+              <span className="text-gray-400 dark:text-gray-500">단계를 누르거나 점을 움직이면 그 단계의 설명이 여기에 나옵니다.</span>
+            )}
+          </span>
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer select-none">
-          <input type="checkbox" checked={single} onChange={toggleSingle} className="w-4 h-4 accent-blue-600" />
-          한 단계만 고르기
-        </label>
+      <div className="flex items-center justify-end gap-3">
         <p className="text-sm text-right break-keep">
           <span className="font-semibold text-gray-900 dark:text-white">{whole ? "전체 (상관 없음)" : rangeLabel}</span>
           {count !== null && (
