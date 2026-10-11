@@ -964,11 +964,15 @@ class CardFaceTest(TestCase):
         call_command("draw_card_faces", "--workers", "1", stdout=io.StringIO())
         for rel in ("cards/face/7.webp", "cards/face_thumb/7.webp", "cards/face/3907.webp"):
             self.assertTrue(os.path.exists(os.path.join(self.media, rel)), rel)
-        self.assertEqual(face_url(7), "/media/cards/face/7.webp")
+        # Browsers keep /media for years, so each address carries the file's version: a redrawn face gets a new one.
+        first = face_url(7)
+        self.assertRegex(first, r"^/media/cards/face/7\.webp\?v=\w+$")
         body = self.client.get("/api/carddb/cards/7/").json()
-        self.assertEqual(body["face_url"], "/media/cards/face/7.webp")
+        self.assertEqual(body["face_url"], first)
         self.assertEqual([f["id"] for f in body["faces"]], [7, 3907])
-        self.assertEqual(self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"], "/media/cards/face_thumb/7.webp")
+        self.assertEqual(body["faces"][0]["face"], first)
+        first_thumb = self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"]
+        self.assertRegex(first_thumb, r"^/media/cards/face_thumb/7\.webp\?v=\w+$")
         os.remove(os.path.join(self.media, "cards/face_thumb/7.webp"))
         out = io.StringIO()
         call_command("draw_card_faces", "--workers", "1", stdout=out)
@@ -977,6 +981,8 @@ class CardFaceTest(TestCase):
         out = io.StringIO()
         call_command("draw_card_faces", "--workers", "1", stdout=out)
         self.assertIn("2 faces drawn", out.getvalue())   # ATK changed: the card and its alternate art
+        self.assertNotEqual(face_url(7), first)
+        self.assertNotEqual(self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"], first_thumb)
         out = io.StringIO()
         call_command("draw_card_faces", "--workers", "1", stdout=out)
         self.assertIn("0 faces drawn, 0 thumbnails made", out.getvalue())

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 
@@ -124,6 +124,7 @@ export default function CardDetail() {
   const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const preloaded = useRef<{ card: number; images: HTMLImageElement[] }>({ card: 0, images: [] });
 
   useEffect(() => {
     let alive = true;
@@ -158,6 +159,20 @@ export default function CardDetail() {
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
   const [levelName, levelValue] = (card.level_label || "").split(" ");
+  // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
+  // after a 150KB download with the old picture still up (엘리스 2026-10-11: "반응이 느리고 가끔 안 눌림").
+  const preloadFaces = () => {
+    if (preloaded.current.card === card.id) return;
+    preloaded.current = {
+      card: card.id,
+      images: card.faces.filter((f) => f.face !== card.face_url).map((f) => {
+        const img = new Image();
+        img.src = f.face;
+        img.decode().catch(() => {});
+        return img;
+      }),
+    };
+  };
   const stats: [string, ReactNode][] = [["종류", card.type_line]];
   if (card.category === "monster") {
     stats.push(["속성", card.attribute || "-"]);
@@ -183,7 +198,7 @@ export default function CardDetail() {
         <div className={AREA.card}>
           {picked ? (
             <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
-              <img src={picked} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain" />
+              <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
               <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                 <ZoomGlyph />
               </span>
@@ -192,13 +207,13 @@ export default function CardDetail() {
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {card.faces.length > 1 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 grid grid-cols-3 gap-1 md:flex md:flex-wrap md:gap-1.5">
               {card.faces.map((f, i) => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => setPicked(f.face)}
-                  className={`w-10 md:w-12 rounded-sm overflow-hidden ring-2 transition ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
+                  className={`md:w-12 rounded-sm overflow-hidden ring-2 transition touch-manipulation ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
                   aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
                 >
                   <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />

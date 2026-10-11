@@ -348,7 +348,13 @@ def thumb_rel(md_id):
 
 
 def _url(rel):
-    return settings.MEDIA_URL + rel if os.path.exists(os.path.join(settings.MEDIA_ROOT, rel)) else None
+    """The file's address with its version (when it was written): nginx lets browsers keep /media for years, so a
+    face drawn again must come under a new address or people who saw it go on seeing the old one."""
+    try:
+        written = os.stat(os.path.join(settings.MEDIA_ROOT, rel)).st_mtime_ns
+    except OSError:
+        return None
+    return f"{settings.MEDIA_URL}{rel}?v={written:x}"
 
 
 def face_url(md_id):

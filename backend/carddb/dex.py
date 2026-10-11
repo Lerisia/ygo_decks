@@ -178,7 +178,7 @@ def cards(request):
     media = settings.MEDIA_URL
     return Response({
         "results": [{"id": r.id, "name": r.name,
-                     "face_thumb_url": f"{media}{FACE_THUMB_DIR}/{r.id}.webp" if r.id in index["face_thumbs"] else None,
+                     "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
                      "image_url": art_url(r.id)} for r in chunk],
         "total": len(rows), "page": page, "has_more": page * PAGE_SIZE < len(rows),
