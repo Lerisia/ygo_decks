@@ -125,7 +125,7 @@ export default function StrengthRangePicker({
         두 점을 움직여 원하는 덱 파워의 범위를 정하세요. 왼쪽일수록 강한 덱이고, 두 점을 겹치면 그 단계만 고릅니다.
       </p>
 
-      <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-2 pt-4 pb-3">
+      <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-2 pt-4 pb-2">
         {/* The track spans the centres of the six label columns, so each point sits right over its label. */}
         <div
           className="relative h-10 mx-[8.333%] touch-none select-none cursor-pointer"
@@ -168,8 +168,8 @@ export default function StrengthRangePicker({
             );
           })}
         </div>
-        {/* Room for two lines (the longest note on a narrow phone), so nothing moves as the notes change. */}
-        <p className="mt-3 px-1 min-h-[2.5rem] text-xs leading-5 break-keep text-gray-600 dark:text-gray-300" aria-live="polite">
+        {/* Room for the longest note — two lines on a phone, one on a wider screen — so nothing moves as notes change. */}
+        <p className="mt-2 px-1 min-h-[2.5rem] sm:min-h-[1.25rem] text-xs leading-5 break-keep text-gray-600 dark:text-gray-300" aria-live="polite">
           <span className={`transition-opacity duration-200 motion-reduce:transition-none ${noteVisible ? "opacity-100" : "opacity-0"}`}>
             {shownNote !== null ? (
               <>
