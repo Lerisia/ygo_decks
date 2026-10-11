@@ -4,7 +4,8 @@ import { CardFinish, type FinishParams, type FinishStyle } from "@/lib/cardFinis
 const FPS = 30;
 
 /** A card face in Master Duel's Shine or Royal finish, animated as in the deck screen (the game moves it with time,
- *  not with tilting). It pauses off screen and in a hidden tab, and stands still for reduced motion. */
+ *  not with tilting). It pauses off screen and in a hidden tab; it moves even for reduced motion, since the motion is
+ *  what the viewer tapped the finish to see. */
 export default function CardFinishCanvas({ faceUrl, style, params, alt, className = "" }: {
   faceUrl: string; style: FinishStyle; params: FinishParams; alt: string; className?: string;
 }) {
@@ -37,7 +38,6 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, classNam
   useEffect(() => {
     if (!finish) return;
     const canvas = canvasRef.current!;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     let visible = true;
     let last = 0;
@@ -48,8 +48,7 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, classNam
       last = now;
       finish.draw(style, (now - t0) / 1000, params);
     };
-    if (still) finish.draw(style, 2, params);
-    else raf = requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
     const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; });
     io.observe(canvas);
     return () => {
