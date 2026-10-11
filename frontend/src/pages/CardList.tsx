@@ -18,6 +18,9 @@ const SORTS = [
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 const hasFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card);
+// The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
+// page shows its name and ✕ above the list instead (엘리스 2026-10-11).
+const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st);
 
 function TileSkeleton() {
   return (
@@ -62,7 +65,7 @@ export default function CardList() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filterOpen, setFilterOpen] = useState(() => hasFilter(filters));
+  const [filterOpen, setFilterOpen] = useState(() => panelFilter(filters));
   const [pickingGroup, setPickingGroup] = useState(false);
   const [groupQuery, setGroupQuery] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -78,7 +81,7 @@ export default function CardList() {
     if (filtersToSearch(next) !== key) {
       setFilters(next);
       setQInput(next.q);
-      if (hasFilter(next)) setFilterOpen(true);
+      if (panelFilter(next)) setFilterOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onList, location.search]);
@@ -259,22 +262,33 @@ export default function CardList() {
       <div className="mb-3 h-6 flex items-center text-sm text-gray-600 dark:text-gray-300 text-left">
         {filters.group && groupCounts ? (
           // A 카드군's own cards, or the cards supporting it (서포트, 엘리스 2026-10-11)
-          <div role="tablist" aria-label={`${groupName ?? "카드군"} 카드`} className="flex gap-1.5">
-            {([["", "구성원", groupCounts.member], ["support", "서포트", groupCounts.support]] as const).map(([role, label, n]) => (
-              <button
-                key={label}
-                type="button"
-                role="tab"
-                aria-selected={filters.role === role}
-                disabled={!n && filters.role !== role}
-                onClick={() => update({ role })}
-                className={`px-3 h-6 rounded-full font-semibold tabular-nums transition disabled:opacity-40 ${
-                  filters.role === role ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-                }`}
-              >
-                {label} {n.toLocaleString()}장
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="truncate font-semibold">'{groupName ?? "카드군"}'</span>
+            <div role="tablist" aria-label={`${groupName ?? "카드군"} 카드`} className="flex gap-1.5 shrink-0">
+              {([["", "구성원", groupCounts.member], ["support", "서포트", groupCounts.support]] as const).map(([role, label, n]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  aria-selected={filters.role === role}
+                  disabled={!n && filters.role !== role}
+                  onClick={() => update({ role })}
+                  className={`px-3 h-6 rounded-full font-semibold tabular-nums transition disabled:opacity-40 ${
+                    filters.role === role ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                  }`}
+                >
+                  {label} {n.toLocaleString()}장
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => update({ group: "" })}
+              aria-label="카드군 지우기"
+              className="shrink-0 w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs"
+            >
+              ✕
+            </button>
           </div>
         ) : filters.card && cardFilter && total !== null ? (
           // a card's own support list, from its page (엘리스 2026-10-11)
