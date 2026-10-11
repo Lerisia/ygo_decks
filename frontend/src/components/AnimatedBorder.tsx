@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 type AnimatedBorderType =
   | "fire" | "water" | "wind" | "earth" | "light" | "dark"
   | "labrynth"
@@ -38,12 +40,15 @@ const SPARKLE_POSITIONS: Array<{ angle: number; r: number; delay: number; size: 
 ];
 
 export default function AnimatedBorder({ type, size }: Props) {
+  // Ids must be unique per instance: with a shared id every copy paints from the first one in the page, and when that
+  // one sits in a hidden header (the phone bar on desktop) the ring is not drawn at all (참혈 2026-10-11).
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   if (type === "melodious") return <MelodiousOverlay size={size} />;
   if (type === "skystriker") return <SkyStrikerOverlay size={size} />;
 
   const stops = THEMES[type] || THEMES.fire;
-  const gradId = `border-grad-${type}`;
-  const maskId = `border-mask-${type}`;
+  const gradId = `border-grad-${type}-${uid}`;
+  const maskId = `border-mask-${type}-${uid}`;
   const rotates = ROTATING.has(type);
   const hasSparkle = SPARKLE.has(type);
 
