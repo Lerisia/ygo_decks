@@ -88,7 +88,7 @@ export type CardDoc = {
     /** The card name alone (white on black over the card's top sixth), for the finishes to paint. */
     name_mask: string | null;
     /** Master Duel's monster cut-in for this print: the animation and the game's camera view. */
-    cutin: { anim: string; view: [number, number, number] | null } | null;
+    cutin: { anim: string; view: [number, number, number] | null; mp?: number } | null;
   }[];
   /** The attribute whose sound goes with a cut-in. */
   cutin_sound: string;

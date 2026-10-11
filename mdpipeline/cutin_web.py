@@ -4,7 +4,8 @@ camera frames it (엘리스 2026-10-11). Konami's assets: written to media, neve
 
 usage: cutin_web.py <cutin dir (cutin_extract.py's)> <LocalData dir> <containers.json> <out dir> [--quality 88]
 
-index.json: {card id: {"anim": name, "view": [cx, cy, half height]}} — the view in skeleton units: the game shows the
+index.json: {card id: {"anim": name, "view": [cx, cy, half height], "mp": megapixels of the large pages}} — the
+phones take the large pictures unless they weigh too much; the view in skeleton units: the game shows the
 cut-in through an orthographic camera (camera2DSize is half the screen's height) on a prefab scaled down (0.01 per
 skeleton unit, then the prefab's own scale), so the same framing comes out here.
 """
@@ -59,6 +60,13 @@ def view_of(prefab_bundle, card):
     return [round(cx, 2), round(cy, 2), round(cam["camera2DSize"] / unit, 2)]
 
 
+def megapixels(folder):
+    """Pixels of all the atlas pages of a cut-in, in millions (the GPU memory it takes is four bytes each)."""
+    atlas = open(os.path.join(folder, "atlas.txt")).read()
+    pages = re.findall(r"^\S+\.png\s*\n\s*size:\s*(\d+),\s*(\d+)", atlas, re.M)
+    return round(sum(int(w) * int(h) for w, h in pages) / 1e6, 1)
+
+
 def _card(job):
     """One cut-in written out; its animation's name (the view is read separately, from the prefab)."""
     src, dst, quality = job
@@ -97,7 +105,8 @@ def main():
              if all(os.path.exists(os.path.join(src_root, c, f)) for f in ("skeleton.json", "atlas.txt"))]
     with multiprocessing.Pool(12) as pool:
         anims = pool.map(_card, [(os.path.join(src_root, c), os.path.join(args.out, c), args.quality) for c in cards])
-    index = {c: {"anim": a, "view": view_of(prefab[c], c) if c in prefab else None} for c, a in zip(cards, anims)}
+    index = {c: {"anim": a, "view": view_of(prefab[c], c) if c in prefab else None, "mp": megapixels(os.path.join(src_root, c))}
+             for c, a in zip(cards, anims)}
     json.dump(index, open(os.path.join(args.out, "index.json"), "w"), separators=(",", ":"))
     print(len(index), "cut-ins")
 

@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { SpinePlayer } from "@/lib/spine";
 
-export type CutinInfo = { anim: string; view: [number, number, number] | null };
+export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number };
 
 const BASE = "/media/md_ui/cutin";
 const SCREEN = 16 / 9;   // the game's screen the camera view is made for
 
-/** Phones get the small pictures (a quarter of the pixels): the large ones can run past what a phone's browser keeps. */
-function smallDevice(): boolean {
+const PHONE_MP = 34;   // the most texture (millions of pixels) a phone gets the large pictures for
+
+/** The small pictures (a quarter of the pixels) only for a heavy cut-in on a phone, whose browser could run out of
+ *  memory: the rest look sharp in their large pictures on a phone too (엘리스 10/11). */
+function wantsSmall(info: CutinInfo): boolean {
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  return Math.min(window.screen.width, window.screen.height) < 600 || (memory !== undefined && memory <= 4);
+  if (memory !== undefined && memory >= 6) return false;
+  const phone = Math.min(window.screen.width, window.screen.height) < 600 || (memory !== undefined && memory <= 4);
+  return phone && (info.mp ?? 0) > PHONE_MP;
 }
 
 /** A monster's cut-in played once over the whole screen, as Master Duel plays it when the monster is summoned, with the
@@ -38,7 +43,7 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
     let alive = true, raf = 0, player: SpinePlayer | null = null;
-    SpinePlayer.load(canvas, `${BASE}/${id}${smallDevice() ? "/sd" : ""}`)
+    SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`)
       .then((p) => {
         player = p;
         if (!alive) return p.dispose();
