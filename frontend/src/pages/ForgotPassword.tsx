@@ -22,7 +22,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-10">
+    <div className="min-h-screen flex flex-col items-center px-4 pt-6">
       <h1 className="text-2xl font-bold mb-2">비밀번호 찾기</h1>
       <p className="text-gray-500 dark:text-gray-400 mb-6 text-center">
         가입한 이메일을 입력하면 재설정 링크를 보내드립니다.

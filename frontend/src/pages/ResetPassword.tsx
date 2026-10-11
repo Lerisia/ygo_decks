@@ -53,7 +53,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-10">
+    <div className="min-h-screen flex flex-col items-center px-4 pt-6">
       <h1 className="text-2xl font-bold mb-6">비밀번호 재설정</h1>
 
       <form className="w-80 space-y-4" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>

@@ -219,10 +219,10 @@ function QuestionPage() {
   };
 
   return (
-    <div className="mb-4 p-4 text-left h-auto min-h-screen flex flex-col items-center">
+    <div className="mb-4 px-4 pt-6 pb-4 text-left h-auto min-h-screen flex flex-col items-center">
       {/* Hidden while fading, and while the next step is on its way after an answer (instead of flashing 로딩 중). */}
       <div
-        className={`mt-6 w-full max-w-lg transition-opacity duration-200 motion-reduce:transition-none ${
+        className={`w-full max-w-lg transition-opacity duration-200 motion-reduce:transition-none ${
           fading || (answers.length > 0 && !stepReady && !stepError) ? "opacity-0" : "opacity-100"
         }`}
       >

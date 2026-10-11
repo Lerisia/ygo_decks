@@ -170,8 +170,8 @@ export default function SoloDrawingDetail() {
     // 1.6:1 canvas area, an action row, and the guess box — so the
     // board → detail transition doesn't flash a blank centered screen.
     return (
-      <div className="min-h-svh bg-gray-50 dark:bg-gray-900 pb-20">
-        <div className="max-w-3xl mx-auto px-3 py-3">
+      <div className="min-h-svh bg-gray-50 dark:bg-gray-900 pt-6 pb-20">
+        <div className="max-w-3xl mx-auto px-3 pb-3">
           <button
             onClick={() => navigate(backToBoardPath)}
             className="inline-flex items-center gap-1 px-3 py-2 mb-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-blue-500"
@@ -205,8 +205,8 @@ export default function SoloDrawingDetail() {
   const answerImg = data.card_image_url || lastResult?.card_image_url || null;
 
   return (
-    <div className="min-h-svh bg-gray-50 dark:bg-gray-900 pb-20">
-      <div className="max-w-3xl mx-auto px-3 py-3">
+    <div className="min-h-svh bg-gray-50 dark:bg-gray-900 pt-6 pb-20">
+      <div className="max-w-3xl mx-auto px-3 pb-3">
         <button
           onClick={() => navigate(backToBoardPath)}
           className="inline-flex items-center gap-1 px-3 py-2 mb-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-blue-500"

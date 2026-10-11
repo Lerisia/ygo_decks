@@ -282,7 +282,7 @@ export default function DatabasePage() {
   };
 
   return (
-    <div className="h-auto min-h-screen px-4 py-4 text-center">
+    <div className="h-auto min-h-screen px-4 pt-6 pb-4 text-center">
       <DexTabs />
       <DatabaseTrackerPromo />
 

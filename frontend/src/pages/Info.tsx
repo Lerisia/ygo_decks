@@ -68,7 +68,7 @@ function Info() {
   const decks = popular?.decks ?? [];
 
   return (
-    <div className="min-h-screen px-4 py-5 md:py-8 max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex flex-col gap-4 md:gap-5 text-gray-900 dark:text-white">
+    <div className="min-h-screen px-4 pt-6 pb-5 md:pb-8 max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex flex-col gap-4 md:gap-5 text-gray-900 dark:text-white">
       <h1 className="sr-only">YGO Decks · 유희왕 마스터 듀얼 덱 도감과 전적 기록</h1>
       <DeckPickerModal open={picker === "deck"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/database/${id}`)} />
       <CardPickerModal open={picker === "card"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/cards/${id}`)} />

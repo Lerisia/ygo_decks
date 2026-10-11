@@ -76,7 +76,7 @@ export default function InquiryPostPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen px-4 py-10 w-full lg:w-[88%] mx-auto text-center text-gray-600 dark:text-gray-300">
+      <div className="min-h-screen px-4 pt-6 pb-10 w-full lg:w-[88%] mx-auto text-center text-gray-600 dark:text-gray-300">
         <p>{error}</p>
         <Link to="/inquiry" className="mt-4 inline-block text-blue-600 dark:text-blue-400">← 문의하기</Link>
       </div>

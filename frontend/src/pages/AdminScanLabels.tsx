@@ -216,7 +216,7 @@ export default function AdminScanLabels() {
   const total = list ? list.counts.todo + list.counts.done + list.counts.skip : 0;
 
   return (
-    <div className="min-h-screen px-4 py-4 max-w-7xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-7xl mx-auto">
       <button type="button" onClick={() => navigate("/manage")} className="text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2">
         ← 관리
       </button>

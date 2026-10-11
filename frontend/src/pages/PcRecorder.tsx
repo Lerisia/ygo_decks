@@ -20,7 +20,7 @@ export default function PcRecorder() {
   const updatable = !outdated && !!status?.update_available;
 
   return (
-    <div className="min-h-screen px-4 py-6 md:py-10 max-w-2xl mx-auto flex flex-col gap-6 text-gray-900 dark:text-white">
+    <div className="min-h-screen px-4 py-6 md:pb-10 max-w-2xl mx-auto flex flex-col gap-6 text-gray-900 dark:text-white">
       <header className="flex flex-col gap-2">
         <span className="text-xs font-bold tracking-wide text-amber-700 dark:text-amber-400">Windows PC 프로그램 · 무료</span>
         <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">YGO Decks 레코더</h1>

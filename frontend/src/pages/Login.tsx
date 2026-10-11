@@ -30,8 +30,8 @@ const Login = () => {
     
 
     return (
-        <form className="h-auto min-h-screen flex flex-col items-center" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
-            <div className="mt-6 w-80">
+        <form className="h-auto min-h-screen flex flex-col items-center pt-6" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+            <div className="w-80">
             <input
                 type="email"
                 autoComplete="email"

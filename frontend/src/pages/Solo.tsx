@@ -25,7 +25,7 @@ function Solo() {
   const visibleGames = games.filter((g) => !g.adminOnly || isAdminUser);
 
   return (
-    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg md:max-w-2xl mx-auto">
+    <div className="min-h-screen px-4 py-6 md:pb-10 max-w-lg md:max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/playground")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"

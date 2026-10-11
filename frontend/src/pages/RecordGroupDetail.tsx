@@ -827,7 +827,7 @@ const RecordGroupDetailPage = () => {
   };
 
   return (
-    <div className="px-4 py-4 min-h-screen max-w-screen-sm mx-auto flex flex-col">
+    <div className="px-4 pt-6 pb-4 min-h-screen max-w-screen-sm mx-auto flex flex-col">
       {myRole && myRole !== "public" && (
         <button
           onClick={() => navigate("/records")}

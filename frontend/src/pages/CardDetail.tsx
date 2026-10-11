@@ -82,7 +82,7 @@ const ROW = "border-b last:border-b-0 border-gray-300 dark:border-gray-600";
 function Skeleton() {
   const bar = "rounded bg-gray-200 dark:bg-gray-700 animate-pulse";
   return (
-    <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
+    <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
       <div className={LAYOUT}>
         <div className={`${AREA.names} h-7 w-2/3 ${bar}`} />
         <div className={AREA.card}>
@@ -174,7 +174,7 @@ export default function CardDetail() {
 
   if (error) {
     return (
-      <div className="min-h-screen px-4 py-16 text-center">
+      <div className="min-h-screen px-4 pt-6 pb-16 text-center">
         <p className="mb-4">{error}</p>
         <Link to="/cards" className="text-blue-600 dark:text-blue-400 underline">카드 목록으로</Link>
       </div>
@@ -268,7 +268,7 @@ export default function CardDetail() {
   }
 
   return (
-    <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
+    <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
       <div className={LAYOUT}>
         <div className={AREA.names}>
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>

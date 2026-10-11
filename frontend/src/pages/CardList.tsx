@@ -187,7 +187,7 @@ export default function CardList() {
   );
 
   return (
-    <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 py-4 text-center">
+    <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 pt-6 pb-4 text-center">
       <DexTabs />
       {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
       {/* Enter (the phone keyboard's 검색 key) searches at once and puts the keyboard away. */}

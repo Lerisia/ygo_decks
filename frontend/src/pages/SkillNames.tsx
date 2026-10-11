@@ -236,7 +236,7 @@ function SkillNames() {
   const urgent = left <= 5000;
 
   return (
-    <div className="min-h-screen px-4 py-6 md:py-10 max-w-lg mx-auto">
+    <div className="min-h-screen px-4 py-6 md:pb-10 max-w-lg mx-auto">
       <button
         onClick={() => navigate("/solo")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"

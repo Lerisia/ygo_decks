@@ -105,7 +105,7 @@ export default function AIScanner() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
+    <div className="min-h-screen px-4 pt-6 pb-4 md:px-8 md:pb-8 max-w-4xl mx-auto">
       <div className="flex max-w-md md:max-w-lg mx-auto border-b border-gray-300 dark:border-gray-600 mb-8">
         {tabs.map((tab) => (
           <button

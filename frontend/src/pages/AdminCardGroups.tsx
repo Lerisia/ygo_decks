@@ -106,7 +106,7 @@ export default function AdminCardGroups() {
   const nameChanged = !!g && nameDraft.trim() !== "" && nameDraft.trim() !== g.name_ko;
 
   return (
-    <div className="min-h-screen px-4 py-4 max-w-7xl mx-auto">
+    <div className="min-h-screen px-4 py-6 max-w-7xl mx-auto">
       <button
         onClick={() => navigate("/manage")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"

@@ -4,7 +4,7 @@ export default function EmailVerified() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-10">
+    <div className="min-h-screen flex flex-col items-center px-4 pt-6">
       <h1 className="text-3xl font-bold text-center">인증 성공!</h1>
       <p className="text-gray-500 dark:text-gray-400 mt-2 text-center text-lg">
         YGODecks에 가입하신 것을 환영합니다.
