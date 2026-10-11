@@ -56,6 +56,7 @@ export default function CardList() {
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [items, setItems] = useState<CardListItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [groupCounts, setGroupCounts] = useState<{ member: number; support: number } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -83,6 +84,7 @@ export default function CardList() {
 
   const update = (patch: Partial<CardFilters>) => {
     const next = { ...filters, ...patch };
+    if (next.group !== filters.group) next.role = "";   // another group starts on its members
     setFilters(next);
     navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
   };
@@ -114,6 +116,7 @@ export default function CardList() {
         if (id !== request.current) return;
         setItems(r.results);
         setTotal(r.total);
+        setGroupCounts(r.group_counts ?? null);
         setHasMore(r.has_more);
       })
       .catch((e) => id === request.current && e.name !== "AbortError" && setError(e.message))
@@ -252,7 +255,28 @@ export default function CardList() {
       )}
 
       <div className="mb-3 h-6 flex items-center text-sm text-gray-600 dark:text-gray-300 text-left">
-        {total !== null && <span>{hasFilter(filters) || filters.q ? `조건에 맞는 카드 ${total.toLocaleString()}장` : `카드 ${total.toLocaleString()}장`}</span>}
+        {filters.group && groupCounts ? (
+          // A 카드군's own cards, or the cards supporting it (서포트, 엘리스 2026-10-11)
+          <div role="tablist" aria-label={`${groupName ?? "카드군"} 카드`} className="flex gap-1.5">
+            {([["", "구성원", groupCounts.member], ["support", "서포트", groupCounts.support]] as const).map(([role, label, n]) => (
+              <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={filters.role === role}
+                disabled={!n && filters.role !== role}
+                onClick={() => update({ role })}
+                className={`px-3 h-6 rounded-full font-semibold tabular-nums transition disabled:opacity-40 ${
+                  filters.role === role ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                }`}
+              >
+                {label} {n.toLocaleString()}장
+              </button>
+            ))}
+          </div>
+        ) : (
+          total !== null && <span>{hasFilter(filters) || filters.q ? `조건에 맞는 카드 ${total.toLocaleString()}장` : `카드 ${total.toLocaleString()}장`}</span>
+        )}
       </div>
 
       {error && (

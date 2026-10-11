@@ -195,6 +195,27 @@ export default function CardDetail() {
   ) : (
     <span className="text-gray-400 dark:text-gray-500">없음</span>
   )]);
+  // 서포트: the 카드군 (filled, like the row above) and cards (outlined) its text names without being one of them.
+  if (card.supports.length) {
+    stats.splice(2, 0, ["서포트", (
+      <div className="flex flex-wrap gap-1">
+        {card.supports.map((t) => (
+          <Link
+            key={`${t.kind}${t.id}`}
+            to={t.kind === "group" ? `/cards?group=${t.id}` : `/cards/${t.id}`}
+            title={t.kind === "group" ? "카드군" : "카드"}
+            className={`px-2 py-0.5 rounded-full text-xs md:text-sm font-semibold transition ${
+              t.kind === "group"
+                ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white"
+                : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-blue-600 hover:text-blue-600"
+            }`}
+          >
+            {t.name}
+          </Link>
+        ))}
+      </div>
+    )]);
+  }
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 py-4">
@@ -319,6 +340,7 @@ export default function CardDetail() {
                   className="w-full h-20 md:h-auto md:aspect-[4/3] object-cover rounded-lg"
                 />
                 <p className="mt-1 text-sm">{d.name}</p>
+                {d.via === "support" && <p className="text-xs text-gray-500 dark:text-gray-400">서포트</p>}
               </Link>
             ))}
           </div>

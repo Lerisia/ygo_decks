@@ -986,6 +986,37 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
         self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel
 
+    def test_supports_on_the_card_page_and_in_the_group_list(self):
+        from deck.models import Deck, DeckCardGroup
+        from .models import CardGroup, CardGroupMember, CardSupport
+        g = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")
+        for c in (self.dm, self.girl):
+            CardGroupMember.objects.create(group=g, card=c, how="name")
+        deck = Deck.objects.create(name="블랙 매지션", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCardGroup.objects.create(deck=deck, group=g)
+        # 속공 (4) names the card 블랙 매지션, and so its group; 링크 몬스터 (6) names the group
+        CardSupport.objects.create(card=self.quick, target=self.dm, how="card")
+        CardSupport.objects.create(card=self.quick, group=g, how="card_group")
+        CardSupport.objects.create(card=self.link, group=g, how="group")
+        body = self.client.get("/api/carddb/cards/4/").json()
+        self.assertEqual(body["supports"], [{"kind": "card", "id": 1, "name": "블랙 매지션"}])   # what it names outright
+        self.assertEqual([(d["name"], d["via"]) for d in body["decks"]], [("블랙 매지션", "support")])
+        self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supports"], [{"kind": "group", "id": g.id, "name": "블랙 매지션"}])
+        self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/3/").json()["decks"]], [("블랙 매지션", "member")])
+        # a group's list: its members, or the cards supporting it, with both counts
+        body = self.get(group=g.id)
+        self.assertEqual(([r["id"] for r in body["results"]], body["group_counts"]), ([3, 1], {"member": 2, "support": 2}))
+        self.assertEqual(self.ids(group=g.id, role="support"), [4, 6])
+        self.assertEqual(self.get(group=g.id, role="support", q="링크")["group_counts"], {"member": 0, "support": 1})
+        self.assertNotIn("group_counts", self.get())
+        # supporting a group under another supports part of it: the decks linked to the one above count too
+        top = CardGroup.objects.create(text="マジシャン", reading="マジシャン", name_ko="매지션")
+        CardGroup.objects.filter(id=g.id).update(parent=top)
+        family = Deck.objects.create(name="매지션 일가", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCardGroup.objects.create(deck=family, group=top)
+        self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/6/").json()["decks"]],
+                         [("블랙 매지션", "support"), ("매지션 일가", "support")])
+
 
 class CardFaceTest(TestCase):
     """Korean card faces drawn from Master Duel's pictures (stand-ins here) with free fonts (마루 부리, Noto)."""

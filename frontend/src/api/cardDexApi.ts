@@ -16,11 +16,13 @@ export type CardFilters = {
   level: string;
   st: string;
   group: string;
+  /** With a group: "" its members, "support" the cards supporting it. */
+  role: string;
   sort: string;
 };
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", sort: "new",
+  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", sort: "new",
 };
 
 export type CardListItem = {
@@ -30,7 +32,14 @@ export type CardListItem = {
   thumb_url: string | null;
   image_url: string | null;
 };
-export type CardListResponse = { results: CardListItem[]; total: number; page: number; has_more: boolean };
+export type CardListResponse = {
+  results: CardListItem[];
+  total: number;
+  page: number;
+  has_more: boolean;
+  /** With a group filter: how many of its members and of the cards supporting it match. */
+  group_counts?: { member: number; support: number };
+};
 
 export type Option = { value: string; label: string };
 export type CardOptions = {
@@ -72,7 +81,10 @@ export type CardDoc = {
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];
-  decks: { id: number; name: string; cover: string | null }[];
+  /** 서포트: the 카드군 and cards its text names outright without being one of them. */
+  supports: { kind: "group" | "card"; id: number; name: string }[];
+  /** Decks of its own groups ("member") first, then of the groups it supports. */
+  decks: { id: number; name: string; cover: string | null; via: "member" | "support" }[];
 };
 
 export function filtersToSearch(f: CardFilters): string {

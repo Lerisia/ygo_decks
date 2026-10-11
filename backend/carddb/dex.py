@@ -13,7 +13,7 @@ from rest_framework.response import Response
 
 from .display import THUMB_DIR as CARD_THUMB_DIR, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url
-from .models import Card, CardGroupMember, MdPrint, has_art
+from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
 PAGE_SIZE = 60
 
@@ -50,7 +50,7 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups")
+                 "groups", "supports")
 
 
 _index = {"key": None, "at": 0.0, "new": [], "name": [], "face_thumbs": set(), "thumbs": set()}
@@ -74,6 +74,7 @@ def _fingerprint():
             dirs.append(0)
     return (tuple(Card.objects.aggregate(n=Count("id"), t=Max("updated_at")).values()),
             tuple(CardGroupMember.objects.aggregate(n=Count("id"), m=Max("id")).values()),
+            tuple(CardSupport.objects.aggregate(n=Count("id"), m=Max("id")).values()),
             tuple(MdArt.objects.aggregate(n=Count("id"), m=Max("id")).values()),
             tuple(MdPrint.objects.aggregate(n=Count("md_id"), d=Max("first_seen"), u=Count("first_seen")).values()),
             tuple(dirs), settings.MEDIA_ROOT)
@@ -85,6 +86,9 @@ def _card_index():
     key = _fingerprint()
     if _index["key"] == key and time.monotonic() - _index["at"] < INDEX_MAX_AGE:
         return _index
+    supports = defaultdict(set)
+    for cid, gid in CardSupport.objects.exclude(group=None).values_list("card_id", "group_id"):
+        supports[cid].add(gid)
     groups = defaultdict(set)
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
         groups[cid].add(gid)
@@ -103,6 +107,7 @@ def _card_index():
         r.category, r.frame, r.attribute, r.race, r.st = category, frame, attribute, race, st
         r.numbers = {n for n in (level, rank, link) if n is not None}
         r.groups = groups.get(cid, set())
+        r.supports = supports.get(cid, set())
         rows.append(r)
     _index.update(
         key=key, at=time.monotonic(),
@@ -133,7 +138,11 @@ def _keep(p):
     if category in ("spell", "trap") and kind:
         tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
     if str(p.get("group", "")).isdigit():
-        tests.append(lambda r, v=int(p["group"]): v in r.groups)
+        # a group's members, or with role=support the cards supporting it (서포트, 엘리스 2026-10-11)
+        if p.get("role") == "support":
+            tests.append(lambda r, v=int(p["group"]): v in r.supports)
+        else:
+            tests.append(lambda r, v=int(p["group"]): v in r.groups)
     return lambda r: all(t(r) for t in tests)
 
 
@@ -166,17 +175,24 @@ def cards(request):
     name)."""
     p = request.query_params
     index = _card_index()
-    keep = _keep(p)
-    rows = [r for r in index["name" if p.get("sort") == "name" else "new"] if keep(r)]
-    if _norm(p.get("q")):
-        rows = _rank(rows, p.get("q"))
+
+    def found(params):
+        keep = _keep(params)
+        rows = [r for r in index["name" if params.get("sort") == "name" else "new"] if keep(r)]
+        return _rank(rows, params.get("q")) if _norm(params.get("q")) else rows
+
+    rows = found(p)
     try:
         page = max(1, int(p.get("page") or 1))
     except ValueError:
         page = 1
     chunk = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
     media = settings.MEDIA_URL
-    return Response({
+    extra = {}
+    if str(p.get("group", "")).isdigit():   # a group's list tells how many members and supporters it has
+        base = {k: p.get(k) for k in p.keys()}
+        extra["group_counts"] = {role: len(found({**base, "role": role})) for role in ("member", "support")}
+    return Response({**extra,
         "results": [{"id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
@@ -258,12 +274,37 @@ def card(request, card_id):
     groups = sorted((m.group for m in c.group_memberships.select_related("group")
                      if m.how != CardGroupMember.How.REMOVED and not m.group.needs_review),
                     key=lambda g: (g.name_ko or g.text))
+    # 서포트: what the card names outright (a 카드군 or a card); the decks of every group it supports follow its own
+    supports = list(CardSupport.objects.filter(card=c).select_related("group", "target"))
+    shown_cards = set(Card.objects.filter(has_art(), id__in=[s.target_id for s in supports if s.target_id])
+                      .values_list("id", flat=True))
+    named = sorted(
+        [{"kind": "group", "id": s.group_id, "name": s.group.name_ko or s.group.text} for s in supports
+         if s.how == CardSupport.How.GROUP and not s.group.needs_review]
+        + [{"kind": "card", "id": s.target_id, "name": display_name(s.target)} for s in supports
+           if s.how == CardSupport.How.CARD and s.target_id in shown_cards],
+        key=lambda x: (x["kind"] != "group", x["name"]))
+    # A group under another is part of it, so the decks linked to the groups above come next (HERO's deck for a card
+    # supporting E・HERO).
+    parent = dict(CardGroup.objects.values_list("id", "parent_id"))
+
+    def above(gids):
+        out = []
+        for gid in gids:
+            gid = parent.get(gid)
+            while gid and gid not in out:
+                out.append(gid)
+                gid = parent.get(gid)
+        return out
+
+    mine, backed = [g.id for g in groups], [s.group_id for s in supports if s.group_id]
     decks, seen = [], set()
-    for link in (DeckCardGroup.objects.filter(group__in=groups).select_related("deck")
-                 .order_by("-weight", "deck__name")):
-        if link.deck_id not in seen:
-            seen.add(link.deck_id)
-            decks.append({"id": link.deck_id, "name": link.deck.name, "cover": _phone_cover_url(link.deck)})
+    for via, gids in (("member", mine), ("member", above(mine)), ("support", backed), ("support", above(backed))):
+        for link in (DeckCardGroup.objects.filter(group_id__in=gids).select_related("deck")
+                     .order_by("-weight", "deck__name")):
+            if link.deck_id not in seen:
+                seen.add(link.deck_id)
+                decks.append({"id": link.deck_id, "name": link.deck.name, "cover": _phone_cover_url(link.deck), "via": via})
     base = MdPrint.objects.filter(md_id=c.id).first()
     return Response({
         "id": c.id, "name": display_name(c), "name_ko": c.name_ko, "name_ja": c.name_ja, "name_ja_ruby": c.name_ja_ruby,
@@ -279,5 +320,6 @@ def card(request, card_id):
         "rarity": base.rarity if base else "",
         "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
+        "supports": named,
         "decks": decks,
     })
