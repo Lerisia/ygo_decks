@@ -6,9 +6,9 @@
 export type FinishStyle = "shine" | "royal";
 /** The frame whose lines and relief the finish lights: a print in 오버프레임 has none. */
 export type FinishFrame = "normal" | "link" | "pendulum" | "overframe";
-/** Per card: the attribute icon's tile in the shader's atlas, the level stars (a rank as a negative count) and the
- *  frame. */
-export type FinishParams = { attribute: number; level: number; frame: FinishFrame };
+/** Per card: the attribute icon's tile in the shader's atlas, the level stars (a rank as a negative count), the frame
+ *  and the picture of its name alone, which the finishes paint (Royal in gold, Shine in white). */
+export type FinishParams = { attribute: number; level: number; frame: FinishFrame; name?: string | null };
 
 const BASE = "/media/md_ui/finish";
 // Toward the light: straight from the viewer, the brightest (엘리스 10/11; a low light from the upper left matched a
@@ -84,6 +84,7 @@ const SOLID: Record<string, [number, number, number, number]> = {
   "@gray": [128, 128, 128, 255],
   "@bump": [128, 128, 255, 255],
   "@overframe": [0, 62, 0, 255],   // a frame mask with no lines, all art
+  "@name": [0, 0, 0, 255],         // no name to paint
 };
 
 export class CardFinish {
@@ -115,14 +116,15 @@ export class CardFinish {
     return f;
   }
 
-  /** Put a face, and its frame, on the card; false when a later call has taken its place meanwhile. */
-  async setFace(faceUrl: string, frame: FinishFrame): Promise<boolean> {
+  /** Put a face, its frame and its name on the card; false when a later call has taken its place meanwhile. */
+  async setFace(faceUrl: string, frame: FinishFrame, nameUrl?: string | null): Promise<boolean> {
     const call = ++this.faceCalls;
     const gl = this.gl;
     const files = new Set(STYLES.flatMap((s) => Object.keys(this.cfg[s].textures).map((i) => this.fileAt(s, i, frame))));
-    const [face] = await Promise.all([
+    const [face, name] = await Promise.all([
       loadImage(faceUrl),
-      ...[...files].filter((file) => file !== "@card" && !this.textures[file]).map(async (file) => {
+      nameUrl ? loadImage(nameUrl) : Promise.resolve(null),
+      ...[...files].filter((file) => file !== "@card" && file !== "@name" && !this.textures[file]).map(async (file) => {
         if (SOLID[file]) this.uploadSolid(file, SOLID[file]);
         else {
           const im = await loadImage(`${BASE}/${file}.png`);
@@ -133,6 +135,9 @@ export class CardFinish {
     if (call !== this.faceCalls || this.disposed) return false;
     if (this.textures["@card"]) gl.deleteTexture(this.textures["@card"]);
     this.upload("@card", face, gl.CLAMP_TO_EDGE);
+    if (this.textures["@name"]) gl.deleteTexture(this.textures["@name"]);
+    if (name) this.upload("@name", name, gl.CLAMP_TO_EDGE);
+    else this.uploadSolid("@name", SOLID["@name"]);
     this.frame = frame;
     return true;
   }

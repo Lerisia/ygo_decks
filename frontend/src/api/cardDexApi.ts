@@ -83,7 +83,15 @@ export type CardDoc = {
   /** The whole card in Korean, drawn from Master Duel's frame (null until drawn). */
   face_url: string | null;
   /** The card's faces: its own print first, then Master Duel's alternate arts. */
-  faces: { id: number; face: string; thumb: string | null; overframe: boolean; rarity: string }[];
+  faces: {
+    id: number; face: string; thumb: string | null; overframe: boolean; rarity: string;
+    /** The card name alone (white on black over the card's top sixth), for the finishes to paint. */
+    name_mask: string | null;
+    /** Master Duel's monster cut-in for this print: the animation and the game's camera view. */
+    cutin: { anim: string; view: [number, number, number] | null } | null;
+  }[];
+  /** The attribute whose sound goes with a cut-in. */
+  cutin_sound: string;
   rarity: string;
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };

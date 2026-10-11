@@ -37,7 +37,14 @@ INPUTS = {   # read off each vertex program: which output varying carries what
 # carddb/face.py draws the icon (the atlas glyphs match ours as a 64 px tile at 597, 48 on the 704×1024 face).
 ICON_X, ICON_Y, ICON_SIZE = 597, 48, 64
 SX, SY = 704 / ICON_SIZE, 1024 / ICON_SIZE
-OVERRIDES = {"_AttributeSize_Pos": [SX, SY, SX / 2 - 0.5 - ICON_X / ICON_SIZE, (ICON_Y + ICON_SIZE) / ICON_SIZE - SY / 2 - 0.5]}
+# The name is painted from a texture of it alone over the card's top sixth (Royal in gold, Shine in white): each card's
+# own (carddb/face.py draw_name_mask, 1056 × 256), "@name" here
+NAME_MASK = (1056, 256)
+OVERRIDES = {
+    "_AttributeSize_Pos": [SX, SY, SX / 2 - 0.5 - ICON_X / ICON_SIZE, (ICON_Y + ICON_SIZE) / ICON_SIZE - SY / 2 - 0.5],
+    "_CardExtensionNormal_TexelSize": [1 / NAME_MASK[0], 1 / NAME_MASK[1], NAME_MASK[0], NAME_MASK[1]],
+}
+TEXTURE_OVERRIDES = {"_CardExtensionNormal": "@name"}
 PARAMS = {"attribute": "_AttributeTile", "level": "_LevelRankValue"}
 FRAMES = {
     "link": {"_CardMask": "CardMask_L", "_MainNormal": "CardNormal_Link"},
@@ -113,7 +120,9 @@ def main():
             material = [0.0] * (cb["m_Size"] // 4)
             for v in cb["m_VectorParams"]:
                 nm, base = names[v["m_NameIndex"]], v["m_Index"] // 4
-                if nm.endswith("_TexelSize"):
+                if nm in OVERRIDES:
+                    vals = OVERRIDES[nm]
+                elif nm.endswith("_TexelSize"):
                     vals = [1 / 16, 1 / 16, 16, 16]
                 elif nm in OVERRIDES:
                     vals = OVERRIDES[nm]
@@ -132,6 +141,8 @@ def main():
             nm = names[tp["m_NameIndex"]]
             if nm == "_MainTex":
                 file = "@card"
+            elif nm in TEXTURE_OVERRIDES:
+                file = TEXTURE_OVERRIDES[nm]
             elif textures3d.get(nm):
                 file = textures3d[nm]
                 wanted[file] = next(o for n, o in textures.values() if n == file)

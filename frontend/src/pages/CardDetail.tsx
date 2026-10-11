@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
+import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
 // Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
@@ -94,6 +95,30 @@ function Skeleton() {
   );
 }
 
+function PlayGlyph() {
+  return (
+    <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden="true" fill="currentColor">
+      <path d="M3 1.5v9l7.5-4.5z" />
+    </svg>
+  );
+}
+
+/** The attribute's cut-in sound, started muted within the tap so that browsers allow it to play once the cut-in has
+ *  loaded. */
+function cutinSound(attribute: string): HTMLAudioElement | null {
+  if (!attribute) return null;
+  const a = new Audio(`/media/md_ui/cutin/sound/${attribute}.wav`);
+  a.muted = true;
+  a.play()
+    .then(() => {
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
+    })
+    .catch(() => {});
+  return a;
+}
+
 function ZoomGlyph() {
   return (
     <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -137,6 +162,8 @@ export default function CardDetail() {
   const [picked, setPicked] = useState<string | null>(null);
   const [ja, setJa] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [cutin, setCutin] = useState<{ id: number; info: CutinInfo; sound: HTMLAudioElement | null } | null>(null);
+  const closeCutin = useCallback(() => setCutin(null), []);
   const [finish, setFinish] = useState<"normal" | FinishStyle>("normal");
   const [canFinish] = useState(finishSupported);
   const preloaded = useRef<{ card: number; images: HTMLImageElement[] }>({ card: 0, images: [] });
@@ -175,7 +202,9 @@ export default function CardDetail() {
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
   const pickedFace = card.faces.find((f) => f.face === picked);
-  const finishParams: FinishParams = { ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame };
+  const finishParams: FinishParams = {
+    ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame, name: pickedFace?.name_mask ?? null,
+  };
   // the print picked decides: an N / R card's UR 오버프레임 comes in 로얄, the card itself does not
   const finishes = FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
   const shown = finishes.some((f) => f.key === finish) ? finish : "normal";
@@ -260,7 +289,7 @@ export default function CardDetail() {
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
         </div>
 
-        <div className={AREA.card}>
+        <div className={`${AREA.card} relative`}>
           {picked ? (
             <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
               {shown === "normal" ? (
@@ -272,7 +301,19 @@ export default function CardDetail() {
                 <ZoomGlyph />
               </span>
             </button>
-          ) : (
+          ) : null}
+          {picked && pickedFace?.cutin ? (
+            <button
+              type="button"
+              onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: cutinSound(card.cutin_sound) })}
+              className="absolute left-1 top-1 h-7 px-2.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1"
+              aria-label="컷인 재생"
+            >
+              <PlayGlyph />
+              컷인
+            </button>
+          ) : null}
+          {picked ? null : (
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {picked && canFinish && (
@@ -383,6 +424,9 @@ export default function CardDetail() {
         )}
       </div>
 
+      {cutin && (
+        <CutinOverlay id={cutin.id} info={cutin.info} sound={cutin.sound} alt={`${card.name} 컷인`} onClose={closeCutin} />
+      )}
       {zoomed && picked && (
         <CardZoom src={picked} alt={`${card.name} 카드`} finish={shown} params={finishParams} onClose={() => setZoomed(false)} />
       )}

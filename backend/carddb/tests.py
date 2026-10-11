@@ -1132,7 +1132,7 @@ class CardFaceTest(TestCase):
         from . import display
         display.forget_art()
         call_command("draw_card_faces", "--workers", "1", stdout=io.StringIO())
-        for rel in ("cards/face/7.webp", "cards/face_thumb/7.webp", "cards/face/3907.webp"):
+        for rel in ("cards/face/7.webp", "cards/face_thumb/7.webp", "cards/face/3907.webp", "cards/face_name/7.png"):
             self.assertTrue(os.path.exists(os.path.join(self.media, rel)), rel)
         # Browsers keep /media for years, so each address carries the file's version: a redrawn face gets a new one.
         first = face_url(7)
@@ -1141,7 +1141,21 @@ class CardFaceTest(TestCase):
         self.assertEqual(body["face_url"], first)
         # an R card's 오버프레임 print is UR: each face carries its own rarity (로얄 comes in SR and UR only)
         self.assertEqual([(f["id"], f["overframe"], f["rarity"]) for f in body["faces"]], [(7, False, "R"), (3907, True, "UR")])
+        # Master Duel's monster cut-ins (index on media) go with the print they belong to; the sound is the attribute's
+        import json
+        os.makedirs(os.path.join(self.media, "md_ui/cutin"))
+        with open(os.path.join(self.media, "md_ui/cutin/index.json"), "w") as f:
+            json.dump({"3907": {"anim": "animation", "view": [0, 0, 500]}}, f)
+        body = self.client.get("/api/carddb/cards/7/").json()
+        self.assertEqual([f["cutin"] for f in body["faces"]], [None, {"anim": "animation", "view": [0, 0, 500]}])
+        self.assertEqual(body["cutin_sound"], "wind")
         self.assertEqual(body["faces"][0]["face"], first)
+        # the name alone, for the Shine / Royal shaders to paint (the card's top sixth at 1.5×)
+        self.assertRegex(body["faces"][0]["name_mask"], r"^/media/cards/face_name/7\.png\?v=\w+$")
+        from PIL import Image
+        with Image.open(os.path.join(self.media, "cards/face_name/7.png")) as mask:
+            self.assertEqual((mask.size, mask.mode), ((1056, 256), "L"))
+            self.assertGreater(mask.getextrema()[1], 200)
         first_thumb = self.client.get("/api/carddb/cards/").json()["results"][0]["face_thumb_url"]
         self.assertRegex(first_thumb, r"^/media/cards/face_thumb/7\.webp\?v=\w+$")
         os.remove(os.path.join(self.media, "cards/face_thumb/7.webp"))

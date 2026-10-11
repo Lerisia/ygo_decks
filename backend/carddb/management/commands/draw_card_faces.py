@@ -6,7 +6,8 @@ from django.core.management.base import BaseCommand
 from django.db import connections
 
 from carddb.display import art_names
-from carddb.face import face_rel, load_signatures, save_face, save_thumb, signature, thumb_rel, write_signatures
+from carddb.face import (face_rel, load_signatures, name_rel, save_face, save_name_mask, save_thumb, signature, thumb_rel,
+                         write_signatures)
 from carddb.models import Card, MdPrint
 
 
@@ -16,10 +17,12 @@ def _exists(rel):
 
 def _job(job):
     card, md_id, draw = job
-    if draw:
+    if draw == "face":
         save_face(card, md_id)
-    else:
+    elif draw == "thumb":
         save_thumb(md_id)
+    else:
+        save_name_mask(card, md_id)
     return md_id
 
 
@@ -52,9 +55,11 @@ class Command(BaseCommand):
         jobs = []
         for card_id, md_id in sorted(prints, key=lambda p: p[1]):
             if opts["all"] or opts["ids"] or not _exists(face_rel(md_id)) or sigs.get(str(md_id)) != now[str(md_id)]:
-                jobs.append((cards[card_id], md_id, True))
+                jobs.append((cards[card_id], md_id, "face"))
             elif not _exists(thumb_rel(md_id)):
-                jobs.append((cards[card_id], md_id, False))
+                jobs.append((cards[card_id], md_id, "thumb"))
+            elif not _exists(name_rel(md_id)):
+                jobs.append((cards[card_id], md_id, "name"))
         done = []
         if opts["workers"] <= 1:
             done = list(map(_job, jobs))
@@ -65,8 +70,9 @@ class Command(BaseCommand):
                     done.append(md_id)
                     if len(done) % 1000 == 0:
                         self.stdout.write(f"{len(done)}/{len(jobs)}")
-        drawn = [j[1] for j in jobs if j[2]]
+        drawn = [j[1] for j in jobs if j[2] == "face"]
         if drawn:
             sigs.update({str(m): now[str(m)] for m in drawn})
             write_signatures(sigs)
-        self.stdout.write(f"{len(drawn)} faces drawn, {len(jobs) - len(drawn)} thumbnails made")
+        thumbs = sum(1 for j in jobs if j[2] == "thumb")
+        self.stdout.write(f"{len(drawn)} faces drawn, {thumbs} thumbnails made, {len(jobs) - len(drawn) - thumbs} name masks made")

@@ -13,7 +13,7 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
   const [finish, setFinish] = useState<CardFinish | null>(null);
   const [onCard, setOnCard] = useState<string | null>(null);   // the face (and frame) the renderer has
   const [failed, setFailed] = useState(false);
-  const want = `${faceUrl} ${params.frame}`;
+  const want = `${faceUrl} ${params.frame} ${params.name ?? ""}`;
   const ready = finish !== null && onCard === want;
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
     let alive = true;
     finish.clear();   // not the last card's frame over the new plain face while it loads
     finish
-      .setFace(faceUrl, params.frame)
+      .setFace(faceUrl, params.frame, params.name)
       .then((put) => alive && put && setOnCard(want))
       .catch(() => alive && setFailed(true));
     return () => {

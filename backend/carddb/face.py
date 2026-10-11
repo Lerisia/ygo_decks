@@ -22,6 +22,8 @@ FACE_VERSION = 5          # raise after any change to how faces are drawn: every
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
+NAME_DIR = "cards/face_name"
+NAME_MASK_SIZE = (1056, 256)   # the card's top sixth at 1.5×, as the Shine / Royal shaders read the name
 THUMB_W = 300
 
 FRAMES = {
@@ -342,6 +344,30 @@ def write_signatures(sigs):
     os.replace(path + ".tmp", path)
 
 
+def draw_name_mask(card):
+    """The card name alone, white on black over the card's top sixth: Master Duel's Shine and Royal shaders paint the
+    name from it (Royal in gold, Shine in white) instead of taking it from the face (엘리스 10/11)."""
+    x0, y0, x1, y1 = NAME_BOX
+    layer = _squeezed_text(card.name_ko or card.name_ja, title(48), (255, 255, 255, 255), x1 - x0, y1 - y0)
+    mask = Image.new("L", (W, H), 0)
+    mask.paste(255, (x0, y0), layer.getchannel("A"))
+    return mask.resize(NAME_MASK_SIZE, Image.LANCZOS, box=(0, 0, W, H / 6))
+
+
+def save_name_mask(card, md_id=None):
+    out = os.path.join(settings.MEDIA_ROOT, name_rel(md_id or card.id))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    draw_name_mask(card).save(out, optimize=True)
+
+
+def name_rel(md_id):
+    return f"{NAME_DIR}/{md_id}.png"
+
+
+def name_mask_url(md_id):
+    return _url(name_rel(md_id))
+
+
 def face_rel(md_id):
     return f"{FACE_DIR}/{md_id}.webp"
 
@@ -384,4 +410,5 @@ def save_face(card, md_id=None, quality=86):
     img = draw_face(card, art_id=md_id)
     img.save(out, "WEBP", quality=quality, method=5)
     save_thumb(md_id, img)
+    save_name_mask(card, md_id)
     return out

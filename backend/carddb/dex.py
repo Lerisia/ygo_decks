@@ -1,4 +1,5 @@
 """카드 도감: the public card list (search, filters, sort, 60 a page) and card documents — Master Duel cards with art."""
+import json
 import os
 import time
 import unicodedata
@@ -14,7 +15,7 @@ from rest_framework.response import Response
 from PIL import Image
 
 from .display import THUMB_DIR as CARD_THUMB_DIR, art_path, art_url, display_name, thumb_url
-from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe
+from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
 from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
 PAGE_SIZE = 60
@@ -273,6 +274,24 @@ def _finish(c):
     return {"attribute": tile, "level": stars, "frame": frame}
 
 
+_cutin_index = {"key": None, "index": {}}
+
+
+def _cutins():
+    """Master Duel's monster cut-ins on media (md_ui/cutin/index.json: print id → animation and the game's camera
+    view), read again when the file changes."""
+    path = os.path.join(settings.MEDIA_ROOT, "md_ui", "cutin", "index.json")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return {}
+    if (path, mtime) != _cutin_index["key"]:
+        with open(path) as f:
+            _cutin_index["index"] = {int(k): v for k, v in json.load(f).items()}
+        _cutin_index["key"] = (path, mtime)
+    return _cutin_index["index"]
+
+
 def _overframe(md_id):
     path = art_path(md_id)
     if not path or not os.path.exists(path):
@@ -353,6 +372,7 @@ def card(request, card_id):
     # each print has its own rarity: an alternate art or 오버프레임 of an N / R card can be UR (and then comes in 로얄)
     alts = list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id").values_list("md_id", "rarity"))
     rarity = {c.id: base.rarity if base else ""} | {m: r or (base.rarity if base else "") for m, r in alts}
+    cutins = _cutins()
     return Response({
         "id": c.id, "name": display_name(c), "name_ko": c.name_ko, "name_ja": c.name_ja, "name_ja_ruby": c.name_ja_ruby,
         "name_en": c.name_en, "category": c.category, "frame": c.frame, "type_line": type_line,
@@ -361,8 +381,11 @@ def card(request, card_id):
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale, "finish": _finish(c),
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
         "image_url": art_url(c.id), "thumb_url": thumb_url(c.id), "face_url": face_url(c.id),
-        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m), "rarity": r}
+        "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m), "rarity": r,
+                   "name_mask": name_mask_url(m), "cutin": cutins.get(m)}
                   for m, r in rarity.items() if face_url(m)],
+        # the cut-in's sound is the attribute's
+        "cutin_sound": c.attribute if c.category == "monster" and c.attribute in ATTRIBUTES else "",
         "rarity": base.rarity if base else "",
         "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
