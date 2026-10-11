@@ -25,7 +25,7 @@ const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute 
 // cards with another art or a monster cut-in (엘리스 2026-10-11)
 const HAS = [
   { value: "alt", label: "다른 일러스트 있음" },
-  { value: "cutin", label: "컷인 있음" },
+  { value: "cutin", label: "소환 연출 있음" },
 ];
 
 function TileSkeleton() {
@@ -228,7 +228,7 @@ export default function CardList() {
             {select("마법·함정 종류", "st", options?.spell_trap_kinds ?? [], filters.category === "monster")}
           </div>
           <div className="text-left">
-            <span className="block text-sm font-semibold mb-1">일러스트·컷인</span>
+            <span className="block text-sm font-semibold mb-1">일러스트·소환 연출</span>
             <div className="flex flex-wrap items-center gap-2">
               {HAS.map((h) => (
                 <button

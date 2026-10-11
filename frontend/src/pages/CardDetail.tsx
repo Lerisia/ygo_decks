@@ -291,11 +291,11 @@ export default function CardDetail() {
                 <button
                   type="button"
                   onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: primeCutinSound(card.cutin_sound) })}
-                  className="absolute left-1 bottom-1 h-7 px-2.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1"
-                  aria-label="컷인 재생"
+                  className="absolute left-1 bottom-1 h-7 px-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold whitespace-nowrap shadow-md ring-1 ring-white/70 flex items-center gap-1"
+                  aria-label="소환 연출 재생"
                 >
                   <PlayGlyph />
-                  컷인
+                  소환 연출
                 </button>
               ) : null}
             </div>
@@ -411,7 +411,7 @@ export default function CardDetail() {
       </div>
 
       {cutin && (
-        <CutinOverlay id={cutin.id} info={cutin.info} sound={cutin.sound} alt={`${card.name} 컷인`} onClose={closeCutin} />
+        <CutinOverlay id={cutin.id} info={cutin.info} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />
       )}
       {zoomed && picked && (
         <CardZoom src={picked} alt={`${card.name} 카드`} finish={shown} params={finishParams} onClose={() => setZoomed(false)} />

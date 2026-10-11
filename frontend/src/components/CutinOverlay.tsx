@@ -97,7 +97,7 @@ export default function CutinOverlay({ id, info, sound, alt, onClose }: {
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       {state !== "playing" && (
         <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-white/80" aria-live="polite">
-          {state === "loading" ? "컷인을 불러오는 중…" : "컷인을 재생하지 못했습니다."}
+          {state === "loading" ? "소환 연출을 불러오는 중…" : "소환 연출을 재생하지 못했습니다."}
         </p>
       )}
     </div>
