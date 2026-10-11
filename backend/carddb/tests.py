@@ -1091,7 +1091,7 @@ class CardFaceTest(TestCase):
         from PIL import Image
         from . import display, face
         fonts = getattr(settings, "CARD_FACE_ASSETS", "")
-        font_files = ("NotoSansKR.ttf", "NotoSerifKR.ttf", "MaruBuri-Bold.otf")
+        font_files = ("NotoSansKR.ttf", "NotoSerifKR.ttf", "MaruBuri-Bold.otf", "NotoSerifJP.ttf", "DejaVuSerif-Bold.ttf")
         if not all(os.path.exists(os.path.join(fonts, f)) for f in font_files):
             self.skipTest("free fonts not installed")
         self.assets, self.media = tempfile.mkdtemp(), tempfile.mkdtemp()
@@ -1123,6 +1123,24 @@ class CardFaceTest(TestCase):
                                         race="dragon", level=8, atk=2500, def_value=2000)
         MdPrint.objects.create(md_id=7, card=self.card)
         MdArt.objects.create(md_print_id=7, version="common", image="cards/art/common/7.webp")
+
+    def test_letters_the_name_font_lacks(self):
+        """마루 부리 has no Greek, Cyrillic or Japanese-only kanji: those letters come from the next free font that has
+        them (엘리스 10/11: PSY프레임로드 Ω showed a box), and only the faces with such names are drawn again."""
+        from .face import draw_face, needs_fallback, signature, text_runs, title
+        runs = text_runs("PSY프레임로드 Ω", title(48))
+        self.assertEqual([t for t, _ in runs], ["PSY프레임로드 ", "Ω"])
+        self.assertTrue(runs[1][1].path.endswith("NotoSerifKR.ttf"))
+        self.assertTrue(text_runs("黙", title(48))[0][1].path.endswith("NotoSerifJP.ttf"))
+        self.assertTrue(text_runs("에니아크래프트ϝ", title(48))[-1][1].path.endswith("DejaVuSerif-Bold.ttf"))
+        self.assertEqual(len(text_runs("스타더스트 드래곤", title(48))), 1)
+        self.assertFalse(needs_fallback("스타더스트 드래곤"))
+        self.assertTrue(needs_fallback("데모닉 모터 Ω"))
+        plain = signature(self.card, 7)
+        self.card.name_ko = "PSY프레임로드 Ω"
+        self.assertEqual(draw_face(self.card).size, (704, 1024))
+        self.card.name_ko = "스타더스트 드래곤"
+        self.assertEqual(signature(self.card, 7), plain)
 
     def test_type_line(self):
         from .face import type_line

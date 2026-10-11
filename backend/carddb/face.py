@@ -1,7 +1,8 @@
 """Korean card faces: a Master Duel card drawn whole — frame, art, name, attribute, stars, Korean text, ATK/DEF —
 from the client's own pictures (frames, icons, link markers). Every letter is set in free (OFL) Noto fonts: no
 commercial font, the game's own included, is ever used: 마루 부리 (Naver's open-licence serif, 엘리스 10/11) for the
-name, the type lines, ATK/DEF and the scales; Noto for card text when it is drawn.
+name, the type lines, ATK/DEF and the scales, with Noto Serif KR / JP and DejaVu Serif for the letters it lacks; Noto
+for card text when it is drawn.
 
 The pieces live outside the repo in settings.CARD_FACE_ASSETS; the faces are saved as media/cards/face/<id>.webp.
 Coordinates are on Master Duel's 704×1024 frame.
@@ -94,6 +95,35 @@ def title(size, weight="Bold"):
     return _font(f"MaruBuri-{weight}.otf", size)
 
 
+# what 마루 부리 lacks (Greek and Cyrillic letters, the kanji of Japanese-only names) comes from the first of these free
+# fonts that has it (엘리스 2026-10-11: "PSY프레임로드 Ω" showed a box)
+FALLBACKS = (("NotoSerifKR.ttf", "Bold"), ("NotoSerifJP.ttf", "Bold"), ("DejaVuSerif-Bold.ttf", None))
+
+
+@lru_cache(maxsize=16)
+def _letters(path):
+    from fontTools.ttLib import TTFont
+    return frozenset(TTFont(path).getBestCmap())
+
+
+def text_runs(text, font):
+    """The text cut where its letters change font: [(text, font)], the given font wherever it has the letter."""
+    fonts = [font] + [_font(n, font.size, w) for n, w in FALLBACKS if os.path.exists(_asset(n))]
+    runs = []
+    for ch in text:
+        f = next((f for f in fonts if ord(ch) in _letters(f.path)), font)
+        if runs and runs[-1][1] is f:
+            runs[-1][0] += ch
+        else:
+            runs.append([ch, f])
+    return [(t, f) for t, f in runs]
+
+
+def needs_fallback(name):
+    """Whether a card name has letters the name font lacks."""
+    return any(ord(ch) not in _letters(title(48).path) for ch in name)
+
+
 def sans(size, weight="Medium"):
     return _font("NotoSansKR.ttf", size, weight)
 
@@ -126,10 +156,20 @@ def is_overframe(art):
 
 
 def _squeezed_text(text, font, fill, max_w, height):
-    """One line of text, squeezed sideways when it is wider than max_w (long card names)."""
-    w = max(1, round(font.getlength(text)))
+    """One line of text, squeezed sideways when it is wider than max_w (long card names); letters the font lacks in
+    the fallback fonts, on the same baseline."""
+    runs = text_runs(text, font)
+    w = max(1, round(sum(f.getlength(t) for t, f in runs)))
     layer = Image.new("RGBA", (w + 4, height), (0, 0, 0, 0))
-    ImageDraw.Draw(layer).text((2, height / 2), text, font=font, fill=fill, anchor="lm")
+    draw = ImageDraw.Draw(layer)
+    if len(runs) == 1 and runs[0][1] is font:
+        draw.text((2, height / 2), text, font=font, fill=fill, anchor="lm")
+    else:
+        ascent, descent = font.getmetrics()
+        x, baseline = 2, height / 2 + (ascent - descent) / 2   # where "lm" puts the name font's baseline
+        for t, f in runs:
+            draw.text((x, baseline), t, font=f, fill=fill, anchor="ls")
+            x += f.getlength(t)
     if layer.width > max_w:
         layer = layer.resize((max_w, height), Image.LANCZOS)
     return layer
@@ -325,6 +365,8 @@ def signature(card, md_id):
     parts = [FACE_VERSION, card.name_ko or card.name_ja, card.category, card.frame, card.attribute, card.race,
              card.types, card.level, card.rank, card.link_rating, card.link_markers, card.atk, card.def_value,
              card.pendulum_scale, card.spell_trap_subtype, art_name(md_id)]
+    if needs_fallback(card.name_ko or card.name_ja or ""):
+        parts.append("fallback letters 1")   # only the faces with such names were drawn again
     return hashlib.sha1(json.dumps(parts, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
 
 
