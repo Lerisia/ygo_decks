@@ -595,3 +595,111 @@ class MakeScanTestsetTest(TestCase):
             self.assertFalse(ScanSample.objects.filter(source="upload:5").exists())
             call_command("make_scan_testset", per_kind='{"wide": 5}', stdout=StringIO())   # nothing picked twice
             self.assertEqual(ScanSample.objects.count(), 3)
+
+
+class ScanLayoutTest(TestCase):
+    """Deck picture layout from card boxes: sections, their headings and the deck panel."""
+
+    @staticmethod
+    def grid(x, y, cols, n, w=50, h=72, gap=4):
+        return [(x + (i % cols) * (w + gap), y + (i // cols) * (h + gap), x + (i % cols) * (w + gap) + w,
+                 y + (i // cols) * (h + gap) + h) for i in range(n)]
+
+    @staticmethod
+    def reader(texts):
+        texts = list(texts)
+
+        def read(crop, psm, langs=None):
+            return [(texts.pop(0), (0, 0, crop.width, crop.height))] if texts else []
+        return read
+
+    def test_headings_and_order(self):
+        from .scan_layout import heading_of
+        self.assertEqual([heading_of(t) for t in ("8메인덱42", "口エクストラデッキ:15枚", "E사이드型:15", "|メインデッキ:42枚",
+                                                  "m.dcinside.com", "마듀 바다", "Extra Deck 15", "EXデッキ",
+                                                  "主牌組 40", "額外牌組 15", "Deck Principale", "Deck Adicional",
+                                                  "Основная колода", "Экстра-колода", "Side Deck 15")],
+                         ["head_main", "head_extra", "head_side", "head_main", None, None, "head_extra", "head_extra",
+                          "head_main", "head_extra", "head_main", "head_extra", "head_main", "head_extra", "head_side"])
+
+    def test_a_deck_with_main_and_extra(self):
+        from .scan_layout import layout, as_boxes
+        boxes = self.grid(10, 40, 10, 40) + self.grid(10, 40 + 4 * 76 + 40, 10, 15)
+        img = PILImage.new("RGB", (600, 600))
+        r = layout(img, boxes, read=self.reader(["메인 덱 40", "엑스트라 덱 15"]))
+        self.assertTrue(r["sure"])
+        self.assertEqual([c for c, _ in r["headings"]], ["head_main", "head_extra"])
+        self.assertEqual(len(r["cards"]), 55)
+        self.assertLess(r["panel"][1], 40)   # the panel takes in the main heading
+        kinds = [b["c"] for b in as_boxes(r, 600, 600)]
+        self.assertEqual((kinds.count("card"), kinds.count("deck_panel"), kinds[-2:]), (55, 1, ["head_main", "head_extra"]))
+
+    def test_a_missed_card_or_unread_heading_is_not_sure(self):
+        from .scan_layout import layout
+        boxes = self.grid(10, 40, 10, 40) + self.grid(10, 40 + 4 * 76 + 40, 10, 15)
+        img = PILImage.new("RGB", (600, 600))
+        self.assertFalse(layout(img, boxes[:13] + boxes[14:], read=self.reader(["메인 덱", "엑스트라 덱"]))["sure"])
+        self.assertFalse(layout(img, boxes, read=self.reader(["메인 덱"]))["sure"])
+        self.assertFalse(layout(img, boxes, read=self.reader(["엑스트라 덱", "메인 덱"]))["sure"])   # out of order
+
+    def test_the_deck_beside_the_collection(self):
+        from .scan_layout import layout
+        deck = self.grid(10, 40, 6, 24)
+        collection = self.grid(500, 10, 4, 20)
+        img = PILImage.new("RGB", (800, 600))
+        texts = iter(["메인 덱 40"] + [""] * 50)
+        r = layout(img, deck + collection, read=lambda crop, psm, langs=None: [(next(texts), (0, 0, crop.width, crop.height))])
+        self.assertEqual(len(r["cards"]), 44)
+        self.assertLess(r["panel"][2], 500)   # the panel is the deck only
+
+
+class ScanDatasetTest(TestCase):
+    """Pieces of the detector's training set: cutting windows by the labelling rule, YOLO lines, composed cards."""
+
+    def test_windows_keep_cards_half_in_view_and_whole_height_headings(self):
+        from .scan_dataset import window_labels
+        labels = [("card", (0, 0, 100, 140)), ("card", (110, 0, 210, 140)), ("head_main", (0, -30, 300, -5)),
+                  ("head_extra", (0, 150, 300, 175)), ("deck_panel", (0, -30, 300, 400))]
+        got = window_labels(labels, (40, 0, 200, 180))
+        self.assertEqual([c for c, _ in got], ["card", "card", "head_extra", "deck_panel"])
+        self.assertEqual(got[0][1], (0, 0, 60, 140))   # 60% of the first card: kept, in window coordinates
+        self.assertEqual([c for c, _ in window_labels(labels, (70, 0, 200, 160))], ["card", "deck_panel"])   # 30%: dropped
+        self.assertEqual([c for c, _ in window_labels(labels, (0, 160, 300, 400))], ["deck_panel"])   # heading cut in height
+
+    def test_yolo_lines(self):
+        from .scan_dataset import yolo_lines
+        self.assertEqual(yolo_lines([("head_side", (0, 0, 50, 20)), ("card", (10, 10, 10, 30))], 100, 200),
+                         ["4 0.250000 0.050000 0.500000 0.100000"])
+
+    def test_composed_cards_sit_inside_the_picture(self):
+        import random
+        from .scan_dataset import compose_cards, plain_background
+        rng = random.Random(3)
+        face = PILImage.new("RGB", (704, 1024), "orange")
+        for _ in range(30):
+            img, labels = compose_cards([face] * 4, plain_background(rng, (640, 480)), rng)
+            self.assertTrue(1 <= len(labels) <= 4)
+            for _, (x0, y0, x1, y1) in labels:
+                self.assertTrue(0 <= x0 < x1 <= 640 and 0 <= y0 < y1 <= 480, (x0, y0, x1, y1))
+                self.assertGreater((x1 - x0) * (y1 - y0), 400)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PrefillScanLayoutTest(TestCase):
+    def test_adds_panel_and_headings_to_unchecked_pictures(self):
+        from .models import ScanSample
+        boxes = [{"c": "card", "x": round(0.1 + (i % 5) * 0.16, 5), "y": round(0.2 + (i // 5) * 0.3, 5), "w": 0.15, "h": 0.28}
+                 for i in range(10)]
+        made = []
+        for status in ("todo", "done"):
+            s = ScanSample.objects.create(source=f"upload:{status}", kind="deck", width=500, height=500, boxes=boxes, status=status)
+            buf = BytesIO()
+            PILImage.new("RGB", (500, 500)).save(buf, "JPEG")
+            s.image.save(f"{status}.jpg", ContentFile(buf.getvalue()))
+            made.append(s)
+        with patch("card.scan_layout.ocr_lines", side_effect=lambda crop, psm, langs=None: [("메인 덱 10", (0, 0, crop.width, crop.height))]):
+            call_command("prefill_scan_layout", stdout=StringIO())
+        todo, done = (ScanSample.objects.get(id=s.id) for s in made)
+        self.assertEqual(sorted({b["c"] for b in todo.boxes}), ["card", "deck_panel", "head_main"])
+        self.assertEqual(sum(b["c"] == "card" for b in todo.boxes), 10)
+        self.assertEqual(done.boxes, boxes)   # checked pictures are never touched
