@@ -302,8 +302,12 @@ const Mypage = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow px-4 py-3 flex items-center justify-between">
           <span className="font-semibold">다크 모드</span>
           <button
+            type="button"
+            role="switch"
+            aria-checked={isDark}
+            aria-label="다크 모드"
             onClick={toggleDarkMode}
-            className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? "bg-blue-600" : "bg-gray-300"}`}
+            className={`relative shrink-0 w-12 h-6 rounded-full p-0 border-0 transition-colors ${isDark ? "bg-blue-600" : "bg-gray-300"}`}
           >
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? "translate-x-6" : ""}`} />
           </button>
