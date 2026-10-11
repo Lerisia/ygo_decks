@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .display import art_name, art_path
 
 W, H = 704, 1024
-FACE_VERSION = 4          # raise after any change to how faces are drawn: every face is drawn again
+FACE_VERSION = 5          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
 THUMB_DIR = "cards/face_thumb"
@@ -49,7 +49,12 @@ TYPE_WORDS = {"fusion": "융합", "ritual": "의식", "synchro": "싱크로", "x
 
 NAME_BOX = (58, 46, 590, 114)          # name plate, leaving the attribute icon its corner
 ATTR_BOX = (596, 47, 662, 113)
-STAR_ROW = (60, 123, 646, 171)
+STAR_ROW = (60, 123, 646, 171)        # the spell / trap line
+# Stars as Master Duel lays them, where its Royal / Shine shaders emboss them: 12 to a row (13 a little wider), a
+# level's from the right, a rank's from the left
+STAR_SPANS = {12: (0.085 * W, 0.915 * W), 13: (0.051 * W, 0.9491 * W)}
+STAR_PITCH = 0.83 * W / 12
+STAR_TOP, STAR_SIZE = 124, 48
 ART = (89, 191, 616, 719)
 PEND_ART = (50, 186, 654, 956)          # the art runs behind both (slightly see-through) pendulum boxes
 TEXT = (62, 769, 644, 956)              # inside the lower box
@@ -174,17 +179,15 @@ def _draw_lines(draw, lines, font, x, y, lh, fill=(0, 0, 0, 255)):
 
 
 def _stars(face, card):
-    n = card.rank if card.frame.startswith("xyz") else card.level
+    xyz = card.frame.startswith("xyz")
+    n = card.rank if xyz else card.level
     if not n:
         return
-    icon = _image("tex_IconRank.png" if card.frame.startswith("xyz") else "tex_IconLv.png")
-    x0, y0, x1, y1 = STAR_ROW
-    size = y1 - y0
-    star = icon.resize((size, size), Image.LANCZOS)
-    gap = min(size + 4, (x1 - x0) // max(n, 1))
+    star = _image("tex_IconRank.png" if xyz else "tex_IconLv.png").resize((STAR_SIZE, STAR_SIZE), Image.LANCZOS)
+    left, right = STAR_SPANS[12 if n <= 12 else 13]
     for i in range(n):
-        x = x0 + i * gap if card.frame.startswith("xyz") else x1 - size - i * gap
-        face.alpha_composite(star, (x, y0))
+        cx = left + STAR_PITCH * (i + .5) if xyz else right - STAR_PITCH * (i + .5)
+        face.alpha_composite(star, (round(cx - STAR_SIZE / 2), STAR_TOP))
 
 
 def _stat_value(v):

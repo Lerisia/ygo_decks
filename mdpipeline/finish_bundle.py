@@ -7,7 +7,7 @@ pulls each shader's pixel program out of data.unity3d, disassembles it with vkd3
              cards with it), else the shader's defaults, which leave the rainbow off,
              bindings — which cbN each constant buffer is, inputs — which varying carries uv / colour / normal …,
              textures — what each t<N> samples (@card = the card face), params — where the per-card values go
-             (the attribute icon's tile).
+             (the attribute icon's tile, the level / rank stars).
 
 Everything written is Konami's (textures, translated shaders): it goes to media, never to the public repository.
 
@@ -36,9 +36,7 @@ INPUTS = {   # read off each vertex program: which output varying carries what
 ICON_X, ICON_Y, ICON_SIZE = 597, 48, 64
 SX, SY = 704 / ICON_SIZE, 1024 / ICON_SIZE
 OVERRIDES = {"_AttributeSize_Pos": [SX, SY, SX / 2 - 0.5 - ICON_X / ICON_SIZE, (ICON_Y + ICON_SIZE) / ICON_SIZE - SY / 2 - 0.5]}
-# _LevelRankValue stays 0, leaving the stars alone: the shader embosses them on Master Duel's spacing (48.7 px, ending
-# at 644 px) and ours step 52 px, so its stars would smudge ours
-PARAMS = {"attribute": "_AttributeTile"}
+PARAMS = {"attribute": "_AttributeTile", "level": "_LevelRankValue"}
 DEFAULT_TEX = {0: "@white", 1: "@black", 2: "@gray", 3: "@bump"}
 
 

@@ -8,9 +8,9 @@ export type FinishStyle = "shine" | "royal";
 export type FinishParams = { attribute: number; level: number };
 
 const BASE = "/media/md_ui/finish";
-// Toward the light: from the upper left, 15° off the card — the light under which both finishes look most like a
-// deck screen screenshot (upload 12017: Royal bright with rainbow shards, Shine dark with a grey text box)
-const LIGHT = [-0.483, 0.837, -0.259, 0];
+// Toward the light: straight from the viewer, the brightest (엘리스 10/11; a low light from the upper left matched a
+// deck screen screenshot better but darkened both finishes)
+const LIGHT = [0, 0, -1, 0];
 const STYLES: FinishStyle[] = ["shine", "royal"];
 
 type StyleConfig = {
