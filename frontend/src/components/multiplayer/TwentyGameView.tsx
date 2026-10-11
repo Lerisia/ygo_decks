@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import type { PublicCardIcon, Border } from "@/api/avatarApi";
+import SearchForm from "@/components/SearchForm";
 
 const DEFAULT_TOTAL_QUESTIONS = 20;
 const ANSWER_LABEL: Record<string, string> = {
@@ -855,14 +856,17 @@ function DrawerCardPicker({ onChoose }: { onChoose: (cardId: number, name: strin
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700 flex flex-col flex-1 min-h-0">
       <p className="font-bold mb-2 shrink-0">출제할 카드를 선택하세요</p>
-      <input
-        type="text"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="카드명 검색"
-        autoFocus
-        className="w-full px-2 py-1.5 border rounded mb-2 bg-white dark:bg-gray-700 text-base shrink-0"
-      />
+      <SearchForm>
+        <input
+          enterKeyHint="search"
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="카드명 검색"
+          autoFocus
+          className="w-full px-2 py-1.5 border rounded mb-2 bg-white dark:bg-gray-700 text-base shrink-0"
+        />
+      </SearchForm>
       {loading && <p className="text-xs text-gray-400 text-center py-2 shrink-0">검색 중...</p>}
       <div className="overflow-y-auto flex-1 min-h-0 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 content-start">
         {results.map((c) => (
@@ -910,14 +914,17 @@ function CardGuessModal({ onClose, onPick }: { onClose: () => void; onPick: (c: 
           <h3 className="font-bold">🎯 정답 카드 선택</h3>
           <button onClick={onClose} className="text-gray-400 text-lg px-2">✕</button>
         </div>
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="카드명 검색"
-          autoFocus
-          className="w-full px-2 py-1.5 border rounded mb-2 bg-white dark:bg-gray-700 text-base"
-        />
+        <SearchForm>
+          <input
+            enterKeyHint="search"
+            type="text"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="카드명 검색"
+            autoFocus
+            className="w-full px-2 py-1.5 border rounded mb-2 bg-white dark:bg-gray-700 text-base"
+          />
+        </SearchForm>
         <div className="flex-1 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 gap-2">
           {results.map((c) => (
             <button

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import PickerModal, { type PickerItem } from "@/components/PickerModal";
 import DexTabs from "@/components/DexTabs";
+import SearchForm from "@/components/SearchForm";
 import {
   type CardFilters, type CardListItem, type CardOptions,
   EMPTY_FILTERS, filtersToSearch, getCardOptions, listCards, searchToFilters,
@@ -174,24 +175,16 @@ export default function CardList() {
     <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 py-4 text-center">
       <DexTabs />
       {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
-      {/* Enter (the phone keyboard's 검색 key) ends the typing: search at once and put the keyboard away. A form
-          submit fires even while a Korean syllable is still being composed, where a bare Enter key may not. */}
-      <form
-        role="search"
-        className="mb-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (qInput.trim() !== filters.q) update({ q: qInput.trim() });
-          (document.activeElement as HTMLElement | null)?.blur();
-        }}
-      >
+      {/* Enter (the phone keyboard's 검색 key) searches at once and puts the keyboard away. */}
+      <SearchForm onSearch={() => qInput.trim() !== filters.q && update({ q: qInput.trim() })}>
         <Input
           placeholder="카드 이름 검색 (한국어·일본어·영어)"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
           enterKeyHint="search"
+          className="mb-4"
         />
-      </form>
+      </SearchForm>
 
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
         <button

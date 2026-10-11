@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTracker } from "@/context/TrackerContext";
 import { getAllDecks } from "@/api/deckApi";
 import { getRankLabel } from "@/utils/rankUtils";
+import SearchForm from "@/components/SearchForm";
 
 type Deck = { id: number; name: string };
 
@@ -75,9 +76,11 @@ export default function TrackerConfirmModal() {
 
         <div>
           <label className="block text-sm font-semibold mb-1">상대 덱 (선택)</label>
-          <input type="text" placeholder="덱 이름 검색..." value={opponentSearch}
-            onChange={(e) => { setOpponentSearch(e.target.value); setSelectedOpponent(null); }}
-            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <SearchForm>
+            <input enterKeyHint="search" type="text" placeholder="덱 이름 검색..." value={opponentSearch}
+              onChange={(e) => { setOpponentSearch(e.target.value); setSelectedOpponent(null); }}
+              className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </SearchForm>
           {opponentSearch && filteredOpponents.length > 0 && (
             <div className="max-h-28 overflow-y-auto border rounded-lg mt-1">
               {filteredOpponents.map((d) => (

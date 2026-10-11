@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getAllDecks } from "../api/deckApi";
 import { getUserDecks, updateUserDecks, updateUserSettings } from "../api/accountApi";
 import { useNavigate } from "react-router-dom";
+import SearchForm from "@/components/SearchForm";
 
 interface Deck {
   id: number;
@@ -98,13 +99,16 @@ const Mydecks = () => {
     <div className="min-h-screen px-4 pt-4 pb-24">
       <h2 className="text-2xl font-semibold text-center mb-4">보유 덱 관리</h2>
 
-      <input
-        type="text"
-        placeholder="덱 이름 검색..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full max-w-md mx-auto block mb-4 px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
+      <SearchForm>
+        <input
+          enterKeyHint="search"
+          type="text"
+          placeholder="덱 이름 검색..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full max-w-md mx-auto block mb-4 px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </SearchForm>
 
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mb-3 text-sm">
         <span>

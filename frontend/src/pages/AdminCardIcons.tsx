@@ -9,6 +9,7 @@ import {
 } from "@/api/cardIconApi";
 import { getMyBorders, type Border } from "@/api/avatarApi";
 import Avatar from "@/components/Avatar";
+import SearchForm from "@/components/SearchForm";
 
 const CATEGORY_LABEL: Record<IconCategory, string> = {
   default: "기본 지급",
@@ -744,13 +745,16 @@ export default function AdminCardIcons() {
             )}
           </div>
         </div>
-        <input
-          type="text"
-          value={savedQuery}
-          onChange={(e) => setSavedQuery(e.target.value)}
-          placeholder="저장된 아이콘 검색 (이름)"
-          className="w-full px-3 py-2 mb-3 border rounded-lg bg-white dark:bg-gray-800 text-sm"
-        />
+        <SearchForm>
+          <input
+            enterKeyHint="search"
+            type="text"
+            value={savedQuery}
+            onChange={(e) => setSavedQuery(e.target.value)}
+            placeholder="저장된 아이콘 검색 (이름)"
+            className="w-full px-3 py-2 mb-3 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+          />
+        </SearchForm>
         <div className="flex flex-wrap gap-2 mb-3">
           {(["all", "default", "shop", "exclusive"] as const).map((cat) => (
             <button

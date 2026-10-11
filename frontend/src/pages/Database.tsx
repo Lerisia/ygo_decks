@@ -5,6 +5,7 @@ import UpdateBadge from "@/components/UpdateBadge";
 import { useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 import DexTabs from "@/components/DexTabs";
+import SearchForm from "@/components/SearchForm";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 
@@ -265,21 +266,15 @@ export default function DatabasePage() {
 
       {/* Search decks */}
       {/* Enter (the phone keyboard's 검색 key) puts the keyboard away; the list already follows the typing. */}
-      <form
-        role="search"
-        className="mb-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          (document.activeElement as HTMLElement | null)?.blur();
-        }}
-      >
+      <SearchForm>
         <Input
           placeholder="덱 이름 검색..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           enterKeyHint="search"
+          className="mb-4"
         />
-      </form>
+      </SearchForm>
 
       {/* Filter expand / fold + deck power border toggle */}
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">

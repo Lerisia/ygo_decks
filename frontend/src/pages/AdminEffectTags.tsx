@@ -6,6 +6,7 @@ import {
   type EffectTagRow,
   type EffectTagListResponse,
 } from "@/api/effectTagAdminApi";
+import SearchForm from "@/components/SearchForm";
 
 /** Admin page for reviewing/correcting card effect tags. Each card row has
  *  a checkbox per tag — clicking patches the row and marks it
@@ -103,13 +104,16 @@ export default function AdminEffectTags() {
       {/* Filters */}
       <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 space-y-2">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="이름 검색"
-            className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-          />
+          <SearchForm>
+            <input
+              enterKeyHint="search"
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="이름 검색"
+              className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+            />
+          </SearchForm>
           {data && (
             <select
               value={tagFilter}

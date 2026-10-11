@@ -11,6 +11,7 @@ import {
   type MemberHow,
   type NameSource,
 } from "@/api/cardGroupAdminApi";
+import SearchForm from "@/components/SearchForm";
 
 /** Staff review of 카드군: the groups worked out from the Japanese card texts. Korean names come from pairing
  *  Japanese 「」 with Korean "" in the same card texts; the uncertain ones are listed first. Edits here
@@ -133,14 +134,17 @@ export default function AdminCardGroups() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <section className="lg:col-span-2">
           <div className="flex gap-2 mb-2">
-            <input
-              id="card-group-search"
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="일본어·한국어로 찾기"
-              className="flex-1 min-w-0 border rounded-lg px-3 py-2 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
+            <SearchForm>
+              <input
+                enterKeyHint="search"
+                id="card-group-search"
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="일본어·한국어로 찾기"
+                className="flex-1 min-w-0 border rounded-lg px-3 py-2 bg-white text-black dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </SearchForm>
             <button
               onClick={() => setReviewOnly((v) => !v)}
               className={`px-3 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap ${reviewOnly

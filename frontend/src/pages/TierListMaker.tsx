@@ -6,6 +6,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 import { toPng } from "html-to-image";
 import { getAllDecks } from "@/api/deckApi";
+import SearchForm from "@/components/SearchForm";
 
 type Deck = {
   id: number;
@@ -705,13 +706,16 @@ export default function TierListMaker() {
         </div>
 
         <div className="mb-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 덱 검색..."
-            className="w-full px-4 py-3 text-base border-2 rounded-lg bg-white dark:bg-gray-800"
-          />
+          <SearchForm>
+            <input
+              enterKeyHint="search"
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔍 덱 검색..."
+              className="w-full px-4 py-3 text-base border-2 rounded-lg bg-white dark:bg-gray-800"
+            />
+          </SearchForm>
         </div>
 
         {aestheticTags.length > 0 && (

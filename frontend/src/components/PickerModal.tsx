@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import SearchForm from "./SearchForm";
 
 /** One picker for choosing a thing from a picture list: decks, cards, and whatever comes next.
  *  It shows the items it is given as a grid or a list (the viewer's choice, remembered per use),
@@ -115,6 +116,8 @@ export function PickerPanel({
     onSubmit?.(query);
     inputRef.current?.blur();
   };
+  // Enter (the phone keyboard's 검색 key) always ends the typing and puts the keyboard away, and runs the search
+  // in pickers that search on Enter; pickers that follow the typing just lose the keyboard (엘리스 2026-10-11).
   const pick = (it: PickerItem) => { onPick(it); onClose(); };
   const shown = items.slice(0, visibleCount);
   const position = new Map(shown.map((it, i) => [it.key, i]));
@@ -161,18 +164,18 @@ export function PickerPanel({
           </div>
         </div>
         <div className="flex gap-1.5 mb-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && onSubmit) { e.preventDefault(); submit(); }
-            }}
-            placeholder={placeholder}
-            autoFocus
-            className="flex-1 min-w-0 px-2 py-1.5 border rounded bg-white dark:bg-gray-700 text-base sm:text-sm"
-          />
+          <SearchForm onSearch={() => onSubmit?.(query)}>
+            <input
+              ref={inputRef}
+              type="text"
+              enterKeyHint="search"
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              placeholder={placeholder}
+              autoFocus
+              className="flex-1 min-w-0 px-2 py-1.5 border rounded bg-white dark:bg-gray-700 text-base sm:text-sm"
+            />
+          </SearchForm>
           {onSubmit && (
             <button
               type="button"

@@ -7,6 +7,7 @@ import {
   removeDmWordByCard,
   type DuchMindWord, type CardSearchHit, type AdminDmPack,
 } from "@/api/duchmindAdminApi";
+import SearchForm from "@/components/SearchForm";
 
 export default function AdminDuchMindWords() {
   const navigate = useNavigate();
@@ -180,13 +181,16 @@ export default function AdminDuchMindWords() {
       {/* Single card search & add */}
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-6">
         <h2 className="font-semibold mb-2">카드 검색해서 추가</h2>
-        <input
-          type="text"
-          value={searchQ}
-          onChange={(e) => setSearchQ(e.target.value)}
-          placeholder="카드 이름으로 검색"
-          className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-3"
-        />
+        <SearchForm>
+          <input
+            enterKeyHint="search"
+            type="text"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="카드 이름으로 검색"
+            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-3"
+          />
+        </SearchForm>
         {searching && <p className="text-xs text-gray-500">검색 중...</p>}
         {searchResults.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-auto">

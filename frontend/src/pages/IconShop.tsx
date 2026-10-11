@@ -9,6 +9,7 @@ import { isAuthenticated, getUserInfo } from "@/api/accountApi";
 import { RARITY_LABEL, RARITY_BADGE, type IconRarity } from "@/api/cardIconApi";
 import ThemeSearchChip, { chipClass } from "@/components/ThemeSearchChip";
 import { orderThemes, NO_THEME } from "@/utils/themeChips";
+import SearchForm from "@/components/SearchForm";
 
 // Folded theme row shows only the themes with the most recent new icons (참혈 2026-10-02).
 const RECENT_THEME_CHIPS = 8;
@@ -396,13 +397,16 @@ export default function IconShop() {
         </div>
       )}
 
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="🔍 아이콘 검색"
-        className="w-full px-4 py-2 mb-4 border rounded-lg bg-white dark:bg-gray-800 text-sm"
-      />
+      <SearchForm>
+        <input
+          enterKeyHint="search"
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="🔍 아이콘 검색"
+          className="w-full px-4 py-2 mb-4 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+        />
+      </SearchForm>
 
       {loading ? (
         <p className="text-center text-gray-500">로딩 중...</p>

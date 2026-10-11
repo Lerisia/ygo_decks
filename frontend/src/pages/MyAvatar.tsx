@@ -6,6 +6,7 @@ import {
   getMyBorders, setMyBorder,
   type PublicCardIcon, type Border,
 } from "@/api/avatarApi";
+import SearchForm from "@/components/SearchForm";
 
 export default function MyAvatar() {
   const navigate = useNavigate();
@@ -249,13 +250,16 @@ export default function MyAvatar() {
         )}
       </div>
 
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="🔍 아이콘 검색"
-        className="w-full px-4 py-2 mb-4 border rounded-lg bg-white dark:bg-gray-800 text-sm"
-      />
+      <SearchForm>
+        <input
+          enterKeyHint="search"
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="🔍 아이콘 검색"
+          className="w-full px-4 py-2 mb-4 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+        />
+      </SearchForm>
 
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4 text-sm text-red-700 dark:text-red-300">
