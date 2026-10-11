@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import SearchForm from "./SearchForm";
 
 /** One picker for choosing a thing from a picture list: decks, cards, and whatever comes next.
@@ -32,6 +33,9 @@ interface PickerPanelProps {
   imageAspect?: string;
   /** "inline": drawn in the page (wider grid, fixed height, no overlay); "modal": inside PickerModal. */
   variant?: "modal" | "inline";
+  /** A page listing every match of the query, offered above the results (the home search, 엘리스 2026-10-11):
+   *  picking one item goes straight to it, so this is the way to browse them all and come back. */
+  allResults?: { to: string; count: number; unit: string };
 }
 
 interface PickerModalProps extends PickerPanelProps {
@@ -93,7 +97,7 @@ export function PickerPanel({
   onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
   idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView = "grid", imageFit = "contain",
   imageAspect = "aspect-square",
-  variant = "modal",
+  variant = "modal", allResults,
 }: PickerPanelProps) {
   const [view, setView] = useState<View>(() => readView(viewKey, defaultView));
   const [visibleCount, setVisibleCount] = useState(PAGE);
@@ -198,6 +202,13 @@ export function PickerPanel({
           }}
         >
           {status === "loading" && <p className="text-xs text-gray-400 text-center py-3">검색 중...</p>}
+          {/* The same one line as 검색 중..., so the results don't jump while the next keystroke is searched. */}
+          {status === "ready" && allResults && query.trim() && allResults.count > 0 && (
+            <Link to={allResults.to} onClick={onClose} className="flex justify-center gap-1 text-xs py-3 font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+              <span className="truncate">'{query.trim()}'</span>
+              <span className="shrink-0">검색 결과 전체 보기 ({allResults.count.toLocaleString()}{allResults.unit}) →</span>
+            </Link>
+          )}
           {status === "idle" && <p className="text-xs text-gray-400 text-center py-3">{idleText}</p>}
           {status === "empty" && <p className="text-xs text-gray-400 text-center py-3">{emptyText}</p>}
           {view === "grid" ? (

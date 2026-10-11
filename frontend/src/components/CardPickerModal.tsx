@@ -10,6 +10,7 @@ export default function CardPickerModal({
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<PickerItem[]>([]);
   const [status, setStatus] = useState<PickerStatus>("idle");
+  const [total, setTotal] = useState(0);
   const request = useRef(0);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function CardPickerModal({
         .then((r) => {
           if (id !== request.current) return;
           setItems(r.results.map((c) => ({ key: c.id, name: c.name, image: c.face_thumb_url || c.thumb_url || c.image_url })));
+          setTotal(r.total);
           setStatus(r.results.length ? "ready" : "empty");
         })
         .catch(() => id === request.current && setStatus("empty"));
@@ -51,6 +53,7 @@ export default function CardPickerModal({
     viewKey: "card",
     imageFit: "contain" as const,
     imageAspect: "aspect-[704/1024]",
+    allResults: { to: `/cards?q=${encodeURIComponent(query.trim())}`, count: total, unit: "장" },
   };
   // Inline: drawn where the caller puts it (the home page on desktop opens the search out in place).
   if (inline) return open ? <PickerPanel {...panel} variant="inline" /> : null;

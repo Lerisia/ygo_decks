@@ -49,6 +49,7 @@ export default function DeckPickerModal({
     onPick: (it: PickerItem) => onPick(Number(it.key)),
     viewKey: "deck",
     imageFit: "cover" as const,
+    allResults: { to: `/database?q=${encodeURIComponent(query.trim())}`, count: items.length, unit: "개" },
   };
   // Inline: drawn where the caller puts it (the home page on desktop opens the search out in place).
   if (inline) return open ? <PickerPanel {...panel} variant="inline" /> : null;

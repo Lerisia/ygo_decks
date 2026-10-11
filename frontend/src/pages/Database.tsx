@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import EngineBadge from "@/components/EngineBadge";
 import UpdateBadge from "@/components/UpdateBadge";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
+import { matchesDeckQuery } from "@/utils/hangul";
 
 interface Deck {
   id: number;
@@ -72,10 +73,18 @@ const readSavedFilters = (): SavedFilters => {
     return {};
   }
 };
+// /database?q=… (the home search's 전체 보기, 엘리스 2026-10-11) opens the list on that search alone, so it shows
+// exactly the decks the search counted.
+const queryInAddress = (search: string) => new URLSearchParams(search).get("q");
 
 export default function DatabasePage() {
+  const location = useLocation();
+  const onList = location.pathname === "/database";
   // Saved filters are read before the first render so the list never shows unfiltered for a frame.
-  const [saved] = useState(readSavedFilters);
+  const [saved] = useState((): SavedFilters => {
+    const q = queryInAddress(location.search);
+    return q !== null ? { searchQuery: q } : readSavedFilters();
+  });
   const [decks, setDecks] = useState<Deck[]>(() => cachedDecks ?? []);
   const [searchQuery, setSearchQuery] = useState(saved.searchQuery || "");
   const [selectedPerformanceTags, setSelectedPerformanceTags] = useState<string[]>(saved.selectedPerformanceTags || []);
@@ -122,6 +131,24 @@ export default function DatabasePage() {
       return !on;
     });
   const navigate = useNavigate();
+  // A ?q= arriving while the list is kept alive behind a deck page works the same; the address then drops it, as the
+  // search lives on in this visit's saved filters (a stale ?q= would otherwise win over later typing on a reload).
+  useEffect(() => {
+    if (!onList) return;
+    const q = queryInAddress(location.search);
+    if (q === null) return;
+    setSearchQuery(q);
+    setSelectedPerformanceTags([]);
+    setSelectedAestheticTags([]);
+    setSelectedSummoningMethod(null);
+    setSelectedStrength(null);
+    setSelectedDifficulty(null);
+    setSelectedDeckType(null);
+    setSelectedArtStyle(null);
+    setSelectedEtc(null);
+    navigate("/database", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onList, location.search]);
   // 운영진은 도감에서 바로 새 덱을 추가한다 (특이점 2026-10-03)
   const [staff, setStaff] = useState(false);  // staff or an editor: may add decks
   const [addingDeck, setAddingDeck] = useState(false);
@@ -191,13 +218,8 @@ export default function DatabasePage() {
 
   // Apply filtering
   const filteredDecks = useMemo(() => {
-    let filtered = decks.filter((deck) => {
-      const lowerQuery = searchQuery.toLowerCase();
-      return (
-        deck.name.toLowerCase().includes(lowerQuery) ||
-        deck.aliases?.some((alias) => alias.toLowerCase().includes(lowerQuery))
-      );
-    });
+    // The same match as the deck pickers (초성, spaces ignored), so the home search's count holds here.
+    let filtered = decks.filter((deck) => matchesDeckQuery(searchQuery, deck.name, deck.aliases ?? []));
 
     if (selectedPerformanceTags.length > 0) {
       filtered = filtered.filter((deck) =>
