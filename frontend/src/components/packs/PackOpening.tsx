@@ -9,6 +9,14 @@ import { playCardMove, playPackSound, setSoundOn, soundOn, unlockPackSound } fro
 import { type Pulled, type Rarity, GEMS_PER_PACK } from "@/utils/packDraw";
 
 const FX = "/media/md_ui/packopen/";
+/** How long the cards take (ms), slow enough to follow a turn on a phone (엘리스 10/13: "회전이 너무 빨라서 안 보여요"). */
+const T = {
+  deal: 480, dealGap: 60,                       // flying in, and one after the next
+  turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
+  leap: { SR: 1500, UR: 1900 },                 // an SR / UR up, held large and back down
+  premium: 1000, premiumLift: 1400,             // a shine / royal card's extra turn into its finish
+  allGap: { low: 200, high: 700 },              // 전부 넘긴다: between one card and the next
+};
 const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
 const RANK: Record<Rarity, number> = { N: 0, R: 1, SR: 2, UR: 3 };
 const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
@@ -437,10 +445,10 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
         [{ transform: `translate(${dx}px, ${dy}px) rotate(-28deg) scale(.85)`, filter: "brightness(2.6)" },
          { filter: "brightness(1.6)", offset: 0.75 },
          { transform: "none", filter: "brightness(1)" }],
-        { duration: quick ? 1 : 380, delay: quick ? 0 : 45 * i, easing: "cubic-bezier(.15,.75,.3,1)", fill: "backwards" },
+        { duration: quick ? 1 : T.deal, delay: quick ? 0 : T.dealGap * i, easing: "cubic-bezier(.15,.75,.3,1)", fill: "backwards" },
       );
     });
-    const landed = quick ? 0 : 45 * 7 + 380;
+    const landed = quick ? 0 : T.dealGap * 7 + T.deal;
     const t1 = window.setTimeout(() => {
       if (!alive.current || !fx.current) return;
       rows().forEach((row, k) => {
@@ -479,11 +487,11 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     }
     window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, delay);
     el.animate([{ transform: "none" }, { transform: "translateY(-8%) scale(1.22)", offset: 0.4 }, { transform: "translateY(-8%) scale(1.22)", offset: 0.8 }, { transform: "none" }],
-      { duration: 900, delay, easing: "cubic-bezier(.3,.7,.3,1)" }).onfinish = () => { el.style.zIndex = ""; };
+      { duration: T.premiumLift, delay, easing: "cubic-bezier(.3,.7,.3,1)" }).onfinish = () => { el.style.zIndex = ""; };
     const a = inner.animate([{ transform: `rotateY(${dir * 180}deg)` }, { transform: `rotateY(${dir * 540}deg)` }],
-      { duration: 560, delay: delay + 80, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" });
+      { duration: T.premium, delay: delay + 120, easing: "cubic-bezier(.45,0,.25,1)", fill: "forwards" });
     a.onfinish = () => { inner.style.transform = `rotateY(${dir * 540}deg)`; };
-    window.setTimeout(() => { if (alive.current) { setFinished((f) => f.map((v, j) => v || j === i)); playCardMove(0.6); } }, delay + 80 + 260);
+    window.setTimeout(() => { if (alive.current) { setFinished((f) => f.map((v, j) => v || j === i)); playCardMove(0.6); } }, delay + 120 + T.premium / 2);
     window.setTimeout(() => {
       if (!alive.current) return;
       const rect = el.getBoundingClientRect();
@@ -493,7 +501,7 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
       }
       playPackSound(royal ? "upgrad_01_ur" : "upgrad_01", royal ? 0.6 : 0.7);
       flash(false);
-    }, delay + 80 + 560);
+    }, delay + 120 + T.premium);
   }, [cards, fx, flash]);
 
   const flip = useCallback((i: number, dir: 1 | -1, delay = 0) => {
@@ -508,18 +516,18 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     const quick = reduced();
     const ur = r === "UR" && !quick;
     // a UR first twists the wrong way, then whips round
-    const turn = quick ? 1 : ur ? 520 : big ? 260 : 200;
+    const turn = quick ? 1 : T.turn[r];
     const a = inner.animate(ur
       ? [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${-dir * 38}deg)`, offset: 0.38 }, { transform: `rotateY(${dir * 180}deg)` }]
       : [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${dir * 180}deg)` }],
       { duration: turn, delay, easing: ur ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
     a.onfinish = () => { inner.style.transform = `rotateY(${dir * 180}deg)`; };
-    const show = big ? (ur ? turn * 0.72 : 150) : turn * 0.45;   // when the face comes round
+    const show = turn * (ur ? 0.72 : 0.5);   // when the face comes round
     let settled = delay + turn + 70;
     if (big && !quick) {
       // the leap: up and large, held a moment in its light, then back to its place
       const scale = r === "UR" ? 1.75 : 1.5;
-      const hold = r === "UR" ? 1500 : 1100;
+      const hold = T.leap[r as "SR" | "UR"];
       const start = delay + (ur ? turn * 0.45 : 0);
       window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, start);
       el.animate(
@@ -555,7 +563,7 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     turnedRef.current.forEach((done, i) => {
       if (done) return;
       flip(i, 1, at);
-      at += high(cards[i].rarity) ? 420 : 110;
+      at += high(cards[i].rarity) ? T.allGap.high : T.allGap.low;
     });
   };
 
