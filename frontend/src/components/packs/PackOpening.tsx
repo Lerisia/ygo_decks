@@ -12,8 +12,8 @@ import { type Pulled, type Rarity, GEMS_PER_PACK } from "@/utils/packDraw";
 const FX = "/media/md_ui/packopen/";
 /** How long the cards take (ms), slow enough to follow a turn on a phone (엘리스 10/13: "회전이 너무 빨라서 안 보여요"). */
 const T = {
-  stream: 640, streamGap: 70,                   // out of the opened pack, one after the next
-  deal: 480, dealGap: 60,                       // flying in, and one after the next
+  stream: 240, streamGap: 95,                   // out of the opened pack and off the top, one after the next
+  deal: 320, dealGap: 50,                       // up into place from below, one after the next
   turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
   leap: { SR: 1500, UR: 1900 },                 // an SR / UR up, held large and back down
   premium: 1000, premiumLift: 1400,             // a shine / royal card's extra turn into its finish
@@ -268,7 +268,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   const [line, setLine] = useState(0);
   const wantCut = useRef(false);
   const timers = useRef<number[]>([]);
-  const drag = useRef<{ x: number; max: number } | null>(null);
+  const drag = useRef<{ x: number; max: number; onPack: boolean } | null>(null);
   const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -324,7 +324,8 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     playPackSound("03_cut", 0.6);
     at(140, () => setPhase("pour"));
     const out = 520;
-    at(out, () => { setPhase("rise"); playPackSound("05_cardout", 0.7); });
+    at(out - 80, () => playPackSound("05_cardout", 0.8));
+    at(out, () => setPhase("rise"));
     const streamed = out + T.streamGap * 7 + T.stream;
     at(streamed - 60, () => setPhase("leave"));
     at(streamed + 240, onOpened);
@@ -337,9 +338,19 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   const cutRef = useRef(cut);
   cutRef.current = cut;
 
+  // a stroke sideways anywhere on the screen opens it, a third of the pack's width being enough (엘리스 10/13: "인식 범위가
+  // 너무 좁아요"); a tap opens it only on the pack
+  const SWIPE = 0.32;
   const down = (e: ReactPointerEvent) => {
     unlockPackSound();
-    drag.current = { x: e.clientX, max: 0 };
+    const target = e.target as HTMLElement;
+    if (phase !== "stand" || target.closest("button")) return;
+    drag.current = { x: e.clientX, max: 0, onPack: !!box.current?.contains(target) };
+    try {
+      root.current?.setPointerCapture(e.pointerId);
+    } catch {
+      /* the stroke still counts while it stays on the screen */
+    }
   };
   const move = (e: ReactPointerEvent) => {
     const d = drag.current;
@@ -347,8 +358,8 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     if (!d || !p || phase !== "stand") return;
     const span = Math.abs(e.clientX - d.x) / p.width;
     d.max = Math.max(d.max, span);
-    setLine(Math.min(1, span));
-    if (span > 0.55) {
+    setLine(Math.min(1, span / SWIPE));
+    if (span > SWIPE) {
       drag.current = null;
       cut();
     }
@@ -357,13 +368,14 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     const d = drag.current;
     drag.current = null;
     if (!d || phase !== "stand") return;
-    if (d.max < 0.08) cut();
+    if (d.max < 0.08 && d.onPack) cut();
     else setLine(0);
   };
 
   const poured = phase === "pour" || phase === "rise" || phase === "leave";
   return (
-    <div ref={root} className="absolute inset-0">
+    <div ref={root} className="absolute inset-0" style={{ touchAction: "none" }}
+         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
       <div className={`po-floor po-floor-${hints.tier.toLowerCase()} ${floor ? "po-on" : ""}`} aria-hidden="true" />
       <div className={`po-curtain po-curtain-${hints.tier.toLowerCase()} ${poured && phase !== "leave" ? "po-on" : ""}`} aria-hidden="true">
         <span style={{ backgroundImage: `url(${FX}streaks.webp)` }} />
@@ -374,7 +386,6 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
       ))}
 
       <div ref={box} className={`po-pack ${frameOf(tier)} ${upgrading ? "po-upgrading" : ""} po-${phase}`}
-           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
            role="button" tabIndex={0} aria-label={`${pack.name} 팩 열기`} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && cut()}>
         <span className="po-cone" aria-hidden="true" />
         {(phase === "rise" || phase === "leave") && <Stream />}
@@ -390,7 +401,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
         {phase === "stand" && (
           <>
             <button type="button" onClick={cut} className="po-cmd">OPEN</button>
-            <span className="po-hint">팩 윗부분을 옆으로 그어도 열립니다</span>
+            <span className="po-hint">화면을 옆으로 그어도 열립니다</span>
           </>
         )}
       </div>
@@ -399,33 +410,25 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   );
 }
 
-/** The eight cards out of the opened pack, one after another (엘리스 10/13: "후루루루룩 8장 나오는 게 팩뜯의 맛"): each
- *  rises out of the mouth from behind the pack's face and shoots up and away, fanning out, with its own whoosh. */
+/** The eight cards out of the opened pack, one after another (엘리스 10/13: "후루루루룩 8장 나오는 게 팩뜯의 맛"): as
+ *  the game's own openings show them, each a white glow shot straight up out of the mouth and off the top, a tenth of
+ *  a second after the one before; the game's card-out sound carries the rush. */
 function Stream() {
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const cards = [...(box.current?.children ?? [])] as HTMLElement[];
-    const timers = cards.map((el, i) => {
-      // sprayed in a fan, left to right, one after another: up out of the mouth, then off along its line, turning to it
-      const angle = -58 + (116 * i) / 7 + (Math.random() - 0.5) * 10;
-      const rad = (angle * Math.PI) / 180;
-      const far = 2.4 + Math.random() * 0.4;   // card heights
-      const x = (Math.sin(rad) * far * 100) / 0.6875;   // % of the card's width
-      const y = -60 - Math.cos(rad) * far * 100;        // % of its height
+    cards.forEach((el, i) => {
       el.animate(
-        [{ transform: "translateY(0)", filter: "brightness(1.3)", opacity: 1 },
-         { transform: "translateY(-60%)", filter: "brightness(1.8)", opacity: 1, offset: 0.28 },
-         { opacity: 1, offset: 0.75 },
-         { transform: `translate(${x}%, ${y}%) rotate(${angle * 0.8}deg) scale(.82)`, filter: "brightness(2.4)", opacity: 0 }],
-        { duration: T.stream, delay: T.streamGap * i, easing: "cubic-bezier(.3,0,.55,1)", fill: "both" },
+        [{ transform: "translateY(0) scaleY(1)", opacity: 1 },
+         { transform: "translateY(-120%) scaleY(1.12)", opacity: 1, offset: 0.3 },
+         { transform: "translateY(-460%) scaleY(1.12)", opacity: 0.9 }],
+        { duration: T.stream, delay: T.streamGap * i, easing: "linear", fill: "both" },
       );
-      return window.setTimeout(() => playCardMove(0.45), T.streamGap * i);
     });
-    return () => timers.forEach(clearTimeout);
   }, []);
   return (
     <span ref={box} className="po-stream" aria-hidden="true">
-      {Array.from({ length: 8 }, (_, i) => <img key={i} src={`${FX}back.webp`} alt="" draggable={false} />)}
+      {Array.from({ length: 8 }, (_, i) => <i key={i} />)}
     </span>
   );
 }
@@ -447,7 +450,7 @@ function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean
   );
 }
 
-/** The eight cards: they fly in from the corner onto the floor, a glint runs along them, then they turn — a tap, or a
+/** The eight cards: they rise from below into place, a glint runs along them, then they turn — a tap, or a
  *  finger drawn across them turning each it passes, in the way it moves. */
 function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext }: {
   cards: Pulled<PackCard>[]; fresh: Set<number>; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
@@ -476,21 +479,19 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     return [...out.values()];
   };
 
-  // in from the lower left, one after another, lit as they fly; then a glint along each row
+  // as in the game's openings: up from below the screen straight into place, left to right, white as they rise; then
+  // a glint along each row
   useLayoutEffect(() => {
-    const vw = window.innerWidth;
     const vh = window.innerHeight;
     playPackSound("04_cardin", 0.8);
     els.current.forEach((el, i) => {
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const dx = -vw * 0.15 - (r.left + r.width / 2) + i * 18;
-      const dy = vh * 1.05 - (r.top + r.height / 2);
       el.animate(
-        [{ transform: `translate(${dx}px, ${dy}px) rotate(-28deg) scale(.85)`, filter: "brightness(2.6)" },
-         { filter: "brightness(1.6)", offset: 0.75 },
+        [{ transform: `translateY(${vh - r.top + 12}px)`, filter: "brightness(3)" },
+         { filter: "brightness(1.5)", offset: 0.8 },
          { transform: "none", filter: "brightness(1)" }],
-        { duration: T.deal, delay: T.dealGap * i, easing: "cubic-bezier(.15,.75,.3,1)", fill: "backwards" },
+        { duration: T.deal, delay: T.dealGap * i, easing: "cubic-bezier(.2,.7,.3,1)", fill: "backwards" },
       );
     });
     const landed = T.dealGap * 7 + T.deal;
@@ -835,8 +836,8 @@ const CSS = `
 .po-pack.po-pour, .po-pack.po-rise, .po-pack.po-leave, .po-pack.po-cut { outline-color: transparent !important; box-shadow: none !important; }
 .po-leave { opacity: 0; transform: translateY(6%); transition: opacity .3s, transform .3s; }
 .po-stream { position: absolute; inset: 0; pointer-events: none; }
-.po-stream img { position: absolute; left: 21%; top: 20%; width: 58%; aspect-ratio: 0.6875; object-fit: fill; border-radius: 3px;
-  box-shadow: 0 0 12px 3px rgba(255,255,255,.7), 0 0 30px 8px rgba(150,190,255,.45); }
+.po-stream i { position: absolute; left: 22%; top: 20%; width: 56%; aspect-ratio: 0.6875; border-radius: 3px; background: #fff;
+  box-shadow: 0 0 10px 3px rgba(255,255,255,.95), 0 0 30px 10px rgba(175,210,255,.6); }
 /* 절취선 (엘리스 10/13): where the pack tears, dashes along its top with a light running over them */
 .po-perf { position: absolute; left: 4%; right: 4%; top: 17%; height: 3px; margin-top: -1.5px; pointer-events: none; border-radius: 2px;
   background: repeating-linear-gradient(90deg, #fff 0 7px, transparent 7px 12px);

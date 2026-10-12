@@ -41,13 +41,22 @@ function load(name: string) {
   return buffers.get(name)!;
 }
 
-/** Call within a tap: opens the sound and fetches the sounds. */
+/** Call within a tap: opens the sound and fetches the sounds. A phone that left the page (another app, the screen
+ *  locked) hands it back "interrupted" or "suspended", so any state but running is resumed here, within the tap, with
+ *  a silent sound played in it as an iPhone wants (엘리스 10/13: "소리가 아예 안 나요"). */
 export function unlockPackSound() {
   if (!soundOn()) return;
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    ctx ??= new Ctx();
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    if (!ctx || ctx.state === "closed") {
+      ctx = new Ctx();
+      buffers.clear();
+    }
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+    const blank = ctx.createBufferSource();
+    blank.buffer = ctx.createBuffer(1, 1, 22050);
+    blank.connect(ctx.destination);
+    blank.start();
     NAMES.forEach(load);
   } catch {
     ctx = null;
@@ -58,6 +67,7 @@ export function unlockPackSound() {
 export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
   if (!ctx || !soundOn()) return;
   const audio = ctx;
+  if (audio.state !== "running") audio.resume().catch(() => {});
   load(name).then((buf) => {
     if (!buf) return;
     const src = audio.createBufferSource();
