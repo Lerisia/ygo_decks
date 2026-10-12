@@ -153,7 +153,10 @@ class FakeChannel:
 
 
 class FakeMessage:
+    _ids = iter(range(1000, 10**6))
+
     def __init__(self, channel, content, type=discord.MessageType.default, reply_fails=False):
+        self.id = next(FakeMessage._ids)   # every Discord message has one
         self.channel, self.content, self.type = channel, content, type
         self.author = SimpleNamespace(id=7, bot=False, name="chamhyul", display_name="참혈", mention="<@7>")
         self.replies, self.reply_fails = [], reply_fails
@@ -244,3 +247,25 @@ class OnMessageTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorktreeTest(unittest.TestCase):
+    """Each request's worktree (2026-10-12): a thread keeps one across its requests (they run one at a time); the
+    channel's requests run side by side, so each gets its own; a DM is one conversation, one at a time like a thread
+    is not, so each of its requests gets its own too."""
+
+    def test_names(self):
+        thread = SimpleNamespace(id=555, parent_id=COOP)
+        self.assertEqual(main.worktree_for(SimpleNamespace(id=1, channel=thread), "thread-555"), "thread-555")
+        self.assertEqual(main.worktree_for(SimpleNamespace(id=42, channel=None), str(COOP)), "req-42")
+        self.assertEqual(main.worktree_for(SimpleNamespace(id=43, channel=None), "dm-7"), "req-43")
+
+    def test_the_request_names_its_worktree(self):
+        text = main.build_user_message("엘리스", 7, "오너", "고쳐 주세요", worktree="thread-555")
+        self.assertIn("[작업 워크트리: thread-555]", text)
+        self.assertTrue(text.endswith("고쳐 주세요"))
+
+    def test_the_rules_send_work_to_worktrees(self):
+        self.assertIn("tools/wt new", main.BOT_SYSTEM_PROMPT)
+        self.assertIn("tools/ship", main.BOT_SYSTEM_PROMPT)
+        self.assertNotIn("bash /home/elyss/ygo_decks/deploy.sh", main.BOT_SYSTEM_PROMPT)

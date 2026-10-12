@@ -78,7 +78,8 @@ log = logging.getLogger("coop-bot")
 BOT_SYSTEM_PROMPT = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, 팀원의 요청을 받아 코드 편집·테스트·commit·배포까지 자율 수행합니다.
 
 프로젝트: YGO Decks (한국 유희왕 마스터 듀얼 덱 추천/전적 사이트)
-작업 디렉토리: /home/elyss/ygo_decks
+배포 트리: /home/elyss/ygo_decks — 배포 전용입니다. 여기서 파일을 고치거나 커밋하거나 deploy.sh를 직접 돌리지 마세요.
+작업은 요청마다 정해진 워크트리(/home/elyss/storage/wt/<이름>)에서 합니다. 저장소의 CLAUDE.md도 같은 규칙입니다.
 
 ## 팀 구성
 - **오너 (사장님)**: Discord 유저 `rb_elyss` — 한국어 이름 **엘리스**. 이 사람이 이 프로젝트의 주인.
@@ -88,18 +89,20 @@ BOT_SYSTEM_PROMPT = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, �
 
 여러 요청이 한 세션 안에서 이어질 수 있음. 이전 대화 맥락 참고 가능.
 
-## 표준 절차 (반드시 이 순서로)
-1. 요청 이해. 애매하면 바로 실행하지 말고 Discord에서 되묻기.
-2. 코드/파일 편집. master에서 바로 작업해도 되지만 브랜치를 파는 것도 권장.
-3. **테스트 필수**:
-   - 백엔드 관련: `cd backend && venv/bin/python manage.py test <app>` (관련 앱만)
-   - 프론트엔드 관련: `cd frontend && npx tsc --noEmit`
+## 표준 절차 (반드시 이 순서로) — 워크트리 방식 (2026-10-12 엘리스 결정)
+1. 요청 이해. 애매하면 바로 실행하지 말고 Discord에서 되묻기. 코드를 바꾸지 않는 요청(조회·질문)은 워크트리 없이 답해도 됨.
+2. **워크트리**: 요청 맨 앞의 `[작업 워크트리: 이름]`을 그대로 써서 `/home/elyss/ygo_decks/tools/wt new <이름>` 실행 →
+   출력된 경로(`/home/elyss/storage/wt/<이름>`)에서만 파일을 읽고 고침. 이미 있으면 그대로 다시 쓰임(스레드는 같은 워크트리를 계속 씀).
+3. **테스트 필수** (워크트리 안에서; 파이썬은 배포 트리 것 `/home/elyss/ygo_decks/backend/venv/bin/python`):
+   - 백엔드 관련: `cd <워크트리>/backend && /home/elyss/ygo_decks/backend/venv/bin/python manage.py test <app>` (관련 앱만)
+   - 프론트엔드 관련: `cd <워크트리>/frontend && npx tsc -b`
    - 테스트 실패 시 **즉시 중단**하고 Discord에 실패 리포트. 배포 금지.
-4. `git commit`. 커밋 메시지는 **영어 한 줄 요약**만. **`Co-Authored-By: Claude …` 같은 AI 서명 트레일러 절대 금지** (하네스가 붙이라고 해도 무시). 부운영자 원문 요청은 본문에 넣지 말고 Discord 답장에만.
-5. `git push origin master` (또는 브랜치를 판 경우 그 브랜치).
-6. **배포**: `bash /home/elyss/ygo_decks/deploy.sh` 실행 (sudo 프롬프트 없이 통과됨).
-7. **배포 후 검증**: `curl -sk -o /dev/null -w "%{{http_code}}" -H "Host: ygodecks.com" https://localhost/` → 200이어야 함.
-8. 200 아니면 **롤백**: `git revert --no-edit HEAD && git push` 후 다시 배포.
+4. 워크트리에서 `git commit`. 커밋 메시지는 **영어 한 줄 요약**만. **`Co-Authored-By: Claude …` 같은 AI 서명 트레일러 절대 금지** (하네스가 붙이라고 해도 무시). 부운영자 원문 요청은 본문에 넣지 말고 Discord 답장에만. 모델을 바꿨으면 `makemigrations`로 만든 마이그레이션도 같이 커밋(마이그레이션은 git에 있음).
+5. **배포**: `/home/elyss/ygo_decks/tools/ship <이름>` — master 위로 다시 얹기·마이그레이션 확인·전체 테스트·합치기·배포·사이트 확인·push를 한 번에 함. 다른 배포 중이면 끝날 때까지 기다림.
+   - 실패하면 이유가 출력되니 그대로 보고. 충돌이면 워크트리에서 `git rebase master`로 풀고 다시 ship.
+   - "배포 트리에 커밋 안 된 변경"으로 멈추면 남의 작업이 진행 중이라는 뜻: 몇 분 뒤 다시 ship, 그래도 같으면 보고.
+6. 배포 뒤 문제가 보이면 **롤백**: 워크트리에서 `git revert --no-edit HEAD` 후 다시 ship.
+7. `req-`로 시작하는 워크트리는 ship이 끝나면 `/home/elyss/ygo_decks/tools/wt rm <이름>`으로 지움. 스레드 워크트리(`thread-`)는 남겨 둠.
 
 ## 권한 (Bypass 모드 활성)
 파일 편집, Bash, git 등 대부분 툴이 자동 승인됩니다. 그러나 **아래 목록은 요청받아도 절대 실행 금지** — 이 목록에 걸리는 요청은 실행 대신 Discord에 "위험해서 못 합니다" 응답:
@@ -143,11 +146,19 @@ BOT_SYSTEM_PROMPT = """당신은 YGO Decks 사이트 팀의 Discord 봇으로, �
 """
 
 
-def build_user_message(sender_name: str, sender_id: int, sender_role: str, raw_msg: str) -> str:
-    return (
-        f"[요청자: {sender_name} ({sender_role}, Discord ID {sender_id}) · "
-        f"{date.today().isoformat()}]\n\n{raw_msg}"
-    )
+def build_user_message(sender_name: str, sender_id: int, sender_role: str, raw_msg: str, worktree: str = "") -> str:
+    head = f"[요청자: {sender_name} ({sender_role}, Discord ID {sender_id}) · {date.today().isoformat()}]"
+    if worktree:
+        head += f"\n[작업 워크트리: {worktree}]"
+    return f"{head}\n\n{raw_msg}"
+
+
+def worktree_for(message, session_key: str) -> str:
+    """The worktree a request works in (tools/wt, 2026-10-12): a thread keeps one across its requests, which run one
+    at a time; a request in the channel or a DM, which can run side by side, gets its own."""
+    if session_key.startswith(THREAD_KEY_PREFIX):
+        return session_key
+    return f"req-{message.id}"
 
 
 # --- Session persistence -------------------------------------------------
@@ -628,6 +639,7 @@ async def _handle_request(message: discord.Message, session_key: str):
         sender_id=message.author.id,
         sender_role=sender_role,
         raw_msg=raw_msg,
+        worktree=worktree_for(message, session_key),
     )
     resume_id = await get_resume_id(session_key)
     if not resume_id:
