@@ -69,8 +69,8 @@ export const MENU_GROUPS: MenuGroup[] = [
     to: "/playground",
     paths: ["/playground", "/solo", "/card-quiz", "/skill-names", "/packs", "/multiplayer", "/duchmind-wordpacks", "/icon-shop", "/tournaments"],
     items: [
-      { label: "미니게임", to: "/playground", desc: "싱글·멀티 게임 모두" },
-      { label: "멀티플레이 방", to: "/multiplayer", desc: "방 목록·방 만들기" },
+      { label: "멀티플레이", to: "/multiplayer", desc: "친구들과 함께" },
+      { label: "미니게임", to: "/playground", desc: "혼자 즐기는 게임까지 모두" },
       { label: "포인트 상점", to: "/icon-shop", desc: "포인트로 아이콘·프레임 사기" },
       { label: "등반 덱 기록", to: "https://mdarchive.pages.dev/#climb", desc: "외부 사이트", external: true },
       { label: "대회", to: "", desc: "준비 중", soon: true },
