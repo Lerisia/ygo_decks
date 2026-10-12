@@ -14,6 +14,7 @@ const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-
 const SORTS = [
   { value: "new", label: "최신 카드순" },
   { value: "name", label: "이름순" },
+  { value: "type", label: "몬마함순" },
 ];
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -43,13 +44,19 @@ function TileSkeleton() {
 function CardTile({ card }: { card: CardListItem }) {
   return (
     <Link to={`/cards/${card.id}`} className="block text-center group">
-      <img
-        loading="lazy"
-        decoding="async"
-        src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
-        alt={card.name}
-        className="w-full aspect-[704/1024] object-contain group-hover:opacity-90 transition"
-      />
+      <span className="relative block">
+        <img
+          loading="lazy"
+          decoding="async"
+          src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
+          alt={card.name}
+          className="w-full aspect-[704/1024] object-contain group-hover:opacity-90 transition"
+        />
+        {/* the rarity in the top right corner, as Master Duel's own card list shows it (엘리스 10/12) */}
+        {card.rarity && (
+          <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}.png`} alt={card.rarity} className="absolute top-0 right-0 h-3.5 sm:h-4 w-auto" />
+        )}
+      </span>
       <p className="mt-1 h-10 text-xs sm:text-sm leading-5 line-clamp-2 break-keep">{card.name}</p>
     </Link>
   );

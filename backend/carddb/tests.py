@@ -876,6 +876,22 @@ class CardDexApiTest(TestCase):
         self.assertEqual(body["results"][0]["name"], "블랙 매지션의 속공")
         self.assertEqual(self.ids(sort="name"), [6, 1, 3, 4, 5, 2])
 
+    def test_type_order(self):
+        # 몬마함순, Master Duel's 디폴트 순 (엘리스 10/12): monsters by frame (each before its pendulum), level / rank /
+        # link low to high, then card number; spells, traps by kind
+        self.card(9, "효과 레벨 4")
+        self.card(12, "엑시즈", frame="xyz", types=["xyz", "effect"], level=None, rank=4)
+        self.card(11, "지속 마법", category="spell", frame="spell", types=[], attribute="", race="", level=None,
+                  atk=None, def_value=None, spell_trap_subtype="continuous")
+        self.card(10, "일반 함정", category="trap", frame="trap", types=[], attribute="", race="", level=None,
+                  atk=None, def_value=None, spell_trap_subtype="normal")
+        self.assertEqual(self.ids(sort="type"), [1, 2, 9, 3, 5, 12, 6, 4, 11, 10])
+
+    def test_list_gives_the_rarity(self):
+        MdPrint.objects.filter(md_id=2).update(rarity="UR")
+        rarity = {r["id"]: r["rarity"] for r in self.get()["results"]}
+        self.assertEqual((rarity[1], rarity[2]), ("SR", "UR"))
+
     def test_newest_goes_by_the_day_a_card_came_to_master_duel(self):
         MdPrint.objects.filter(md_id=1).update(first_seen=date(2026, 9, 1))   # an old card, newly in Master Duel
         self.assertEqual(self.ids()[:2], [1, 4])

@@ -36,6 +36,8 @@ export type CardListItem = {
   face_thumb_url: string | null;
   thumb_url: string | null;
   image_url: string | null;
+  /** The rarity of its Master Duel print ("" when not known). */
+  rarity: string;
 };
 export type CardListResponse = {
   results: CardListItem[];
