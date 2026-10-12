@@ -7,7 +7,7 @@ import type { Rarity } from "@/utils/packDraw";
 const FX = "/media/md_ui/packopen/";
 const TEXTURES = ["star", "star_big", "dot", "shards", "burst", "soft", "cross", "glow_soft", "bg_particle", "card_light"] as const;
 export const CYAN = "#5fe3ff";
-type Tex = (typeof TEXTURES)[number];
+type Tex = (typeof TEXTURES)[number] | "ring";   // a ring is drawn, not a picture
 const GRIDS = new Set<Tex>(["shards"]);   // sprite sheets: their cells are cut, not faded
 
 type Particle = {
@@ -28,7 +28,7 @@ export class FxLayer {
   private ctx: CanvasRenderingContext2D;
   private particles: Particle[] = [];
   private emitters: Emitter[] = [];
-  private images = new Map<Tex, HTMLImageElement>();
+  private images = new Map<Tex, HTMLImageElement>();   // (no picture for a ring)
   private tinted = new Map<string, HTMLCanvasElement>();
   private raf = 0;
   private last = 0;
@@ -125,6 +125,20 @@ export class FxLayer {
   };
 
   private draw(p: Particle, alpha: number, size: number) {
+    if (p.tex === "ring") {
+      const { ctx } = this;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, alpha);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1, size * 0.035 * (1 - p.t / p.life) + 1);
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = size * 0.06;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const img = this.tint(p.tex, p.color);
     if (!img || alpha <= 0.002 || size < 0.5) return;
     const { ctx } = this;
@@ -148,7 +162,7 @@ export class FxLayer {
     const key = `${tex}${color}`;
     const done = this.tinted.get(key);
     if (done) return done;
-    const img = this.images.get(tex);
+    const img = tex === "ring" ? undefined : this.images.get(tex);
     if (!img || !img.complete || !img.naturalWidth) return null;
     const canvas = () => {
       const c = document.createElement("canvas");
@@ -297,6 +311,30 @@ export class FxLayer {
                  vy: Math.sin(a) * w * rand(0.2, 0.9) - w * 0.4, ay: w * 0.9, drag: 1.4, life: rand(0.9, 1.7), size: w * rand(0.05, 0.13),
                  fadeIn: 0.05, twinkle: rand(8, 16),
                  color: rarity === "UR" ? RAINBOW[Math.floor(rand(0, RAINBOW.length))] : i % 3 ? GOLD : "#fff3b0" });
+    }
+  }
+
+  /** A UR's reveal: a cyan ring spreading from the card (the game's), under the burst. */
+  ring(x: number, y: number, w: number, color = CYAN) {
+    this.add({ tex: "ring", x, y, size: w * 1.2, grow: 1.6, life: 0.55, alpha: 1, fadeIn: 0.02, color });
+    this.add({ tex: "ring", x, y, size: w * 1.0, grow: 1.1, life: 0.45, alpha: 0.7, fadeIn: 0.02, color: WHITE });
+  }
+
+  /** A finish taking hold after the card's extra turn: rays of white-blue light from its edge (royal: bigger,
+   *  with rainbow stars). */
+  premium(x: number, y: number, w: number, royal: boolean) {
+    const big = royal ? 1.35 : 1;
+    this.add({ tex: "burst", x, y, size: w * 2.8 * big, grow: 0.5, life: 0.6, vr: 0.6, rot: rand(0, 6), alpha: 1, fadeIn: 0.02, color: "#dff4ff" });
+    this.add({ tex: "star_big", x, y, size: w * 2.4 * big, grow: 0.4, life: 0.65, vr: -0.5, alpha: 0.95, fadeIn: 0.02, color: royal ? "#ffe0ff" : "#cfefff" });
+    this.add({ tex: "card_light", x, y, size: w * 1.5, grow: 0.2, life: 0.5, alpha: 0.9, fadeIn: 0.02, color: "#e8f6ff" });
+    this.ring(x, y, w, royal ? "#ff9cf5" : CYAN);
+    const n = royal ? 30 : 18;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const v = w * rand(2, 3.6);
+      this.add({ tex: royal && i % 2 ? "cross" : "star", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 3, life: rand(0.5, 0.9),
+                 size: w * rand(0.16, 0.3), grow: -0.5, rot: rand(0, 6), vr: rand(-3, 3), fadeIn: 0.01,
+                 color: royal ? RAINBOW[i % RAINBOW.length] : i % 2 ? CYAN : WHITE, twinkle: royal ? rand(12, 20) : 0 });
     }
   }
 

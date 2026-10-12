@@ -1,40 +1,47 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import type { PackCard, PackDetail } from "@/api/packApi";
 import { getCard } from "@/api/cardDexApi";
 import CardZoom from "@/components/CardZoom";
-import type { FinishParams } from "@/lib/cardFinish";
+import { type FinishParams, finishSupported } from "@/lib/cardFinish";
+import { lazyChunk } from "@/lib/lazyChunk";
 import { FxLayer } from "@/lib/packFx";
 import { playCardMove, playPackSound, setSoundOn, soundOn, unlockPackSound } from "@/lib/packSound";
 import { type Pulled, type Rarity, GEMS_PER_PACK } from "@/utils/packDraw";
 
 const FX = "/media/md_ui/packopen/";
+const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
 const RANK: Record<Rarity, number> = { N: 0, R: 1, SR: 2, UR: 3 };
 const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const high = (r: Rarity) => r === "SR" || r === "UR";
 const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK[c.rarity] > RANK[b] ? c.rarity : b), "N");
 
-/** What a pack shows before it opens. The game's own rule is not known (its server decides): a gold frame and floor
- *  when it holds an SR or better; lightning often then, now and then without; the monster only for a UR, one time in
- *  two, so it never lies (엘리스 10/13). */
-type Hints = { gold: boolean; lightning: boolean; monster: boolean };
+/** What a pack shows before it opens: its tier (a gold pack for an SR, a rainbow one for a UR, as the game's pack turns
+ *  into its gold or rainbow version), lightning (one to three strikes) and the Hope cut-in. The game's own rule for these
+ *  is not known (its server decides): lightning often for an SR or better and now and then without, Hope only for a UR,
+ *  one time in two, so it never lies (엘리스 10/13). */
+type Tier = "N" | "SR" | "UR";
+type Hints = { tier: Tier; strikes: number; monster: boolean };
 const hintsFor = (cards: Pulled<PackCard>[]): Hints => {
   const top = best(cards);
-  const gold = RANK[top] >= RANK.SR;
-  return { gold, lightning: Math.random() < (gold ? 0.6 : 0.12), monster: top === "UR" && Math.random() < 0.5 };
+  const tier: Tier = top === "UR" ? "UR" : top === "SR" ? "SR" : "N";
+  const lit = Math.random() < (tier !== "N" ? 0.6 : 0.12);
+  return { tier, strikes: lit ? 1 + Math.floor(Math.random() * 3) : 0, monster: tier === "UR" && Math.random() < 0.5 };
 };
+const frameOf = (tier: Tier) => (tier === "UR" ? "po-frame-ur" : tier === "SR" ? "po-frame-sr" : "");
 
 type Stage = "overview" | "pack" | "cards" | "result";
 type Zoom = { card: Pulled<PackCard>; params: FinishParams | null };
 type Fx = MutableRefObject<FxLayer | null>;
 
-/** The game's pack opening, rebuilt from its own pictures and sounds and from watching it (엘리스 10/12–13: "진짜 마듀처럼"):
- *  a dark stage with a lit horizon the packs and cards stand and mirror on; ten packs laid out first (a gold frame on
- *  those holding an SR or better); each pack comes on, lightning may strike beside it and a gold floor or the monster
- *  may announce what it holds; a tap or a stroke across its top cuts it in a white flash, light pours up out of it
- *  through a curtain of blue (gold for SR and up) and the cards fly in from the corner onto the floor, a glint
- *  running along them; a tap or a finger drawn across turns them — N and R flip over with a whisk, SR and UR leap up
- *  big in a burst of light and drift of dust. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
+/** The game's pack opening, rebuilt from its own pictures, sounds and effect data and from watching it (엘리스 10/12–13:
+ *  "진짜 마듀처럼"): a blue burst to begin; a dark stage with a lit horizon the packs and cards stand and mirror on; ten
+ *  packs laid out first (gold those with an SR, rainbow those with a UR); each pack comes on, lightning may strike, a
+ *  single pack may turn into its gold or rainbow pack, Hope may cut in for a UR; a tap or a stroke across its top cuts it
+ *  in a white flash, light pours up through a blue, gold or rainbow curtain and the cards fly in onto the floor, a glint
+ *  running along them; a tap or a finger drawn across turns them — N and R whisk over, SR and UR leap up in light and
+ *  dust (a UR twisting the wrong way first, a ring spreading), and a shine or royal card turns once more into its finish
+ *  in the game's shader. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
 export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
   pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>;
   onClose: () => void; onAgain: (count: 1 | 10) => void;
@@ -49,7 +56,28 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
   const bgCanvas = useRef<HTMLCanvasElement>(null);
   const fx = useRef<FxLayer | null>(null);
   const shaker = useRef<HTMLDivElement>(null);
+  const [warp, setWarp] = useState(!reduced());
+  const [finishes, setFinishes] = useState<Map<number, FinishParams>>(() => new Map());
   const total = packs.length;
+
+  // a shine or royal card turns into its finish in the game's shader: what that needs, asked for once now
+  useEffect(() => {
+    let live = true;
+    const want = packs.flat().filter((c) => c.finish !== "basic");
+    Promise.all(want.map(async (c) => {
+      try {
+        const doc = await getCard(c.card.card);
+        const face = doc.faces.find((f) => f.id === c.card.print);
+        const params: FinishParams = { ...doc.finish, frame: face?.overframe ? "overframe" : doc.finish.frame, name: face?.name_mask ?? null };
+        return [c.card.print, params] as const;
+      } catch {
+        return null;
+      }
+    })).then((rows) => {
+      if (live) setFinishes(new Map(rows.filter((r): r is readonly [number, FinishParams] => !!r)));
+    });
+    return () => { live = false; };
+  }, [packs]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -126,10 +154,10 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
 
         {stage === "overview" && <Overview packs={packs} hints={hints} pack={pack} onOpen={() => { unlockPackSound(); setStage("pack"); }} />}
         {stage === "pack" && (
-          <PackScene key={index} pack={pack} hints={hints[index]} fx={fx} flash={flashNow} onOpened={() => setStage("cards")} />
+          <PackScene key={index} pack={pack} hints={hints[index]} framed={total > 1} fx={fx} flash={flashNow} onOpened={() => setStage("cards")} />
         )}
         {stage === "cards" && (
-          <Cards key={index} cards={packs[index]} fresh={fresh} fx={fx} flash={flashNow} shake={shake} onOpen={open}
+          <Cards key={index} cards={packs[index]} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
         {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} onOpen={open} onAgain={onAgain} onClose={onClose} />}
@@ -148,6 +176,15 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
       </div>
 
       <canvas ref={fxCanvas} className="absolute inset-0 z-50 w-full h-full pointer-events-none" aria-hidden="true" />
+      {warp && (
+        <div className="po-warp" aria-hidden="true" onAnimationEnd={() => setWarp(false)}>
+          <div className="po-warp-rays">
+            {[[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([x, y], i) => (
+              <span key={i} style={{ backgroundImage: `url(${FX}rays.webp)`, transform: `scale(${x}, ${y})`, left: x > 0 ? 0 : "50%", top: y > 0 ? 0 : "50%" }} />
+            ))}
+          </div>
+        </div>
+      )}
       {flash && <span key={flash.id} className={flash.white ? "po-flash-white" : "po-flash"} aria-hidden="true" onAnimationEnd={() => setFlash(null)} />}
 
       {zoom && (
@@ -163,7 +200,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
   );
 }
 
-/** Ten packs laid out on the stage, a gold frame on those holding an SR or better; OPEN opens them one by one. */
+/** Ten packs laid out on the stage, gold those holding an SR, rainbow those holding a UR; OPEN opens them one by one. */
 function Overview({ packs, hints, pack, onOpen }: { packs: Pulled<PackCard>[][]; hints: Hints[]; pack: PackDetail; onOpen: () => void }) {
   useEffect(() => {
     playPackSound("02_packout", 0.8);
@@ -172,7 +209,7 @@ function Overview({ packs, hints, pack, onOpen }: { packs: Pulled<PackCard>[][];
     <>
       <div className="po-overview">
         {packs.map((_, i) => (
-          <div key={i} className={`po-mini ${hints[i].gold ? "po-gold-frame" : ""}`} style={{ animationDelay: `${i * 40}ms` }}>
+          <div key={i} className={`po-mini ${frameOf(hints[i].tier)}`} style={{ animationDelay: `${i * 40}ms` }}>
             <PackPicture pack={pack} small />
           </div>
         ))}
@@ -196,13 +233,16 @@ function PackPicture({ pack, small = false }: { pack: PackDetail; small?: boolea
 }
 
 /** One pack: it comes on, the signs of what it holds play, and a tap or a stroke across its top opens it. */
-function PackScene({ pack, hints, fx, flash, onOpened }: {
-  pack: PackDetail; hints: Hints; fx: Fx; flash: (white: boolean) => void; onOpened: () => void;
+function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
+  pack: PackDetail; hints: Hints; framed: boolean; fx: Fx; flash: (white: boolean) => void; onOpened: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  const [bolts, setBolts] = useState<boolean[]>([false, false]);
-  const [goldFloor, setGoldFloor] = useState(false);
+  const [bolts, setBolts] = useState<number[]>([]);
+  const [floor, setFloor] = useState(false);
+  // a single pack starts plain and turns into its gold or rainbow pack; after the ten laid out it already is
+  const [tier, setTier] = useState<Tier>(framed ? hints.tier : "N");
+  const [upgrading, setUpgrading] = useState(false);
   const [monster, setMonster] = useState<"waiting" | "showing" | "done">(hints.monster ? "waiting" : "done");
   const [phase, setPhase] = useState<"stand" | "cut" | "pour" | "rise" | "leave">("stand");
   const [line, setLine] = useState(0);
@@ -213,35 +253,46 @@ function PackScene({ pack, hints, fx, flash, onOpened }: {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  const strike = (side: 0 | 1) => {
-    setBolts((b) => b.map((v, i) => v || i === side));
-    playPackSound(side ? "kaminari_02" : "kaminari_01", 0.7);
+  // the strikes land left, right, then lower left of the pack, a sixth of a second apart
+  const SPOTS = [0.2, 0.8, 0.1];
+  const strike = (k: number) => {
+    setBolts((b) => [...b, k]);
+    playPackSound((["kaminari_01", "kaminari_02", "kaminari_03"] as const)[k], 0.7);
     const r = root.current?.getBoundingClientRect();
     const p = box.current?.getBoundingClientRect();
     if (r && p && fx.current) {
-      const foot = fx.current.local(r.left + r.width * (side ? 0.8 : 0.2), p.bottom);
+      const foot = fx.current.local(r.left + r.width * SPOTS[k], p.bottom + (k === 2 ? p.height * 0.08 : 0));
       fx.current.strike(foot.x, foot.y, p.width * 0.35);
     }
   };
 
   useEffect(() => {
     playPackSound("01_op", 0.7);
-    if (hints.lightning) {
-      at(420, () => strike(0));
-      at(640, () => strike(1));
+    let t = 420;
+    for (let k = 0; k < hints.strikes; k++) at(t + k * 167, () => strike(k));
+    if (hints.strikes) t += hints.strikes * 167 + 300;
+    if (hints.tier !== "N") {
+      if (framed) at(t, () => { setFloor(true); playPackSound("proc_rare", 0.8); });
+      else {
+        // the upgrade: a sheen runs over it, it draws in and springs out as its gold or rainbow pack
+        at(t, () => { setUpgrading(true); playPackSound("proc_rare", 0.8); });
+        at(t + 330, () => { setTier(hints.tier); setFloor(true); flash(false); });
+        at(t + 800, () => setUpgrading(false));
+      }
+      t += 850;
     }
-    if (hints.gold) at(hints.lightning ? 980 : 520, () => { setGoldFloor(true); playPackSound("proc_rare", 0.8); });
-    if (hints.monster) at(hints.lightning ? 1350 : 900, () => setMonster("showing"));
+    if (hints.monster) at(t, () => setMonster("showing"));
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const cut = () => {
     if (phase !== "stand") return;
     unlockPackSound();
-    if (monster !== "done") {   // the monster has its moment first
+    if (monster !== "done") {   // Hope has its moment first
       wantCut.current = true;
       if (monster === "waiting") setMonster("showing");
       return;
     }
+    setTier(hints.tier);
     const p = box.current?.getBoundingClientRect();
     if (p && fx.current) {
       const a = fx.current.local(p.left, p.top + p.height * 0.17);
@@ -291,21 +342,22 @@ function PackScene({ pack, hints, fx, flash, onOpened }: {
   const poured = phase === "pour" || phase === "rise" || phase === "leave";
   return (
     <div ref={root} className="absolute inset-0">
-      <div className={`po-floor-gold ${goldFloor ? "po-on" : ""}`} aria-hidden="true" />
-      <div className={`po-curtain ${hints.gold ? "po-curtain-gold" : ""} ${poured && phase !== "leave" ? "po-on" : ""}`} aria-hidden="true">
+      <div className={`po-floor po-floor-${hints.tier.toLowerCase()} ${floor ? "po-on" : ""}`} aria-hidden="true" />
+      <div className={`po-curtain po-curtain-${hints.tier.toLowerCase()} ${poured && phase !== "leave" ? "po-on" : ""}`} aria-hidden="true">
         <span style={{ backgroundImage: `url(${FX}streaks.webp)` }} />
         <span style={{ backgroundImage: `url(${FX}streaks.webp)` }} />
       </div>
-      {[0, 1].map((i) => bolts[i] && (
-        <img key={i} src={`${FX}thunder.webp`} alt="" aria-hidden="true" className={`po-bolt ${i ? "po-bolt-right" : "po-bolt-left"}`} />
+      {bolts.map((k) => (
+        <img key={k} src={`${FX}thunder.webp`} alt="" aria-hidden="true" className={`po-bolt po-bolt-${k}`} />
       ))}
 
-      <div ref={box} className={`po-pack ${hints.gold ? "po-gold-frame" : ""} po-${phase}`}
+      <div ref={box} className={`po-pack ${frameOf(tier)} ${upgrading ? "po-upgrading" : ""} po-${phase}`}
            onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
            role="button" tabIndex={0} aria-label={`${pack.name} 팩 열기`} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && cut()}>
         <span className="po-cone" aria-hidden="true" />
         <span className="po-part po-body"><PackPicture pack={pack} /></span>
         <span className="po-part po-top"><PackPicture pack={pack} /></span>
+        <span className="po-pack-sheen" aria-hidden="true" />
         <span className="po-mouth" aria-hidden="true" />
         <span className="po-cutline" style={{ transform: `scaleX(${line})` }} aria-hidden="true" />
         {phase === "rise" && <span className="po-bundle" aria-hidden="true" />}
@@ -343,14 +395,15 @@ function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean
 
 /** The eight cards: they fly in from the corner onto the floor, a glint runs along them, then they turn — a tap, or a
  *  finger drawn across them turning each it passes, in the way it moves. */
-function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
-  cards: Pulled<PackCard>[]; fresh: Set<number>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
+function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext }: {
+  cards: Pulled<PackCard>[]; fresh: Set<number>; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
   onOpen: (c: Pulled<PackCard>) => void; last: boolean; onNext: () => void;
 }) {
   const grid = useRef<HTMLDivElement>(null);
   const els = useRef<(HTMLDivElement | null)[]>([]);
   const turnedRef = useRef<boolean[]>(Array(8).fill(false));
   const [turned, setTurned] = useState<boolean[]>(() => Array(8).fill(false));
+  const [finished, setFinished] = useState<boolean[]>(() => Array(8).fill(false));
   const [ready, setReady] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const drag = useRef<{ x: number; y: number; lastX: number; moved: boolean } | null>(null);
@@ -413,6 +466,36 @@ function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
     return () => [t1, t2].forEach(clearTimeout);
   }, [cards, fx]);
 
+  /** A shine or royal card, once face up, turns once more and comes round in its finish, in a burst of light (the
+   *  game's "premium" turn, seen in its own openings). */
+  const premium = useCallback((i: number, dir: 1 | -1, delay: number) => {
+    const el = els.current[i];
+    const inner = el?.querySelector<HTMLElement>(".po-inner");
+    if (!el || !inner) return;
+    const royal = cards[i].finish === "royal";
+    if (reduced()) {
+      window.setTimeout(() => alive.current && setFinished((f) => f.map((v, j) => v || j === i)), delay);
+      return;
+    }
+    window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, delay);
+    el.animate([{ transform: "none" }, { transform: "translateY(-8%) scale(1.22)", offset: 0.4 }, { transform: "translateY(-8%) scale(1.22)", offset: 0.8 }, { transform: "none" }],
+      { duration: 900, delay, easing: "cubic-bezier(.3,.7,.3,1)" }).onfinish = () => { el.style.zIndex = ""; };
+    const a = inner.animate([{ transform: `rotateY(${dir * 180}deg)` }, { transform: `rotateY(${dir * 540}deg)` }],
+      { duration: 560, delay: delay + 80, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" });
+    a.onfinish = () => { inner.style.transform = `rotateY(${dir * 540}deg)`; };
+    window.setTimeout(() => { if (alive.current) { setFinished((f) => f.map((v, j) => v || j === i)); playCardMove(0.6); } }, delay + 80 + 260);
+    window.setTimeout(() => {
+      if (!alive.current) return;
+      const rect = el.getBoundingClientRect();
+      if (fx.current) {
+        const c = fx.current.local(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        fx.current.premium(c.x, c.y, rect.width, royal);
+      }
+      playPackSound(royal ? "upgrad_01_ur" : "upgrad_01", royal ? 0.6 : 0.7);
+      flash(false);
+    }, delay + 80 + 560);
+  }, [cards, fx, flash]);
+
   const flip = useCallback((i: number, dir: 1 | -1, delay = 0) => {
     if (turnedRef.current[i]) return;
     turnedRef.current[i] = true;
@@ -423,20 +506,28 @@ function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
     const r = cards[i].rarity;
     const big = high(r);
     const quick = reduced();
-    const turn = quick ? 1 : big ? 260 : 200;
-    const a = inner.animate([{ transform: "rotateY(0deg)" }, { transform: `rotateY(${dir * 180}deg)` }],
-      { duration: turn, delay, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
+    const ur = r === "UR" && !quick;
+    // a UR first twists the wrong way, then whips round
+    const turn = quick ? 1 : ur ? 520 : big ? 260 : 200;
+    const a = inner.animate(ur
+      ? [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${-dir * 38}deg)`, offset: 0.38 }, { transform: `rotateY(${dir * 180}deg)` }]
+      : [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${dir * 180}deg)` }],
+      { duration: turn, delay, easing: ur ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
     a.onfinish = () => { inner.style.transform = `rotateY(${dir * 180}deg)`; };
+    const show = big ? (ur ? turn * 0.72 : 150) : turn * 0.45;   // when the face comes round
+    let settled = delay + turn + 70;
     if (big && !quick) {
       // the leap: up and large, held a moment in its light, then back to its place
-      const scale = r === "UR" ? 1.62 : 1.45;
-      const hold = r === "UR" ? 1350 : 1050;
-      window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, delay);
+      const scale = r === "UR" ? 1.75 : 1.5;
+      const hold = r === "UR" ? 1500 : 1100;
+      const start = delay + (ur ? turn * 0.45 : 0);
+      window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, start);
       el.animate(
-        [{ transform: "none" }, { transform: `translateY(-26%) scale(${scale})`, offset: 0.2 },
-         { transform: `translateY(-27%) scale(${scale * 1.02})`, offset: 0.74 }, { transform: "none" }],
-        { duration: hold, delay, easing: "cubic-bezier(.3,.7,.3,1)" },
+        [{ transform: "none" }, { transform: `translateY(-28%) scale(${scale})`, offset: 0.2 },
+         { transform: `translateY(-29%) scale(${scale * 1.02})`, offset: 0.74 }, { transform: "none" }],
+        { duration: hold, delay: start, easing: "cubic-bezier(.3,.7,.3,1)" },
       ).onfinish = () => { el.style.zIndex = ""; };
+      settled = start + hold;
     } else if (!quick) {
       el.animate([{ transform: "none" }, { transform: `translateY(-5%) scale(1.07) rotate(${-dir * 2}deg)`, offset: 0.5 }, { transform: "none" }],
         { duration: turn + 70, delay, easing: "ease-out" });
@@ -448,14 +539,16 @@ function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
         const c = fx.current.local(rect.left + rect.width / 2, rect.top + rect.height / 2);
         fx.current.reveal(c.x, c.y, rect.width, r);
         if (big) fx.current.dust(c.x, c.y, rect.width, r);
+        if (r === "UR") fx.current.ring(c.x, c.y, rect.width);
       }
       if (big) {
         playPackSound(r === "UR" ? "card_ur" : "card_sr", r === "UR" ? 0.7 : 0.65);
         flash(false);
         if (r === "UR") shake();
       } else playCardMove(0.7);
-    }, delay + (big ? 150 : turn * 0.45));
-  }, [cards, fx, flash, shake]);
+    }, delay + show);
+    if (cards[i].finish !== "basic") premium(i, dir, settled + 160);
+  }, [cards, fx, flash, shake, premium]);
 
   const turnAll = () => {
     let at = 0;
@@ -524,7 +617,7 @@ function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
                 {high(c.rarity) && <span className="po-foil" style={{ backgroundImage: `url(${FX}foil_${c.rarity.toLowerCase()}.webp)` }} />}
               </span>
               <span className="po-front">
-                <CardFace pulled={c} isNew={fresh.has(c.card.print)} />
+                <CardFace pulled={c} isNew={fresh.has(c.card.print)} finishOn={finished[i]} params={finishes.get(c.card.print)} />
               </span>
             </span>
           </div>
@@ -544,15 +637,24 @@ function Cards({ cards, fresh, fx, flash, shake, onOpen, last, onNext }: {
   );
 }
 
-function CardFace({ pulled, isNew }: { pulled: Pulled<PackCard>; isNew: boolean }) {
+/** A card's face; once its finish has come round, the finish itself — the game's shader when the browser can draw it
+ *  (in the opening), a light sheen otherwise (the results, where there may be many). */
+function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<PackCard>; isNew: boolean; finishOn?: boolean; params?: FinishParams }) {
   const { card, rarity, finish } = pulled;
+  const showFinish = finishOn && finish !== "basic";
+  const shader = showFinish && !!params && finishSupported();
+  const plain = <img src={card.thumb} alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover card-corner" />;
   return (
     <>
-      <img src={card.thumb} alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover card-corner" />
-      {finish !== "basic" && <span className={`po-sheen ${finish === "royal" ? "po-royal" : ""}`} style={finish === "royal" ? { backgroundImage: `url(${FX}rainbow.webp)` } : undefined} />}
+      {shader ? (
+        <Suspense fallback={plain}>
+          <CardFinishCanvas faceUrl={card.face ?? card.thumb} style={finish as "shine" | "royal"} params={params!} alt="" className="absolute inset-0 w-full h-full card-corner" />
+        </Suspense>
+      ) : plain}
+      {showFinish && !shader && <span className={`po-sheen ${finish === "royal" ? "po-royal" : ""}`} style={finish === "royal" ? { backgroundImage: `url(${FX}rainbow.webp)` } : undefined} />}
       <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}_hd.png`} alt="" className="absolute top-0 right-0 h-[11%] w-auto" />
       {isNew && <img src={`${FX}new.webp`} alt="NEW" className="absolute -top-[4%] -left-[4%] h-[12%] w-auto drop-shadow" />}
-      {finish !== "basic" && (
+      {showFinish && (
         <span className={`absolute bottom-[3%] left-[3%] px-1 rounded text-[9px] sm:text-[11px] font-bold leading-4 ${finish === "royal" ? "bg-fuchsia-600" : "bg-sky-600"}`}>
           {FINISH_LABEL[finish]}
         </span>
@@ -605,6 +707,12 @@ function Result({ pack, packs, fresh, onOpen, onAgain, onClose }: {
 
 const CSS = `
 .po-root { --horizon: 60%; background: #0b0816; }
+.po-warp { position: absolute; inset: 0; z-index: 46; pointer-events: none; overflow: hidden; animation: po-warp-out .7s ease-out forwards;
+  background: radial-gradient(circle at 50% 50%, rgba(220,250,255,1), rgba(80,190,255,.7) 18%, rgba(10,40,140,.6) 55%, rgba(0,0,0,.2)); }
+.po-warp-rays { position: absolute; left: 50%; top: 50%; width: 170vmax; height: 170vmax; translate: -50% -50%; animation: po-warp-rays .7s cubic-bezier(.2,.6,.3,1) forwards; }
+.po-warp-rays > span { position: absolute; width: calc(50% + 2px); height: calc(50% + 2px); margin: -1px; background-size: 100% 100%; mix-blend-mode: screen; }
+@keyframes po-warp-rays { from { transform: scale(.35) rotate(-8deg); } to { transform: scale(1.6) rotate(6deg); } }
+@keyframes po-warp-out { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
 @media (orientation: landscape) and (min-aspect-ratio: 4/3) { .po-root { --horizon: 64%; } }
 .po-backdrop { position: absolute; inset: 0;
   background:
@@ -632,7 +740,20 @@ const CSS = `
 @media (orientation: landscape) and (min-aspect-ratio: 4/3) { .po-overview { grid-template-columns: repeat(10, 1fr); width: min(94vw, calc((64svh - 120px) * .488 * 10 + 90px)); } }
 .po-mini { position: relative; aspect-ratio: 250 / 512; animation: po-slide-in .45s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes po-slide-in { from { transform: translateX(60vw); opacity: 0; } }
-.po-gold-frame { outline: 2px solid #ffd86b; outline-offset: 1px; box-shadow: 0 0 10px 2px rgba(255,205,90,.85), 0 0 26px 6px rgba(255,180,40,.45); }
+.po-frame-sr { outline: 2px solid #ffd86b; outline-offset: 1px; box-shadow: 0 0 10px 2px rgba(255,205,90,.85), 0 0 26px 6px rgba(255,180,40,.45); }
+.po-frame-ur { outline: 2px solid #ff6ad5; outline-offset: 1px; animation-name: po-rainbow-frame; animation-duration: 1.6s; animation-iteration-count: infinite; animation-timing-function: linear; }
+@keyframes po-rainbow-frame {
+  0% { outline-color: #ff6ad5; box-shadow: 0 0 12px 3px rgba(255,106,213,.85); } 20% { outline-color: #9b7bff; box-shadow: 0 0 12px 3px rgba(155,123,255,.85); }
+  40% { outline-color: #57d2ff; box-shadow: 0 0 12px 3px rgba(87,210,255,.85); } 60% { outline-color: #6cff9a; box-shadow: 0 0 12px 3px rgba(108,255,154,.85); }
+  80% { outline-color: #ffe25a; box-shadow: 0 0 12px 3px rgba(255,226,90,.85); } 100% { outline-color: #ff6ad5; box-shadow: 0 0 12px 3px rgba(255,106,213,.85); } }
+.po-mini.po-frame-ur { animation: po-slide-in .45s cubic-bezier(.2,.8,.3,1) both, po-rainbow-frame 1.6s linear infinite; }
+.po-pack.po-frame-ur { animation: po-pack-in .4s cubic-bezier(.2,.8,.3,1) both, po-rainbow-frame 1.6s linear infinite; }
+.po-pack-sheen { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.9) 45%, transparent 60%); background-size: 300% 100%; }
+.po-upgrading .po-pack-sheen { animation: po-pack-sheen .5s ease-in-out forwards; }
+.po-upgrading .po-part { animation: po-upgrade .8s cubic-bezier(.3,.6,.3,1) forwards; }
+@keyframes po-pack-sheen { 0% { opacity: 1; background-position: 120% 0; } 100% { opacity: 1; background-position: -120% 0; } }
+@keyframes po-upgrade { 0% { transform: none; } 35% { transform: scale(.85); filter: brightness(1.6); } 55% { transform: scale(1.3); filter: brightness(2.2); } 100% { transform: none; filter: none; } }
 
 .po-pack { position: absolute; left: 50%; bottom: calc(100% - var(--horizon) - .5%); height: min(40svh, 84vw); aspect-ratio: 250 / 512; translate: -50% 0;
   touch-action: none; cursor: pointer; z-index: 10; -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.28));
@@ -651,26 +772,31 @@ const CSS = `
 .po-cut .po-cutline, .po-pour .po-cutline, .po-rise .po-cutline, .po-leave .po-cutline { opacity: 0; transition: opacity .2s; }
 .po-pour .po-cone, .po-rise .po-cone { opacity: 1; transition: opacity .25s; }
 .po-pour .po-mouth, .po-rise .po-mouth { opacity: 1; transition: opacity .2s; }
-.po-pack.po-gold-frame.po-pour, .po-pack.po-gold-frame.po-rise, .po-pack.po-gold-frame.po-leave, .po-pack.po-gold-frame.po-cut { outline-color: transparent; box-shadow: none; }
+.po-pack.po-pour, .po-pack.po-rise, .po-pack.po-leave, .po-pack.po-cut { outline-color: transparent !important; box-shadow: none !important; }
 .po-leave { opacity: 0; transform: translateY(6%); transition: opacity .3s, transform .3s; }
 .po-bundle { position: absolute; left: 14%; right: 14%; top: 4%; aspect-ratio: 704 / 1024; border-radius: 6px; background: #fff; pointer-events: none;
   box-shadow: 0 0 24px 10px rgba(255,255,255,.85), 0 0 60px 20px rgba(170,200,255,.5); animation: po-bundle .6s cubic-bezier(.5,0,.7,.4) forwards; }
 @keyframes po-bundle { from { transform: translateY(10%); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-190%); opacity: .9; } }
 
-.po-floor-gold { position: absolute; left: 0; right: 0; top: var(--horizon); bottom: 0; opacity: 0; pointer-events: none; transition: opacity .35s;
-  background: radial-gradient(70% 55% at 50% 0%, rgba(255,205,70,.75), rgba(255,170,30,.25) 50%, transparent 80%); }
-.po-floor-gold.po-on { opacity: 1; }
+.po-floor { position: absolute; left: 0; right: 0; top: var(--horizon); bottom: 0; opacity: 0; pointer-events: none; transition: opacity .35s; }
+.po-floor-sr { background: radial-gradient(70% 55% at 50% 0%, rgba(255,205,70,.75), rgba(255,170,30,.25) 50%, transparent 80%); }
+.po-floor-ur { background: radial-gradient(70% 55% at 50% 0%, rgba(255,120,220,.7), rgba(150,110,255,.3) 50%, transparent 80%); }
+.po-floor.po-on { opacity: 1; }
 .po-curtain { position: absolute; inset: 0; z-index: 5; opacity: 0; pointer-events: none; transition: opacity .3s;
   background: linear-gradient(90deg, #0617a0, #1c3cf2 30%, #2848ff 50%, #1c3cf2 70%, #0617a0); }
-.po-curtain-gold { background: linear-gradient(90deg, #5a3800, #c98f12 30%, #f1c43a 50%, #c98f12 70%, #5a3800); }
+.po-curtain-sr { background: linear-gradient(90deg, #5a3800, #c98f12 30%, #f1c43a 50%, #c98f12 70%, #5a3800); }
+.po-curtain-ur { background: linear-gradient(90deg, #ff2fd0, #8a3cff 14%, #2c6bff 28%, #22d0ff 40%, #27e07a 54%, #f5e33a 68%, #ff8a2a 82%, #ff2fd0);
+  background-size: 200% 100%; animation: po-rainbow-shift 1.6s linear infinite; }
+@keyframes po-rainbow-shift { to { background-position: 200% 0; } }
 .po-curtain.po-on { opacity: 1; }
 .po-curtain > span { position: absolute; inset: -10% 0 0 0; background-size: 300px 100svh; background-repeat: repeat; mix-blend-mode: screen; animation: po-streak 1.4s linear infinite; }
 .po-curtain > span + span { background-size: 190px 120svh; background-position: 90px 0; opacity: .75; animation-duration: .9s; }
 @keyframes po-streak { from { background-position: 0 0; } to { background-position: 0 -100svh; } }
 .po-bolt { position: absolute; bottom: calc(100% - var(--horizon)); height: 62svh; width: auto; max-width: none; translate: -50% 0; pointer-events: none; z-index: 6;
   mix-blend-mode: screen; filter: sepia(1) hue-rotate(175deg) saturate(6) brightness(1.25) drop-shadow(0 0 10px #3aa0ff); animation: po-bolt .55s steps(1) forwards; }
-.po-bolt-left { left: 20%; }
-.po-bolt-right { left: 80%; transform: scaleX(-1); }
+.po-bolt-0 { left: 20%; }
+.po-bolt-1 { left: 80%; transform: scaleX(-1); }
+.po-bolt-2 { left: 10%; height: 70svh; bottom: calc(100% - var(--horizon) - 6%); }
 @keyframes po-bolt { 0% { opacity: 1; } 18% { opacity: .35; } 30% { opacity: 1; } 55% { opacity: .8; } 100% { opacity: 0; } }
 
 .po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56);
@@ -715,6 +841,6 @@ const CSS = `
 .po-btn small { font-weight: 600; opacity: .8; margin-left: 4px; }
 .po-plain { background: rgba(255,255,255,.12); box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
-  .po-mini, .po-pack, .po-curtain > span, .po-bolt, .po-glow, .po-foil, .po-sheen, .po-royal, .po-result, .po-bundle, .po-monster, .po-monster img { animation: none; }
+  .po-warp, .po-warp-rays, .po-mini, .po-pack, .po-curtain > span, .po-bolt, .po-glow, .po-foil, .po-sheen, .po-royal, .po-result, .po-bundle, .po-monster, .po-monster img { animation: none; }
 }
 `;

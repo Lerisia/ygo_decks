@@ -3,7 +3,7 @@
  *  can turn them off; that is remembered. */
 const BASE = "/media/md_ui/packopen/sound/";
 const NAMES = ["01_op", "02_packout", "02_packout_1pack", "03_cut", "04_cardin", "05_cardout", "card_move_01", "card_move_02", "card_move_03", "card_move_04",
-               "card_sr", "card_ur", "card_shake", "hope", "kaminari_01", "kaminari_02", "kaminari_03", "proc_rare",
+               "card_sr", "card_ur", "card_shake", "hope", "upgrad_01", "upgrad_01_ur", "kaminari_01", "kaminari_02", "kaminari_03", "proc_rare",
                "proc_rare_02"] as const;
 export type PackSoundName = (typeof NAMES)[number];
 const OFF = "pack_sound_off";
