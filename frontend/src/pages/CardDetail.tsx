@@ -498,10 +498,11 @@ export default function CardDetail() {
         </div>
 
         {/* on a phone the stats fill the panel beside the card: rows spread over its height, sized to its width
-            (stat-fill in index.css; 참혈 2026-10-12) */}
+            (stat-fill in index.css; 참혈 2026-10-12), and sized as if there were six rows, so a card with fewer
+            does not get bigger text (참혈 2026-10-13) */}
         <div
           className={`${AREA.stats} ${panelWide} stat-fill px-2.5 py-2 md:px-3 md:py-1.5 flex flex-col justify-evenly gap-1 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}
-          style={{ "--rows": left.length + right.length } as CSSProperties}
+          style={{ "--rows": Math.max(6, left.length + right.length) } as CSSProperties}
         >
           <StatGroup items={left} />
           {right.length > 0 && <StatGroup items={right} />}
