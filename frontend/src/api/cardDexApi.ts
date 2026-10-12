@@ -69,6 +69,8 @@ export type CardOptions = {
   levels: number[];
   spell_trap_kinds: Option[];
   groups: { id: number; name: string; count: number }[];
+  /** Cards with a support list of their own (other cards name them); count is its size, the card included. */
+  support_cards: { id: number; name: string; count: number }[];
 };
 
 export type CardTexts = { materials: string; effect: string; pendulum_effect: string; flavor: string } | null;

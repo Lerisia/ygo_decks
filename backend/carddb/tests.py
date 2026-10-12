@@ -1122,6 +1122,10 @@ class CardDexApiTest(TestCase):
         body = self.get(card=2)
         self.assertEqual(([r["id"] for r in body["results"]], body["card_filter"]), ([2, 3, 5], {"id": 2, "name": "푸른 눈의 백룡"}))
         self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supporters"], 0)   # nobody names it: no list
+        # the cards with such a list, to search them beside the 카드군 (엘리스 10/12): the same count as their page
+        support_cards = self.client.get("/api/carddb/cards/options/").json()["support_cards"]
+        self.assertIn({"id": 2, "name": "푸른 눈의 백룡", "count": 3}, support_cards)
+        self.assertNotIn(6, [c["id"] for c in support_cards])
         CardSupport.objects.filter(how="named").delete()
         body = self.client.get("/api/carddb/cards/4/").json()
         self.assertEqual(body["supports"], [{"kind": "card", "id": 1, "name": "블랙 매지션", "mutual": False}])   # what it names outright

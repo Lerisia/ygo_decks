@@ -3,7 +3,7 @@ import json
 import os
 import time
 import unicodedata
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from django.conf import settings
 from django.db.models import Count, Max
@@ -354,12 +354,20 @@ def card_options(request):
             seen.add(key)
             groups.append({"id": gid, "name": info[gid], "count": len(members[gid])})
     groups.sort(key=lambda g: (g["name"], g["id"]))
+    # cards with a support list of their own (some other card names them), searched beside the 카드군 (엘리스 10/12);
+    # count is the list's size, the card itself included, as on its page
+    rows = _card_index()["type"]
+    by_id = {r.id: r for r in rows}
+    lists = Counter(t for r in rows for t in r.as_cards)
+    support_cards = sorted(({"id": t, "name": by_id[t].name, "count": n} for t, n in lists.items() if n > 1 and t in by_id),
+                           key=lambda c: (c["name"], c["id"]))
     return Response({
         "categories": _options(CATEGORIES), "frames": _options(FRAMES), "attributes": _options(ATTRIBUTES),
         "races": _options(RACES), "levels": list(range(0, 14)),
         "spell_trap_kinds": [{"value": f"spell:{k}", "label": v} for k, v in SPELL_KINDS.items()]
                             + [{"value": f"trap:{k}", "label": v} for k, v in TRAP_KINDS.items()],
         "groups": groups,
+        "support_cards": support_cards,
     })
 
 

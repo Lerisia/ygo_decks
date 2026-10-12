@@ -3,11 +3,16 @@ import SearchForm from "./SearchForm";
 import { Input } from "./ui/input";
 import { matchesDeckQuery } from "@/utils/hangul";
 
-export type ComboItem = { key: string; name: string; sub?: string };
+/** tag: a word before the name saying what it is; searchOnly: listed only once something is typed. */
+export type ComboItem = { key: string; name: string; sub?: string; tag?: string; searchOnly?: boolean };
+
+const STEP = 60;   // rows drawn at a time: drawing all of a long list at once stalls a phone (엘리스 10/12)
+const squash = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 /** Choosing one of many without a modal (엘리스 2026-10-12, the 카드군 filter): the box is a search box, its matches
- *  (name or 초성) drop down under it, and a tap picks one. Arrow keys move through them; Enter — the phone keyboard's
- *  검색 key — picks the one marked and puts the keyboard away. */
+ *  (name or 초성; the whole name, then its start, first) drop down under it, drawn a screenful at a time as the list
+ *  scrolls, and a tap picks one. Arrow keys move through them; Enter — the phone keyboard's 검색 key — picks the one
+ *  marked and puts the keyboard away. */
 export default function ComboBox({ items, value, onPick, onClear, placeholder, label, emptyText, loading = false }: {
   items: ComboItem[]; value: string; onPick: (key: string) => void; onClear: () => void;
   placeholder: string; label: string; emptyText: string; loading?: boolean;
@@ -15,15 +20,29 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [limit, setLimit] = useState(STEP);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const id = useId();
   const chosen = items.find((it) => it.key === value);
-  const matches = useMemo(() => items.filter((it) => matchesDeckQuery(query, it.name)), [items, query]);
+  const matches = useMemo(() => {
+    const q = squash(query);
+    const found = items.filter((it) => (q || !it.searchOnly) && matchesDeckQuery(query, it.name));
+    if (!q) return found;
+    const rank = (it: ComboItem) => (squash(it.name) === q ? 0 : squash(it.name).startsWith(q) ? 1 : 2);
+    return found.map((it, i) => [rank(it), i, it] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+  }, [items, query]);
 
   useEffect(() => {
     list.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
+
+  const restart = (q: string) => {
+    setQuery(q);
+    setActive(0);
+    setLimit(STEP);
+    setOpen(true);
+  };
 
   const pick = (it: ComboItem | undefined) => {
     if (!it) return;
@@ -45,22 +64,16 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
           aria-autocomplete="list"
           placeholder={chosen ? chosen.name : placeholder}
           value={open ? query : chosen?.name ?? ""}
-          onFocus={() => {
-            setQuery("");
-            setActive(0);
-            setOpen(true);
-          }}
+          onFocus={() => restart("")}
           onBlur={() => setOpen(false)}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setActive(0);
-            setOpen(true);
-          }}
+          onChange={(e) => restart(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
               setOpen(true);
-              setActive((a) => Math.max(0, Math.min(matches.length - 1, a + (e.key === "ArrowDown" ? 1 : -1))));
+              const next = Math.max(0, Math.min(matches.length - 1, active + (e.key === "ArrowDown" ? 1 : -1)));
+              setActive(next);
+              if (next >= limit) setLimit(limit + STEP);
             } else if (e.key === "Escape") {
               setOpen(false);
               input.current?.blur();
@@ -88,12 +101,16 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
           aria-label={label}
           // a press on the list must not blur the box before the pick lands
           onMouseDown={(e) => e.preventDefault()}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (limit < matches.length && el.scrollTop + el.clientHeight > el.scrollHeight - 200) setLimit(limit + STEP);
+          }}
           className="absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1"
         >
           {loading ? (
             <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">불러오는 중…</li>
           ) : matches.length ? (
-            matches.map((it, i) => (
+            matches.slice(0, limit).map((it, i) => (
               <li
                 key={it.key}
                 id={`${id}-${i}`}
@@ -106,7 +123,14 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
                   i === active ? "bg-blue-50 dark:bg-gray-700" : ""
                 } ${it.key === value ? "font-semibold text-blue-700 dark:text-blue-300" : ""}`}
               >
-                <span className="break-keep">{it.name}</span>
+                <span className="flex items-center gap-1.5 min-w-0">
+                  {it.tag && (
+                    <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                      {it.tag}
+                    </span>
+                  )}
+                  <span className="break-keep">{it.name}</span>
+                </span>
                 {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
               </li>
             ))

@@ -209,8 +209,14 @@ export default function CardList() {
   }, []);
 
   const groupName = options?.groups.find((g) => String(g.id) === filters.group)?.name;
+  // 카드군, and once a name is typed the cards with a support list (엘리스 10/12: a card's 서포트 searched here too)
   const groupItems: ComboItem[] = useMemo(
-    () => (options?.groups ?? []).map((g) => ({ key: String(g.id), name: g.name, sub: `${g.count.toLocaleString()}장` })),
+    () => [
+      ...(options?.groups ?? []).map((g) => ({ key: `g${g.id}`, name: g.name, sub: `${g.count.toLocaleString()}장`, tag: "카드군" })),
+      ...(options?.support_cards ?? []).map((c) => ({
+        key: `c${c.id}`, name: c.name, sub: `서포트 ${c.count.toLocaleString()}장`, tag: "카드", searchOnly: true,
+      })),
+    ],
     [options],
   );
   const monsterOnly = filters.category === "spell" || filters.category === "trap";
@@ -241,13 +247,13 @@ export default function CardList() {
           />
         </SearchForm>
         <ComboBox
-          label="카드군"
-          placeholder="카드군 검색 (이름·초성)"
+          label="카드군·서포트"
+          placeholder="카드군·카드 서포트 검색 (이름·초성)"
           items={groupItems}
-          value={filters.group}
-          onPick={(group) => update({ group })}
-          onClear={() => update({ group: "" })}
-          emptyText="맞는 카드군이 없습니다."
+          value={filters.group ? `g${filters.group}` : filters.card ? `c${filters.card}` : ""}
+          onPick={(key) => update(key[0] === "g" ? { group: key.slice(1), card: "" } : { card: key.slice(1), group: "" })}
+          onClear={() => update({ group: "", card: "" })}
+          emptyText="맞는 카드군·카드가 없습니다."
           loading={!options}
         />
       </div>
