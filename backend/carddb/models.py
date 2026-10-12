@@ -235,6 +235,52 @@ class CardSupport(models.Model):
         ]
 
 
+class BanStatus(models.TextChoices):
+    """A card's place on a 금제 list; 미출시 is a card not yet out in that game on the day (엘리스 2026-10-12)."""
+    FORBIDDEN = "forbidden", "금지"
+    LIMITED = "limited", "제한"
+    SEMI_LIMITED = "semi_limited", "준제한"
+    UNLIMITED = "unlimited", "무제한"
+    UNRELEASED = "unreleased", "미출시"
+
+
+class Banlist(models.Model):
+    """One 금제 (Forbidden & Limited list) of a game: every card it limits, from its day until the next list. Master
+    Duel's first (엘리스 2026-10-12); the format leaves room for OCG and TCG."""
+
+    class Format(models.TextChoices):
+        MD = "md", "마스터 듀얼"
+        OCG = "ocg", "OCG"
+        TCG = "tcg", "TCG"
+
+    format = models.CharField(max_length=8, choices=Format.choices)
+    effective = models.DateField(help_text="시행일")
+    source = models.CharField(max_length=200, blank=True, help_text="출처 문서 (Yugipedia)")
+
+    class Meta:
+        ordering = ["format", "-effective"]
+        constraints = [models.UniqueConstraint(fields=["format", "effective"], name="carddb_banlist_format_day")]
+
+    def __str__(self):
+        return f"{self.get_format_display()} {self.effective}"
+
+
+class BanlistEntry(models.Model):
+    """A card on a list, as its source writes it: the status, and the one before when it changed. The source's name
+    stays, so a card the card DB does not know yet is kept and linked once it is."""
+
+    banlist = models.ForeignKey(Banlist, on_delete=models.CASCADE, related_name="entries")
+    card = models.ForeignKey(Card, null=True, blank=True, on_delete=models.SET_NULL, related_name="banlist_entries")
+    name = models.CharField(max_length=200, help_text="출처에 적힌 이름")
+    status = models.CharField(max_length=12, choices=BanStatus.choices)
+    previous = models.CharField(max_length=12, choices=BanStatus.choices, blank=True,
+                                help_text="바뀐 카드의 바로 전 상태 (그대로면 비움)")
+
+    class Meta:
+        ordering = ["banlist", "name"]
+        constraints = [models.UniqueConstraint(fields=["banlist", "name"], name="carddb_banlist_entry_name")]
+
+
 def has_art(card_field="pk"):
     """Filter for cards (or rows pointing at one) with Master Duel art — the site leaves out cards outside Master Duel."""
     return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))

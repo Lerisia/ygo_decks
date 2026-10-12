@@ -22,6 +22,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 CARD_FACE_ASSETS = os.environ.get("CARD_FACE_ASSETS", "/home/elyss/storage/md/face_assets")
 # Master Duel's card_named list file (ja-jp) the 카드군 are checked against; skipped when missing.
 MD_NAMED_PATH = os.environ.get("MD_NAMED_PATH", "/home/elyss/storage/md/extract/raw_jp/ja-jp_card_named.bytes")
+# The 금제 list pages fetched from Yugipedia (carddb import_banlists), kept so that a run asks only for what is new.
+BANLIST_CACHE = os.environ.get("BANLIST_CACHE", "/home/elyss/storage/banlists/yugipedia")
 
 from django.conf import settings
 from django.conf.urls.static import static
