@@ -81,8 +81,12 @@ export default function PackOpening({ pack, packs, fresh, gems, owed = false, on
   const [finishes, setFinishes] = useState<Map<number, FinishParams>>(() => new Map());
   const total = packs.length;
 
-  // the opening's start sound, once, with the blue burst (the game's openings: once each, before the packs)
-  useEffect(() => { playPackSound("01_op", 0.7); }, []);
+  // the opening's start sound, once, with the blue burst (the game's openings: once each, before the packs); Hope's picture
+  // fetched now, so it is there when it cuts in
+  useEffect(() => {
+    playPackSound("01_op", 0.7);
+    new Image().src = `${FX}monster.webp`;
+  }, []);
 
   // a shine or royal card turns into its finish in the game's shader: what that needs, asked for once now
   useEffect(() => {
@@ -912,11 +916,14 @@ const CSS = `
 
 .po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56);
   animation: po-monster-bg 1.95s linear forwards; }
-/* Hope's head (37.5% down its picture, a little left of the middle) a quarter of the way down the screen, all of it from
-   its horns to its legs in view on a phone held upright (엘리스 10/13: "여전히 너무 아래") */
-.po-monster img { position: absolute; left: 50%; top: 26%; width: min(max(150vw, 125svh), 200svh); max-width: none; translate: -47% -37.5%;
+/* Hope's head (37.5% down its picture, a little left of the middle) a third of the way down, all of it from its horns to
+   its legs in view on a phone held upright (엘리스 10/13: "여전히 아래에 박혀요 … 크기를 좀 줄여야"). Its box is square
+   before the picture comes and the move to its head is in the animation itself: Safari worked out a translate in % of
+   the picture before it had come (0) and kept it, leaving Hope low and to the right. */
+.po-monster img { position: absolute; left: 50%; top: 33%; width: min(max(105vw, 88svh), 200svh); aspect-ratio: 1; height: auto; max-width: none;
   transform-origin: 47% 37.5%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
-@keyframes po-monster { 0% { transform: scale(1.5) translateX(14%); opacity: 0; } 8% { opacity: 1; } 70% { transform: scale(1.08) translateX(0); } 100% { transform: scale(1.03) translateX(-2%); opacity: 1; } }
+@keyframes po-monster { 0% { transform: translate(-47%, -37.5%) scale(1.5) translateX(14%); opacity: 0; } 8% { opacity: 1; }
+  70% { transform: translate(-47%, -37.5%) scale(1.08); } 100% { transform: translate(-47%, -37.5%) scale(1.03) translateX(-2%); opacity: 1; } }
 @keyframes po-monster-bg { 0% { background: #000; } 6% { background: #000; } 9% { background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56); } 92% { opacity: 1; } 100% { opacity: 0; } }
 
 .po-grid { position: absolute; left: 50%; bottom: calc(100% - var(--horizon) - .5%); translate: -50% 0; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
