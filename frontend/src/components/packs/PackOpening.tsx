@@ -12,6 +12,9 @@ import { type Pulled, type Rarity, GEMS_PER_PACK } from "@/utils/packDraw";
 const FX = "/media/md_ui/packopen/";
 /** How long the cards take (ms), slow enough to follow a turn on a phone (엘리스 10/13: "회전이 너무 빨라서 안 보여요"). */
 const T = {
+  // from the tear, as the game's openings go (its 4.5 s cut sound rising under them, 엘리스 10/13): the cards out at
+  // 1.3 s, the pack gone at 2.3 s, the cards dealt at 3.2 s
+  out: 1320, gone: 2300, dealt: 3200,
   stream: 240, streamGap: 95,                   // out of the opened pack and off the top, one after the next
   deal: 320, dealGap: 50,                       // up into place from below, one after the next
   turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
@@ -31,14 +34,16 @@ const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK
 /** What a pack shows before it opens: its tier (a gold pack for an SR, a rainbow one for a UR, as the game's pack turns
  *  into its gold or rainbow version), lightning (one to three strikes) and the Hope cut-in. The game's own rule for these
  *  is not known (its server decides): lightning often for an SR or better and now and then without, Hope only for a UR,
- *  one time in two, so it never lies (엘리스 10/13). */
+ *  one time in two, so it never lies (엘리스 10/13). Face down, an SR / UR shows its gold / rainbow back in some packs
+ *  and not in others (in the game's openings two packs of four with one marked them): one pack in two. */
 type Tier = "N" | "SR" | "UR";
-type Hints = { tier: Tier; strikes: number; monster: boolean };
+type Hints = { tier: Tier; strikes: number; monster: boolean; marked: boolean };
 const hintsFor = (cards: Pulled<PackCard>[]): Hints => {
   const top = best(cards);
   const tier: Tier = top === "UR" ? "UR" : top === "SR" ? "SR" : "N";
   const lit = Math.random() < (tier !== "N" ? 0.6 : 0.12);
-  return { tier, strikes: lit ? 1 + Math.floor(Math.random() * 3) : 0, monster: tier === "UR" && Math.random() < 0.5 };
+  return { tier, strikes: lit ? 1 + Math.floor(Math.random() * 3) : 0, monster: tier === "UR" && Math.random() < 0.5,
+           marked: tier !== "N" && Math.random() < 0.5 };
 };
 const frameOf = (tier: Tier) => (tier === "UR" ? "po-frame-ur" : tier === "SR" ? "po-frame-sr" : "");
 
@@ -176,7 +181,7 @@ export default function PackOpening({ pack, packs, fresh, gems, onClose, onAgain
           <PackScene key={index} pack={pack} hints={hints[index]} framed={total > 1} fx={fx} flash={flashNow} onOpened={() => setStage("cards")} />
         )}
         {stage === "cards" && (
-          <Cards key={index} cards={packs[index]} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
+          <Cards key={index} cards={packs[index]} marked={hints[index].marked} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
         {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} gems={gems} onOpen={open} onAgain={onAgain} onClose={onClose} />}
@@ -323,12 +328,9 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     flash(true);
     playPackSound("03_cut", 0.6);
     at(140, () => setPhase("pour"));
-    const out = 520;
-    at(out - 80, () => playPackSound("05_cardout", 0.8));
-    at(out, () => setPhase("rise"));
-    const streamed = out + T.streamGap * 7 + T.stream;
-    at(streamed - 60, () => setPhase("leave"));
-    at(streamed + 240, onOpened);
+    at(T.out, () => setPhase("rise"));
+    at(T.gone, () => setPhase("leave"));
+    at(T.dealt, onOpened);
   };
 
   const monsterDone = () => {
@@ -412,7 +414,8 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
 
 /** The eight cards out of the opened pack, one after another (엘리스 10/13: "후루루루룩 8장 나오는 게 팩뜯의 맛"): as
  *  the game's own openings show them, each a white glow shot straight up out of the mouth and off the top, a tenth of
- *  a second after the one before; the game's card-out sound carries the rush. */
+ *  a second after the one before. The game gives them no sound of their own: the cut sound's long rise carries the
+ *  rush. */
 function Stream() {
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -452,8 +455,8 @@ function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean
 
 /** The eight cards: they rise from below into place, a glint runs along them, then they turn — a tap, or a
  *  finger drawn across them turning each it passes, in the way it moves. */
-function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext }: {
-  cards: Pulled<PackCard>[]; fresh: Set<number>; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
+function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last, onNext }: {
+  cards: Pulled<PackCard>[]; marked: boolean; fresh: Set<number>; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
   onOpen: (c: Pulled<PackCard>) => void; last: boolean; onNext: () => void;
 }) {
   const grid = useRef<HTMLDivElement>(null);
@@ -512,13 +515,13 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
       if (!alive.current) return;
       setReady(true);
       els.current.forEach((el, i) => {
-        if (el && high(cards[i].rarity) && fx.current) {
+        if (el && marked && high(cards[i].rarity) && fx.current) {
           fx.current.twinkleOn(() => (alive.current ? el.getBoundingClientRect() : null), cards[i].rarity, () => !alive.current || turnedRef.current[i]);
         }
       });
     }, landed + 300);
     return () => [t1, t2].forEach(clearTimeout);
-  }, [cards, fx]);
+  }, [cards, fx, marked]);
 
   /** A shine or royal card, once face up, turns once more and comes round in its finish, in a burst of light (the
    *  game's "premium" turn, seen in its own openings). */
@@ -659,10 +662,10 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { if (turned[i]) onOpen(c); else flip(i, 1); } }}
                aria-label={turned[i] ? `${c.card.name} ${c.rarity}${c.finish !== "basic" ? ` ${FINISH_LABEL[c.finish]}` : ""}` : `${i + 1}번째 카드 넘기기`}>
             <span className="po-inner">
-              <span className={`po-back po-back-${c.rarity.toLowerCase()}`}>
-                {high(c.rarity) && <img src={`${FX}glow_${c.rarity.toLowerCase()}.webp`} alt="" aria-hidden="true" className="po-glow" />}
+              <span className={`po-back po-back-${marked ? c.rarity.toLowerCase() : "n"}`}>
+                {marked && high(c.rarity) && <img src={`${FX}glow_${c.rarity.toLowerCase()}.webp`} alt="" aria-hidden="true" className="po-glow" />}
                 <img src={`${FX}back.webp`} alt="" aria-hidden="true" draggable={false} className="po-back-img" />
-                {high(c.rarity) && <span className="po-foil" style={{ backgroundImage: `url(${FX}foil_${c.rarity.toLowerCase()}.webp)` }} />}
+                {marked && high(c.rarity) && <span className="po-foil" style={{ backgroundImage: `url(${FX}foil_${c.rarity.toLowerCase()}.webp)` }} />}
               </span>
               <span className="po-front">
                 <CardFace pulled={c} isNew={fresh.has(c.card.print)} finishOn={finished[i]} params={finishes.get(c.card.print)} />
