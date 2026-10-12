@@ -40,7 +40,7 @@ interface Deck {
   video_count?: number;
   has_hyeol?: boolean;
   /** How many 테마 카드 and 서포트 the card book lists for the deck. */
-  card_book?: { member: number; support: number };
+  card_book?: { member: number; support: number; by_card?: boolean };
   stats?: DeckStats;
 }
 
@@ -246,7 +246,8 @@ export default function DeckDetail() {
               <span aria-hidden="true">🃏</span>
               이 덱의 카드 보기
               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 tabular-nums">
-                테마 {deck.card_book.member} · 서포트 {deck.card_book.support}
+                {/* a deck built on a card alone has one list, not a 카드군's 테마 / 서포트 (엘리스 10/12) */}
+                {deck.card_book.by_card ? `카드 ${deck.card_book.member}` : `테마 ${deck.card_book.member} · 서포트 ${deck.card_book.support}`}
               </span>
             </Link>
           ) : (

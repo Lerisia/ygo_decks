@@ -61,7 +61,8 @@ export type CardListResponse = {
   card_filter?: { id: number; name: string } | null;
   /** With a deck filter: how many of its 테마 카드 and of the cards supporting them match, and the deck. */
   deck_counts?: { member: number; support: number };
-  deck_filter?: { id: number; name: string } | null;
+  /** by_card: a deck built on a card alone, one list with no 테마 카드 / 서포트 split (엘리스 10/12). */
+  deck_filter?: { id: number; name: string; by_card?: boolean } | null;
 };
 
 export type Option = { value: string; label: string };

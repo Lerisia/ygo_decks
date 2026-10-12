@@ -228,14 +228,20 @@ def _deck_tests(deck_id):
     def support(r):
         return not member(r) and (bool(r.supports & groups) or bool(r.names & cards))
 
-    return member, support
+    if not linked and cards:
+        # built on a card alone, no 카드군 to split by (빛의 황금궤, 엘리스 10/12): one list, as the card's own support
+        # list is — the card, the cards bearing its name and the cards naming it
+        return (lambda r: member(r) or support(r)), (lambda r: False), True
+    return member, support, False
 
 
 def deck_card_counts(deck_id):
-    """How many 테마 카드 and 서포트 the card book shows for a deck (its page's button)."""
-    member, support = _deck_tests(deck_id)
+    """How many 테마 카드 and 서포트 the card book shows for a deck (its page's button); a deck built on a card alone
+    has one list (by_card)."""
+    member, support, by_card = _deck_tests(deck_id)
     rows = _card_index()["type"]
-    return {"member": sum(1 for r in rows if member(r)), "support": sum(1 for r in rows if support(r))}
+    counts = {"member": sum(1 for r in rows if member(r)), "support": sum(1 for r in rows if support(r))}
+    return {**counts, "by_card": True} if by_card else counts
 
 
 def _keep(p):
@@ -274,8 +280,8 @@ def _keep(p):
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)
     if str(p.get("deck", "")).isdigit():
-        member, support = _deck_tests(int(p["deck"]))
-        tests.append(support if p.get("role") == "support" else member)
+        member, support, by_card = _deck_tests(int(p["deck"]))
+        tests.append(support if p.get("role") == "support" and not by_card else member)
     if str(p.get("group", "")).isdigit():
         # a group's members, or with role=support the cards supporting it (서포트, 엘리스 2026-10-11)
         if p.get("role") == "support":
@@ -337,9 +343,12 @@ def cards(request):
     if str(p.get("deck", "")).isdigit():   # a deck's list: its name and how many 테마 카드 and 서포트 it has
         from deck.models import Deck
         base = {k: p.get(k) for k in p.keys()}
+        by_card = _deck_tests(int(p["deck"]))[2]
         extra["deck_counts"] = {role: len(found({**base, "role": role})) for role in ("member", "support")}
+        if by_card:
+            extra["deck_counts"]["support"] = 0
         deck = Deck.objects.filter(id=int(p["deck"])).values("id", "name").first()
-        extra["deck_filter"] = deck
+        extra["deck_filter"] = {**deck, "by_card": by_card} if deck else None
     if str(p.get("card", "")).isdigit():
         named = Card.objects.filter(id=int(p["card"])).first()
         extra["card_filter"] = {"id": named.id, "name": display_name(named)} if named else None

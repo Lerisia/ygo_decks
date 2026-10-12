@@ -127,7 +127,7 @@ export default function CardList() {
   const [groupCounts, setGroupCounts] = useState<{ member: number; support: number } | null>(null);
   const [cardFilter, setCardFilter] = useState<{ id: number; name: string } | null>(null);
   const [deckCounts, setDeckCounts] = useState<{ member: number; support: number } | null>(null);
-  const [deckFilter, setDeckFilter] = useState<{ id: number; name: string } | null>(null);
+  const [deckFilter, setDeckFilter] = useState<{ id: number; name: string; by_card?: boolean } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -337,6 +337,10 @@ export default function CardList() {
             ) : (
               <span className="truncate font-semibold">덱</span>
             )}
+            {deckFilter?.by_card ? (
+              // built on a card alone: one list, no 카드군 to split into 테마 카드 and 서포트 (엘리스 10/12)
+              <span className="shrink-0 tabular-nums">카드 {deckCounts.member.toLocaleString()}장</span>
+            ) : (
             <div role="tablist" aria-label={`${deckFilter?.name ?? "덱"} 카드`} className="flex gap-1.5 shrink-0">
               {([["", "테마 카드", deckCounts.member], ["support", "서포트", deckCounts.support]] as const).map(([role, label, n]) => (
                 <button
@@ -354,6 +358,7 @@ export default function CardList() {
                 </button>
               ))}
             </div>
+            )}
             <button
               type="button"
               onClick={() => update({ deck: "" })}

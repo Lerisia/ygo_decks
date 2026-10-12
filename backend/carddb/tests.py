@@ -1117,7 +1117,7 @@ class CardDexApiTest(TestCase):
         CardSupport.objects.create(card=self.quick, target=self.bewd, how="card")  # names the card it is built on
         CardSupport.objects.create(card=self.scale, group=sub, how="group")        # a member naming a group: stays a member
         body = self.get(deck=deck.id)
-        self.assertEqual((body["deck_filter"], body["deck_counts"]), ({"id": deck.id, "name": "매지션"}, {"member": 4, "support": 2}))
+        self.assertEqual((body["deck_filter"], body["deck_counts"]), ({"id": deck.id, "name": "매지션", "by_card": False}, {"member": 4, "support": 2}))
         self.assertEqual(sorted(r["id"] for r in body["results"]), [1, 2, 3, 5])
         self.assertEqual(sorted(r["id"] for r in self.get(deck=deck.id, role="support")["results"]), [4, 6])
         self.assertEqual(self.get(deck=deck.id, q="블랙")["deck_counts"], {"member": 2, "support": 1})
@@ -1145,6 +1145,21 @@ class CardDexApiTest(TestCase):
                       self.client.get("/api/carddb/cards/options/").json()["support_cards"])
         self.assertEqual(self.client.get("/api/carddb/cards/22/").json()["supports"], [])
         self.assertEqual([t["id"] for t in self.client.get("/api/carddb/cards/23/").json()["supports"]], [20])
+
+    def test_a_deck_built_on_a_card_alone_is_one_list(self):
+        # no 카드군 to split into 테마 카드 and 서포트 (빛의 황금궤, 엘리스 10/12): the card, the cards bearing its name
+        # and the cards naming it, in one list, as the card's own support list shows them
+        from deck.models import Deck, DeckCard
+        from .models import CardSupport
+        deck = Deck.objects.create(name="빛의 황금궤", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCard.objects.create(deck=deck, card=self.quick)
+        CardSupport.objects.create(card=self.dm, target=self.quick, how="card")     # names it
+        CardSupport.objects.create(card=self.girl, target=self.quick, how="named")  # bears its name
+        body = self.get(deck=deck.id)
+        self.assertEqual(sorted(r["id"] for r in body["results"]), [1, 3, 4])
+        self.assertEqual((body["deck_counts"], body["deck_filter"]["by_card"]), ({"member": 3, "support": 0}, True))
+        self.assertEqual(sorted(self.ids(deck=deck.id, role="support")), [1, 3, 4])   # no 서포트 tab to fall into
+        self.assertEqual(self.client.get(f"/api/deck/{deck.id}/").json()["card_book"], {"member": 3, "support": 0, "by_card": True})
 
     def test_supports_on_the_card_page_and_in_the_group_list(self):
         from deck.models import Deck, DeckCardGroup
