@@ -109,6 +109,17 @@ def _fingerprint():
             tuple(dirs), settings.MEDIA_ROOT)
 
 
+def _shown_groups(card_ids=None):
+    """Each card's reviewed 카드군 (as its page shows them): {card id: {group id}}."""
+    rows = CardGroupMember.objects.filter(group__needs_review=False).exclude(how=CardGroupMember.How.REMOVED)
+    if card_ids is not None:
+        rows = rows.filter(card_id__in=card_ids)
+    out = defaultdict(set)
+    for cid, gid in rows.values_list("card_id", "group_id"):
+        out[cid].add(gid)
+    return out
+
+
 def _card_index():
     """Every card on the site, with its names normalized once, kept in memory in both list orders and rebuilt only
     when the cards, their 카드군, their art or the thumbnail folders change — a search is a pass over memory."""
@@ -117,11 +128,14 @@ def _card_index():
         return _index
     supports, as_cards = defaultdict(set), defaultdict(set)   # groups it supports / cards whose list it is in
     named, names = defaultdict(set), defaultdict(set)         # cards whose name it bears / cards it names
+    shown = _shown_groups()
     for cid, gid, target, how in CardSupport.objects.values_list("card_id", "group_id", "target_id", "how"):
         if gid:
             supports[cid].add(gid)
         else:
-            as_cards[cid].add(target)
+            # a card's support list leaves out its own 카드군, however the card names it (엘리스 10/12)
+            if not shown[cid] & shown[target]:
+                as_cards[cid].add(target)
             (named if how == CardSupport.How.NAMED else names)[cid].add(target)
     groups = defaultdict(set)
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
@@ -451,7 +465,11 @@ def card(request, card_id):
                     key=lambda g: (g.name_ko or g.text))
     # 서포트: what the card names outright (a 카드군 or a card); the decks of every group it supports follow its own
     supports = list(CardSupport.objects.filter(card=c).select_related("group", "target"))
-    shown_cards = set(Card.objects.filter(has_art(), id__in=[s.target_id for s in supports if s.target_id])
+    own_groups = {g.id for g in groups}
+    # a card of its own 카드군 is none of its 서포트 (엘리스 10/12)
+    targets = [s.target_id for s in supports if s.target_id]
+    theirs = _shown_groups(targets)
+    shown_cards = set(Card.objects.filter(has_art(), id__in=[t for t in targets if not theirs[t] & own_groups])
                       .values_list("id", flat=True))
     # a card naming this one back supports it too: the pair is marked as mutual (의식 몬스터 ↔ 의식 마법)
     back = set(CardSupport.objects.filter(target=c, how=CardSupport.How.CARD).values_list("card_id", flat=True))
@@ -492,6 +510,11 @@ def card(request, card_id):
     alts = list(MdPrint.objects.filter(card=c, is_alt_art=True).order_by("md_id").values_list("md_id", "rarity"))
     rarity = {c.id: base.rarity if base else ""} | {m: r or (base.rarity if base else "") for m, r in alts}
     cutins = _cutins()
+    # the cards naming this one or bearing its name, but none of its own 카드군 (엘리스 10/12)
+    naming = list(CardSupport.objects.filter(target=c, card__in=Card.objects.filter(has_art()))
+                  .exclude(card=c).values_list("card_id", flat=True))
+    naming_groups = _shown_groups(naming)
+    supporters = [cid for cid in naming if not naming_groups[cid] & own_groups]
     return Response({
         "id": c.id, "name": display_name(c), "name_ko": c.name_ko, "name_ja": c.name_ja, "name_ja_ruby": c.name_ja_ruby,
         "name_en": c.name_en, "category": c.category, "frame": c.frame, "type_line": type_line,
@@ -513,8 +536,6 @@ def card(request, card_id):
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
         "supports": named,
         # how many cards its own support list holds (itself included), or 0 when no other card names it
-        "supporters": (lambda n: n + 1 if n else 0)(
-            CardSupport.objects.filter(target=c, card__in=Card.objects.filter(has_art()))
-            .exclude(card=c).count()),
+        "supporters": (lambda n: n + 1 if n else 0)(len(supporters)),
         "decks": decks,
     })

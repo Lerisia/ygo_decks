@@ -1105,6 +1105,24 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.client.get(f"/api/deck/{bare.id}/").json()["card_book"], {"member": 0, "support": 0})
         self.assertEqual(self.get(deck=bare.id)["total"], 0)
 
+    def test_a_cards_support_list_leaves_out_its_own_groups(self):
+        # whatever the link, a card sharing a 카드군 with it is no 서포트 of it (엘리스 10/12, SPYRAL－댄디)
+        from .models import CardGroup, CardGroupMember, CardSupport
+        g = CardGroup.objects.create(text="ＳＰＹＲＡＬ", reading="スパイラル", name_ko="SPYRAL")
+        dandy, tough, mate, charming = (self.card(20, "SPYRAL－댄디"), self.card(21, "SPYRAL－터프니스"),
+                                        self.card(22, "SPYRAL－동료"), self.card(23, "RESORT STAFF－차밍"))
+        for c in (dandy, tough, mate):
+            CardGroupMember.objects.create(group=g, card=c, how="name")
+        CardSupport.objects.create(card=tough, target=dandy, how="named")     # bears its name
+        CardSupport.objects.create(card=mate, target=dandy, how="card")       # names it from inside the 카드군
+        CardSupport.objects.create(card=charming, target=dandy, how="card")   # names it from outside
+        self.assertEqual(self.client.get("/api/carddb/cards/20/").json()["supporters"], 2)   # itself and 차밍
+        self.assertEqual(sorted(self.ids(card=20)), [20, 23])
+        self.assertIn({"id": 20, "name": "SPYRAL－댄디", "count": 2},
+                      self.client.get("/api/carddb/cards/options/").json()["support_cards"])
+        self.assertEqual(self.client.get("/api/carddb/cards/22/").json()["supports"], [])
+        self.assertEqual([t["id"] for t in self.client.get("/api/carddb/cards/23/").json()["supports"]], [20])
+
     def test_supports_on_the_card_page_and_in_the_group_list(self):
         from deck.models import Deck, DeckCardGroup
         from .models import CardGroup, CardGroupMember, CardSupport
