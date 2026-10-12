@@ -5,7 +5,6 @@ import { StatRadar } from "@/components/charts";
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
 import * as Showdown from "showdown";
-import DeckVideosModal from "@/components/DeckVideosModal";
 import DeckNotesSection from "@/components/DeckNotesSection";
 import EngineBadge from "@/components/EngineBadge";
 import UpdateBadge from "@/components/UpdateBadge";
@@ -71,7 +70,6 @@ export default function DeckDetail() {
   const isLoggedIn = useMemo(() => isAuthenticated(), []);
   // staff or an editor
   const [canEdit, setCanEdit] = useState(false);
-  const [showVideos, setShowVideos] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [descOpen, setDescOpen] = useState(true); // 특이점 요청(2026-10-03): 강의노트·상대법처럼 접을 수 있되 기본은 펼침
 
@@ -238,42 +236,12 @@ export default function DeckDetail() {
       {/* 본문 섹션 */}
       <div className="text-left rounded-lg">
         <div className="overflow-hidden mb-4">
-          {deck.video_count ? (
-            <button
-              type="button"
-              onClick={() => setShowVideos(true)}
-              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
-              플레이 영상 보러 가기
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">{deck.video_count}</span>
-            </button>
-          ) : deck.play_video_url ? (
-            <a
-              href={deck.play_video_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              <span className="inline-flex w-5 h-5 rounded-full bg-red-600 text-white text-[10px] items-center justify-center">▶</span>
-              플레이 영상 보러 가기
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="플레이 영상 준비 중"
-              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-semibold cursor-not-allowed"
-            >
-              <span className="inline-flex w-5 h-5 rounded-full bg-gray-400 dark:bg-gray-600 text-white text-[10px] items-center justify-center">▶</span>
-              플레이 영상 보러 가기 (준비 중)
-            </button>
-          )}
+          {/* 플레이 영상 보러 가기 is off for now (특이점 2026-10-12); DeckVideosModal and the API stay for its return. */}
           {/* The deck's cards in the card book: its 테마 카드, then the cards supporting them (특이점 2026-10-12) */}
           {deck.card_book && deck.card_book.member + deck.card_book.support > 0 ? (
             <Link
               to={`/cards?deck=${deck.id}`}
-              className="mt-2 flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
             >
               <span aria-hidden="true">🃏</span>
               이 덱의 카드 보기
@@ -286,16 +254,13 @@ export default function DeckDetail() {
               type="button"
               disabled
               title="카드 도감 연결 준비 중"
-              className="mt-2 flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-semibold cursor-not-allowed"
+              className="flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-semibold cursor-not-allowed"
             >
               <span aria-hidden="true">🃏</span>
               이 덱의 카드 보기 (준비 중)
             </button>
           )}
         </div>
-        {showVideos && (
-          <DeckVideosModal deckId={deck.id} deckName={deck.name} onClose={() => setShowVideos(false)} />
-        )}
         <DeckNotesSection deckId={deck.id} />
         {deck.has_hyeol && <DeckHyeolSection deckId={deck.id} />}
         <section className="mb-5 overflow-hidden">
