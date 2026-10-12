@@ -29,7 +29,7 @@ export type CardFilters = {
 
 export const EMPTY_FILTERS: CardFilters = {
   q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", has: "",
-  sort: "new", dir: "",
+  sort: "type", dir: "",   // Master Duel's 디폴트 순 first (엘리스 10/12)
 };
 
 /** The way a sort goes when none is chosen. */
@@ -122,7 +122,7 @@ export type CardDoc = {
 export function filtersToSearch(f: CardFilters): string {
   const qs = new URLSearchParams();
   (Object.keys(f) as (keyof CardFilters)[]).forEach((k) => {
-    if (f[k] && !(k === "sort" && f[k] === "new")) qs.set(k, f[k]);
+    if (f[k] && !(k === "sort" && f[k] === EMPTY_FILTERS.sort)) qs.set(k, f[k]);
   });
   const s = qs.toString();
   return s ? `?${s}` : "";

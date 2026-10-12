@@ -27,7 +27,7 @@ export default function CardPickerModal({
     }
     setStatus("loading");
     const t = setTimeout(() => {
-      listCards({ ...EMPTY_FILTERS, q }, 1)
+      listCards({ ...EMPTY_FILTERS, q, sort: "new" }, 1)
         .then((r) => {
           if (id !== request.current) return;
           setItems(r.results.map((c) => ({ key: c.id, name: c.name, image: c.face_thumb_url || c.thumb_url || c.image_url })));

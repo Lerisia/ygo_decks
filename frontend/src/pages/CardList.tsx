@@ -11,17 +11,42 @@ import {
 
 const SELECT = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm disabled:opacity-50";
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
-// Master Duel's sorts, each either way (엘리스 10/12); 기본순 is its 디폴트 순: each monster frame before its pendulum,
+// Master Duel's sorts, each either way (엘리스 10/12), under its names; 디폴트 순: each monster frame before its pendulum,
 // low levels first, then spells and traps
 const SORTS = [
   { value: "new", label: "최신 카드순" },
-  { value: "type", label: "기본순" },
+  { value: "type", label: "디폴트 순" },
   { value: "name", label: "이름순" },
   { value: "rarity", label: "레어리티" },
   { value: "level", label: "레벨 / 랭크 / 링크" },
   { value: "atk", label: "공격력" },
   { value: "def", label: "수비력" },
 ];
+
+const SORT_KEY = "card_list_sort";
+
+/** The viewer's last sort and its way, kept in this browser (엘리스 10/12); an address that names one wins. */
+function withRememberedSort(f: CardFilters, search: string): CardFilters {
+  const qs = new URLSearchParams(search);
+  if (qs.has("sort") || qs.has("dir")) return f;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_KEY) || "null");
+    if (SORTS.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) {
+      return { ...f, sort: saved.sort, dir: saved.dir };
+    }
+  } catch {
+    /* no storage: the default sort */
+  }
+  return f;
+}
+
+function rememberSort(f: CardFilters) {
+  try {
+    localStorage.setItem(SORT_KEY, JSON.stringify({ sort: f.sort, dir: f.dir }));
+  } catch {
+    /* private mode: the choice lasts while the page is open */
+  }
+}
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 const hasFilter = (f: CardFilters) =>
@@ -74,7 +99,7 @@ export default function CardList() {
   const location = useLocation();
   const navigate = useNavigate();
   const onList = location.pathname === "/cards";
-  const [filters, setFilters] = useState<CardFilters>(() => searchToFilters(location.search));
+  const [filters, setFilters] = useState<CardFilters>(() => withRememberedSort(searchToFilters(location.search), location.search));
   const [qInput, setQInput] = useState(filters.q);
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [items, setItems] = useState<CardListItem[]>([]);
@@ -97,7 +122,7 @@ export default function CardList() {
   // The address is the source of truth while the list is on screen (a 카드군 chip links here with ?group=).
   useEffect(() => {
     if (!onList) return;
-    const next = searchToFilters(location.search);
+    const next = withRememberedSort(searchToFilters(location.search), location.search);
     if (filtersToSearch(next) !== key) {
       setFilters(next);
       setQInput(next.q);
@@ -109,6 +134,7 @@ export default function CardList() {
   const update = (patch: Partial<CardFilters>) => {
     const next = { ...filters, ...patch };
     if (next.group !== filters.group) next.role = "";   // another group starts on its members
+    if (next.sort !== filters.sort || next.dir !== filters.dir) rememberSort(next);
     setFilters(next);
     navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
   };
@@ -309,7 +335,7 @@ export default function CardList() {
               className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
               onClick={() => {
                 setQInput("");
-                update({ ...EMPTY_FILTERS });
+                update({ ...EMPTY_FILTERS, sort: filters.sort, dir: filters.dir });   // the sort is not a filter
               }}
             >
               필터 초기화

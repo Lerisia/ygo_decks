@@ -867,17 +867,19 @@ class CardDexApiTest(TestCase):
         return self.client.get("/api/carddb/cards/", params).json()
 
     def ids(self, **params):
+        params.setdefault("sort", "new")   # the filter tests read the cards newest first
         return [r["id"] for r in self.get(**params)["results"]]
 
-    def test_list_is_public_newest_first_and_master_duel_only(self):
-        body = self.get()
-        self.assertEqual([r["id"] for r in body["results"]], [4, 6, 5, 3, 2, 1])   # same day: higher id first
+    def test_list_is_public_in_default_order_and_master_duel_only(self):
+        body = self.get()   # Master Duel's 디폴트 순 unless another is asked (엘리스 10/12)
+        self.assertEqual([r["id"] for r in body["results"]], [1, 2, 3, 5, 6, 4])
         self.assertEqual((body["total"], body["page"], body["has_more"]), (6, 1, False))
-        self.assertEqual(body["results"][0]["name"], "블랙 매지션의 속공")
+        self.assertEqual(body["results"][0]["name"], "블랙 매지션")
+        self.assertEqual(self.ids(sort="new"), [4, 6, 5, 3, 2, 1])   # same day: higher id first
         self.assertEqual(self.ids(sort="name"), [6, 1, 3, 4, 5, 2])
 
     def test_type_order(self):
-        # 몬마함순, Master Duel's 디폴트 순 (엘리스 10/12): monsters by frame (each before its pendulum), level / rank /
+        # 디폴트 순 as Master Duel has it (몬마함순; 엘리스 10/12): monsters by frame (each before its pendulum), level / rank /
         # link low to high, then card number; spells, traps by kind
         self.card(9, "효과 레벨 4")
         self.card(12, "엑시즈", frame="xyz", types=["xyz", "effect"], level=None, rank=4)
@@ -889,7 +891,7 @@ class CardDexApiTest(TestCase):
 
     def test_master_duel_sorts_either_way(self):
         # every sort of Master Duel's card list, low to high or high to low (엘리스 10/12): equal cards keep the
-        # 기본순, cards without the value (a spell's level, a link's DEF) come last
+        # 디폴트 순, cards without the value (a spell's level, a link's DEF) come last
         for md_id, rarity in ((1, "N"), (2, "UR"), (3, "R"), (4, "UR"), (5, "N"), (6, "SR")):
             MdPrint.objects.filter(md_id=md_id).update(rarity=rarity)
         expect = {
@@ -1090,7 +1092,7 @@ class CardDexApiTest(TestCase):
         # a card's own support list: the card itself, cards bearing its name, cards naming it (엘리스 2026-10-11)
         self.assertEqual(self.client.get("/api/carddb/cards/2/").json()["supporters"], 3)
         body = self.get(card=2)
-        self.assertEqual(([r["id"] for r in body["results"]], body["card_filter"]), ([5, 3, 2], {"id": 2, "name": "푸른 눈의 백룡"}))
+        self.assertEqual(([r["id"] for r in body["results"]], body["card_filter"]), ([2, 3, 5], {"id": 2, "name": "푸른 눈의 백룡"}))
         self.assertEqual(self.client.get("/api/carddb/cards/6/").json()["supporters"], 0)   # nobody names it: no list
         CardSupport.objects.filter(how="named").delete()
         body = self.client.get("/api/carddb/cards/4/").json()
@@ -1101,7 +1103,7 @@ class CardDexApiTest(TestCase):
         self.assertEqual([(d["name"], d["via"]) for d in self.client.get("/api/carddb/cards/3/").json()["decks"]], [("블랙 매지션", "member")])
         # a group's list: its members, or the cards supporting it, with both counts
         body = self.get(group=g.id)
-        self.assertEqual(([r["id"] for r in body["results"]], body["group_counts"]), ([3, 1], {"member": 2, "support": 2}))
+        self.assertEqual(([r["id"] for r in body["results"]], body["group_counts"]), ([1, 3], {"member": 2, "support": 2}))
         self.assertEqual(self.ids(group=g.id, role="support"), [4, 6])
         self.assertEqual(self.get(group=g.id, role="support", q="링크")["group_counts"], {"member": 0, "support": 1})
         self.assertNotIn("group_counts", self.get())

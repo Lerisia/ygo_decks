@@ -58,7 +58,7 @@ class _Row:
                  "groups", "supports", "as_cards", "alt", "cutin", "rarity", "type_key", "number", "atk", "def_")
 
 
-# 몬마함순, Master Duel's 디폴트 순 (엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
+# 디폴트 순, as Master Duel names it (몬마함순; 엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
 # level / rank / link low to high, then the card's number; then spells and traps by kind (the official database's
 # order of kinds), tokens last
 TYPE_ORDER = {kind: i for i, kind in enumerate(
@@ -68,8 +68,8 @@ TYPE_ORDER = {kind: i for i, kind in enumerate(
     + [f"trap:{k}" for k in ("normal", "continuous", "counter")] + ["token"])}
 RARITY_ORDER = {"N": 0, "R": 1, "SR": 2, "UR": 3}
 # Master Duel's sorts (엘리스 10/12), each either way: the value, and whether high to low turns the whole order round
-# (newest, name, 기본순) or only the value, equal cards keeping the 기본순 (rarity, level / rank / link, ATK, DEF).
-# Cards without the value (None: a spell's level, a link's DEF) come last, in the 기본순.
+# (newest, name, 디폴트 순) or only the value, equal cards keeping the 디폴트 순 (rarity, level / rank / link, ATK, DEF).
+# Cards without the value (None: a spell's level, a link's DEF) come last, in the 디폴트 순.
 SORTS = {
     "type": (lambda r: r.type_key, True),
     "new": (lambda r: None if r.released is None else (r.released, r.id), True),
@@ -167,7 +167,7 @@ def _ordered(index, sort, high_first):
         value, whole = SORTS[sort]
         have = [r for r in index["type"] if value(r) is not None]
         missing = [r for r in index["type"] if value(r) is None]
-        # Python's sort is stable either way round: equal values keep the 기본순 they come in
+        # Python's sort is stable either way round: equal values keep the 디폴트 순 they come in
         have.sort(key=value, reverse=high_first)
         if whole and high_first:
             missing.reverse()
@@ -239,13 +239,13 @@ def _rank(rows, query):
 def cards(request):
     """Card list: filters, then search (exact → prefix → substring over Korean/Japanese/English names, or 초성), in
     the chosen order (SORTS: new = by the day the card came to Master Duel, else its first paper release; name;
-    type = 기본순; rarity, level, atk, def), low to high or high to low (dir)."""
+    type = 디폴트 순; rarity, level, atk, def), low to high or high to low (dir)."""
     p = request.query_params
     index = _card_index()
 
     def found(params):
         keep = _keep(params)
-        sort = params.get("sort") if params.get("sort") in SORTS else "new"
+        sort = params.get("sort") if params.get("sort") in SORTS else "type"   # 디폴트 순 first (엘리스 10/12)
         way = params.get("dir")
         high_first = way == "desc" if way in ("asc", "desc") else sort in HIGH_FIRST
         rows = [r for r in _ordered(index, sort, high_first) if keep(r)]
