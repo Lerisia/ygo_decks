@@ -1,4 +1,4 @@
-import { Suspense, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, Fragment, type ReactNode, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { lazyChunk } from "@/lib/lazyChunk";
 import { Link, useParams } from "react-router-dom";
 import BackToDex from "@/components/BackToDex";
@@ -68,7 +68,7 @@ const BOX = "grid grid-cols-[40%_1fr] gap-1.5 p-1.5 rounded-xl dark:ring-1 dark:
 const AREA = {
   head: "col-span-2 col-start-1 row-start-1 md:col-span-1 md:col-start-2 px-1.5 pt-1 pb-0.5",
   card: "col-start-1 row-start-2 p-1.5 md:row-start-1 md:row-span-3",
-  stats: "col-start-2 row-start-2 self-start md:self-auto",
+  stats: "col-start-2 row-start-2 self-stretch md:self-auto",
   effect: "col-span-2 col-start-1 row-start-3 md:col-span-1 md:col-start-2",
   lower: "col-span-2 col-start-1 row-start-3 -mx-1.5 -mb-1.5 -mt-[3px] rounded-b-xl",
   pair: "col-span-2 col-start-1 row-start-2 md:hidden",   // a phone's one panel under the card and its stats
@@ -92,18 +92,19 @@ const KIND_ICONS = new Set(["quick_play", "continuous", "field", "equip", "ritua
 /** One stat behind its icon (a blank of the same width where the game shows none, so a phone's list stays aligned). */
 function Stat({ icon, label, children }: { icon: string | null; label?: string; children: ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5">
-      {icon ? <img src={`${ICONS}/${icon}.webp`} alt="" className="w-6 h-6 md:w-7 md:h-7 shrink-0" /> : <span className="w-6 shrink-0 md:hidden" />}
+    <span className="stat-row flex items-center gap-1.5">
+      {icon ? <img src={`${ICONS}/${icon}.webp`} alt="" className="stat-icon w-6 h-6 md:w-7 md:h-7 shrink-0" /> : <span className="stat-icon w-6 shrink-0 md:hidden" />}
       {label && <span className="sr-only">{label}</span>}
       <span className="flex items-center gap-1.5 break-keep">{children}</span>
     </span>
   );
 }
 
-/** Stats one under another on a phone, in a line between bars on wider screens. */
+/** Stats one under another on a phone (each a row of the panel itself, so the rows spread over its height), in a
+ *  line between bars on wider screens. */
 function StatGroup({ items }: { items: ReactNode[] }) {
   return (
-    <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center">
+    <div className="contents md:flex md:flex-row md:flex-wrap md:items-center">
       {items.map((it, i) => (
         <Fragment key={i}>
           {i > 0 && <span className="hidden md:inline mx-2 text-gray-400 dark:text-gray-500" aria-hidden="true">|</span>}
@@ -521,7 +522,12 @@ export default function CardDetail() {
           )}
         </div>
 
-        <div className={`${AREA.stats} ${panelWide} px-2 py-2 md:px-3 md:py-1.5 flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}>
+        {/* on a phone the stats fill the panel beside the card: rows spread over its height, sized to its width
+            (stat-fill in index.css; 참혈 2026-10-12) */}
+        <div
+          className={`${AREA.stats} ${panelWide} stat-fill px-2.5 py-2 md:px-3 md:py-1.5 flex flex-col justify-evenly gap-1 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}
+          style={{ "--rows": left.length + right.length } as CSSProperties}
+        >
           <StatGroup items={left} />
           {right.length > 0 && <StatGroup items={right} />}
         </div>

@@ -320,3 +320,22 @@ button:focus-visible {
 .card-corner {
   border-radius: 3.5% / 2.4%;
 }
+
+/* The card page on a phone: the stats beside the card grow to fill their panel (참혈 2026-10-12). The panel takes
+   the card's height (size containment: its own rows don't stretch it) and says how many rows it holds (--rows);
+   each row is as big as both the width (cqw) and the height per row (cqh) allow, between the old size and 3rem. */
+@media (max-width: 767px) {
+  .stat-fill {
+    container-type: size;
+  }
+  .stat-fill .stat-row {
+    --row: calc((100cqh - 1rem) / var(--rows, 4));
+    gap: clamp(0.375rem, 4cqw, 0.75rem);
+    font-size: clamp(0.875rem, min(12cqw, var(--row) * 0.52), 1.5rem);
+    line-height: 1.25;
+  }
+  .stat-fill .stat-icon {
+    width: clamp(1.5rem, min(22cqw, var(--row) * 0.74), 3rem);
+    height: clamp(1.5rem, min(22cqw, var(--row) * 0.74), 3rem);
+  }
+}
