@@ -20,7 +20,7 @@ from django.conf import settings
 from .models import Banlist, BanStatus, Card, MdPrint
 
 API = "https://yugipedia.com/api.php"
-USER_AGENT = "ygodecks.com banlist import (contact: rlawodus96@gmail.com)"
+USER_AGENT = "YGODecks banlist import (+https://ygodecks.com)"
 
 # per format: the first list (the rest are found by each page's "next") and the game its pages must be about
 FIRST = {Banlist.Format.MD: "January 2022 Lists (Master Duel)", Banlist.Format.OCG: "August 1999 Lists",
