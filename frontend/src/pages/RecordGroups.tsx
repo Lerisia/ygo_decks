@@ -17,6 +17,7 @@ import { KebabMenu, RankIcon, confirmSheetDelete } from "@/components/records/Sh
 import { ResultChips, UsagePie, rate, pctText, winRateTint, COIN_FRONT, COIN_BACK } from "@/components/charts";
 import { getRankLabel } from "@/utils/rankUtils";
 import UpdateBadge from "@/components/UpdateBadge";
+import { mdSeason } from "../utils/mdSeason";
 
 type RecordGroupBasic = {
   id: number;
@@ -122,10 +123,8 @@ const RecordGroups = () => {
       .then((data) => {
         setMetaStats(data.meta_decks || []);
         setTotalMatches(data.total_matches || 0);
-        if (data.since_reset && data.since) {
-          const d = new Date(data.since);
-          setMetaSince(`${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} 이후`);
-        }
+        // counted from a reset: named by its Master Duel season rather than the moment (특이점 2026-10-12)
+        if (data.since_reset && data.since) setMetaSince(`시즌 ${mdSeason(new Date(data.since))}`);
       })
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));
   }, []);
