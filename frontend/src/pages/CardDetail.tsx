@@ -15,7 +15,6 @@ const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
   { key: "royal", label: "로얄" },
 ];
 
-const LABEL = "p-2 text-left break-keep font-semibold bg-gray-200 dark:bg-gray-700 w-28 align-top";
 const MARKERS = ["top_left", "top", "top_right", "left", "", "right", "bottom_left", "bottom", "bottom_right"];
 const ARROWS: Record<string, string> = {
   top_left: "↖", top: "↑", top_right: "↗", left: "←", right: "→", bottom_left: "↙", bottom: "↓", bottom_right: "↘",
@@ -157,9 +156,10 @@ const BAN_LABELS: Record<BanStatus, string> = {
   forbidden: "금지", limited: "제한", semi_limited: "준제한", unlimited: "무제한", unreleased: "미출시",
 };
 const BAN_TAB_KEY = "card_banlist_format";
-const BAN_SHOWN = 8;   // runs shown before 전체 보기
+const HISTORY_SHOWN = 8;   // lines shown before 전체 보기
+const EVENT_LABELS = { release: "출시", release_kr: "한국 발매" } as const;
 
-/** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media), none for 미출시. */
+/** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media). */
 function BanIcon({ status }: { status: BanStatus }) {
   return status === "unreleased" ? (
     <span className="w-6 h-6 shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600" aria-hidden="true" />
@@ -168,8 +168,9 @@ function BanIcon({ status }: { status: BanStatus }) {
   );
 }
 
-/** A card's 금제 in each game, as it changed over time (엘리스 2026-10-12): the game picked last time first. */
-function BanlistHistory({ banlists }: { banlists: CardDoc["banlists"] }) {
+/** A card's 연혁 in each game (엘리스 2026-10-12): when it came out and each 금제 change since, the latest first; the
+ *  game picked last time opens first. */
+function CardHistory({ history }: { history: CardDoc["history"] }) {
   const [picked, setPicked] = useState(() => {
     try {
       return localStorage.getItem(BAN_TAB_KEY) ?? "";
@@ -178,10 +179,9 @@ function BanlistHistory({ banlists }: { banlists: CardDoc["banlists"] }) {
     }
   });
   const [all, setAll] = useState(false);
-  if (!banlists.length) return null;
-  const shown = banlists.find((b) => b.format === picked) ?? banlists[0];
-  const runs = [...shown.runs].reverse();   // the latest first
-  const now = runs[0];
+  if (!history.length) return null;
+  const shown = history.find((h) => h.format === picked) ?? history[0];
+  const events = [...shown.events].reverse();   // the latest first
   const pick = (format: string) => {
     setPicked(format);
     setAll(false);
@@ -194,43 +194,56 @@ function BanlistHistory({ banlists }: { banlists: CardDoc["banlists"] }) {
   return (
     <section className="mt-6">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h2 className="text-lg font-bold">금제</h2>
-        {banlists.length > 1 && (
-          <div role="tablist" aria-label="금제 형식" className="flex rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
-            {banlists.map((b) => (
+        <h2 className="text-lg font-bold">연혁</h2>
+        {history.length > 1 && (
+          <div role="tablist" aria-label="연혁 형식" className="flex rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
+            {history.map((h) => (
               <button
-                key={b.format}
+                key={h.format}
                 type="button"
                 role="tab"
-                aria-selected={b.format === shown.format}
-                onClick={() => pick(b.format)}
+                aria-selected={h.format === shown.format}
+                onClick={() => pick(h.format)}
                 className={`px-3 py-1 rounded-md transition ${
-                  b.format === shown.format ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
+                  h.format === shown.format ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
                 }`}
               >
-                {b.label}
+                {h.label}
               </button>
             ))}
           </div>
         )}
       </div>
-      <ol className="rounded-lg border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-        {(all ? runs : runs.slice(0, BAN_SHOWN)).map((r, i) => (
-          <li key={r.from} className={`flex items-center gap-2.5 px-3 py-2 ${i === 0 ? "font-semibold" : ""} ${r.status === "unreleased" ? "text-gray-500 dark:text-gray-400" : ""}`}>
-            <BanIcon status={r.status} />
-            <span className="w-12 shrink-0">{BAN_LABELS[r.status]}</span>
-            <span className="tabular-nums text-gray-600 dark:text-gray-300 font-normal">
-              {day(r.from)} ~ {i === 0 ? "현재" : day(runs[i - 1].from)}
-            </span>
-          </li>
-        ))}
-      </ol>
-      {runs.length > BAN_SHOWN && (
+      {events.length ? (
+        <ol className="rounded-lg border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+          {(all ? events : events.slice(0, HISTORY_SHOWN)).map((e, i) => (
+            <li key={`${e.day}${e.event}`} className="flex items-center gap-2.5 px-3 py-2">
+              <BanIcon status={e.status} />
+              <span className="w-[5.5rem] shrink-0 tabular-nums text-gray-600 dark:text-gray-300">{day(e.day)}</span>
+              <span className={i === 0 ? "font-semibold" : ""}>
+                {e.event ? (
+                  <>
+                    {EVENT_LABELS[e.event]}
+                    <span className="text-gray-500 dark:text-gray-400 font-normal"> · {BAN_LABELS[e.status]}</span>
+                  </>
+                ) : (
+                  BAN_LABELS[e.status]
+                )}
+              </span>
+              {i === 0 && <span className="ml-auto shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400">현재</span>}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+          {shown.label}에는 아직 나오지 않았습니다.
+        </p>
+      )}
+      {events.length > HISTORY_SHOWN && (
         <button type="button" onClick={() => setAll(!all)} className="mt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">
-          {all ? "접기" : `전체 보기 (${runs.length}번)`}
+          {all ? "접기" : `전체 보기 (${events.length}줄)`}
         </button>
       )}
-      <p className="sr-only">현재 {BAN_LABELS[now.status]}</p>
     </section>
   );
 }
@@ -314,7 +327,6 @@ export default function CardDetail() {
   const pendulum = card.pendulum_scale !== null && card.pendulum_scale !== undefined;
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
-  const dates = [["마듀", card.dates.md], ["OCG", card.dates.ocg], ["한국", card.dates.kr], ["TCG", card.dates.tcg]].filter(([, d]) => d);
   const pickedFace = card.faces.find((f) => f.face === picked);
   const finishParams: FinishParams = {
     ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame, name: pickedFace?.name_mask ?? null,
@@ -533,20 +545,8 @@ export default function CardDetail() {
         </tbody>
       </table>
 
-      <BanlistHistory key={card.id} banlists={card.banlists} />
-
-      {dates.length > 0 && (
-        <table className="mt-3 w-full border border-gray-300 dark:border-gray-600 text-left text-sm">
-          <tbody>
-            <tr className={ROW}>
-              <th scope="row" className={LABEL}>출시일</th>
-              <td className="p-2 tabular-nums">
-                {dates.map(([label, d]) => <div key={label}>{label} {day(d)}</div>)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+      {/* the release days are in the 연혁, each game's with its 금제 (엘리스 10/12) */}
+      <CardHistory key={card.id} history={card.history} />
 
       {cutin && (
         <CutinOverlay id={cutin.id} info={cutin.info} attribute={card.cutin_sound} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />

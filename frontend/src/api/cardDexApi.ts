@@ -130,8 +130,9 @@ export type CardDoc = {
   supporters: number;
   /** Decks of its own groups ("member") first, then of the groups it supports. */
   decks: { id: number; name: string; cover: string | null; via: "member" | "support" }[];
-  /** Each game's 금제 over time: runs from the day each status began, oldest first (games with lists stored). */
-  banlists: { format: string; label: string; runs: { from: string; status: BanStatus }[] }[];
+  /** Each game's 연혁, oldest first: its release ("release"; Korea's on the OCG's line, "release_kr") with the 금제 it
+   *  came out in, then each 금제 change (event ""); no events when it never came out there. */
+  history: { format: string; label: string; events: { day: string; status: BanStatus; event: "" | "release" | "release_kr" }[] }[];
 };
 
 export function filtersToSearch(f: CardFilters): string {

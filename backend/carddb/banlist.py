@@ -218,11 +218,36 @@ def runs(card, fmt=Banlist.Format.MD):
     return out
 
 
-def card_banlists(card):
-    """The card page's 금제 history: each game with lists stored, its runs."""
+def events(card, fmt=Banlist.Format.MD):
+    """[(day, status, event)] oldest first: the release ("release", with the status it came out in; before a game's
+    first list everything was unlimited) and each change after it; Korea's release ("release_kr") on the OCG's line.
+    Empty when the card never came out in the game."""
+    released, _ = _known(card, fmt)
+    if released is None:
+        return []
+    day_out = released if released is not True else None
+    out = []
+    for day, status in runs(card, fmt):
+        if status == BanStatus.UNRELEASED:
+            continue
+        if not out and day_out and day_out < day:   # out before the game's first list
+            out.append((day_out, BanStatus.UNLIMITED, "release"))
+        if out and out[-1][1] == status:
+            continue
+        out.append((day, status, "release" if not out and day == day_out else ""))
+    if fmt == Banlist.Format.OCG and card.kr_date and out:
+        then = [status for day, status, _ in out if day <= card.kr_date]
+        out.append((card.kr_date, then[-1] if then else BanStatus.UNLIMITED, "release_kr"))
+        out.sort(key=lambda e: e[0])
+    return out
+
+
+def card_history(card):
+    """The card page's 연혁 (엘리스 10/12): each game with lists stored, its release and 금제 changes."""
     have = set(Banlist.objects.values_list("format", flat=True).distinct())
     return [{"format": fmt.value, "label": fmt.label,
-             "runs": [{"from": day.isoformat(), "status": str(status)} for day, status in runs(card, fmt)]}
+             "events": [{"day": day.isoformat(), "status": str(status), "event": event}
+                        for day, status, event in events(card, fmt)]}
             for fmt in Banlist.Format if fmt in have]
 
 

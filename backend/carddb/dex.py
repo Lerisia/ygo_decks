@@ -549,6 +549,6 @@ def card(request, card_id):
         # how many cards its own support list holds (itself included), or 0 when no other card names it
         "supporters": (lambda n: n + 1 if n else 0)(len(supporters)),
         "decks": decks,
-        # each game's 금제 over time (엘리스 10/12)
-        "banlists": banlist.card_banlists(c),
+        # each game's 연혁: its release and 금제 changes (엘리스 10/12)
+        "history": banlist.card_history(c),
     })

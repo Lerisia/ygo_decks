@@ -283,12 +283,34 @@ class RunsTest(TestCase):
         self.assertEqual(banlist.runs(c, "ocg"), [(date(2020, 1, 1), BanStatus.LIMITED)])
         self.assertEqual(banlist.runs(self.card(4), "ocg"), [(date(2020, 1, 1), BanStatus.UNRELEASED)])   # never out there
 
-    def test_card_page(self):
-        c = self.card(5, date(2022, 1, 19), ocg_date=date(2019, 1, 1))
-        BanlistEntry.objects.create(banlist=self.may, card=c, name="5", status="limited", previous="unlimited")
-        body = banlist.card_banlists(c)
-        self.assertEqual(body, [
-            {"format": "md", "label": "마스터 듀얼", "runs": [{"from": "2022-01-19", "status": "unlimited"},
-                                                             {"from": "2022-05-09", "status": "limited"}]},
-            {"format": "ocg", "label": "OCG", "runs": [{"from": "2020-01-01", "status": "unlimited"}]},
-        ])   # a game with no lists stored (TCG here) is left out
+
+class CardHistoryTest(TestCase):
+    """연혁 (엘리스 10/12): each game's release and 금제 changes in one line, oldest first."""
+
+    def setUp(self):
+        Banlist.objects.create(format="md", effective=date(2022, 1, 19))
+        self.may = Banlist.objects.create(format="md", effective=date(2022, 5, 9))
+        Banlist.objects.create(format="ocg", effective=date(2020, 1, 1))
+        Banlist.objects.create(format="tcg", effective=date(2020, 1, 1))
+
+    def test_history(self):
+        c = Card.objects.create(id=7, category="spell", name_ja="7", name_en="7", frame="spell",
+                                ocg_date=date(2019, 1, 1), kr_date=date(2019, 6, 1))
+        MdPrint.objects.create(md_id=7, card=c, first_seen=date(2022, 3, 1))
+        BanlistEntry.objects.create(banlist=self.may, card=c, name="7", status="limited", previous="unlimited")
+        md, ocg, tcg = banlist.card_history(c)
+        # out between two lists, unlimited, then limited; no 미출시 line: the release says it
+        self.assertEqual(md, {"format": "md", "label": "마스터 듀얼", "events": [
+            {"day": "2022-03-01", "status": "unlimited", "event": "release"},
+            {"day": "2022-05-09", "status": "limited", "event": ""}]})
+        # out before the game's first list: one release line, the first list changing nothing; Korea's day with it
+        self.assertEqual(ocg["events"], [
+            {"day": "2019-01-01", "status": "unlimited", "event": "release"},
+            {"day": "2019-06-01", "status": "unlimited", "event": "release_kr"}])
+        self.assertEqual(tcg["events"], [])   # never out there
+
+    def test_a_listed_card_without_its_day(self):
+        c = Card.objects.create(id=8, category="spell", name_ja="8", name_en="8", frame="spell")
+        BanlistEntry.objects.create(banlist=Banlist.objects.get(format="ocg"), card=c, name="8", status="forbidden")
+        ocg = banlist.card_history(c)[1]
+        self.assertEqual(ocg["events"], [{"day": "2020-01-01", "status": "forbidden", "event": ""}])
