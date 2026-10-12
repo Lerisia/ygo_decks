@@ -299,15 +299,25 @@ class CardHistoryTest(TestCase):
         MdPrint.objects.create(md_id=7, card=c, first_seen=date(2022, 3, 1))
         BanlistEntry.objects.create(banlist=self.may, card=c, name="7", status="limited", previous="unlimited")
         md, ocg, tcg = banlist.card_history(c)
-        # out between two lists, unlimited, then limited; no 미출시 line: the release says it
+        # the release apart from the 금제 (엘리스 10/12): its own line without a status; out unlimited, as nearly every
+        # card is, it has no 금제 line until one changes it; no 미출시 line: the release says it
         self.assertEqual(md, {"format": "md", "label": "마스터 듀얼", "events": [
-            {"day": "2022-03-01", "status": "unlimited", "event": "release"},
+            {"day": "2022-03-01", "status": "", "event": "release"},
             {"day": "2022-05-09", "status": "limited", "event": ""}]})
-        # out before the game's first list: one release line, the first list changing nothing; Korea's day with it
+        # out before the game's first list, which changed nothing; Korea's day on the OCG's line
         self.assertEqual(ocg["events"], [
-            {"day": "2019-01-01", "status": "unlimited", "event": "release"},
-            {"day": "2019-06-01", "status": "unlimited", "event": "release_kr"}])
+            {"day": "2019-01-01", "status": "", "event": "release"},
+            {"day": "2019-06-01", "status": "", "event": "release_kr"}])
         self.assertEqual(tcg["events"], [])   # never out there
+
+    def test_limited_from_the_day_it_came_out(self):
+        # 선금제: out already limited, the 금제 line stands beside the release
+        c = Card.objects.create(id=9, category="spell", name_ja="9", name_en="9", frame="spell")
+        MdPrint.objects.create(md_id=9, card=c, first_seen=date(2022, 5, 9))
+        BanlistEntry.objects.create(banlist=self.may, card=c, name="9", status="limited", previous="unreleased")
+        self.assertEqual(banlist.card_history(c)[0]["events"], [
+            {"day": "2022-05-09", "status": "", "event": "release"},
+            {"day": "2022-05-09", "status": "limited", "event": ""}])
 
     def test_a_listed_card_without_its_day(self):
         c = Card.objects.create(id=8, category="spell", name_ja="8", name_en="8", frame="spell")

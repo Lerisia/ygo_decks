@@ -158,9 +158,10 @@ const BAN_LABELS: Record<BanStatus, string> = {
 const BAN_TAB_KEY = "card_banlist_format";
 const EVENT_LABELS = { release: "출시", release_kr: "한국 발매" } as const;
 
-/** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media). */
+/** Master Duel's own 금제 icon (0 / 1 / 2 copies; mdpipeline/info_icons.py, served from media); unlimited, like a
+ *  release, an empty dashed ring — the game shows nothing for it either (엘리스 10/12). */
 function BanIcon({ status, size = "w-6 h-6" }: { status: BanStatus; size?: string }) {
-  return status === "unreleased" ? (
+  return status === "unreleased" || status === "unlimited" ? (
     <span className={`${size} shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600`} aria-hidden="true" />
   ) : (
     <img src={`${ICONS}/limit/${status}.webp`} alt="" className={`${size} shrink-0`} />
@@ -180,6 +181,7 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
   if (!history.length) return null;
   const shown = history.find((h) => h.format === picked) ?? history[0];
   const events = [...shown.events].reverse();   // the latest first
+  const current = events.findIndex((e) => !e.event);   // the latest 금제 line; none while it was never limited
   const pick = (format: string) => {
     setPicked(format);
     try {
@@ -214,29 +216,25 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
       {events.length ? (
         <ol className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
           {/* every line, however long: nothing folded away (엘리스 10/12) */}
-          {events.map((e, i) => (
-            // the current line stands out: tinted, larger, a 현재 badge (엘리스 10/12)
-            <li
-              key={`${e.day}${e.event}`}
-              className={`flex items-center gap-2.5 px-3 ${i === 0 ? "py-3 bg-blue-50 dark:bg-blue-950/40 text-base" : "py-2"}`}
-            >
-              <BanIcon status={e.status} size={i === 0 ? "w-8 h-8" : "w-6 h-6"} />
-              <span className={`w-[5.5rem] shrink-0 tabular-nums ${i === 0 ? "text-gray-800 dark:text-gray-100 font-semibold text-sm" : "text-gray-600 dark:text-gray-300"}`}>
-                {day(e.day)}
-              </span>
-              <span className={i === 0 ? "font-bold" : ""}>
-                {e.event ? (
-                  <>
-                    {EVENT_LABELS[e.event]}
-                    <span className="text-gray-500 dark:text-gray-400 font-normal"> · {BAN_LABELS[e.status]}</span>
-                  </>
-                ) : (
-                  BAN_LABELS[e.status]
-                )}
-              </span>
-              {i === 0 && <span className="ml-auto shrink-0 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-xs font-bold">현재</span>}
-            </li>
-          ))}
+          {events.map((e, i) => {
+            // the 금제 in force stands out, without a word for it; a release is no 금제 (엘리스 10/12)
+            const now = i === current;
+            return (
+              <li
+                key={`${e.day}${e.event}`}
+                aria-current={now || undefined}
+                className={`flex items-center gap-2.5 px-3 ${now ? "py-3 bg-blue-50 dark:bg-blue-950/40 text-base" : "py-2"}`}
+              >
+                <BanIcon status={e.status || "unreleased"} size={now ? "w-8 h-8" : "w-6 h-6"} />
+                <span className={`w-[5.5rem] shrink-0 tabular-nums ${now ? "text-gray-800 dark:text-gray-100 font-semibold text-sm" : "text-gray-600 dark:text-gray-300"}`}>
+                  {day(e.day)}
+                </span>
+                <span className={now ? "font-bold" : e.event ? "text-gray-600 dark:text-gray-300" : ""}>
+                  {e.event ? EVENT_LABELS[e.event] : BAN_LABELS[e.status as BanStatus]}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       ) : (
         <p className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">

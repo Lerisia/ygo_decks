@@ -219,26 +219,28 @@ def runs(card, fmt=Banlist.Format.MD):
 
 
 def events(card, fmt=Banlist.Format.MD):
-    """[(day, status, event)] oldest first: the release ("release", with the status it came out in; before a game's
-    first list everything was unlimited) and each change after it; Korea's release ("release_kr") on the OCG's line.
-    Empty when the card never came out in the game."""
+    """[(day, status, event)] oldest first: the release ("release", no status: it stands apart from the 금제,
+    엘리스 10/12), Korea's release on the OCG's line ("release_kr"), and a 금제 line ("", its status) each time it
+    changed. A card out unlimited, as nearly every card is, has no 금제 line until it changes; one out already limited
+    (선금제) has one beside its release. Before a game's first list everything was unlimited. Empty when the card never
+    came out in the game."""
     released, _ = _known(card, fmt)
     if released is None:
         return []
     day_out = released if released is not True else None
-    out = []
+    out = [(day_out, "", "release")] if day_out else []
+    # from its release the card is unlimited unless a list says otherwise; with no day known, the first list says
+    last = BanStatus.UNLIMITED if day_out else None
     for day, status in runs(card, fmt):
         if status == BanStatus.UNRELEASED:
             continue
-        if not out and day_out and day_out < day:   # out before the game's first list
-            out.append((day_out, BanStatus.UNLIMITED, "release"))
-        if out and out[-1][1] == status:
-            continue
-        out.append((day, status, "release" if not out and day == day_out else ""))
+        if status != last:
+            out.append((day, status, ""))
+            last = status
     if fmt == Banlist.Format.OCG and card.kr_date and out:
-        then = [status for day, status, _ in out if day <= card.kr_date]
-        out.append((card.kr_date, then[-1] if then else BanStatus.UNLIMITED, "release_kr"))
-        out.sort(key=lambda e: e[0])
+        out.append((card.kr_date, "", "release_kr"))
+    order = {"release": 0, "": 1, "release_kr": 2}   # on one day: the release, then the 금제 it came out in
+    out.sort(key=lambda e: (e[0], order[e[2]]))
     return out
 
 
