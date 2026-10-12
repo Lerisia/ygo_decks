@@ -319,6 +319,16 @@ class CardHistoryTest(TestCase):
             {"day": "2022-05-09", "status": "", "event": "release"},
             {"day": "2022-05-09", "status": "limited", "event": ""}])
 
+    def test_korea_coming_out_under_a_limit_keeps_its_icon(self):
+        # 한국 발매 while the card was already limited: that line carries the limit, not an empty ring (엘리스 10/12)
+        c = Card.objects.create(id=10, category="spell", name_ja="10", name_en="10", frame="spell",
+                                ocg_date=date(2019, 1, 1), kr_date=date(2020, 4, 14))
+        BanlistEntry.objects.create(banlist=Banlist.objects.get(format="ocg"), card=c, name="10", status="limited")
+        self.assertEqual(banlist.card_history(c)[1]["events"], [
+            {"day": "2019-01-01", "status": "", "event": "release"},
+            {"day": "2020-01-01", "status": "limited", "event": ""},
+            {"day": "2020-04-14", "status": "limited", "event": "release_kr"}])
+
     def test_a_listed_card_without_its_day(self):
         c = Card.objects.create(id=8, category="spell", name_ja="8", name_en="8", frame="spell")
         BanlistEntry.objects.create(banlist=Banlist.objects.get(format="ocg"), card=c, name="8", status="forbidden")

@@ -220,7 +220,7 @@ def runs(card, fmt=Banlist.Format.MD):
 
 def events(card, fmt=Banlist.Format.MD):
     """[(day, status, event)] oldest first: the release ("release", no status: it stands apart from the 금제,
-    엘리스 10/12), Korea's release on the OCG's line ("release_kr"), and a 금제 line ("", its status) each time it
+    엘리스 10/12), Korea's release on the OCG's line ("release_kr", with the 금제 it came under if any), and a 금제 line ("", its status) each time it
     changed. A card out unlimited, as nearly every card is, has no 금제 line until it changes; one out already limited
     (선금제) has one beside its release. Before a game's first list everything was unlimited. Empty when the card never
     came out in the game."""
@@ -238,7 +238,11 @@ def events(card, fmt=Banlist.Format.MD):
             out.append((day, status, ""))
             last = status
     if fmt == Banlist.Format.OCG and card.kr_date and out:
-        out.append((card.kr_date, "", "release_kr"))
+        # Korea's release carries the 금제 the card was under then, if any, so a limited card does not look free
+        # (엘리스 10/12)
+        then = [status for day, status, event in out if not event and day <= card.kr_date]
+        limit = then[-1] if then and then[-1] != BanStatus.UNLIMITED else ""
+        out.append((card.kr_date, limit, "release_kr"))
     order = {"release": 0, "": 1, "release_kr": 2}   # on one day: the release, then the 금제 it came out in
     out.sort(key=lambda e: (e[0], order[e[2]]))
     return out
