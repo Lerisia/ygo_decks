@@ -6,6 +6,15 @@ const NAMES = ["01_op", "02_packout", "02_packout_1pack", "03_cut", "04_cardin",
                "card_sr", "card_ur", "card_shake", "hope", "upgrad_01", "upgrad_01_ur", "kaminari_01", "kaminari_02", "kaminari_03", "proc_rare",
                "proc_rare_02"] as const;
 export type PackSoundName = (typeof NAMES)[number];
+/** Where each sound starts to be heard, in seconds: the game's files begin with a little silence (the rare-card one
+ *  0.68 s), skipped so a sound comes with what it goes with (엘리스 10/13: "전부 선딜이 아주 긴 느낌"). Measured on the
+ *  game's files: the first 5 ms at 5% of the loudest, less 10 ms. */
+const LEAD: Partial<Record<PackSoundName, number>> = {
+  "01_op": 0.08, "02_packout": 0.015, "02_packout_1pack": 0.07, "03_cut": 0.11, "04_cardin": 0.1, "05_cardout": 0.035,
+  card_move_01: 0.055, card_move_02: 0.02, card_move_03: 0.025, card_move_04: 0.01, card_sr: 0.165, card_ur: 0.185,
+  card_shake: 0.15, hope: 0.075, upgrad_01: 0.145, upgrad_01_ur: 0.035, kaminari_01: 0.025, kaminari_02: 0.06,
+  proc_rare: 0.665, proc_rare_02: 0.335,
+};
 const OFF = "pack_sound_off";
 
 let ctx: AudioContext | null = null;
@@ -72,9 +81,9 @@ export function unlockPackSound() {
   }
 }
 
-/** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time);
- *  offset skips the silence a sound starts with, in seconds. */
-export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1, offset = 0) {
+/** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time).
+ *  A sound plays from where it is first heard (LEAD). */
+export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
   if (!ctx || !soundOn()) return;
   const audio = ctx;
   if (audio.state !== "running") audio.resume().catch(() => {});
@@ -86,7 +95,7 @@ export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1, offse
     src.playbackRate.value = rate;
     gain.gain.value = volume;
     src.connect(gain).connect(audio.destination);
-    src.start(0, offset);
+    src.start(0, LEAD[name] ?? 0);
   });
 }
 

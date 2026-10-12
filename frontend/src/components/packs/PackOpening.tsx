@@ -568,9 +568,8 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     const wait = rattleOf(i);
     if (wait) {
       el.animate([0, 7, -7, 6, -6, 5, -4, 2, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: T.rattle, delay: start });
-      // the game's rattle sound is silent for its first 0.4 s: from there, so the "챠카챠카" comes with the shake
-      // (엘리스 10/13: "흔들릴 때 챠카챠카만 안 들려요")
-      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.85, 1, 0.4); }, start);
+      // played from where it is heard (LEAD), so the "챠카챠카" comes with the shake (엘리스 10/13)
+      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.85); }, start);
     }
     const delay = start + wait;
     // a UR first twists the wrong way, then whips round
@@ -611,8 +610,11 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
         playPackSound(r === "UR" ? "card_ur" : "card_sr", r === "UR" ? 0.7 : 0.65);
         flash(false);
         if (r === "UR") shake();
-      } else playCardMove(0.7);
+      }
     }, delay + show);
+    // an N / R's whisk sounds as the turn starts, with the tap, not when its face comes round (엘리스 10/13: the sounds
+    // came late)
+    if (!big) window.setTimeout(() => { if (alive.current) playCardMove(0.7); }, delay);
     if (cards[i].finish !== "basic") premium(i, dir, settled + 160);
   }, [cards, fx, flash, shake, premium, rattleOf]);
 
