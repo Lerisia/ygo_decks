@@ -67,7 +67,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     label: "놀이터",
     icon: "🎮",
     to: "/playground",
-    paths: ["/playground", "/solo", "/card-quiz", "/skill-names", "/multiplayer", "/duchmind-wordpacks", "/icon-shop", "/tournaments"],
+    paths: ["/playground", "/solo", "/card-quiz", "/skill-names", "/packs", "/multiplayer", "/duchmind-wordpacks", "/icon-shop", "/tournaments"],
     items: [
       { label: "멀티플레이", to: "/multiplayer", desc: "여럿이 함께" },
       { label: "솔로 플레이", to: "/solo", desc: "혼자 즐기는 미니게임" },

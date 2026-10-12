@@ -106,6 +106,7 @@ class PackMapTest(TestCase):
         {"pack_id": "2009", "ko_name": "워리어즈 유나이트", "mdm_set_id": "s2", "image": "03_17614",
          "other_images": [{"image": "03_13172"}]},
         {"pack_id": "1001", "ko_name": "리바이벌", "mdm_set_id": "s3", "image": None},
+        {"pack_id": "1039", "ko_name": "마이티 컨텐더즈", "mdm_set_id": "s4", "image": None},
     ], "images": {
         "03_13668": {"file_card_id": 13668}, "03_3899": {"file_card_id": 3899, "alt_art": True, "pack_ids": ["2116"]},
         "03_13999": {"file_card_id": 13999, "alt_art": True, "pack_ids": ["2116"]},
@@ -121,7 +122,8 @@ class PackMapTest(TestCase):
 
     def sync(self):
         return md_packs.sync([mdm_set("s1", "Singular Strike Overthrow"), mdm_set("s2", "Warriors Unite!"),
-                              mdm_set("s3", "Revival of Legends", kind="Selection Pack")],
+                              mdm_set("s3", "Revival of Legends", kind="Selection Pack"),
+                              mdm_set("s4", "Mighty Contenders", kind="Normal Pack")],
                              [mdm_card(13668, "SR", "s1"), mdm_card(5, "N", "s1", "s2")],
                              pack_map=md_packs.load_pack_map(self.MAP))
 
@@ -131,6 +133,8 @@ class PackMapTest(TestCase):
         self.assertEqual(got["s1"], (2116, "싱귤러 스트라이크 오버스로", "03_3899"))   # the campaign cover
         self.assertEqual(got["s2"], (2009, "워리어즈 유나이트", "03_17614"))          # a plain second cover: the usual one
         self.assertEqual(got["s3"], (1001, "리바이벌", ""))
+        # MDM calls it a normal pack; the game numbers it a selection pack
+        self.assertEqual(MdPack.objects.get(mdm_id="s4").kind, MdPack.Kind.SELECTION)
 
     def test_the_cover_art_comes_in_the_pack(self):
         self.sync()

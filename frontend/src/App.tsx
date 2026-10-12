@@ -47,6 +47,8 @@ const CreateTournament = lazyChunk(() => import("./pages/CreateTournament"));
 const TournamentDetailPage = lazyChunk(() => import("./pages/TournamentDetail"));
 const DeckScanner = lazyChunk(() => import("./pages/DeckScanner"));
 const CardQuiz = lazyChunk(() => import("./pages/CardQuiz"));
+const PackList = lazyChunk(() => import("./pages/PackList"));
+const PackDetail = lazyChunk(() => import("./pages/PackDetail"));
 const Playground = lazyChunk(() => import("./pages/Playground"));
 const AllMenu = lazyChunk(() => import("./pages/AllMenu"));
 const Tools = lazyChunk(() => import("./pages/Tools"));
@@ -204,6 +206,8 @@ function App() {
             <Route path="/solo-twenty" element={<SoloTwenty />} />
             <Route path="/skill-names" element={<SkillNames />} />
             <Route path="/card-quiz" element={<CardQuiz />} />
+            <Route path="/packs" element={<PackList />} />
+            <Route path="/packs/:packId" element={<PackDetail />} />
             <Route path="/tier-list-maker" element={<TierListMaker />} />
             <Route path="/multiplayer" element={<Multiplayer />} />
             <Route path="/multiplayer/rooms/:roomId" element={<MultiplayerRoom />} />

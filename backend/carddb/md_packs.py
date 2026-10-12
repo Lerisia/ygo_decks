@@ -150,6 +150,8 @@ def sync(sets, cards, pack_map=None):
     with transaction.atomic():
         for sid, (s, kind) in packs.items():
             game = pack_map.get(sid, {})
+            if 1000 < (game.get("game_id") or 0) < 2000:
+                kind = MdPack.Kind.SELECTION   # the game numbers it a selection pack (MDM: Mighty Contenders, a normal pack)
             pack, _ = MdPack.objects.update_or_create(
                 mdm_id=sid, defaults={"kind": kind, "name_en": s.get("name", ""), "released": _day(s.get("release")),
                                       "game_id": game.get("game_id"), "name_ko": game.get("name_ko", ""),
