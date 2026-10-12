@@ -15,7 +15,7 @@ from .models import MdPack, MdPackCard
 
 OPENABLE = [MdPack.Kind.NORMAL, MdPack.Kind.SECRET, MdPack.Kind.SELECTION]
 MASTER_PACK = "Master Pack"
-PACK_IMAGE_DIR = "md_ui/packs"   # the game's pack pictures, by its pack number
+PACK_IMAGE_DIR = "md_ui/packs"   # the game's pack pictures, by their file name (MdPack.cover); hd/ for the opening
 
 _cache = {"key": None, "packs": None, "cards": {}}
 
@@ -35,10 +35,10 @@ def _fresh():
         _cache.update(key=key, packs=None, cards={})
 
 
-def _image(pack):
-    if pack.game_id is None:
+def _image(pack, hd=False):
+    if not pack.cover:
         return None
-    rel = f"{PACK_IMAGE_DIR}/{pack.game_id}.webp"
+    rel = f"{PACK_IMAGE_DIR}/{'hd/' if hd else ''}{pack.cover}.webp"
     return settings.MEDIA_URL + rel if os.path.exists(os.path.join(settings.MEDIA_ROOT, rel)) else None
 
 
@@ -78,6 +78,7 @@ def pack(request, pack_id):
                   "rarity": e.rarity, "thumb": face_thumb_url(e.md_print_id), "face": face_url(e.md_print_id)}
                  for e in p.cards.select_related("md_print__card")]
         row = _row(p)
+        row["image_hd"] = _image(p, hd=True)
         row["cards"] = [c for c in cards if c["thumb"]]
         if p.kind == MdPack.Kind.SECRET:
             master = MdPack.objects.filter(name_en=MASTER_PACK, kind=MdPack.Kind.NORMAL).first()

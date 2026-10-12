@@ -24,6 +24,8 @@ CARD_FACE_ASSETS = os.environ.get("CARD_FACE_ASSETS", "/home/elyss/storage/md/fa
 MD_NAMED_PATH = os.environ.get("MD_NAMED_PATH", "/home/elyss/storage/md/extract/raw_jp/ja-jp_card_named.bytes")
 # The 금제 list pages fetched from Yugipedia (carddb import_banlists), kept so that a run asks only for what is new.
 BANLIST_CACHE = os.environ.get("BANLIST_CACHE", "/home/elyss/storage/banlists/yugipedia")
+# the game's own pack numbers, Korean names and covers, taken from the Master Duel client (the pack simulator)
+MD_PACK_MAP = os.environ.get("MD_PACK_MAP", "/home/elyss/storage/md/packs/pack_map.json")
 
 from django.conf import settings
 from django.conf.urls.static import static

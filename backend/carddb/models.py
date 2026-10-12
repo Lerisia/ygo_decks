@@ -302,7 +302,8 @@ class MdPack(models.Model):
     name_en = models.CharField(max_length=200)
     name_ko = models.CharField(max_length=200, blank=True)
     released = models.DateField(null=True, blank=True)
-    game_id = models.PositiveIntegerField(null=True, blank=True, help_text="게임 속 팩 번호 (팩 그림)")
+    game_id = models.PositiveIntegerField(null=True, blank=True, help_text="게임 속 팩 번호")
+    cover = models.CharField(max_length=24, blank=True, help_text="게임 속 팩 그림 (md_ui/packs/<cover>.webp)")
 
     class Meta:
         ordering = ["-released", "name_en"]
