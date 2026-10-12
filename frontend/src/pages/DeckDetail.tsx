@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 import { StatRadar } from "@/components/charts";
 import SimpleMDE from "react-simplemde-editor";
@@ -39,6 +39,8 @@ interface Deck {
   play_video_url?: string | null;
   video_count?: number;
   has_hyeol?: boolean;
+  /** How many 테마 카드 and 서포트 the card book lists for the deck. */
+  card_book?: { member: number; support: number };
   stats?: DeckStats;
 }
 
@@ -263,6 +265,29 @@ export default function DeckDetail() {
             >
               <span className="inline-flex w-5 h-5 rounded-full bg-gray-400 dark:bg-gray-600 text-white text-[10px] items-center justify-center">▶</span>
               플레이 영상 보러 가기 (준비 중)
+            </button>
+          )}
+          {/* The deck's cards in the card book: its 테마 카드, then the cards supporting them (특이점 2026-10-12) */}
+          {deck.card_book && deck.card_book.member + deck.card_book.support > 0 ? (
+            <Link
+              to={`/cards?deck=${deck.id}`}
+              className="mt-2 flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            >
+              <span aria-hidden="true">🃏</span>
+              이 덱의 카드 보기
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 tabular-nums">
+                테마 {deck.card_book.member} · 서포트 {deck.card_book.support}
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="카드 도감 연결 준비 중"
+              className="mt-2 flex items-center justify-center gap-2 w-full max-w-sm mx-auto py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-semibold cursor-not-allowed"
+            >
+              <span aria-hidden="true">🃏</span>
+              이 덱의 카드 보기 (준비 중)
             </button>
           )}
         </div>

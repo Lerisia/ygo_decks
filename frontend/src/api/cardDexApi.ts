@@ -20,6 +20,8 @@ export type CardFilters = {
   role: string;
   /** A card's own support list: the card, cards bearing its name and cards naming it. */
   card: string;
+  /** A deck's cards (from its page): "" role its 테마 카드, "support" the cards supporting them. */
+  deck: string;
   /** "alt": cards with another art (다른 일러스트), "cutin": cards with a monster cut-in. */
   has: string;
   sort: string;
@@ -28,7 +30,7 @@ export type CardFilters = {
 };
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", has: "",
+  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", deck: "", has: "",
   sort: "type", dir: "",   // Master Duel's 디폴트 순 first (엘리스 10/12)
 };
 
@@ -53,6 +55,9 @@ export type CardListResponse = {
   group_counts?: { member: number; support: number };
   /** With a card filter: the card whose support list this is. */
   card_filter?: { id: number; name: string } | null;
+  /** With a deck filter: how many of its 테마 카드 and of the cards supporting them match, and the deck. */
+  deck_counts?: { member: number; support: number };
+  deck_filter?: { id: number; name: string } | null;
 };
 
 export type Option = { value: string; label: string };

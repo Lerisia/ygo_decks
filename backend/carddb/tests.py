@@ -1066,6 +1066,34 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.client.get("/api/carddb/cards/7/").status_code, 404)   # no art
         self.assertEqual(self.client.get("/api/carddb/cards/8/").status_code, 404)   # not in Master Duel
 
+    def test_a_decks_cards_in_the_card_book(self):
+        """덱 문서 → 카드 도감 (특이점 2026-10-12): a deck's 테마 카드 — its 카드군 and those under them, the card it is
+        built on and cards bearing that card's name — and, with role=support, the cards supporting them."""
+        from deck.models import Deck, DeckCard, DeckCardGroup
+        from .models import CardGroup, CardGroupMember, CardSupport
+        top = CardGroup.objects.create(text="マジシャン", reading="マジシャン", name_ko="매지션")
+        sub = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션", parent=top)
+        CardGroupMember.objects.create(group=sub, card=self.dm, how="name")       # in a group under the deck's
+        CardGroupMember.objects.create(group=top, card=self.scale, how="name")    # in the deck's own group
+        deck = Deck.objects.create(name="매지션", strength=0, difficulty=0, deck_type=0, art_style=0)
+        DeckCardGroup.objects.create(deck=deck, group=top)
+        DeckCard.objects.create(deck=deck, card=self.bewd)                         # built on a card as well
+        CardSupport.objects.create(card=self.girl, target=self.bewd, how="named")  # bears that card's name: one of them
+        CardSupport.objects.create(card=self.link, group=sub, how="group")         # supports a group under the deck's
+        CardSupport.objects.create(card=self.quick, target=self.bewd, how="card")  # names the card it is built on
+        CardSupport.objects.create(card=self.scale, group=sub, how="group")        # a member naming a group: stays a member
+        body = self.get(deck=deck.id)
+        self.assertEqual((body["deck_filter"], body["deck_counts"]), ({"id": deck.id, "name": "매지션"}, {"member": 4, "support": 2}))
+        self.assertEqual(sorted(r["id"] for r in body["results"]), [1, 2, 3, 5])
+        self.assertEqual(sorted(r["id"] for r in self.get(deck=deck.id, role="support")["results"]), [4, 6])
+        self.assertEqual(self.get(deck=deck.id, q="블랙")["deck_counts"], {"member": 2, "support": 1})
+        self.assertNotIn("deck_counts", self.get())
+        # the deck page knows how many there are, for its button
+        self.assertEqual(self.client.get(f"/api/deck/{deck.id}/").json()["card_book"], {"member": 4, "support": 2})
+        bare = Deck.objects.create(name="연결 없음", strength=0, difficulty=0, deck_type=0, art_style=0)
+        self.assertEqual(self.client.get(f"/api/deck/{bare.id}/").json()["card_book"], {"member": 0, "support": 0})
+        self.assertEqual(self.get(deck=bare.id)["total"], 0)
+
     def test_supports_on_the_card_page_and_in_the_group_list(self):
         from deck.models import Deck, DeckCardGroup
         from .models import CardGroup, CardGroupMember, CardSupport

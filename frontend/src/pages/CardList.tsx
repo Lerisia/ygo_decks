@@ -50,7 +50,7 @@ function rememberSort(f: CardFilters) {
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 const hasFilter = (f: CardFilters) =>
-  !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.has);
+  !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has);
 // The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
 // page shows its name and ✕ above the list instead (엘리스 2026-10-11).
 const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.has);
@@ -106,6 +106,8 @@ export default function CardList() {
   const [total, setTotal] = useState<number | null>(null);
   const [groupCounts, setGroupCounts] = useState<{ member: number; support: number } | null>(null);
   const [cardFilter, setCardFilter] = useState<{ id: number; name: string } | null>(null);
+  const [deckCounts, setDeckCounts] = useState<{ member: number; support: number } | null>(null);
+  const [deckFilter, setDeckFilter] = useState<{ id: number; name: string } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -133,7 +135,7 @@ export default function CardList() {
 
   const update = (patch: Partial<CardFilters>) => {
     const next = { ...filters, ...patch };
-    if (next.group !== filters.group) next.role = "";   // another group starts on its members
+    if (next.group !== filters.group || next.deck !== filters.deck) next.role = "";   // another group or deck starts on its own cards
     if (next.sort !== filters.sort || next.dir !== filters.dir) rememberSort(next);
     setFilters(next);
     navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
@@ -168,6 +170,8 @@ export default function CardList() {
         setTotal(r.total);
         setGroupCounts(r.group_counts ?? null);
         setCardFilter(r.card_filter ?? null);
+        setDeckCounts(r.deck_counts ?? null);
+        setDeckFilter(r.deck_filter ?? null);
         setHasMore(r.has_more);
       })
       .catch((e) => id === request.current && e.name !== "AbortError" && setError(e.message))
@@ -345,7 +349,43 @@ export default function CardList() {
       )}
 
       <div className="mb-3 h-6 flex items-center text-sm text-gray-600 dark:text-gray-300 text-left">
-        {filters.group && groupCounts ? (
+        {filters.deck && deckCounts ? (
+          // a deck's cards, from its page: its 테마 카드 or the cards supporting them (특이점 2026-10-12)
+          <div className="flex items-center gap-1.5 min-w-0">
+            {deckFilter ? (
+              <Link to={`/database/${deckFilter.id}`} className="truncate font-semibold hover:underline" title="덱 문서로">
+                '{deckFilter.name}'
+              </Link>
+            ) : (
+              <span className="truncate font-semibold">덱</span>
+            )}
+            <div role="tablist" aria-label={`${deckFilter?.name ?? "덱"} 카드`} className="flex gap-1.5 shrink-0">
+              {([["", "테마 카드", deckCounts.member], ["support", "서포트", deckCounts.support]] as const).map(([role, label, n]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  aria-selected={filters.role === role}
+                  disabled={!n && filters.role !== role}
+                  onClick={() => update({ role })}
+                  className={`px-3 h-6 rounded-full font-semibold tabular-nums whitespace-nowrap transition disabled:opacity-40 ${
+                    filters.role === role ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                  }`}
+                >
+                  {label} {n.toLocaleString()}장
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => update({ deck: "" })}
+              aria-label="덱 카드 보기 끝내기"
+              className="shrink-0 w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        ) : filters.group && groupCounts ? (
           // A 카드군's own cards, or the cards supporting it (서포트, 엘리스 2026-10-11)
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="truncate font-semibold">'{groupName ?? "카드군"}'</span>

@@ -55,7 +55,8 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups", "supports", "as_cards", "alt", "cutin", "rarity", "type_key", "number", "atk", "def_")
+                 "groups", "supports", "as_cards", "named", "names", "alt", "cutin", "rarity", "type_key", "number", "atk",
+                 "def_")
 
 
 # 디폴트 순, as Master Duel names it (몬마함순; 엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
@@ -115,11 +116,13 @@ def _card_index():
     if _index["key"] == key and time.monotonic() - _index["at"] < INDEX_MAX_AGE:
         return _index
     supports, as_cards = defaultdict(set), defaultdict(set)   # groups it supports / cards whose list it is in
+    named, names = defaultdict(set), defaultdict(set)         # cards whose name it bears / cards it names
     for cid, gid, target, how in CardSupport.objects.values_list("card_id", "group_id", "target_id", "how"):
         if gid:
             supports[cid].add(gid)
         else:
             as_cards[cid].add(target)
+            (named if how == CardSupport.How.NAMED else names)[cid].add(target)
     groups = defaultdict(set)
     for cid, gid in CardGroupMember.objects.exclude(how=CardGroupMember.How.REMOVED).values_list("card_id", "group_id"):
         groups[cid].add(gid)
@@ -145,6 +148,7 @@ def _card_index():
         r.groups = groups.get(cid, set())
         r.supports = supports.get(cid, set())
         r.as_cards = as_cards.get(cid, set()) | {cid}
+        r.named, r.names = named.get(cid, set()), names.get(cid, set())
         r.alt, r.cutin = cid in alt_cards, cid in cutin_cards
         r.rarity = md_rarity.get(cid, "")
         kind = frame if category == "monster" else f"{category}:{st}"
@@ -173,6 +177,43 @@ def _ordered(index, sort, high_first):
             missing.reverse()
         index["orders"][sort, high_first] = have + missing
     return index["orders"][sort, high_first]
+
+
+def _deck_tests(deck_id):
+    """A deck's 테마 카드 and its 서포트 as two tests on index rows (덱 문서 → 카드 도감, 특이점 2026-10-12) — the card
+    page's decks the other way round: cards in the deck's 카드군 or one under them, the card it is built on (DeckCard)
+    and cards bearing that card's name; then cards supporting those 카드군 or naming that card, unless already one of
+    the first."""
+    from deck.models import DeckCard, DeckCardGroup
+    linked = set(DeckCardGroup.objects.filter(deck_id=deck_id).values_list("group_id", flat=True))
+    parent = dict(CardGroup.objects.values_list("id", "parent_id"))
+
+    def under_linked(gid):
+        seen = set()
+        while gid and gid not in seen:
+            if gid in linked:
+                return True
+            seen.add(gid)
+            gid = parent.get(gid)
+        return False
+
+    groups = {gid for gid in parent if under_linked(gid)}
+    cards = set(DeckCard.objects.filter(deck_id=deck_id).values_list("card_id", flat=True))
+
+    def member(r):
+        return bool(r.groups & groups) or r.id in cards or bool(r.named & cards)
+
+    def support(r):
+        return not member(r) and (bool(r.supports & groups) or bool(r.names & cards))
+
+    return member, support
+
+
+def deck_card_counts(deck_id):
+    """How many 테마 카드 and 서포트 the card book shows for a deck (its page's button)."""
+    member, support = _deck_tests(deck_id)
+    rows = _card_index()["type"]
+    return {"member": sum(1 for r in rows if member(r)), "support": sum(1 for r in rows if support(r))}
 
 
 def _keep(p):
@@ -204,6 +245,9 @@ def _keep(p):
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)
+    if str(p.get("deck", "")).isdigit():
+        member, support = _deck_tests(int(p["deck"]))
+        tests.append(support if p.get("role") == "support" else member)
     if str(p.get("group", "")).isdigit():
         # a group's members, or with role=support the cards supporting it (서포트, 엘리스 2026-10-11)
         if p.get("role") == "support":
@@ -262,6 +306,12 @@ def cards(request):
     if str(p.get("group", "")).isdigit():   # a group's list tells how many members and supporters it has
         base = {k: p.get(k) for k in p.keys()}
         extra["group_counts"] = {role: len(found({**base, "role": role})) for role in ("member", "support")}
+    if str(p.get("deck", "")).isdigit():   # a deck's list: its name and how many 테마 카드 and 서포트 it has
+        from deck.models import Deck
+        base = {k: p.get(k) for k in p.keys()}
+        extra["deck_counts"] = {role: len(found({**base, "role": role})) for role in ("member", "support")}
+        deck = Deck.objects.filter(id=int(p["deck"])).values("id", "name").first()
+        extra["deck_filter"] = deck
     if str(p.get("card", "")).isdigit():
         named = Card.objects.filter(id=int(p["card"])).first()
         extra["card_filter"] = {"id": named.id, "name": display_name(named)} if named else None

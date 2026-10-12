@@ -306,6 +306,7 @@ def serialize_deck_detail(deck):
         "video_count": 1 if _featured(deck) else 0,
         "note_count": _note_entry_count(_visible_notes(deck)),
         "has_hyeol": hasattr(deck, "hyeol"),
+        "card_book": _card_book(deck),
         "summoning_methods": [method.get_method_display() for method in deck.summoning_methods.all()],
         "performance_tags": [tag.name for tag in deck.performance_tags.all()],
         "aesthetic_tags": [tag.name for tag in deck.aesthetic_tags.all()],
@@ -319,6 +320,12 @@ def serialize_deck_detail(deck):
             "deck_space": deck.stat_deck_space,
         },
     }
+
+
+def _card_book(deck):
+    """How many 테마 카드 and 서포트 the card book lists for the deck (the button to them, 특이점 2026-10-12)."""
+    from carddb.dex import deck_card_counts
+    return deck_card_counts(deck.id)
 
 
 def _featured(deck):
