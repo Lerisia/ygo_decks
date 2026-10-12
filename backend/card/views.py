@@ -96,32 +96,6 @@ def get_quiz_card(request):
         }
     })
 
-@api_view(["POST"])
-@parser_classes([MultiPartParser])
-def predict_card_api(request):
-    if "image" not in request.FILES:
-        return Response({"error": "No image uploaded."}, status=400)
-
-    from io import BytesIO
-    try:
-        image = Image.open(BytesIO(request.FILES["image"].read()))
-        match = identify([image])[0]
-    except Exception as e:
-        return Response({"error": f"Prediction failed: {str(e)}"}, status=500)
-
-    from carddb.display import art_url, display_name
-    card = _scanned_cards([match.card_id]).get(match.card_id)
-    if not card:
-        return Response({"error": "카드를 알아보지 못했습니다."}, status=404)
-
-    return Response({
-        "card_id": card.id,
-        "name": display_name(card),
-        "image_url": request.build_absolute_uri(art_url(card.id)),
-        "confidence": round(match.similarity, 4)
-    })
-
-
 def _scanned_cards(card_ids):
     """The site's cards the identifier named (those with Master Duel art), by id."""
     from carddb.models import Card as NewCard, has_art
@@ -130,18 +104,34 @@ def _scanned_cards(card_ids):
 from datetime import timedelta
 from django.utils import timezone
 
+SCAN_INTERVAL = 10   # seconds between one person's scans
+
+
+def _client_ip(request):
+    import ipaddress
+    ip = (request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR") or "").strip()
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    return ip
+
+
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def classify_deck_image(request):
-    user = request.user
-    if not user.is_staff:
-        one_minute_ago = timezone.now() - timedelta(seconds=10)
-        recent = UploadRecord.objects.filter(
-            user=user,
-            detected_at__gte=one_minute_ago
-        ).exists()
-        if recent:
-            return JsonResponse({'error': '10초에 한 번만 요청할 수 있습니다.'}, status=429)
+    """A deck list's picture, or one card's (엘리스 10/12: the single-card scanner went into this one), named card by
+    card. Guests may scan too (the identifier runs on the CPU), one scan per address every SCAN_INTERVAL seconds."""
+    from django.core.cache import cache
+    user = request.user if request.user.is_authenticated else None
+    too_soon = JsonResponse({'error': f'{SCAN_INTERVAL}초에 한 번만 요청할 수 있습니다.'}, status=429)
+    if user and not user.is_staff:
+        if UploadRecord.objects.filter(user=user, detected_at__gte=timezone.now() - timedelta(seconds=SCAN_INTERVAL)).exists():
+            return too_soon
+    elif user is None:
+        key = f"deck-scan:{_client_ip(request)}"
+        if not cache.add(key, 1, SCAN_INTERVAL):
+            return too_soon
     image_file = request.FILES.get('image')
     if not image_file:
         return JsonResponse({'error': 'No image provided'}, status=400)
@@ -179,6 +169,13 @@ def classify_deck_image(request):
     results = []
     # the identifier reads each whole cut card (엘리스 10/12); the art crops stay with the record
     illust_files = sorted([f for f in os.listdir(illust_dir) if f.startswith("illust")])
+    if not illust_files:
+        # nothing found: one card filling the picture, or its art alone — the identifier reads the picture whole
+        whole = Image.open(image_path).convert("RGB")
+        if identify([whole])[0].card_id is not None:
+            whole.save(os.path.join(card_dir, "card_01.jpg"))
+            whole.save(os.path.join(illust_dir, "illust_01.jpg"))
+            illust_files = ["illust_01.jpg"]
     card_files = [fname.replace("illust", "card") for fname in illust_files]
     matches = identify([Image.open(os.path.join(card_dir, f)) for f in card_files])
     cards = _scanned_cards([m.card_id for m in matches])

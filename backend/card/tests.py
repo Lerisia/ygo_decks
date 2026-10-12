@@ -499,16 +499,39 @@ class DeckScannerTest(FreshArt, TestCase):
         from .models import CardDetection
         self.assertEqual(list(CardDetection.objects.order_by("id").values_list("new_card_id", flat=True)), [4041, None, None])
 
-    def test_single_card(self):
+    def test_guests_scan_once_per_ten_seconds_per_address(self):
+        from django.core.cache import cache
         from .identify import Match
-        with patch("card.views.identify", return_value=[Match(4041, 4041, 0.9)]):
-            r = self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart")
-        body = r.json()
-        self.assertEqual((body["card_id"], body["name"], body["confidence"]), (4041, "블랙 매지션", 0.9))
-        self.assertTrue(body["image_url"].endswith("/media/cards/art/common/4041.webp"))
-        for miss in (Match(5392, 5392, 0.9), Match(None, None, 0.2)):
-            with patch("card.views.identify", return_value=[miss]):
-                self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
+        cache.clear()
+        guest, other = APIClient(REMOTE_ADDR="203.0.113.7"), APIClient(REMOTE_ADDR="203.0.113.8")
+        with patch("card.views.crop_cards_and_draw_boxes", side_effect=self.fake_crop), \
+                patch("card.views.identify", return_value=[Match(4041, 4041, 0.93)] * 3):
+            r = guest.post("/api/classify-deck/", {"image": self.photo()}, format="multipart")
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()["result"][0]["card_name"], "블랙 매지션")
+            self.assertEqual(guest.post("/api/classify-deck/", {"image": self.photo()}, format="multipart").status_code, 429)
+            self.assertEqual(other.post("/api/classify-deck/", {"image": self.photo()}, format="multipart").status_code, 200)
+        from .models import UploadRecord
+        self.assertEqual(UploadRecord.objects.filter(user__isnull=True).count(), 2)
+
+    def test_a_picture_with_no_card_found_is_read_whole(self):
+        """One card filling the picture, or its art alone: the detector finds nothing, the identifier reads it all."""
+        from .identify import Match
+
+        def nothing(image_path, card_output_dir, illust_output_dir, boxed_image_path, min_conf=None):
+            PILImage.new("RGB", (10, 10)).save(boxed_image_path)
+
+        with patch("card.views.crop_cards_and_draw_boxes", side_effect=nothing), \
+                patch("card.views.identify", return_value=[Match(4041, 4041, 0.88)]):
+            r = self.client.post("/api/classify-deck/", {"image": self.photo()}, format="multipart")
+        self.assertEqual([x["card_name"] for x in r.json()["result"]], ["블랙 매지션"])
+        with patch("card.views.crop_cards_and_draw_boxes", side_effect=nothing), \
+                patch("card.views.identify", return_value=[Match(None, None, 0.2)]):
+            r = self.client.post("/api/classify-deck/", {"image": self.photo()}, format="multipart")
+        self.assertEqual(r.json()["result"], [])
+
+    def test_the_single_card_scanner_is_gone(self):
+        self.assertEqual(self.client.post("/api/predict-card/", {"image": self.photo()}, format="multipart").status_code, 404)
 
 
 class IdentifyTest(SimpleTestCase):
