@@ -229,14 +229,23 @@ class CampaignTest(TestCase):
         self.assertEqual(got["new"], ([5], []))
 
     def test_days_within_the_packs_sale(self):
-        got = self.sync({50: {"spans": [("2025-12-01", "2026-06-30")], "source": ""}})
-        self.assertEqual(got["on"][1], [("2026-01-08", "2026-03-01", {"5": 50})])   # from its release to its end
+        got = self.sync({50: {"spans": [("2025-12-01", "2026-02-15")], "source": ""}})
+        self.assertEqual(got["on"][1], [("2026-01-08", "2026-02-15", {"5": 50})])   # from its release
+        got = self.sync({50: {"spans": [("2026-02-01", "2026-06-30")], "source": ""}})
+        self.assertEqual(got["on"][1], [("2026-02-01", "2026-03-01", {"5": 50})])   # to its end
 
     def test_an_art_mdm_puts_in_the_pack_comes_in_its_version(self):
         # MDM lists the campaign art as the pack's own; Yugipedia says when it came: the usual art in the usual pack
         self.cards = [mdm_card(5, "UR", "on", alt=True, release="2026-02-01T00:00:00.000Z")]
         got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}})
         self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-03-01", {"5": 50})]))
+
+    def test_a_pack_sold_only_while_it_ran(self):
+        # the campaign ran the whole time the pack was sold: there was never a usual one (엘리스 10/13: 파워업 셀렉션)
+        got = self.sync({50: {"spans": [("2026-01-08", "2026-03-01")], "source": ""}})
+        self.assertEqual(got["on"], ([50], []))
+        got = self.sync({50: {"spans": [("2025-12-01", "2026-05-01")], "source": ""}})
+        self.assertEqual(got["on"], ([50], []))
 
     def test_resolve_names_to_prints(self):
         MdPrint.objects.create(md_id=52, card_id=5, is_alt_art=True, rarity="UR")

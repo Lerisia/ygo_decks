@@ -397,6 +397,13 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
                 base = days and base_of(sid, art)
                 if base:
                     versions[(sid, *days)][base] = art_id
+    # a selection pack sold only while a campaign ran was never sold without its arts: they are the usual pack's
+    for (sid, start, end), swaps in list(versions.items()):
+        if (start, end) == sale[sid]:
+            for base, art_id in swaps.items():
+                rarity, amount = wanted[sid].pop(base)
+                wanted[sid][art_id] = (prints[art_id].rarity or rarity, amount)
+            del versions[(sid, start, end)]
     # a pack whose cover shows such an art though it was not on sale while the art came (it came out with it later):
     # the usual pack has it, as the cover says
     for sid, art_id in pending:
