@@ -330,7 +330,7 @@ export default function SoloTwenty() {
       >← 놀이터</button>
 
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl shadow px-3 py-3 sm:p-5">
-        <h1 className="text-xl md:text-2xl font-bold text-center mb-1">🧩 솔로 딱무고개</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-center mb-1">🧩 딱무고개</h1>
         <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-3">
           20개의 질문으로 카드를 맞춰보세요
         </p>
@@ -732,7 +732,7 @@ export default function SoloTwenty() {
               >×</button>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-3">
-              이제 솔로 딱무고개에 <b>마법 / 함정 카드</b>도 출제됩니다.
+              이제 딱무고개에 <b>마법 / 함정 카드</b>도 출제됩니다.
             </p>
             <ul className="space-y-1 text-gray-700 dark:text-gray-300 mb-4 list-disc list-inside">
               <li>"일반적인 질문"에 <b>몬스터 / 마법 / 함정</b> 분기 추가</li>
