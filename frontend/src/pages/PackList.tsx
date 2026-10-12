@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import SearchForm from "@/components/SearchForm";
 import { Input } from "@/components/ui/input";
 import PackFront from "@/components/packs/PackFront";
@@ -22,14 +22,25 @@ export default function PackList() {
   const navigate = useNavigate();
   const [packs, setPacks] = useState<PackSummary[] | null>(null);
   const [error, setError] = useState(false);
-  const [kind, setKind] = useState<"all" | PackKind>("all");
-  const [query, setQuery] = useState("");
-  const [special, setSpecial] = useState(false);   // only the packs with a new art or an 오버프레임 (엘리스 10/13)
+  // the kind, the search and the filter live in the address too, so Back from a pack finds them as they were
+  // (엘리스 10/13); the scroll comes back with useScrollRestoration
+  const [params, setParams] = useSearchParams();
+  const [kind, setKind] = useState<"all" | PackKind>(() => KINDS.find((k) => k.key === params.get("kind"))?.key ?? "all");
+  const [query, setQuery] = useState(() => params.get("q") ?? "");
+  const [special, setSpecial] = useState(() => params.get("art") === "1");   // only the packs with a new art or an 오버프레임
   const [hits, setHits] = useState<{ q: string; byPack: Map<number, PackHit & { rank: number }> } | null>(null);
 
   useEffect(() => {
     getPacks().then(setPacks).catch(() => setError(true));
   }, []);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (kind !== "all") next.set("kind", kind);
+    if (query) next.set("q", query);
+    if (special) next.set("art", "1");
+    if (next.toString() !== params.toString()) setParams(next, { replace: true });
+  }, [kind, query, special]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const q = query.trim();

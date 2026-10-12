@@ -144,11 +144,15 @@ export default function PackDetail() {
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold">
                   1팩 <span className="text-sm font-semibold opacity-90"><GemIcon /> {GEMS_PER_PACK}</span>
                 </button>
+                {/* after ten without a UR the next ten owe one, and the button says so in a bright purple, as the game's
+                    does (엘리스 10/13); the wording is the game's */}
                 <button type="button" disabled={!can(10)} onClick={() => open(10)}
-                        className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold leading-tight">
+                        className={`h-12 rounded-lg disabled:bg-none disabled:bg-gray-500 text-white font-bold leading-tight ${tally.owed
+                          ? "bg-gradient-to-r from-fuchsia-400 via-purple-500 to-violet-600 shadow-[0_0_14px_rgba(232,121,249,.6)]"
+                          : "bg-blue-600 hover:bg-blue-700"}`}>
                   10팩 <span className="text-sm font-semibold opacity-90"><GemIcon /> {(GEMS_PER_PACK * 10).toLocaleString()}</span>
-                  <span className={`block text-[11px] font-semibold ${tally.owed ? "text-amber-200" : "opacity-80"}`}>
-                    {tally.owed ? "10팩으로 UR 확정" : "10팩으로 SR 이상 1장 확정"}
+                  <span className="block text-[11px] font-semibold opacity-90">
+                    {tally.owed ? "10팩이면 UR 1장 확정" : "10팩이면 SR 이상 1장 확정"}
                   </span>
                 </button>
               </div>
@@ -173,7 +177,7 @@ export default function PackDetail() {
       )}
 
       {run && pack && (
-        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} gems={gems} onClose={() => setRun(null)} onAgain={open}
+        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} gems={gems} owed={tally.owed} onClose={() => setRun(null)} onAgain={open}
                      onStage={(st) => { openStage.current = st; }} />
       )}
       {rates && pack && <Rates pack={pack} master={master} onClose={() => setRates(false)} />}

@@ -289,15 +289,16 @@ export class FxLayer {
     });
   }
 
-  /** A bolt's foot on the floor at (x, y): a flash, cyan shards thrown out, a glow spreading on the floor. */
-  strike(x: number, y: number, s: number) {
-    this.add({ tex: "glow_soft", x, y, size: s * 2.4, grow: 0.4, life: 0.35, alpha: 1, fadeIn: 0.01, color: "#cfefff" });
-    this.add({ tex: "star_big", x, y, size: s * 1.8, grow: 0.3, life: 0.3, alpha: 0.9, fadeIn: 0.01, color: CYAN });
+  /** A bolt's foot on the floor at (x, y): a flash, cyan shards thrown out (pink for a red bolt), a glow spreading on the floor. */
+  strike(x: number, y: number, s: number, red = false) {
+    const color = red ? "#ff5aa5" : CYAN;
+    this.add({ tex: "glow_soft", x, y, size: s * 2.4, grow: 0.4, life: 0.35, alpha: 1, fadeIn: 0.01, color: red ? "#ffd0e6" : "#cfefff" });
+    this.add({ tex: "star_big", x, y, size: s * 1.8, grow: 0.3, life: 0.3, alpha: 0.9, fadeIn: 0.01, color });
     for (let i = 0; i < 14; i++) {
       const a = rand(Math.PI * 1.05, Math.PI * 1.95);
       const v = s * rand(3, 7);
       this.add({ tex: "shards", grid: 3, frame: Math.floor(rand(0, 9)), x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, ay: s * 9,
-                 drag: 1.2, life: rand(0.5, 0.9), size: s * rand(0.12, 0.22), rot: rand(0, 6), vr: rand(-10, 10), color: CYAN });
+                 drag: 1.2, life: rand(0.5, 0.9), size: s * rand(0.12, 0.22), rot: rand(0, 6), vr: rand(-10, 10), color });
     }
   }
 

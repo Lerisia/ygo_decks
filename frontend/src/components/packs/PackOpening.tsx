@@ -15,6 +15,8 @@ const T = {
   // from the tear, as the game's openings go (its 4.5 s cut sound rising under them, 엘리스 10/13): the cards out at
   // 1.3 s, the pack gone at 2.3 s, the cards dealt at 3.2 s
   out: 1320, gone: 2300, dealt: 3200,
+  strikeAt: 120, tearAt: 1000,                  // from the tap: the first strike, then the tear (or Hope)
+  rattle: 380, rattleWait: { SR: 40, UR: 620 }, // a marked SR / UR shaking before it turns, a UR then held a moment
   stream: 240, streamGap: 95,                   // out of the opened pack and off the top, one after the next
   deal: 320, dealGap: 50,                       // up into place from below, one after the next
   turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
@@ -31,19 +33,18 @@ const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
 const high = (r: Rarity) => r === "SR" || r === "UR";
 const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK[c.rarity] > RANK[b] ? c.rarity : b), "N");
 
-/** What a pack shows before it opens: its tier (a gold pack for an SR, a rainbow one for a UR, as the game's pack turns
- *  into its gold or rainbow version), lightning (one to three strikes) and the Hope cut-in. The game's own rule for these
- *  is not known (its server decides): lightning often for an SR or better and now and then without, Hope only for a UR,
- *  one time in two, so it never lies (엘리스 10/13). Face down, an SR / UR shows its gold / rainbow back in some packs
- *  and not in others (in the game's openings two packs of four with one marked them): one pack in two. */
+/** What a pack shows of what it holds, as counted in the game's openings (엘리스 10/13; its server decides, so the odds are
+ *  ours): its tier (a gold pack for an SR, a rainbow one for a UR); the lightning, two or three strikes every time it is
+ *  opened, one of them red in an SR / UR pack three times in five (never in a plain one); Hope tearing it, only for a UR,
+ *  one time in two, so it never lies; and, face down, an SR / UR's gold / rainbow back in one pack of two (the others
+ *  leave them plain), such a card rattling before it turns. */
 type Tier = "N" | "SR" | "UR";
-type Hints = { tier: Tier; strikes: number; monster: boolean; marked: boolean };
+type Hints = { tier: Tier; strikes: number; red: number; monster: boolean; marked: boolean };
 const hintsFor = (cards: Pulled<PackCard>[]): Hints => {
   const top = best(cards);
   const tier: Tier = top === "UR" ? "UR" : top === "SR" ? "SR" : "N";
-  const lit = Math.random() < (tier !== "N" ? 0.6 : 0.12);
-  return { tier, strikes: lit ? 1 + Math.floor(Math.random() * 3) : 0, monster: tier === "UR" && Math.random() < 0.5,
-           marked: tier !== "N" && Math.random() < 0.5 };
+  return { tier, strikes: Math.random() < 0.5 ? 2 : 3, red: tier !== "N" && Math.random() < 0.6 ? 1 : -1,
+           monster: tier === "UR" && Math.random() < 0.5, marked: tier !== "N" && Math.random() < 0.5 };
 };
 const frameOf = (tier: Tier) => (tier === "UR" ? "po-frame-ur" : tier === "SR" ? "po-frame-sr" : "");
 
@@ -53,14 +54,15 @@ type Fx = MutableRefObject<FxLayer | null>;
 
 /** The game's pack opening, rebuilt from its own pictures, sounds and effect data and from watching it (엘리스 10/12–13:
  *  "진짜 마듀처럼"): a blue burst to begin; a dark stage with a lit horizon the packs and cards stand and mirror on; ten
- *  packs laid out first (gold those with an SR, rainbow those with a UR); each pack comes on, lightning may strike, a
- *  single pack may turn into its gold or rainbow pack, Hope may cut in for a UR; a tap or a stroke across its top cuts it
- *  in a white flash, light pours up through a blue, gold or rainbow curtain and the cards fly in onto the floor, a glint
- *  running along them; a tap or a finger drawn across turns them — N and R whisk over, SR and UR leap up in light and
- *  dust (a UR twisting the wrong way first, a ring spreading), and a shine or royal card turns once more into its finish
+ *  packs laid out first (gold those with an SR, rainbow those with a UR); each pack comes on, a single pack may turn
+ *  into its gold or rainbow pack; a tap or a stroke opens it — lightning strikes (a red bolt hinting at an SR / UR), then
+ *  it tears in a white flash or Hope tears it for a UR; light pours up through a blue, gold or rainbow curtain, the
+ *  cards shoot out and rise into place from below, a glint running along them; a tap or a finger drawn across turns
+ *  them — N and R whisk over, SR and UR leap up in light and dust (one whose back showed it rattling first, a UR
+ *  twisting the wrong way, a ring spreading), and a shine or royal card turns once more into its finish
  *  in the game's shader. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
-export default function PackOpening({ pack, packs, fresh, gems, onClose, onAgain, onStage }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; gems: number;
+export default function PackOpening({ pack, packs, fresh, gems, owed = false, onClose, onAgain, onStage }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; gems: number; owed?: boolean;
   onClose: () => void; onAgain: (count: 1 | 10) => void; onStage?: (stage: string) => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -184,7 +186,7 @@ export default function PackOpening({ pack, packs, fresh, gems, onClose, onAgain
           <Cards key={index} cards={packs[index]} marked={hints[index].marked} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
-        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} gems={gems} onOpen={open} onAgain={onAgain} onClose={onClose} />}
+        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} gems={gems} owed={owed} onOpen={open} onAgain={onAgain} onClose={onClose} />}
 
         <div className="absolute left-0 right-0 top-0 z-40 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <span className="po-count">{stage === "result" ? "팩 개봉 결과" : stage === "overview" ? pack.name : `${index + 1}/${total}`}</span>
@@ -257,7 +259,7 @@ function PackPicture({ pack, small = false }: { pack: PackDetail; small?: boolea
   );
 }
 
-/** One pack: it comes on, the signs of what it holds play, and a tap or a stroke across its top opens it. */
+/** One pack: it comes on (turning gold or rainbow if it holds an SR / UR), and a tap or a stroke opens it. */
 function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   pack: PackDetail; hints: Hints; framed: boolean; fx: Fx; flash: (white: boolean) => void; onOpened: () => void;
 }) {
@@ -268,10 +270,9 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   // a single pack starts plain and turns into its gold or rainbow pack; after the ten laid out it already is
   const [tier, setTier] = useState<Tier>(framed ? hints.tier : "N");
   const [upgrading, setUpgrading] = useState(false);
-  const [monster, setMonster] = useState<"waiting" | "showing" | "done">(hints.monster ? "waiting" : "done");
-  const [phase, setPhase] = useState<"stand" | "cut" | "pour" | "rise" | "leave">("stand");
+  const [monster, setMonster] = useState(false);
+  const [phase, setPhase] = useState<"stand" | "strike" | "cut" | "pour" | "rise" | "leave">("stand");
   const [line, setLine] = useState(0);
-  const wantCut = useRef(false);
   const timers = useRef<number[]>([]);
   const drag = useRef<{ x: number; max: number; onPack: boolean } | null>(null);
   const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
@@ -287,15 +288,13 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     const p = box.current?.getBoundingClientRect();
     if (r && p && fx.current) {
       const foot = fx.current.local(r.left + r.width * SPOTS[k], p.bottom + (k === 2 ? p.height * 0.08 : 0));
-      fx.current.strike(foot.x, foot.y, p.width * 0.35);
+      fx.current.strike(foot.x, foot.y, p.width * 0.35, k === hints.red);
     }
   };
 
   useEffect(() => {
     playPackSound("01_op", 0.7);
-    let t = 420;
-    for (let k = 0; k < hints.strikes; k++) at(t + k * 167, () => strike(k));
-    if (hints.strikes) t += hints.strikes * 167 + 300;
+    const t = 420;
     if (hints.tier !== "N") {
       if (framed) at(t, () => { setFloor(true); playPackSound("proc_rare", 0.8); });
       else {
@@ -304,20 +303,22 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
         at(t + 330, () => { setTier(hints.tier); setFloor(true); flash(false); });
         at(t + 800, () => setUpgrading(false));
       }
-      t += 850;
     }
-    if (hints.monster) at(t, () => setMonster("showing"));
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // a tap or a stroke opens it as the game does: lightning first, every time, then the tear a second after the tap —
+  // or Hope tearing it
   const cut = () => {
     if (phase !== "stand") return;
     unlockPackSound();
-    if (monster !== "done") {   // Hope has its moment first
-      wantCut.current = true;
-      if (monster === "waiting") setMonster("showing");
-      return;
-    }
     setTier(hints.tier);
+    setLine(1);
+    setPhase("strike");
+    for (let k = 0; k < hints.strikes; k++) at(T.strikeAt + k * 167, () => strike(k));
+    at(T.tearAt, () => (hints.monster ? setMonster(true) : tear()));
+  };
+
+  const tear = () => {
     const p = box.current?.getBoundingClientRect();
     if (p && fx.current) {
       const a = fx.current.local(p.left, p.top + p.height * 0.17);
@@ -334,11 +335,9 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   };
 
   const monsterDone = () => {
-    setMonster("done");
-    if (wantCut.current) window.setTimeout(() => { wantCut.current = false; cutRef.current(); }, 120);
+    setMonster(false);
+    tear();
   };
-  const cutRef = useRef(cut);
-  cutRef.current = cut;
 
   // a stroke sideways anywhere on the screen opens it, a third of the pack's width being enough (엘리스 10/13: "인식 범위가
   // 너무 좁아요"); a tap opens it only on the pack
@@ -384,7 +383,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
         <span style={{ backgroundImage: `url(${FX}streaks.webp)` }} />
       </div>
       {bolts.map((k) => (
-        <img key={k} src={`${FX}thunder.webp`} alt="" aria-hidden="true" className={`po-bolt po-bolt-${k}`} />
+        <img key={k} src={`${FX}thunder.webp`} alt="" aria-hidden="true" className={`po-bolt po-bolt-${k} ${k === hints.red ? "po-bolt-red" : ""}`} />
       ))}
 
       <div ref={box} className={`po-pack ${frameOf(tier)} ${upgrading ? "po-upgrading" : ""} po-${phase}`}
@@ -407,7 +406,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
           </>
         )}
       </div>
-      {monster === "showing" && <Monster onDone={monsterDone} flash={flash} />}
+      {monster && <Monster onDone={monsterDone} flash={flash} />}
     </div>
   );
 }
@@ -549,7 +548,13 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     }, delay + 120 + T.premium);
   }, [cards, fx, flash]);
 
-  const flip = useCallback((i: number, dir: 1 | -1, delay = 0) => {
+  /** How long a card rattles (and a UR then waits) before it turns: only an SR / UR whose back showed it. */
+  const rattleOf = useCallback((i: number) => {
+    const r = cards[i].rarity;
+    return marked && high(r) ? T.rattle + T.rattleWait[r as "SR" | "UR"] : 0;
+  }, [cards, marked]);
+
+  const flip = useCallback((i: number, dir: 1 | -1, start = 0) => {
     if (turnedRef.current[i]) return;
     turnedRef.current[i] = true;
     setTurned([...turnedRef.current]);
@@ -559,6 +564,13 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     const r = cards[i].rarity;
     const big = high(r);
     const ur = r === "UR";
+    // a marked SR / UR first rattles where it lies, "챠카챠카", with the game's sound for it (엘리스 10/13)
+    const wait = rattleOf(i);
+    if (wait) {
+      el.animate([0, 7, -7, 6, -6, 5, -4, 2, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: T.rattle, delay: start });
+      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.7); }, start);
+    }
+    const delay = start + wait;
     // a UR first twists the wrong way, then whips round
     const turn = T.turn[r];
     const a = inner.animate(ur
@@ -600,14 +612,14 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
       } else playCardMove(0.7);
     }, delay + show);
     if (cards[i].finish !== "basic") premium(i, dir, settled + 160);
-  }, [cards, fx, flash, shake, premium]);
+  }, [cards, fx, flash, shake, premium, rattleOf]);
 
   const turnAll = () => {
     let at = 0;
     turnedRef.current.forEach((done, i) => {
       if (done) return;
       flip(i, 1, at);
-      at += high(cards[i].rarity) ? T.allGap.high : T.allGap.low;
+      at += (high(cards[i].rarity) ? T.allGap.high : T.allGap.low) + rattleOf(i);
     });
   };
 
@@ -715,8 +727,8 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
 }
 
 /** 팩 개봉 결과: every card pulled, UR first, a royal or shine one before a plain one, popping in; a tap shows it large. */
-function Result({ pack, packs, fresh, finishes, gems, onOpen, onAgain, onClose }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>; gems: number;
+function Result({ pack, packs, fresh, finishes, gems, owed, onOpen, onAgain, onClose }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>; gems: number; owed: boolean;
   onOpen: (c: Pulled<PackCard>) => void; onAgain: (count: 1 | 10) => void; onClose: () => void;
 }) {
   const all = useMemo(() => {
@@ -752,7 +764,10 @@ function Result({ pack, packs, fresh, finishes, gems, onOpen, onAgain, onClose }
       </div>
       <div className="flex justify-center gap-2 px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] border-t border-white/10 bg-black/60">
         <button type="button" onClick={() => onAgain(1)} disabled={gems < GEMS_PER_PACK} className="po-btn">1팩 <small><GemIcon /> {GEMS_PER_PACK}</small></button>
-        <button type="button" onClick={() => onAgain(10)} disabled={gems < GEMS_PER_PACK * 10} className="po-btn">10팩 <small><GemIcon /> {(GEMS_PER_PACK * 10).toLocaleString()}</small></button>
+        <button type="button" onClick={() => onAgain(10)} disabled={gems < GEMS_PER_PACK * 10} className={`po-btn ${owed ? "po-btn-owed" : ""}`}
+                title={owed ? "10팩이면 UR 1장 확정" : undefined}>
+          10팩 <small><GemIcon /> {(GEMS_PER_PACK * 10).toLocaleString()}</small>{owed && <small className="po-owed">UR 확정</small>}
+        </button>
         <button type="button" onClick={onClose} className="po-btn po-plain" aria-label={`${pack.name} 페이지로`}>닫기</button>
       </div>
     </div>
@@ -872,11 +887,15 @@ const CSS = `
 .po-bolt-0 { left: 20%; }
 .po-bolt-1 { left: 80%; transform: scaleX(-1); }
 .po-bolt-2 { left: 10%; height: 70svh; bottom: calc(100% - var(--horizon) - 6%); }
+.po-bolt-red { filter: sepia(1) hue-rotate(295deg) saturate(6) brightness(1.2) drop-shadow(0 0 10px #ff3d8b); }
 @keyframes po-bolt { 0% { opacity: 1; } 18% { opacity: .35; } 30% { opacity: 1; } 55% { opacity: .8; } 100% { opacity: 0; } }
 
 .po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56);
   animation: po-monster-bg 1.95s linear forwards; }
-.po-monster img { position: absolute; left: 50%; top: 50%; width: min(max(150vw, 150svh), 210svh); max-width: none; translate: -50% -42%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
+/* Hope's head (37.5% down its picture, a little left of the middle) a quarter of the way down the screen, all of it from
+   its horns to its legs in view on a phone held upright (엘리스 10/13: "여전히 너무 아래") */
+.po-monster img { position: absolute; left: 50%; top: 26%; width: min(max(150vw, 125svh), 200svh); max-width: none; translate: -47% -37.5%;
+  transform-origin: 47% 37.5%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
 @keyframes po-monster { 0% { transform: scale(1.5) translateX(14%); opacity: 0; } 8% { opacity: 1; } 70% { transform: scale(1.08) translateX(0); } 100% { transform: scale(1.03) translateX(-2%); opacity: 1; } }
 @keyframes po-monster-bg { 0% { background: #000; } 6% { background: #000; } 9% { background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56); } 92% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -915,6 +934,9 @@ const CSS = `
   background: linear-gradient(180deg, #4f8ff7, #1d4ed8); box-shadow: 0 0 0 1px rgba(255,255,255,.3) inset; }
 .po-btn small { font-weight: 600; opacity: .8; margin-left: 4px; }
 .po-plain { background: rgba(255,255,255,.12); box-shadow: none; }
+/* the next ten owe a UR (ten without one before): the game's button turns bright (엘리스 10/13) */
+.po-btn-owed { background: linear-gradient(90deg, #e879f9, #a855f7 55%, #7c3aed); box-shadow: 0 0 0 1px rgba(255,255,255,.5) inset, 0 0 14px rgba(232,121,249,.65); }
+.po-owed { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 9999px; background: rgba(255,255,255,.25); opacity: 1 !important; }
 .po-btn:disabled { opacity: .4; }
 }
 `;
