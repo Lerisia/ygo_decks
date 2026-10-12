@@ -20,10 +20,10 @@ const LOOKS: Record<Look, string> = {
   off: "border-transparent hover:border-transparent bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600",
   disabled: "border-transparent hover:border-transparent bg-gray-100 dark:bg-gray-700/40 text-gray-400 dark:text-gray-500 cursor-not-allowed",
 };
-// a chip in use is two buttons (참혈 2026-10-12 round 2): its value opens the choices, the ✕ clears it; each half
-// darkens on its own
-const IN_USE = `${CHIP_BOX} overflow-hidden border-transparent bg-blue-600 text-white`;
-const HALF = "h-full flex items-center p-0 border-0 rounded-none bg-transparent text-white font-semibold transition hover:bg-blue-700";
+// a chip in use is two buttons (참혈 2026-10-12 round 2): its value opens the choices, the ✕ clears it; the whole
+// chip darkens under the mouse, not each half (참혈 2026-10-12)
+const IN_USE = `${CHIP_BOX} overflow-hidden border-transparent bg-blue-600 text-white transition hover:bg-blue-700`;
+const HALF = "h-full flex items-center p-0 border-0 rounded-none bg-transparent text-white font-semibold";
 const OPTION = "h-8 px-3 rounded-lg hover:border-transparent text-sm font-semibold whitespace-nowrap break-keep transition";
 const optionLook = (on: boolean) =>
   on ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600";
