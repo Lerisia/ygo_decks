@@ -137,7 +137,7 @@ def admin_user_search(request):
           .order_by("username")[:20])
     return Response({
         "results": [
-            {"id": u.id, "username": u.username, "points": u.points or 0}
+            {"id": u.id, "username": u.username, "points": u.points or 0, "gems": u.gems or 0}
             for u in qs
         ]
     })
@@ -378,3 +378,46 @@ def confirm_password_reset(request):
 def is_admin(request):
     from deck.permissions import can_edit_deck_book
     return Response({"is_admin": request.user.is_staff, "can_edit_dex": can_edit_deck_book(request.user)})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def admin_grant_gems(request):
+    """An operator gives (or, negative, takes back, never below zero) a user's gems, with a reason; logged."""
+    from .gems import change_gems
+    from .models import User as UserM
+    username = (request.data.get("username") or "").strip()
+    note = (request.data.get("note") or "").strip()
+    try:
+        amount = int(request.data.get("amount"))
+    except (TypeError, ValueError):
+        return Response({"error": "amount는 정수여야 합니다."}, status=400)
+    if amount == 0:
+        return Response({"error": "amount는 0일 수 없습니다."}, status=400)
+    target = UserM.objects.filter(username=username).first()
+    if not target:
+        return Response({"error": f"사용자 '{username}'을 찾을 수 없습니다."}, status=404)
+    amount = max(amount, -(target.gems or 0))
+    if amount:
+        change_gems(target, amount, kind="admin_grant", note=note)
+    return Response({"ok": True, "user": {"id": target.id, "username": target.username, "gems": target.gems},
+                     "amount": amount, "note": note})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def gems_history(request):
+    """The user's gems and their changes, newest first (page, page_size up to 200)."""
+    from .models import GemTransaction
+    try:
+        page = max(1, int(request.query_params.get("page", 1)))
+        size = min(200, max(1, int(request.query_params.get("page_size", 50))))
+    except ValueError:
+        page, size = 1, 50
+    qs = GemTransaction.objects.filter(user=request.user)
+    total = qs.count()
+    rows = qs[(page - 1) * size: page * size]
+    labels = dict(GemTransaction.KIND_CHOICES)
+    return Response({"gems": request.user.gems, "count": total, "page": page, "results": [
+        {"amount": t.amount, "kind": t.kind, "kind_label": labels.get(t.kind, t.kind), "note": t.note,
+         "balance_after": t.balance_after, "created_at": t.created_at.isoformat()} for t in rows]})

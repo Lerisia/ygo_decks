@@ -35,3 +35,44 @@ export function getPack(id: number): Promise<PackDetail> {
   }
   return details.get(id)!;
 }
+
+export type PackTally = { gems: number; packs: number; ur: number; sr: number; owed: boolean };
+export type PackMine = { signed_in: boolean; gems: number; tally: PackTally };
+export type OpenedCard = PackCard & { finish: "basic" | "shine" | "royal"; new: boolean };
+export type CollectionCard = {
+  print: number; card: number; name: string; rarity: Rarity; thumb: string | null; face: string | null;
+  basic: number; shine: number; royal: number; first: string; last: string;
+};
+export type Collection = {
+  gems: number; cards: CollectionCard[];
+  summary: { kinds: number; total: number; ur: number; sr: number; shine: number; royal: number; gems_spent: number; packs: number };
+};
+
+const auth = (): Record<string, string> => {
+  const token = localStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+/** The signed-in user's gems and their tally for a pack. */
+export async function getPackMine(id: number): Promise<PackMine> {
+  const r = await fetch(`/api/carddb/packs/${id}/mine/`, { headers: auth() });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+/** Buy one or ten packs with gems; the server draws them into the user's collection. */
+export async function openPack(id: number, count: 1 | 10): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
+  const r = await fetch(`/api/carddb/packs/${id}/open/`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body.error || body.detail || `HTTP ${r.status}`), { gems: body.gems });
+  return body;
+}
+
+/** The signed-in user's 카드 모음. */
+export async function getCollection(): Promise<Collection> {
+  const r = await fetch("/api/carddb/packs/collection/", { headers: auth() });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}

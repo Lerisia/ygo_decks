@@ -113,6 +113,7 @@ export interface AdminUserHit {
   id: number;
   username: string;
   points: number;
+  gems: number;
 }
 
 export const adminSearchUsers = async (q: string): Promise<AdminUserHit[]> => {
@@ -132,6 +133,22 @@ export const adminGrantPoints = async (
 ): Promise<{ ok: boolean; user: { id: number; username: string; points: number }; amount: number; note: string }> => {
   const token = localStorage.getItem("access_token") || "";
   const res = await fetch("/api/manage/points/grant/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username, amount, note }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body && (body.error || body.detail)) || "지급 실패");
+  return body;
+};
+
+export const adminGrantGems = async (
+  username: string,
+  amount: number,
+  note: string,
+): Promise<{ ok: boolean; user: { id: number; username: string; gems: number }; amount: number; note: string }> => {
+  const token = localStorage.getItem("access_token") || "";
+  const res = await fetch("/api/manage/gems/grant/", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ username, amount, note }),

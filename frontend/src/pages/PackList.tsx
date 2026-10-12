@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import PackFront from "@/components/packs/PackFront";
 import { type PackKind, type PackSummary, getPacks } from "@/api/packApi";
 import { makeMatcher, nameKeys } from "@/utils/hangul";
+import { isAuthenticated } from "@/api/accountApi";
 
 const KINDS: { key: "all" | PackKind; label: string }[] = [
   { key: "all", label: "전체" },
@@ -44,9 +45,12 @@ export default function PackList() {
       >
         ← 솔로 플레이
       </button>
-      <h1 className="text-2xl md:text-4xl font-bold">팩 개봉 시뮬레이터</h1>
+      <div className="flex items-end justify-between gap-3">
+        <h1 className="text-2xl md:text-4xl font-bold">팩 개봉 시뮬레이터</h1>
+        {isAuthenticated() && <Link to="/packs/collection" className="shrink-0 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음 →</Link>}
+      </div>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-keep">
-        마스터 듀얼의 팩을 게임과 같은 제공 확률로 열어 봅니다. 젬은 들지 않습니다.
+        마스터 듀얼의 팩을 게임과 같은 제공 확률로 열어 봅니다. 뽑은 카드는 카드 모음에 쌓입니다.
       </p>
 
       <div className="mt-4 flex flex-col sm:flex-row gap-2">

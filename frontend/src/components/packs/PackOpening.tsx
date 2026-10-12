@@ -52,8 +52,8 @@ type Fx = MutableRefObject<FxLayer | null>;
  *  running along them; a tap or a finger drawn across turns them — N and R whisk over, SR and UR leap up in light and
  *  dust (a UR twisting the wrong way first, a ring spreading), and a shine or royal card turns once more into its finish
  *  in the game's shader. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
-export default function PackOpening({ pack, packs, fresh, onClose, onAgain, onStage }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>;
+export default function PackOpening({ pack, packs, fresh, gems, onClose, onAgain, onStage }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; gems: number;
   onClose: () => void; onAgain: (count: 1 | 10) => void; onStage?: (stage: string) => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -177,7 +177,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain, onSt
           <Cards key={index} cards={packs[index]} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
-        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} onOpen={open} onAgain={onAgain} onClose={onClose} />}
+        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} gems={gems} onOpen={open} onAgain={onAgain} onClose={onClose} />}
 
         <div className="absolute left-0 right-0 top-0 z-40 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <span className="po-count">{stage === "result" ? "팩 개봉 결과" : stage === "overview" ? pack.name : `${index + 1}/${total}`}</span>
@@ -674,8 +674,8 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
 }
 
 /** 팩 개봉 결과: every card pulled, UR first, a royal or shine one before a plain one, popping in; a tap shows it large. */
-function Result({ pack, packs, fresh, finishes, onOpen, onAgain, onClose }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>;
+function Result({ pack, packs, fresh, finishes, gems, onOpen, onAgain, onClose }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>; gems: number;
   onOpen: (c: Pulled<PackCard>) => void; onAgain: (count: 1 | 10) => void; onClose: () => void;
 }) {
   const all = useMemo(() => {
@@ -696,7 +696,7 @@ function Result({ pack, packs, fresh, finishes, onOpen, onAgain, onClose }: {
             <img src={`/media/md_ui/rarity_${r.toLowerCase()}_hd.png`} alt={r} className="h-4 w-auto" />{count(r)}
           </span>
         ))}
-        <span className="ml-auto text-white/70 tabular-nums">{(packs.length * GEMS_PER_PACK).toLocaleString()}젬</span>
+        <span className="ml-auto text-white/70 tabular-nums">{(packs.length * GEMS_PER_PACK).toLocaleString()}젬 · 남은 젬 {gems.toLocaleString()}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4">
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-w-4xl mx-auto">
@@ -710,8 +710,8 @@ function Result({ pack, packs, fresh, finishes, onOpen, onAgain, onClose }: {
         </div>
       </div>
       <div className="flex justify-center gap-2 px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] border-t border-white/10 bg-black/60">
-        <button type="button" onClick={() => onAgain(1)} className="po-btn">1팩 <small>{GEMS_PER_PACK}젬</small></button>
-        <button type="button" onClick={() => onAgain(10)} className="po-btn">10팩 <small>{(GEMS_PER_PACK * 10).toLocaleString()}젬</small></button>
+        <button type="button" onClick={() => onAgain(1)} disabled={gems < GEMS_PER_PACK} className="po-btn">1팩 <small>{GEMS_PER_PACK}젬</small></button>
+        <button type="button" onClick={() => onAgain(10)} disabled={gems < GEMS_PER_PACK * 10} className="po-btn">10팩 <small>{(GEMS_PER_PACK * 10).toLocaleString()}젬</small></button>
         <button type="button" onClick={onClose} className="po-btn po-plain" aria-label={`${pack.name} 페이지로`}>닫기</button>
       </div>
     </div>
@@ -746,6 +746,16 @@ const CSS = `
   border-top: 1px solid rgba(255,255,255,.35); border-bottom: 1px solid rgba(255,255,255,.35); text-shadow: 0 0 10px rgba(160,200,255,.9); }
 .po-cmd:disabled { opacity: .45; }
 .po-hint { font-size: 12px; color: rgba(255,255,255,.6); }
+@media (max-height: 520px) {
+  .po-root { --horizon: 56%; }
+  .po-bottom { bottom: max(8px, env(safe-area-inset-bottom)); }
+  .po-hint { display: none; }
+  .po-cmd { height: 38px; font-size: 15px; }
+  .po-grid { width: min(94vw, calc((56svh - 70px) * .6875 * 8 + 70px)); grid-template-columns: repeat(8, 1fr); }
+  .po-pack { height: min(40svh, 84vw); }
+  .po-overview { grid-template-columns: repeat(10, 1fr); width: min(94vw, calc((56svh - 80px) * .488 * 10 + 90px)); }
+  .po-skip { bottom: max(8px, env(safe-area-inset-bottom)); }
+}
 @media (hover: hover) { .po-cmd:hover { background: linear-gradient(90deg, transparent, rgba(255,255,255,.24) 22%, rgba(255,255,255,.24) 78%, transparent); } }
 
 .po-overview { position: absolute; left: 50%; bottom: calc(100% - var(--horizon)); translate: -50% 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
@@ -814,7 +824,7 @@ const CSS = `
 
 .po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56);
   animation: po-monster-bg 1.95s linear forwards; }
-.po-monster img { position: absolute; left: 50%; top: 50%; width: max(150vw, 150svh); max-width: none; translate: -50% -50%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
+.po-monster img { position: absolute; left: 50%; top: 50%; width: min(max(150vw, 150svh), 210svh); max-width: none; translate: -50% -42%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
 @keyframes po-monster { 0% { transform: scale(1.5) translateX(14%); opacity: 0; } 8% { opacity: 1; } 70% { transform: scale(1.08) translateX(0); } 100% { transform: scale(1.03) translateX(-2%); opacity: 1; } }
 @keyframes po-monster-bg { 0% { background: #000; } 6% { background: #000; } 9% { background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56); } 92% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -853,5 +863,6 @@ const CSS = `
   background: linear-gradient(180deg, #4f8ff7, #1d4ed8); box-shadow: 0 0 0 1px rgba(255,255,255,.3) inset; }
 .po-btn small { font-weight: 600; opacity: .8; margin-left: 4px; }
 .po-plain { background: rgba(255,255,255,.12); box-shadow: none; }
+.po-btn:disabled { opacity: .4; }
 }
 `;

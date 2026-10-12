@@ -49,6 +49,7 @@ const DeckScanner = lazyChunk(() => import("./pages/DeckScanner"));
 const CardQuiz = lazyChunk(() => import("./pages/CardQuiz"));
 const PackList = lazyChunk(() => import("./pages/PackList"));
 const PackDetail = lazyChunk(() => import("./pages/PackDetail"));
+const PackCollection = lazyChunk(() => import("./pages/PackCollection"));
 const Playground = lazyChunk(() => import("./pages/Playground"));
 const AllMenu = lazyChunk(() => import("./pages/AllMenu"));
 const Tools = lazyChunk(() => import("./pages/Tools"));
@@ -207,6 +208,7 @@ function App() {
             <Route path="/skill-names" element={<SkillNames />} />
             <Route path="/card-quiz" element={<CardQuiz />} />
             <Route path="/packs" element={<PackList />} />
+            <Route path="/packs/collection" element={<PackCollection />} />
             <Route path="/packs/:packId" element={<PackDetail />} />
             <Route path="/tier-list-maker" element={<TierListMaker />} />
             <Route path="/multiplayer" element={<Multiplayer />} />

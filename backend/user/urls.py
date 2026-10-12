@@ -3,7 +3,8 @@ from dj_rest_auth.registration.views import VerifyEmailView
 from .views import CustomRegisterView, CustomConfirmEmailView, CustomTokenObtainPairView, \
      check_email_exists, check_username_exists, change_username, change_password, get_user_info, \
      get_user_decks, update_user_decks, update_user_settings, is_admin, delete_account, \
-     request_password_reset, confirm_password_reset, claim_daily_bonus, points_history, admin_grant_points, admin_user_search
+     request_password_reset, confirm_password_reset, claim_daily_bonus, points_history, admin_grant_points, admin_user_search, \
+     admin_grant_gems, gems_history
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 urlpatterns = [
@@ -18,6 +19,8 @@ urlpatterns = [
     path("daily-bonus/", claim_daily_bonus, name="claim-daily-bonus"),
     path("user/points/history/", points_history, name="user-points-history"),
     path("manage/points/grant/", admin_grant_points, name="admin-points-grant"),
+    path("manage/gems/grant/", admin_grant_gems, name="admin-gems-grant"),
+    path("user/gems/history/", gems_history, name="user-gems-history"),
     path("manage/users/search/", admin_user_search, name="admin-user-search"),
     path("auth/register/", CustomRegisterView.as_view(), name="custom_register"),
     path("account-confirm-email/<str:key>/", CustomConfirmEmailView.as_view(), name="account_confirm_email"),

@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
-import { type PackCard, type PackDetail as Pack, getPack } from "@/api/packApi";
+import { type PackCard, type PackDetail as Pack, type PackMine, getPack, getPackMine, openPack } from "@/api/packApi";
+import { isAuthenticated } from "@/api/accountApi";
 import { unlockPackSound } from "@/lib/packSound";
-import { type Pool, type Pulled, type Rarity, GEMS_PER_PACK, RATES, drawPack, drawTen } from "@/utils/packDraw";
-import { clearTally, markSeen, saveTally, tallyOf } from "@/utils/packRecord";
+import { type Pool, type Pulled, type Rarity, GEMS_PER_PACK, RATES } from "@/utils/packDraw";
 
 const KIND_LABEL = { normal: "마스터 팩", secret: "시크릿 팩", selection: "셀렉션 팩" } as const;
 const RARITIES: Rarity[] = ["UR", "SR", "R", "N"];
 const STEP = 60;
 const pct = (x: number) => `${+(x * 100).toFixed(3)}%`;
+const NO_TALLY = { gems: 0, packs: 0, ur: 0, sr: 0, owed: false };
 
 const byRarity = (cards: PackCard[]): Pool<PackCard> => {
   const pool: Pool<PackCard> = { N: [], R: [], SR: [], UR: [] };
@@ -18,14 +19,17 @@ const byRarity = (cards: PackCard[]): Pool<PackCard> => {
   return pool;
 };
 
-/** A pack: open one or ten (the game's guarantees and its UR owed after ten without one, kept in this browser), what
- *  it holds by rarity, and its 제공 확률 in the game's own words. */
+/** A pack: buy one or ten with gems (엘리스 10/13 — the server draws them, by the game's guarantees and its UR owed after
+ *  ten without one, into the user's 카드 모음), what it holds by rarity, and its 제공 확률 in the game's own words. */
 export default function PackDetail() {
   const id = Number(useParams().packId);
+  const navigate = useNavigate();
   const [pack, setPack] = useState<Pack | null>(null);
   const [master, setMaster] = useState<Pack | null>(null);
   const [error, setError] = useState(false);
-  const [tally, setTally] = useState(() => tallyOf(id));
+  const [mine, setMine] = useState<PackMine | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const [run, setRun] = useState<{ key: number; packs: Pulled<PackCard>[][]; fresh: Set<number> } | null>(null);
   const [rates, setRates] = useState(false);
   const openStage = useRef("pack");
@@ -55,37 +59,56 @@ export default function PackDetail() {
   useEffect(() => {
     setPack(null);
     setMaster(null);
-    setTally(tallyOf(id));
+    setMine(null);
+    setNotice("");
     getPack(id)
       .then((p) => {
         setPack(p);
-        if (p.kind === "secret" && p.master_pack) getPack(p.master_pack).then(setMaster).catch(() => setError(true));
+        if (p.kind === "secret" && p.master_pack) getPack(p.master_pack).then(setMaster).catch(() => {});
       })
       .catch(() => setError(true));
+    getPackMine(id).then(setMine).catch(() => setMine({ signed_in: isAuthenticated(), gems: 0, tally: NO_TALLY }));
   }, [id]);
 
-  const pools = useMemo(() => {
-    if (!pack || (pack.kind === "secret" && !master)) return null;
-    return { main: byRarity(pack.cards), master: pack.kind === "secret" && master ? byRarity(master.cards) : undefined };
-  }, [pack, master]);
+  const tally = mine?.tally ?? NO_TALLY;
+  const gems = mine?.gems ?? 0;
 
-  const open = (count: 1 | 10) => {
-    if (!pools) return;
+  const open = async (count: 1 | 10) => {
+    if (!pack || busy) return;
+    if (!mine?.signed_in) {
+      navigate("/login");
+      return;
+    }
+    if (gems < count * GEMS_PER_PACK) {
+      setNotice(`젬이 부족합니다. ${count}팩에 ${(count * GEMS_PER_PACK).toLocaleString()}젬이 필요합니다.`);
+      return;
+    }
     unlockPackSound();
-    const drawn = count === 1 ? { packs: [drawPack(pools)], pity: tally.pity } : drawTen(pools, tally.pity);
-    const flat = drawn.packs.flat();
-    const next = {
-      gems: tally.gems + count * GEMS_PER_PACK, packs: tally.packs + count, pity: drawn.pity,
-      ur: tally.ur + flat.filter((c) => c.rarity === "UR").length, sr: tally.sr + flat.filter((c) => c.rarity === "SR").length,
-    };
-    saveTally(id, next);
-    setTally(next);
-    setRun({ key: Date.now(), packs: drawn.packs, fresh: markSeen(flat.map((c) => c.card.print)) });
+    setBusy(true);
+    setNotice("");
+    try {
+      const r = await openPack(id, count);
+      const packs = r.packs.map((p) => p.map((c) => ({
+        card: { print: c.print, card: c.card, name: c.name, rarity: c.rarity, thumb: c.thumb, face: c.face }, rarity: c.rarity, finish: c.finish,
+      })));
+      setMine({ signed_in: true, gems: r.gems, tally: r.tally });
+      setRun({ key: Date.now(), packs, fresh: new Set(r.packs.flat().filter((c) => c.new).map((c) => c.print)) });
+    } catch (e) {
+      const err = e as Error & { gems?: number };
+      setNotice(err.message || "팩을 열지 못했습니다.");
+      if (typeof err.gems === "number") setMine((m) => m && { ...m, gems: err.gems! });
+    } finally {
+      setBusy(false);
+    }
   };
 
+  const can = (count: number) => !!pack && !busy && (!mine?.signed_in || gems >= count * GEMS_PER_PACK);
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-4xl mx-auto">
-      <Link to="/packs" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+      <div className="flex items-center justify-between">
+        <Link to="/packs" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+        {mine?.signed_in && <Link to="/packs/collection" className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음 →</Link>}
+      </div>
       {error && !pack ? (
         <p className="py-16 text-center text-gray-500">팩을 불러오지 못했습니다.</p>
       ) : (
@@ -100,30 +123,33 @@ export default function PackDetail() {
               <span className="h-4 text-xs font-bold text-blue-600 dark:text-blue-400">{pack ? KIND_LABEL[pack.kind] : ""}</span>
               <h1 className="text-xl sm:text-3xl font-extrabold leading-tight break-keep min-h-[1.25em]">{pack?.name ?? ""}</h1>
               <p className="h-5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">{pack?.released ? `${pack.released} 출시` : ""}</p>
+              <p className="h-5 text-sm tabular-nums">
+                {mine === null ? "" : mine.signed_in ? <>보유 젬 <b>{gems.toLocaleString()}</b></> : (
+                  <Link to="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">로그인하면 팩을 열 수 있습니다</Link>
+                )}
+              </p>
               <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button type="button" disabled={!pools} onClick={() => open(1)}
+                <button type="button" disabled={!can(1)} onClick={() => open(1)}
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold">
                   1팩 <span className="text-sm font-semibold opacity-80">{GEMS_PER_PACK}젬</span>
                 </button>
-                <button type="button" disabled={!pools} onClick={() => open(10)}
+                <button type="button" disabled={!can(10)} onClick={() => open(10)}
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold leading-tight">
                   10팩 <span className="text-sm font-semibold opacity-80">{(GEMS_PER_PACK * 10).toLocaleString()}젬</span>
-                  <span className={`block text-[11px] font-semibold ${tally.pity.owed ? "text-amber-200" : "opacity-80"}`}>
-                    {tally.pity.owed ? "10팩으로 UR 확정" : "10팩으로 SR 이상 1장 확정"}
+                  <span className={`block text-[11px] font-semibold ${tally.owed ? "text-amber-200" : "opacity-80"}`}>
+                    {tally.owed ? "10팩으로 UR 확정" : "10팩으로 SR 이상 1장 확정"}
                   </span>
                 </button>
               </div>
             </div>
           </div>
+          <p className="mt-2 min-h-[20px] text-sm text-red-600 dark:text-red-400" role="status">{notice}</p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm min-h-[24px]">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm min-h-[24px]">
             {tally.packs > 0 && (
               <>
                 <span className="tabular-nums">이 팩에 쓴 젬 <b>{tally.gems.toLocaleString()}</b></span>
                 <span className="tabular-nums">UR <b>{tally.ur}</b> · SR <b>{tally.sr}</b></span>
-                <button type="button" onClick={() => { clearTally(id); setTally(tallyOf(id)); }} className="text-gray-500 dark:text-gray-400 underline">
-                  기록 지우기
-                </button>
               </>
             )}
             <button type="button" onClick={() => setRates(true)} disabled={!pack} className="ml-auto text-blue-600 dark:text-blue-400 font-semibold hover:underline">
@@ -136,7 +162,7 @@ export default function PackDetail() {
       )}
 
       {run && pack && (
-        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} onClose={() => setRun(null)} onAgain={open}
+        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} gems={gems} onClose={() => setRun(null)} onAgain={open}
                      onStage={(st) => { openStage.current = st; }} />
       )}
       {rates && pack && <Rates pack={pack} master={master} onClose={() => setRates(false)} />}

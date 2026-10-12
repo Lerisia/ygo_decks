@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminGrantPoints, adminSearchUsers, type AdminUserHit } from "@/api/accountApi";
+import { adminGrantGems, adminGrantPoints, adminSearchUsers, type AdminUserHit } from "@/api/accountApi";
+
+/** Points, or the pack simulator's gems (엘리스 2026-10-13: operators grant gems until buying them with points opens). */
+const CURRENCIES = { points: { label: "포인트", unit: "P" }, gems: { label: "젬", unit: "젬" } } as const;
+type Currency = keyof typeof CURRENCIES;
 
 export default function AdminPointsGrant() {
   const navigate = useNavigate();
+  const [currency, setCurrency] = useState<Currency>("points");
+  const unit = CURRENCIES[currency].unit;
+  const held = (u: AdminUserHit) => (currency === "gems" ? u.gems : u.points);
   const [usernameQuery, setUsernameQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<AdminUserHit | null>(null);
   const [searchResults, setSearchResults] = useState<AdminUserHit[]>([]);
@@ -18,7 +25,8 @@ export default function AdminPointsGrant() {
     username: string;
     amount: number;
     note: string;
-    points: number;
+    balance: number;
+    unit: string;
   } | null>(null);
 
   // Debounced search; only fires when no user is locked in.
@@ -60,23 +68,24 @@ export default function AdminPointsGrant() {
       if (!confirm("사유 없이 지급하시겠습니까?")) return;
     }
     if (amt < 0) {
-      if (!confirm(`${selectedUser.username} 의 포인트를 ${Math.abs(amt)}P 차감합니다. 진행할까요?`)) return;
+      if (!confirm(`${selectedUser.username} 의 ${CURRENCIES[currency].label}를 ${Math.abs(amt)}${unit} 차감합니다. 진행할까요?`)) return;
     }
     setSubmitting(true);
     try {
-      const r = await adminGrantPoints(selectedUser.username, amt, note.trim());
-      setLastResult({
-        username: r.user.username,
-        amount: r.amount,
-        note: r.note,
-        points: r.user.points,
-      });
+      if (currency === "gems") {
+        const r = await adminGrantGems(selectedUser.username, amt, note.trim());
+        setLastResult({ username: r.user.username, amount: r.amount, note: r.note, balance: r.user.gems, unit });
+        setSelectedUser({ ...selectedUser, gems: r.user.gems });
+      } else {
+        const r = await adminGrantPoints(selectedUser.username, amt, note.trim());
+        setLastResult({ username: r.user.username, amount: r.amount, note: r.note, balance: r.user.points, unit });
+        // Keep selectedUser so multiple grants to same user are easy.
+        setSelectedUser({ ...selectedUser, points: r.user.points });
+      }
       setAmountStr("");
       setNote("");
-      // Keep selectedUser so multiple grants to same user are easy.
-      setSelectedUser({ ...selectedUser, points: r.user.points });
-    } catch (e: any) {
-      setError(e?.message || "지급 실패");
+    } catch (e) {
+      setError((e as Error)?.message || "지급 실패");
     } finally {
       setSubmitting(false);
     }
@@ -92,9 +101,19 @@ export default function AdminPointsGrant() {
       </button>
 
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-3 py-4 sm:p-5">
-        <h1 className="text-xl font-bold mb-1">🏛️ 포인트 지급/차감</h1>
+        <h1 className="text-xl font-bold mb-1">🏛️ {CURRENCIES[currency].label} 지급/차감</h1>
+        <div role="tablist" aria-label="지급할 것" className="mb-3 grid grid-cols-2 rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-sm font-semibold">
+          {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+            <button key={c} type="button" role="tab" aria-selected={currency === c} onClick={() => { setCurrency(c); setLastResult(null); }}
+                    className={`h-8 rounded-md transition ${currency === c ? "bg-white dark:bg-gray-900 shadow text-blue-700 dark:text-blue-300" : "text-gray-600 dark:text-gray-300"}`}>
+              {CURRENCIES[c].label}
+            </button>
+          ))}
+        </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-          음수를 입력하면 차감됩니다. 차감 시 보유 포인트가 0 미만이면 0 으로 클램프됩니다. 누적 포인트는 차감되지 않아요.
+          {currency === "gems"
+            ? "팩 개봉 시뮬레이터에서 팩을 사는 젬입니다(1팩 100젬). 음수를 입력하면 차감되고, 0 아래로는 내려가지 않습니다."
+            : "음수를 입력하면 차감됩니다. 차감 시 보유 포인트가 0 미만이면 0 으로 클램프됩니다. 누적 포인트는 차감되지 않아요."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -104,7 +123,7 @@ export default function AdminPointsGrant() {
               <div className="flex items-center justify-between gap-2 px-2 py-2 border rounded bg-blue-50 dark:bg-blue-900/20">
                 <div className="min-w-0">
                   <span className="font-semibold truncate">{selectedUser.username}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">현재 {selectedUser.points.toLocaleString()}P</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">현재 {held(selectedUser).toLocaleString()}{unit}</span>
                 </div>
                 <button
                   type="button"
@@ -145,7 +164,7 @@ export default function AdminPointsGrant() {
                         className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between gap-2"
                       >
                         <span className="font-medium truncate">{u.username}</span>
-                        <span className="shrink-0 text-xs text-gray-500 tabular-nums">{u.points.toLocaleString()}P</span>
+                        <span className="shrink-0 text-xs text-gray-500 tabular-nums">{held(u).toLocaleString()}{unit}</span>
                       </button>
                     ))}
                   </div>
@@ -155,7 +174,7 @@ export default function AdminPointsGrant() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">금액 (P)</label>
+            <label className="block text-sm font-medium mb-1">금액 ({unit})</label>
             <input
               type="number"
               inputMode="numeric"
@@ -200,13 +219,13 @@ export default function AdminPointsGrant() {
             <p className="mt-1">
               {lastResult.username}{" "}
               <span className={lastResult.amount >= 0 ? "text-blue-600 dark:text-blue-400 font-bold" : "text-red-500 font-bold"}>
-                {lastResult.amount >= 0 ? "+" : ""}{lastResult.amount}P
+                {lastResult.amount >= 0 ? "+" : ""}{lastResult.amount}{lastResult.unit}
               </span>
               {lastResult.note && (
                 <span className="text-gray-600 dark:text-gray-400"> — {lastResult.note}</span>
               )}
             </p>
-            <p className="text-xs text-gray-500 mt-1">잔액: {lastResult.points.toLocaleString()}P</p>
+            <p className="text-xs text-gray-500 mt-1">잔액: {lastResult.balance.toLocaleString()}{lastResult.unit}</p>
           </div>
         )}
       </div>

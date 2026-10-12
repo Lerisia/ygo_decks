@@ -35,6 +35,7 @@ class User(AbstractUser):
     points = models.PositiveIntegerField(default=0)
     lifetime_points_earned = models.PositiveIntegerField(default=0, help_text="Cumulative points ever earned (never decreases). Used for border tier unlocks.")
     last_daily_bonus_at = models.DateField(null=True, blank=True)
+    gems = models.PositiveIntegerField(default=0, help_text="팩 개봉 시뮬레이터의 젬 (운영자 지급, 나중에 포인트로 교환)")
 
     def __str__(self):
         return self.username
@@ -86,3 +87,26 @@ class PointTransaction(models.Model):
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
         return f"{self.user.username} {sign}{self.amount}P ({self.kind}) → {self.balance_after}"
+
+class GemTransaction(models.Model):
+    """Every change to a user's gems, the pack simulator's currency (엘리스 2026-10-13: packs are bought with gems,
+    gems later with points): positive earned, negative spent."""
+    KIND_CHOICES = [
+        ("pack_purchase", "팩 구매"),
+        ("admin_grant", "관리자 지급"),
+        ("exchange", "포인트 교환"),
+        ("other", "기타"),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="gem_transactions")
+    amount = models.IntegerField(help_text="양수=획득, 음수=소비")
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="other", db_index=True)
+    note = models.CharField(max_length=200, blank=True, default="")
+    balance_after = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.user.username} {self.amount:+}젬 ({self.kind}) → {self.balance_after}"
