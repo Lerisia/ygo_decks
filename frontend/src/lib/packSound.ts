@@ -82,8 +82,8 @@ export function unlockPackSound() {
 }
 
 /** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time).
- *  A sound plays from where it is first heard (LEAD). */
-export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
+ *  A sound plays from where it is first heard (LEAD), or from `from` seconds in. */
+export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1, from?: number) {
   if (!ctx || !soundOn()) return;
   const audio = ctx;
   if (audio.state !== "running") audio.resume().catch(() => {});
@@ -95,12 +95,13 @@ export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
     src.playbackRate.value = rate;
     gain.gain.value = volume;
     src.connect(gain).connect(audio.destination);
-    src.start(0, LEAD[name] ?? 0);
+    src.start(0, from ?? LEAD[name] ?? 0);
   });
 }
 
-/** A card's move: one of the game's four, at a pitch a little different each time (SE_PACK_CARD_MOVE). */
+/** A card's move: one of the game's, at a pitch a little different each time (SE_PACK_CARD_MOVE; its openings use 02–04,
+ *  never 01). */
 export function playCardMove(volume = 0.7) {
-  const n = 1 + Math.floor(Math.random() * 4);
+  const n = 2 + Math.floor(Math.random() * 3);
   playPackSound(`card_move_0${n}` as PackSoundName, volume, 0.92 + Math.random() * 0.25);
 }

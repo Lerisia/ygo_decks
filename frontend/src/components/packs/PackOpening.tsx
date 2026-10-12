@@ -81,6 +81,9 @@ export default function PackOpening({ pack, packs, fresh, gems, owed = false, on
   const [finishes, setFinishes] = useState<Map<number, FinishParams>>(() => new Map());
   const total = packs.length;
 
+  // the opening's start sound, once, with the blue burst (the game's openings: once each, before the packs)
+  useEffect(() => { playPackSound("01_op", 0.7); }, []);
+
   // a shine or royal card turns into its finish in the game's shader: what that needs, asked for once now
   useEffect(() => {
     let live = true;
@@ -285,7 +288,8 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   const SPOTS = [0.2, 0.8, 0.1];
   const strike = (k: number) => {
     setBolts((b) => [...b, k]);
-    playPackSound((["kaminari_01", "kaminari_02", "kaminari_03"] as const)[k], 0.7);
+    // one thunder an opening, whichever of the game's three, however many bolts (its openings: one each time)
+    if (k === 0) playPackSound((["kaminari_01", "kaminari_02", "kaminari_03"] as const)[Math.floor(Math.random() * 3)], 0.7);
     const r = root.current?.getBoundingClientRect();
     const p = box.current?.getBoundingClientRect();
     if (r && p && fx.current) {
@@ -295,13 +299,18 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   };
 
   useEffect(() => {
-    playPackSound("01_op", 0.7);
+    if (!framed) playPackSound("02_packout_1pack", 0.8);
     const t = 420;
     if (hints.tier !== "N") {
-      if (framed) at(t, () => { setFloor(true); playPackSound("proc_rare", 0.8); });
+      if (framed) at(t, () => setFloor(true));
       else {
         // the upgrade: a sheen runs over it, it draws in and springs out as its gold or rainbow pack
-        at(t, () => { setUpgrading(true); playPackSound("proc_rare", 0.8); });
+        // the game's upgrade sound (proc_rare is a finish's, heard as a shine card turns in its openings), from just
+        // before its peak so the peak meets the flash
+        at(t, () => {
+          setUpgrading(true);
+          playPackSound(hints.tier === "UR" ? "upgrad_01_ur" : "upgrad_01", 0.75, 1, hints.tier === "UR" ? 2.675 : 1.24);
+        });
         at(t + 330, () => { setTier(hints.tier); setFloor(true); flash(false); });
         at(t + 800, () => setUpgrading(false));
       }
@@ -441,7 +450,6 @@ function Stream() {
 function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean) => void }) {
   useEffect(() => {
     playPackSound("hope", 0.75);
-    window.setTimeout(() => playPackSound("kaminari_03", 0.6), 120);
     const a = window.setTimeout(() => flash(true), 150);
     const b = window.setTimeout(() => flash(true), 1750);
     const c = window.setTimeout(onDone, 1950);
@@ -545,7 +553,7 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
         const c = fx.current.local(rect.left + rect.width / 2, rect.top + rect.height / 2);
         fx.current.premium(c.x, c.y, rect.width, royal);
       }
-      playPackSound(royal ? "upgrad_01_ur" : "upgrad_01", royal ? 0.6 : 0.7);
+      playPackSound(royal ? "proc_rare_02" : "proc_rare", 0.8);   // the game's, as a shine / royal card comes round
       flash(false);
     }, delay + 120 + T.premium);
   }, [cards, fx, flash]);
@@ -635,7 +643,7 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     setLeaving(true);
     els.current.forEach((el, i) => el?.animate([{ transform: "none", opacity: 1 }, { transform: "translateX(-110vw)", opacity: 1 }],
       { duration: 360, delay: i * 28, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" }));
-    playCardMove(0.5);
+    playPackSound("05_cardout", 0.7);   // the game's, as the cards go (heard at each NEXT in its openings)
     window.setTimeout(onNext, 7 * 28 + 360);
   };
 
