@@ -156,7 +156,6 @@ const BAN_LABELS: Record<BanStatus, string> = {
   forbidden: "금지", limited: "제한", semi_limited: "준제한", unlimited: "무제한", unreleased: "미출시",
 };
 const BAN_TAB_KEY = "card_banlist_format";
-const HISTORY_SHOWN = 8;   // lines shown before 전체 보기
 const EVENT_LABELS = { release: "출시", release_kr: "한국 발매" } as const;
 
 /** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media). */
@@ -178,13 +177,11 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
       return "";
     }
   });
-  const [all, setAll] = useState(false);
   if (!history.length) return null;
   const shown = history.find((h) => h.format === picked) ?? history[0];
   const events = [...shown.events].reverse();   // the latest first
   const pick = (format: string) => {
     setPicked(format);
-    setAll(false);
     try {
       localStorage.setItem(BAN_TAB_KEY, format);
     } catch {
@@ -216,7 +213,8 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
       </div>
       {events.length ? (
         <ol className="rounded-lg border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-          {(all ? events : events.slice(0, HISTORY_SHOWN)).map((e, i) => (
+          {/* every line, however long: nothing folded away (엘리스 10/12) */}
+          {events.map((e, i) => (
             <li key={`${e.day}${e.event}`} className="flex items-center gap-2.5 px-3 py-2">
               <BanIcon status={e.status} />
               <span className="w-[5.5rem] shrink-0 tabular-nums text-gray-600 dark:text-gray-300">{day(e.day)}</span>
@@ -238,11 +236,6 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
         <p className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
           {shown.label}에는 아직 나오지 않았습니다.
         </p>
-      )}
-      {events.length > HISTORY_SHOWN && (
-        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">
-          {all ? "접기" : `전체 보기 (${events.length}줄)`}
-        </button>
       )}
     </section>
   );
