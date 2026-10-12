@@ -53,6 +53,9 @@ def main():
         size = (1280, 1280) if out == "monster" else (512, 512)   # the monster fills the screen
         webp(os.path.join(src, "open/textures", name + ".png"), os.path.join(opening, out + ".webp"), size=size, quality=90)
     webp(os.path.join(src, "card_back/ProtectorIcon1070001.png"), os.path.join(opening, "back.webp"), size=(352, 704))
+    # the gem (the game's ConsumeIcon0001, from data.unity3d): small for prices and balances, large for headings
+    webp(os.path.join(src, "ui/gem/gem.png"), os.path.join(opening, "gem.webp"), quality=90)
+    webp(os.path.join(src, "ui/gem/gem_l.png"), os.path.join(opening, "gem_l.webp"), size=(256, 256), quality=90)
     os.makedirs(os.path.join(opening, "sound"), exist_ok=True)
     for name in SOUNDS:
         data, rate = soundfile.read(os.path.join(src, "sounds", name + ".wav"))

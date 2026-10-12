@@ -26,7 +26,7 @@ const tiles: Tile[] = [
   { to: "/solo-duchmind", icon: "🎨", title: "솔로 듀치마인드", desc: "그리고, 맞히고", mode: "single", rewardBadge: true },
   { to: "/solo-twenty", icon: "🧩", title: "솔로 딱무고개", desc: "20개 질문으로 카드 맞히기", mode: "single", rewardBadge: true, beta: true },
   { to: "/skill-names", icon: "⌨️", title: "스킬 릴레이", desc: "롤 스킬 이름을 아는 대로 입력하기", mode: "single", beta: true },
-  { to: "/packs", icon: "🎴", title: "팩 개봉 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", mode: "single", beta: true, adminOnly: true },
+  { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", mode: "single", beta: true, adminOnly: true },
   ...AVAILABLE_GAMES.filter((g) => g.available).map((g): Tile => ({
     to: `/multiplayer?game=${g.id}`, icon: g.icon, title: g.label, desc: g.description, mode: "multi", rewardBadge: true,
   })),

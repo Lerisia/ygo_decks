@@ -5,12 +5,14 @@ import CardZoom from "@/components/CardZoom";
 import { type FinishParams, finishSupported } from "@/lib/cardFinish";
 import { lazyChunk } from "@/lib/lazyChunk";
 import { FxLayer } from "@/lib/packFx";
+import { GemCount, GemIcon } from "@/components/packs/Gem";
 import { playCardMove, playPackSound, setSoundOn, soundOn, unlockPackSound } from "@/lib/packSound";
 import { type Pulled, type Rarity, GEMS_PER_PACK } from "@/utils/packDraw";
 
 const FX = "/media/md_ui/packopen/";
 /** How long the cards take (ms), slow enough to follow a turn on a phone (엘리스 10/13: "회전이 너무 빨라서 안 보여요"). */
 const T = {
+  stream: 640, streamGap: 70,                   // out of the opened pack, one after the next
   deal: 480, dealGap: 60,                       // flying in, and one after the next
   turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
   leap: { SR: 1500, UR: 1900 },                 // an SR / UR up, held large and back down
@@ -182,6 +184,7 @@ export default function PackOpening({ pack, packs, fresh, gems, onClose, onAgain
         <div className="absolute left-0 right-0 top-0 z-40 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <span className="po-count">{stage === "result" ? "팩 개봉 결과" : stage === "overview" ? pack.name : `${index + 1}/${total}`}</span>
           <span className="flex items-center gap-2">
+            <GemCount dark />
             <button type="button" onClick={() => { setSoundOn(!sound); setSound(!sound); }} aria-label={sound ? "소리 끄기" : "소리 켜기"}
                     className="w-9 h-9 rounded-full bg-black/40 border border-white/30">{sound ? "🔊" : "🔇"}</button>
             <button type="button" onClick={onClose} aria-label="닫기" className="w-9 h-9 rounded-full bg-black/40 border border-white/30">✕</button>
@@ -320,9 +323,11 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
     flash(true);
     playPackSound("03_cut", 0.6);
     at(140, () => setPhase("pour"));
-    at(780, () => { setPhase("rise"); playPackSound("05_cardout", 0.7); });
-    at(1380, () => setPhase("leave"));
-    at(1700, onOpened);
+    const out = 520;
+    at(out, () => { setPhase("rise"); playPackSound("05_cardout", 0.7); });
+    const streamed = out + T.streamGap * 7 + T.stream;
+    at(streamed - 60, () => setPhase("leave"));
+    at(streamed + 240, onOpened);
   };
 
   const monsterDone = () => {
@@ -372,12 +377,13 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
            onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
            role="button" tabIndex={0} aria-label={`${pack.name} 팩 열기`} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && cut()}>
         <span className="po-cone" aria-hidden="true" />
+        {(phase === "rise" || phase === "leave") && <Stream />}
         <span className="po-part po-body"><PackPicture pack={pack} /></span>
         <span className="po-part po-top"><PackPicture pack={pack} /></span>
         <span className="po-pack-sheen" aria-hidden="true" />
         <span className="po-mouth" aria-hidden="true" />
+        {phase === "stand" && <span className="po-perf" aria-hidden="true"><i /></span>}
         <span className="po-cutline" style={{ transform: `scaleX(${line})` }} aria-hidden="true" />
-        {phase === "rise" && <span className="po-bundle" aria-hidden="true" />}
       </div>
 
       <div className="po-bottom">
@@ -390,6 +396,37 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
       </div>
       {monster === "showing" && <Monster onDone={monsterDone} flash={flash} />}
     </div>
+  );
+}
+
+/** The eight cards out of the opened pack, one after another (엘리스 10/13: "후루루루룩 8장 나오는 게 팩뜯의 맛"): each
+ *  rises out of the mouth from behind the pack's face and shoots up and away, fanning out, with its own whoosh. */
+function Stream() {
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const cards = [...(box.current?.children ?? [])] as HTMLElement[];
+    const timers = cards.map((el, i) => {
+      // sprayed in a fan, left to right, one after another: up out of the mouth, then off along its line, turning to it
+      const angle = -58 + (116 * i) / 7 + (Math.random() - 0.5) * 10;
+      const rad = (angle * Math.PI) / 180;
+      const far = 2.4 + Math.random() * 0.4;   // card heights
+      const x = (Math.sin(rad) * far * 100) / 0.6875;   // % of the card's width
+      const y = -60 - Math.cos(rad) * far * 100;        // % of its height
+      el.animate(
+        [{ transform: "translateY(0)", filter: "brightness(1.3)", opacity: 1 },
+         { transform: "translateY(-60%)", filter: "brightness(1.8)", opacity: 1, offset: 0.28 },
+         { opacity: 1, offset: 0.75 },
+         { transform: `translate(${x}%, ${y}%) rotate(${angle * 0.8}deg) scale(.82)`, filter: "brightness(2.4)", opacity: 0 }],
+        { duration: T.stream, delay: T.streamGap * i, easing: "cubic-bezier(.3,0,.55,1)", fill: "both" },
+      );
+      return window.setTimeout(() => playCardMove(0.45), T.streamGap * i);
+    });
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  return (
+    <span ref={box} className="po-stream" aria-hidden="true">
+      {Array.from({ length: 8 }, (_, i) => <img key={i} src={`${FX}back.webp`} alt="" draggable={false} />)}
+    </span>
   );
 }
 
@@ -696,7 +733,7 @@ function Result({ pack, packs, fresh, finishes, gems, onOpen, onAgain, onClose }
             <img src={`/media/md_ui/rarity_${r.toLowerCase()}_hd.png`} alt={r} className="h-4 w-auto" />{count(r)}
           </span>
         ))}
-        <span className="ml-auto text-white/70 tabular-nums">{(packs.length * GEMS_PER_PACK).toLocaleString()}젬 · 남은 젬 {gems.toLocaleString()}</span>
+        <span className="ml-auto text-white/70 tabular-nums">쓴 <GemIcon /> {(packs.length * GEMS_PER_PACK).toLocaleString()}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4">
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-w-4xl mx-auto">
@@ -710,8 +747,8 @@ function Result({ pack, packs, fresh, finishes, gems, onOpen, onAgain, onClose }
         </div>
       </div>
       <div className="flex justify-center gap-2 px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] border-t border-white/10 bg-black/60">
-        <button type="button" onClick={() => onAgain(1)} disabled={gems < GEMS_PER_PACK} className="po-btn">1팩 <small>{GEMS_PER_PACK}젬</small></button>
-        <button type="button" onClick={() => onAgain(10)} disabled={gems < GEMS_PER_PACK * 10} className="po-btn">10팩 <small>{(GEMS_PER_PACK * 10).toLocaleString()}젬</small></button>
+        <button type="button" onClick={() => onAgain(1)} disabled={gems < GEMS_PER_PACK} className="po-btn">1팩 <small><GemIcon /> {GEMS_PER_PACK}</small></button>
+        <button type="button" onClick={() => onAgain(10)} disabled={gems < GEMS_PER_PACK * 10} className="po-btn">10팩 <small><GemIcon /> {(GEMS_PER_PACK * 10).toLocaleString()}</small></button>
         <button type="button" onClick={onClose} className="po-btn po-plain" aria-label={`${pack.name} 페이지로`}>닫기</button>
       </div>
     </div>
@@ -797,9 +834,20 @@ const CSS = `
 .po-pour .po-mouth, .po-rise .po-mouth { opacity: 1; transition: opacity .2s; }
 .po-pack.po-pour, .po-pack.po-rise, .po-pack.po-leave, .po-pack.po-cut { outline-color: transparent !important; box-shadow: none !important; }
 .po-leave { opacity: 0; transform: translateY(6%); transition: opacity .3s, transform .3s; }
-.po-bundle { position: absolute; left: 14%; right: 14%; top: 4%; aspect-ratio: 704 / 1024; border-radius: 6px; background: #fff; pointer-events: none;
-  box-shadow: 0 0 24px 10px rgba(255,255,255,.85), 0 0 60px 20px rgba(170,200,255,.5); animation: po-bundle .6s cubic-bezier(.5,0,.7,.4) forwards; }
-@keyframes po-bundle { from { transform: translateY(10%); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-190%); opacity: .9; } }
+.po-stream { position: absolute; inset: 0; pointer-events: none; }
+.po-stream img { position: absolute; left: 21%; top: 20%; width: 58%; aspect-ratio: 0.6875; object-fit: fill; border-radius: 3px;
+  box-shadow: 0 0 12px 3px rgba(255,255,255,.7), 0 0 30px 8px rgba(150,190,255,.45); }
+/* 절취선 (엘리스 10/13): where the pack tears, dashes along its top with a light running over them */
+.po-perf { position: absolute; left: 4%; right: 4%; top: 17%; height: 3px; margin-top: -1.5px; pointer-events: none; border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #fff 0 7px, transparent 7px 12px);
+  filter: drop-shadow(0 0 2px rgba(170,215,255,.95)) drop-shadow(0 0 6px rgba(110,170,255,.7));
+  animation: po-perf-in .4s .25s both, po-perf-breathe 1.8s .65s ease-in-out infinite; }
+.po-perf i { position: absolute; top: -7px; bottom: -7px; left: 0; width: 26%; opacity: 0;
+  background: radial-gradient(closest-side, #fff, rgba(190,225,255,.7) 40%, transparent);
+  animation: po-perf-run 1.8s .65s ease-in-out infinite; }
+@keyframes po-perf-in { from { opacity: 0; clip-path: inset(-10px 100% -10px -10px); } to { opacity: 1; clip-path: inset(-10px -10px -10px -10px); } }
+@keyframes po-perf-breathe { 50% { opacity: .72; } }
+@keyframes po-perf-run { 0% { transform: translateX(-100%); opacity: 0; } 12% { opacity: 1; } 62% { transform: translateX(385%); opacity: 1; } 70%, 100% { transform: translateX(385%); opacity: 0; } }
 
 .po-floor { position: absolute; left: 0; right: 0; top: var(--horizon); bottom: 0; opacity: 0; pointer-events: none; transition: opacity .35s; }
 .po-floor-sr { background: radial-gradient(70% 55% at 50% 0%, rgba(255,205,70,.75), rgba(255,170,30,.25) 50%, transparent 80%); }

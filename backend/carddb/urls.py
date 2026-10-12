@@ -9,6 +9,7 @@ urlpatterns = [
     path("cards/<int:card_id>/", dex.card),
     path("packs/", packs.packs),
     path("packs/collection/", packs.collection),
+    path("packs/search/", packs.pack_search),
     path("packs/<int:pack_id>/", packs.pack),
     path("packs/<int:pack_id>/open/", packs.open_pack),
     path("packs/<int:pack_id>/mine/", packs.pack_mine),

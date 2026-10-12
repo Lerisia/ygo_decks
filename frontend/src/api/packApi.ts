@@ -4,9 +4,10 @@ export type PackKind = "normal" | "secret" | "selection";
 export type PackSummary = {
   id: number; kind: PackKind; name: string; name_en: string; released: string | null; image: string | null;
   master: boolean; counts: Record<Rarity, number>;
+  arts: { new_art: number; overframe: number };   // cards that came in a new art / an 오버프레임 with this pack
 };
 export type PackCard = { print: number; card: number; name: string; rarity: Rarity; thumb: string; face: string | null };
-export type PackDetail = Omit<PackSummary, "counts"> & { image_hd: string | null; cards: PackCard[]; master_pack?: number | null };
+export type PackDetail = Omit<PackSummary, "counts" | "arts"> & { image_hd: string | null; cards: PackCard[]; master_pack?: number | null };
 
 let list: Promise<PackSummary[]> | null = null;
 const details = new Map<number, Promise<PackDetail>>();
@@ -34,6 +35,16 @@ export function getPack(id: number): Promise<PackDetail> {
       }));
   }
   return details.get(id)!;
+}
+
+export type PackHit = { id: number; cards: string[]; count: number };
+
+/** Packs by their pickup cards (a secret pack's pickup cards, a selection pack's own; never the master pack), the best
+ *  match first, each with how many of its cards match and the first three names. */
+export async function searchPacks(q: string, signal?: AbortSignal): Promise<PackHit[]> {
+  const r = await fetch(`/api/carddb/packs/search/?q=${encodeURIComponent(q)}`, { signal });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return (await r.json()).packs;
 }
 
 export type PackTally = { gems: number; packs: number; ur: number; sr: number; owed: boolean };

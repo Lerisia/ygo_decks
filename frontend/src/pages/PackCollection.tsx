@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import SearchForm from "@/components/SearchForm";
 import { Input } from "@/components/ui/input";
 import CardZoom from "@/components/CardZoom";
+import { GemIcon, PackTopBar } from "@/components/packs/Gem";
+import { setGems } from "@/lib/gems";
 import { type Collection, type CollectionCard, getCollection } from "@/api/packApi";
 import { getCard } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
@@ -37,7 +39,7 @@ export default function PackCollection() {
   const signedIn = isAuthenticated();
 
   useEffect(() => {
-    if (signedIn) getCollection().then(setData).catch(() => setError(true));
+    if (signedIn) getCollection().then((d) => { setData(d); setGems(d.gems); }).catch(() => setError(true));
   }, [signedIn]);
 
   const shown = useMemo(() => {
@@ -75,8 +77,10 @@ export default function PackCollection() {
   const s = data?.summary;
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
-      <Link to="/packs" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
-      <h1 className="mt-3 text-2xl md:text-4xl font-bold">카드 모음</h1>
+      <PackTopBar>
+        <Link to="/packs" className="text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+      </PackTopBar>
+      <h1 className="mt-2 text-2xl md:text-4xl font-bold">카드 모음</h1>
       {!signedIn ? (
         <p className="py-16 text-center text-gray-500">
           <Link to="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">로그인</Link>하면 팩에서 뽑은 카드가 여기에 모입니다.
@@ -87,12 +91,12 @@ export default function PackCollection() {
         <>
           <dl className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-2 text-center tabular-nums">
             {[
-              ["보유 젬", data?.gems], ["카드", s?.total], ["종류", s?.kinds],
+              ["보유", data?.gems], ["카드", s?.total], ["종류", s?.kinds],
               ["UR · SR", s ? `${s.ur} · ${s.sr}` : undefined], ["샤인 · 로얄", s ? `${s.shine} · ${s.royal}` : undefined],
-              ["쓴 젬", s?.gems_spent],
+              ["쓴", s?.gems_spent],
             ].map(([label, value]) => (
               <div key={label as string} className="rounded-lg bg-gray-100 dark:bg-gray-800 py-2">
-                <dt className="text-[11px] text-gray-500 dark:text-gray-400">{label}</dt>
+                <dt className="text-[11px] text-gray-500 dark:text-gray-400">{label}{label === "보유" || label === "쓴" ? <> <GemIcon /></> : null}</dt>
                 <dd className="h-6 font-bold">{value === undefined ? "" : typeof value === "number" ? value.toLocaleString() : value}</dd>
               </div>
             ))}

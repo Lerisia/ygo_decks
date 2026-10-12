@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
+import { GemIcon, PackTopBar } from "@/components/packs/Gem";
+import { setGems } from "@/lib/gems";
 import { type PackCard, type PackDetail as Pack, type PackMine, getPack, getPackMine, openPack } from "@/api/packApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { unlockPackSound } from "@/lib/packSound";
@@ -67,7 +69,12 @@ export default function PackDetail() {
         if (p.kind === "secret" && p.master_pack) getPack(p.master_pack).then(setMaster).catch(() => {});
       })
       .catch(() => setError(true));
-    getPackMine(id).then(setMine).catch(() => setMine({ signed_in: isAuthenticated(), gems: 0, tally: NO_TALLY }));
+    getPackMine(id)
+      .then((m) => {
+        setMine(m);
+        if (m.signed_in) setGems(m.gems);
+      })
+      .catch(() => setMine({ signed_in: isAuthenticated(), gems: 0, tally: NO_TALLY }));
   }, [id]);
 
   const tally = mine?.tally ?? NO_TALLY;
@@ -92,11 +99,15 @@ export default function PackDetail() {
         card: { print: c.print, card: c.card, name: c.name, rarity: c.rarity, thumb: c.thumb, face: c.face }, rarity: c.rarity, finish: c.finish,
       })));
       setMine({ signed_in: true, gems: r.gems, tally: r.tally });
+      setGems(r.gems);
       setRun({ key: Date.now(), packs, fresh: new Set(r.packs.flat().filter((c) => c.new).map((c) => c.print)) });
     } catch (e) {
       const err = e as Error & { gems?: number };
       setNotice(err.message || "팩을 열지 못했습니다.");
-      if (typeof err.gems === "number") setMine((m) => m && { ...m, gems: err.gems! });
+      if (typeof err.gems === "number") {
+        setMine((m) => m && { ...m, gems: err.gems! });
+        setGems(err.gems);
+      }
     } finally {
       setBusy(false);
     }
@@ -105,10 +116,10 @@ export default function PackDetail() {
   const can = (count: number) => !!pack && !busy && (!mine?.signed_in || gems >= count * GEMS_PER_PACK);
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <Link to="/packs" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
-        {mine?.signed_in && <Link to="/packs/collection" className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음 →</Link>}
-      </div>
+      <PackTopBar>
+        <Link to="/packs" className="text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+        {mine?.signed_in && <Link to="/packs/collection" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
+      </PackTopBar>
       {error && !pack ? (
         <p className="py-16 text-center text-gray-500">팩을 불러오지 못했습니다.</p>
       ) : (
@@ -124,18 +135,18 @@ export default function PackDetail() {
               <h1 className="text-xl sm:text-3xl font-extrabold leading-tight break-keep min-h-[1.25em]">{pack?.name ?? ""}</h1>
               <p className="h-5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">{pack?.released ? `${pack.released} 출시` : ""}</p>
               <p className="h-5 text-sm tabular-nums">
-                {mine === null ? "" : mine.signed_in ? <>보유 젬 <b>{gems.toLocaleString()}</b></> : (
+                {mine === null || mine.signed_in ? "" : (
                   <Link to="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">로그인하면 팩을 열 수 있습니다</Link>
                 )}
               </p>
               <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button type="button" disabled={!can(1)} onClick={() => open(1)}
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold">
-                  1팩 <span className="text-sm font-semibold opacity-80">{GEMS_PER_PACK}젬</span>
+                  1팩 <span className="text-sm font-semibold opacity-90"><GemIcon /> {GEMS_PER_PACK}</span>
                 </button>
                 <button type="button" disabled={!can(10)} onClick={() => open(10)}
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold leading-tight">
-                  10팩 <span className="text-sm font-semibold opacity-80">{(GEMS_PER_PACK * 10).toLocaleString()}젬</span>
+                  10팩 <span className="text-sm font-semibold opacity-90"><GemIcon /> {(GEMS_PER_PACK * 10).toLocaleString()}</span>
                   <span className={`block text-[11px] font-semibold ${tally.owed ? "text-amber-200" : "opacity-80"}`}>
                     {tally.owed ? "10팩으로 UR 확정" : "10팩으로 SR 이상 1장 확정"}
                   </span>
@@ -148,7 +159,7 @@ export default function PackDetail() {
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm min-h-[24px]">
             {tally.packs > 0 && (
               <>
-                <span className="tabular-nums">이 팩에 쓴 젬 <b>{tally.gems.toLocaleString()}</b></span>
+                <span className="tabular-nums">이 팩에 쓴 <GemIcon /> <b>{tally.gems.toLocaleString()}</b></span>
                 <span className="tabular-nums">UR <b>{tally.ur}</b> · SR <b>{tally.sr}</b></span>
               </>
             )}
@@ -182,14 +193,16 @@ function CardList({ pack }: { pack: Pack }) {
       {pack.kind === "secret" && (
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-keep">1~4장째는 마스터 팩 수록 카드에서, 5~8장째는 픽업 대상 카드에서 나옵니다.</p>
       )}
-      <div role="tablist" aria-label="레어도" className="mt-3 flex gap-1.5">
+      {/* four even tabs, each its badge and count side by side in the middle (엘리스 10/13: the badge took the middle and
+          the count was pushed to the edge); the badge picture's clear left edge is pulled in */}
+      <div role="tablist" aria-label="레어도" className="mt-3 grid grid-cols-4 gap-1.5 sm:w-[26rem]">
         {RARITIES.map((r) => (
           <button key={r} role="tab" aria-selected={tab === r} disabled={!pool[r].length}
                   onClick={() => { setTab(r); setLimit(STEP); }}
-                  className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-semibold tabular-nums transition disabled:opacity-40 ${
+                  className={`h-9 min-w-0 px-1 rounded-lg inline-flex items-center justify-center gap-1 text-[13px] font-semibold tabular-nums transition disabled:opacity-40 ${
                     tab === r ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
-            <img src={`/media/md_ui/rarity_${r.toLowerCase()}_hd.png`} alt={r} className="h-4 w-auto" />
-            {pool[r].length.toLocaleString()}
+            <img src={`/media/md_ui/rarity_${r.toLowerCase()}_hd.png`} alt={r} className="h-3.5 w-auto -ml-1.5 shrink-0" />
+            <span>{pool[r].length.toLocaleString()}</span>
           </button>
         ))}
       </div>

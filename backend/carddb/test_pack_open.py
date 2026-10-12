@@ -152,3 +152,18 @@ class OpenTest(TestCase):
         c = self.client.get("/api/carddb/packs/collection/").json()
         self.assertEqual(c["summary"], {"kinds": 1, "total": 8, "ur": 1, "sr": 0, "shine": 0, "royal": 8, "gems_spent": 100, "packs": 1})
         self.assertEqual((c["cards"][0]["print"], c["cards"][0]["royal"], c["cards"][0]["name"]), (103, 8, "카드103"))
+
+    def test_search_by_pickup_cards_not_the_master_packs(self):
+        search = lambda q: self.client.get("/api/carddb/packs/search/", {"q": q}).json()["packs"]
+        self.assertEqual(search("카드 202"), [{"id": self.secret.id, "cards": ["카드202"], "count": 1}])
+        self.assertEqual(search("카드102"), [])
+        hit = search("ㅋㄷ")
+        self.assertEqual((hit[0]["id"], hit[0]["count"], len(hit[0]["cards"])), (self.secret.id, 4, 3))
+        self.assertEqual(search(" "), [])
+
+    def test_the_list_counts_new_arts_and_overframes(self):
+        MdPrint.objects.filter(md_id=203).update(is_alt_art=True)
+        with mock.patch("carddb.dex._overframe", lambda md_id: False):
+            rows = {p["id"]: p for p in self.client.get("/api/carddb/packs/").json()["packs"]}
+        self.assertEqual(rows[self.secret.id]["arts"], {"new_art": 1, "overframe": 0})
+        self.assertEqual(rows[self.master.id]["arts"], {"new_art": 0, "overframe": 0})

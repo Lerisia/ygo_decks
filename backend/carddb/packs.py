@@ -15,9 +15,10 @@ from rest_framework.response import Response
 
 from user.gems import NotEnoughGems, change_gems
 
+from . import dex
 from .display import display_name
 from .face import face_thumb_url, face_url
-from .models import MdPack, MdPackCard, PackPull, PackTally
+from .models import Card, MdPack, MdPackCard, PackPull, PackTally
 from .pack_draw import GEMS_PER_PACK, draw_pack, draw_ten
 
 RARITY_RANK = {"N": 0, "R": 1, "SR": 2, "UR": 3}
@@ -26,7 +27,7 @@ OPENABLE = [MdPack.Kind.NORMAL, MdPack.Kind.SECRET, MdPack.Kind.SELECTION]
 MASTER_PACK = "Master Pack"
 PACK_IMAGE_DIR = "md_ui/packs"   # the game's pack pictures, by their file name (MdPack.cover); hd/ for the opening
 
-_cache = {"key": None, "packs": None, "cards": {}}
+_cache = {"key": None, "packs": None, "cards": {}, "pickups": None}
 
 
 def _key():
@@ -41,7 +42,7 @@ def _key():
 def _fresh():
     key = _key()
     if _cache["key"] != key:
-        _cache.update(key=key, packs=None, cards={})
+        _cache.update(key=key, packs=None, cards={}, pickups=None)
 
 
 def _image(pack, hd=False):
@@ -63,14 +64,67 @@ def _row(pack, counts=None):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def packs(request):
-    """The packs one can open (master, secret and selection packs), newest first, with how many cards of each rarity."""
+    """The packs one can open (master, secret and selection packs), newest first, with how many cards of each rarity
+    and how many came in a new art or an 오버프레임."""
     _fresh()
     if _cache["packs"] is None:
         rarities = ("UR", "SR", "R", "N")
         rows = (MdPack.objects.filter(kind__in=OPENABLE)
                 .annotate(**{r: Count("cards", filter=Q(cards__rarity=r)) for r in rarities}).order_by("-released", "name_en"))
-        _cache["packs"] = [_row(p, {r: getattr(p, r) for r in rarities}) for p in rows]
+        # the cards a pack brought in a new art or an 오버프레임 (엘리스 10/13: to pick those packs out)
+        arts = {}
+        for pack_id, md_id in MdPackCard.objects.filter(md_print__is_alt_art=True).values_list("pack_id", "md_print_id"):
+            kind = "overframe" if dex._overframe(md_id) else "new_art"
+            arts.setdefault(pack_id, {"new_art": 0, "overframe": 0})[kind] += 1
+        _cache["packs"] = [{**_row(p, {r: getattr(p, r) for r in rarities}),
+                            "arts": arts.get(p.id, {"new_art": 0, "overframe": 0})} for p in rows]
     return Response({"packs": _cache["packs"]})
+
+
+class _Pickup:
+    __slots__ = ("card", "name", "norms", "cho", "packs")
+
+
+def _pickups():
+    """The cards packs are searched by (엘리스 10/13 "팩 수록 카드 X 픽업 카드 O"): a secret pack's pickup cards and a
+    selection pack's own, not the master pack's (it holds nearly every card); each card once, its names made
+    searchable as the card dex makes them, with the packs it is in."""
+    _fresh()
+    if _cache["pickups"] is None:
+        in_packs, released = {}, {}
+        for pack_id, card_id, day in (MdPackCard.objects.filter(pack__kind__in=OPENABLE).exclude(pack__name_en=MASTER_PACK)
+                                      .values_list("pack_id", "md_print__card_id", "pack__released")):
+            in_packs.setdefault(card_id, set()).add(pack_id)
+            released[pack_id] = day.toordinal() if day else 0
+        rows = []
+        for card in Card.objects.filter(id__in=in_packs):
+            r = _Pickup()
+            r.card, r.name = card.id, display_name(card)
+            r.packs = sorted(in_packs[card.id], key=lambda p: (-released[p], p))   # newest first
+            r.norms = [dex._norm(n) for n in (card.name_ko, card.name_ja, card.name_en) if n]
+            r.cho = dex.choseong(dex._norm(card.name_ko))
+            rows.append(r)
+        _cache["pickups"] = rows
+    return _cache["pickups"]
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def pack_search(request):
+    """Packs by their pickup cards: the packs holding the cards that match the query (as the card dex matches: exact,
+    then the start, then anywhere; or 초성), the best match first, each with how many of its cards match and the
+    names of the first three."""
+    q = request.query_params.get("q") or ""
+    if not "".join(q.split()):
+        return Response({"packs": []})
+    found = {}
+    for r in dex._rank(_pickups(), q):
+        for pack_id in r.packs:
+            hit = found.setdefault(pack_id, {"id": pack_id, "cards": [], "count": 0})
+            hit["count"] += 1
+            if len(hit["cards"]) < 3:
+                hit["cards"].append(r.name)
+    return Response({"packs": list(found.values())})
 
 
 def _detail(pack_id):
