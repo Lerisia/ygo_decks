@@ -86,8 +86,8 @@ function TileSkeleton() {
 function CardTile({ card }: { card: CardListItem }) {
   return (
     <Link to={`/cards/${card.id}`} state={{ fromList: true }} className="block text-center group">
-      {/* the corner rounds the rarity badge off with the card */}
-      <span className="relative block card-corner overflow-hidden">
+      {/* the card's corners are rounded, the rarity badge's are not (특이점 2026-10-12) */}
+      <span className="relative block">
         <img
           loading="lazy"
           decoding="async"
