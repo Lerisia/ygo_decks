@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { listRooms, createRoom, joinRoom, myRoom, getRoomByCode, setGuestSession, type RoomListItem, type RoomDetail } from "@/api/multiplayerApi";
 import { isAuthenticated, getUserInfo } from "@/api/accountApi";
 import { AVAILABLE_GAMES, getGameInfo, type GameId } from "@/lib/multiplayerGames";
@@ -33,7 +33,12 @@ export default function Multiplayer() {
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newMaxPlayers, setNewMaxPlayers] = useState(6);
-  const [newGame, setNewGame] = useState<GameId>(AVAILABLE_GAMES[0].id);
+  // a game's tile on 놀이터 comes with ?game= and picks that game for a new room
+  const [searchParams] = useSearchParams();
+  const [newGame, setNewGame] = useState<GameId>(() => {
+    const picked = getGameInfo(searchParams.get("game"));
+    return picked?.available ? picked.id : AVAILABLE_GAMES[0].id;
+  });
   const [newSpectatorsCanChat, setNewSpectatorsCanChat] = useState(true);
   const [newAllowGuests, setNewAllowGuests] = useState(true);
   const [newIsAnonymous, setNewIsAnonymous] = useState(false);

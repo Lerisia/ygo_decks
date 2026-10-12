@@ -1,18 +1,55 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PLogo from "@/components/PLogo";
+import { isAdmin } from "@/api/accountApi";
+import { AVAILABLE_GAMES } from "@/lib/multiplayerGames";
 
-// `external` tiles are another site's page: they open in a new tab and say so.
-type Game = { to: string; icon: string; title: string; desc: string; rewardBadge?: boolean; external?: boolean };
-const games: Game[] = [
-  { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "여러 명이 함께 즐기는 게임", rewardBadge: true },
-  { to: "/solo", icon: "🐤", title: "솔로 플레이", desc: "혼자 즐기는 미니 게임", rewardBadge: true },
+// Every game sits on this page, 싱글 플레이 first and then 멀티플레이, each tile saying which; the other features
+// follow and another site's pages come last (특이점 2026-10-13; the games used to sit on a 솔로 플레이 page and in
+// the 멀티플레이 room list). A 멀티플레이 tile opens the room list with its game picked for a new room.
+type Mode = "single" | "multi";
+type Tile = {
+  to: string;
+  icon: string;
+  title: string;
+  desc: string;
+  mode?: Mode;
+  rewardBadge?: boolean;
+  beta?: boolean;
+  adminOnly?: boolean;
+  // another site's page: opens in a new tab and says so
+  external?: boolean;
+};
+
+const tiles: Tile[] = [
+  { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞히기", mode: "single", rewardBadge: true },
+  { to: "/solo-duchmind", icon: "🎨", title: "솔로 듀치마인드", desc: "그리고, 맞히고", mode: "single", rewardBadge: true },
+  { to: "/solo-twenty", icon: "🧩", title: "솔로 딱무고개", desc: "20개 질문으로 카드 맞히기", mode: "single", rewardBadge: true, beta: true },
+  { to: "/skill-names", icon: "⌨️", title: "스킬 릴레이", desc: "롤 스킬 이름을 아는 대로 입력하기", mode: "single", beta: true },
+  { to: "/packs", icon: "🎴", title: "팩 개봉 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", mode: "single", beta: true, adminOnly: true },
+  ...AVAILABLE_GAMES.filter((g) => g.available).map((g): Tile => ({
+    to: `/multiplayer?game=${g.id}`, icon: g.icon, title: g.label, desc: g.description, mode: "multi", rewardBadge: true,
+  })),
   { to: "/tier-list-maker", icon: "📊", title: "티어표 만들기", desc: "덱 티어리스트 만들고 이미지로 저장" },
-  { to: "https://mdarchive.pages.dev/#climb", icon: "📜", title: "등반 덱 기록", desc: "달마다 사용한 덱을 기록하고 자랑하기", external: true },
   { to: "/icon-shop", icon: "🛍️", title: "포인트 상점", desc: "포인트로 아이콘·프레임 구매" },
+  { to: "https://mdarchive.pages.dev/#climb", icon: "📜", title: "등반 덱 기록", desc: "달마다 사용한 덱을 기록하고 자랑하기", external: true },
 ];
+
+const MODE_LABEL: Record<Mode, string> = { single: "싱글 플레이", multi: "멀티플레이" };
+const MODE_CHIP: Record<Mode, string> = {
+  single: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
+  multi: "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+};
 
 function Playground() {
   const navigate = useNavigate();
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    isAdmin().then((flag) => { if (!cancelled) setIsAdminUser(!!flag); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-lg md:max-w-2xl mx-auto">
@@ -20,7 +57,7 @@ function Playground() {
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">다양한 미니게임을 즐겨보세요!</p>
 
       <div className="grid grid-cols-2 gap-4 md:gap-6">
-        {games.map((g) => (
+        {tiles.filter((g) => !g.adminOnly || isAdminUser).map((g) => (
           <button
             key={g.to}
             onClick={() => (g.external ? window.open(g.to, "_blank", "noopener,noreferrer") : navigate(g.to))}
@@ -31,14 +68,27 @@ function Playground() {
                 <PLogo size={20} />
               </span>
             )}
+            {g.beta && (
+              <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                BETA
+              </span>
+            )}
             {g.external && (
               <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-gray-500 text-white">
                 외부 사이트 ↗
               </span>
             )}
             <span className="text-3xl md:text-5xl mb-2">{g.icon}</span>
-            <span className="font-semibold md:text-lg">{g.title}</span>
-            <span className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">{g.desc}</span>
+            <span className="font-semibold md:text-lg break-keep">
+              {g.title}
+              {g.beta && <span className="text-amber-600 dark:text-amber-400"> (베타)</span>}
+            </span>
+            <span className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1 break-keep">{g.desc}</span>
+            {g.mode && (
+              <span className={`mt-2 text-[11px] md:text-xs font-semibold px-2 py-0.5 rounded-full ${MODE_CHIP[g.mode]}`}>
+                {MODE_LABEL[g.mode]}
+              </span>
+            )}
           </button>
         ))}
       </div>

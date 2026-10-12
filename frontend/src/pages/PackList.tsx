@@ -40,10 +40,10 @@ export default function PackList() {
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
       <button
-        onClick={() => navigate("/solo")}
+        onClick={() => navigate("/playground")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
       >
-        ← 솔로 플레이
+        ← 놀이터
       </button>
       <div className="flex items-end justify-between gap-3">
         <h1 className="text-2xl md:text-4xl font-bold">팩 개봉 시뮬레이터</h1>

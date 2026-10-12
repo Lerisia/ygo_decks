@@ -53,7 +53,6 @@ const PackCollection = lazyChunk(() => import("./pages/PackCollection"));
 const Playground = lazyChunk(() => import("./pages/Playground"));
 const AllMenu = lazyChunk(() => import("./pages/AllMenu"));
 const Tools = lazyChunk(() => import("./pages/Tools"));
-const Solo = lazyChunk(() => import("./pages/Solo"));
 const SoloDuchmind = lazyChunk(() => import("./pages/SoloDuchmind"));
 const SoloDraw = lazyChunk(() => import("./pages/SoloDraw"));
 const SoloDrawingDetail = lazyChunk(() => import("./pages/SoloDrawingDetail"));
@@ -200,7 +199,7 @@ function App() {
             <Route path="/playground" element={<Playground />} />
             <Route path="/all" element={<AllMenu />} />
             <Route path="/tools" element={<Tools />} />
-            <Route path="/solo" element={<Solo />} />
+            <Route path="/solo" element={<Navigate to="/playground" replace />} />
             <Route path="/solo-duchmind" element={<SoloDuchmind />} />
             <Route path="/solo-duchmind/draw" element={<SoloDraw />} />
             <Route path="/solo-duchmind/:id" element={<SoloDrawingDetail />} />

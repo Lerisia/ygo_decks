@@ -238,10 +238,10 @@ function SkillNames() {
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-lg mx-auto">
       <button
-        onClick={() => navigate("/solo")}
+        onClick={() => navigate("/playground")}
         className="mb-3 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
       >
-        ← 솔로 플레이
+        ← 놀이터
       </button>
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-1">
         스킬 릴레이 <span className="text-amber-600 dark:text-amber-400">(베타)</span>
@@ -426,7 +426,7 @@ function SkillNames() {
             )}
             <div className="mt-4 flex gap-2">
               <button
-                onClick={() => navigate("/solo")}
+                onClick={() => navigate("/playground")}
                 className="flex-1 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
               >
                 나가기

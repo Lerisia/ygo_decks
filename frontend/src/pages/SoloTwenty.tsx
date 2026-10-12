@@ -325,9 +325,9 @@ export default function SoloTwenty() {
   return (
     <div className="min-h-screen px-4 pt-6 pb-4 md:pb-8 max-w-2xl mx-auto">
       <button
-        onClick={() => navigate("/solo")}
+        onClick={() => navigate("/playground")}
         className="mb-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-      >← 솔로 플레이</button>
+      >← 놀이터</button>
 
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl shadow px-3 py-3 sm:p-5">
         <h1 className="text-xl md:text-2xl font-bold text-center mb-1">🧩 솔로 딱무고개</h1>
