@@ -143,15 +143,17 @@ function Info() {
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-sm min-h-[30px]">
-              <span className="text-gray-500 dark:text-gray-400 mr-1">많이 보는 덱</span>
+            {/* One line on any screen (엘리스 2026-10-12): the row is one chip tall and wraps, so a deck that does not
+                fit whole drops out of sight instead of starting a second line. */}
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-4 text-[13px] sm:text-sm h-6 md:h-7 overflow-hidden">
+              <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mr-0.5 md:mr-1">많이 보는 덱</span>
               {decks.slice(0, 5).map((d, i) => (
                 <Link
                   key={d.id}
                   to={`/database/${d.id}`}
-                  className={`${i >= 3 ? "hidden md:inline-flex" : "inline-flex"} items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold transition`}
+                  className={`${i >= 3 ? "hidden md:inline-flex" : "inline-flex"} items-center gap-1 md:gap-1.5 pl-0.5 md:pl-1 pr-2 md:pr-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold whitespace-nowrap transition`}
                 >
-                  <img src={d.cover_image_phone || d.cover_image} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  <img src={d.cover_image_phone || d.cover_image} alt="" className="w-5 h-5 md:w-6 md:h-6 rounded-full object-cover" />
                   {d.name}
                 </Link>
               ))}
@@ -160,7 +162,7 @@ function Info() {
               to="/recommend"
               className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-dashed border-blue-400 dark:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
             >
-              <span className="text-sm">어떤 덱을 할지 모르겠다면</span>
+              <span className="text-sm break-keep">어떤 덱을 할지 모르겠다면</span>
               <span className="text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">덱 성향 테스트 →</span>
             </Link>
           </div>
