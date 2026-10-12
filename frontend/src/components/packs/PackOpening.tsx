@@ -20,7 +20,8 @@ const T = {
 const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
 const RANK: Record<Rarity, number> = { N: 0, R: 1, SR: 2, UR: 3 };
 const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
-const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// The opening plays in full whatever the device's reduced-motion setting says: it is what a visitor comes to watch
+// (엘리스 10/13 "동작 줄이기 무시하세요" — on an iPhone with it on, the cards did not turn at all).
 const high = (r: Rarity) => r === "SR" || r === "UR";
 const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK[c.rarity] > RANK[b] ? c.rarity : b), "N");
 
@@ -64,7 +65,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
   const bgCanvas = useRef<HTMLCanvasElement>(null);
   const fx = useRef<FxLayer | null>(null);
   const shaker = useRef<HTMLDivElement>(null);
-  const [warp, setWarp] = useState(!reduced());
+  const [warp, setWarp] = useState(true);
   const [finishes, setFinishes] = useState<Map<number, FinishParams>>(() => new Map());
   const total = packs.length;
 
@@ -94,7 +95,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
     const back = new FxLayer(bgCanvas.current!);
     fx.current = front;
     let gone = false;
-    if (!reduced()) back.drift(() => gone);
+    back.drift(() => gone);
     const onResize = () => {
       front.resize();
       back.resize();
@@ -120,7 +121,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
 
   const flashNow = useCallback((white: boolean) => setFlash({ id: Date.now() + Math.random(), white }), []);
   const shake = useCallback(() => {
-    if (!shaker.current || reduced()) return;
+    if (!shaker.current) return;
     shaker.current.animate(
       [{ transform: "none" }, { transform: "translate(-6px, 3px)" }, { transform: "translate(5px, -4px)" }, { transform: "translate(-3px, 2px)" }, { transform: "none" }],
       { duration: 320, easing: "ease-out" },
@@ -257,7 +258,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   const wantCut = useRef(false);
   const timers = useRef<number[]>([]);
   const drag = useRef<{ x: number; max: number } | null>(null);
-  const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, reduced() ? Math.min(ms, 30) : ms));
+  const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -391,7 +392,7 @@ function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean
     window.setTimeout(() => playPackSound("kaminari_03", 0.6), 120);
     const a = window.setTimeout(() => flash(true), 150);
     const b = window.setTimeout(() => flash(true), 1750);
-    const c = window.setTimeout(onDone, reduced() ? 400 : 1950);
+    const c = window.setTimeout(onDone, 1950);
     return () => [a, b, c].forEach(clearTimeout);
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -432,7 +433,6 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
 
   // in from the lower left, one after another, lit as they fly; then a glint along each row
   useLayoutEffect(() => {
-    const quick = reduced();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     playPackSound("04_cardin", 0.8);
@@ -445,10 +445,10 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
         [{ transform: `translate(${dx}px, ${dy}px) rotate(-28deg) scale(.85)`, filter: "brightness(2.6)" },
          { filter: "brightness(1.6)", offset: 0.75 },
          { transform: "none", filter: "brightness(1)" }],
-        { duration: quick ? 1 : T.deal, delay: quick ? 0 : T.dealGap * i, easing: "cubic-bezier(.15,.75,.3,1)", fill: "backwards" },
+        { duration: T.deal, delay: T.dealGap * i, easing: "cubic-bezier(.15,.75,.3,1)", fill: "backwards" },
       );
     });
-    const landed = quick ? 0 : T.dealGap * 7 + T.deal;
+    const landed = T.dealGap * 7 + T.deal;
     const t1 = window.setTimeout(() => {
       if (!alive.current || !fx.current) return;
       rows().forEach((row, k) => {
@@ -466,7 +466,7 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
       if (!alive.current) return;
       setReady(true);
       els.current.forEach((el, i) => {
-        if (el && high(cards[i].rarity) && fx.current && !quick) {
+        if (el && high(cards[i].rarity) && fx.current) {
           fx.current.twinkleOn(() => (alive.current ? el.getBoundingClientRect() : null), cards[i].rarity, () => !alive.current || turnedRef.current[i]);
         }
       });
@@ -481,10 +481,6 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     const inner = el?.querySelector<HTMLElement>(".po-inner");
     if (!el || !inner) return;
     const royal = cards[i].finish === "royal";
-    if (reduced()) {
-      window.setTimeout(() => alive.current && setFinished((f) => f.map((v, j) => v || j === i)), delay);
-      return;
-    }
     window.setTimeout(() => { if (alive.current) el.style.zIndex = "20"; }, delay);
     el.animate([{ transform: "none" }, { transform: "translateY(-8%) scale(1.22)", offset: 0.4 }, { transform: "translateY(-8%) scale(1.22)", offset: 0.8 }, { transform: "none" }],
       { duration: T.premiumLift, delay, easing: "cubic-bezier(.3,.7,.3,1)" }).onfinish = () => { el.style.zIndex = ""; };
@@ -513,10 +509,9 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     if (!el || !inner) return;
     const r = cards[i].rarity;
     const big = high(r);
-    const quick = reduced();
-    const ur = r === "UR" && !quick;
+    const ur = r === "UR";
     // a UR first twists the wrong way, then whips round
-    const turn = quick ? 1 : T.turn[r];
+    const turn = T.turn[r];
     const a = inner.animate(ur
       ? [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${-dir * 38}deg)`, offset: 0.38 }, { transform: `rotateY(${dir * 180}deg)` }]
       : [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${dir * 180}deg)` }],
@@ -524,7 +519,7 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
     a.onfinish = () => { inner.style.transform = `rotateY(${dir * 180}deg)`; };
     const show = turn * (ur ? 0.72 : 0.5);   // when the face comes round
     let settled = delay + turn + 70;
-    if (big && !quick) {
+    if (big) {
       // the leap: up and large, held a moment in its light, then back to its place
       const scale = r === "UR" ? 1.75 : 1.5;
       const hold = T.leap[r as "SR" | "UR"];
@@ -536,7 +531,7 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
         { duration: hold, delay: start, easing: "cubic-bezier(.3,.7,.3,1)" },
       ).onfinish = () => { el.style.zIndex = ""; };
       settled = start + hold;
-    } else if (!quick) {
+    } else {
       el.animate([{ transform: "none" }, { transform: `translateY(-5%) scale(1.07) rotate(${-dir * 2}deg)`, offset: 0.5 }, { transform: "none" }],
         { duration: turn + 70, delay, easing: "ease-out" });
     }
@@ -570,11 +565,10 @@ function Cards({ cards, fresh, finishes, fx, flash, shake, onOpen, last, onNext 
   const leave = () => {
     if (leaving) return;
     setLeaving(true);
-    const quick = reduced();
     els.current.forEach((el, i) => el?.animate([{ transform: "none", opacity: 1 }, { transform: "translateX(-110vw)", opacity: 1 }],
-      { duration: quick ? 1 : 360, delay: quick ? 0 : i * 28, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" }));
+      { duration: 360, delay: i * 28, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" }));
     playCardMove(0.5);
-    window.setTimeout(onNext, quick ? 0 : 7 * 28 + 360);
+    window.setTimeout(onNext, 7 * 28 + 360);
   };
 
   const cardAt = (x: number, y: number) => {
@@ -848,7 +842,5 @@ const CSS = `
   background: linear-gradient(180deg, #4f8ff7, #1d4ed8); box-shadow: 0 0 0 1px rgba(255,255,255,.3) inset; }
 .po-btn small { font-weight: 600; opacity: .8; margin-left: 4px; }
 .po-plain { background: rgba(255,255,255,.12); box-shadow: none; }
-@media (prefers-reduced-motion: reduce) {
-  .po-warp, .po-warp-rays, .po-mini, .po-pack, .po-curtain > span, .po-bolt, .po-glow, .po-foil, .po-sheen, .po-royal, .po-result, .po-bundle, .po-monster, .po-monster img { animation: none; }
 }
 `;
