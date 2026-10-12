@@ -2,7 +2,7 @@
  *  tap, so the ones that follow a tap by a moment (the tear, the cards coming out) still play on a phone. The viewer
  *  can turn them off; that is remembered. */
 const BASE = "/media/md_ui/packopen/sound/";
-const NAMES = ["01_op", "03_cut", "05_cardout", "card_move_01", "card_sr", "card_ur", "card_shake"] as const;
+const NAMES = ["01_op", "03_cut", "05_cardout", "card_move_01", "card_sr", "card_ur", "card_shake", "hope"] as const;
 export type PackSoundName = (typeof NAMES)[number];
 const OFF = "pack_sound_off";
 
