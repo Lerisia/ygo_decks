@@ -73,6 +73,10 @@ export type CardDoc = {
   type_line: string;
   attribute: string;
   level_label: string;
+  /** The keys Master Duel's icons are chosen by: attribute and race (monsters), spell / trap kind ("" for 일반). */
+  attribute_key: string;
+  race: string;
+  spell_trap_kind: string;
   atk: string | null;
   def: string | null;
   link_markers: string[];

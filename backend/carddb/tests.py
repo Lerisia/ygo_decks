@@ -1004,6 +1004,8 @@ class CardDexApiTest(TestCase):
         body = self.client.get("/api/carddb/cards/3/").json()
         self.assertEqual((body["name_ko"], body["name_ja"], body["name_en"]), ("블랙 매지션 걸", "ブラック・マジシャン・ガール", "Dark Magician Girl"))
         self.assertEqual((body["type_line"], body["attribute"], body["level_label"]), ("마법사족 / 효과", "어둠", "레벨 6"))
+        # the keys the document's icons are chosen by (Master Duel's own: attribute, race, spell / trap kind)
+        self.assertEqual((body["attribute_key"], body["race"], body["spell_trap_kind"]), ("dark", "spellcaster", ""))
         self.assertEqual((body["atk"], body["def"]), ("2000", "1700"))
         self.assertEqual(body["texts"]["ko"]["effect"], "①: 이 카드의 공격력은 올라간다.")
         self.assertEqual(body["groups"], [{"id": g.id, "name": "블랙 매지션", "parent_id": None}])
@@ -1014,6 +1016,7 @@ class CardDexApiTest(TestCase):
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()
         self.assertEqual((spell["type_line"], spell["attribute"]), ("속공 마법", ""))
+        self.assertEqual((spell["attribute_key"], spell["race"], spell["spell_trap_kind"]), ("", "", "quick_play"))
         # what Master Duel's finish shaders draw themselves: the attribute icon's tile (光 闇 水 炎 地 風 神 魔 罠), the
         # level stars (a rank as a negative count, its stars sitting on the left) and the frame they light
         self.assertEqual(body["finish"], {"attribute": 1, "level": 6, "frame": "normal"})

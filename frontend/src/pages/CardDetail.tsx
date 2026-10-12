@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
@@ -23,24 +23,14 @@ const ARROWS: Record<string, string> = {
 
 const day = (d: string | null) => (d ? d.replace(/-/g, ".") : "");
 
+/** The link markers as a small 3×3 (the size of an icon), the arrows in red. */
 function LinkMarkers({ on }: { on: string[] }) {
   return (
-    <div className="inline-grid grid-cols-3 gap-0.5" aria-label={`링크 마커 ${on.length}개`}>
-      {MARKERS.map((m, i) =>
-        m ? (
-          <span
-            key={m}
-            className={`w-6 h-6 flex items-center justify-center rounded text-xs ${
-              on.includes(m) ? "bg-red-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500"
-            }`}
-          >
-            {ARROWS[m]}
-          </span>
-        ) : (
-          <span key={i} className="w-6 h-6" />
-        ),
-      )}
-    </div>
+    <span role="img" aria-label={`링크 마커 ${on.map((m) => ARROWS[m]).join(" ")}`} className="grid grid-cols-3 gap-px w-6 h-6 md:w-7 md:h-7 shrink-0">
+      {MARKERS.map((m, i) => (
+        <span key={i} className={m ? `rounded-[1px] ${on.includes(m) ? "bg-red-500" : "bg-gray-400/40 dark:bg-gray-500/40"}` : ""} />
+      ))}
+    </span>
   );
 }
 
@@ -66,33 +56,76 @@ function TextBlock({ t, pendulum }: { t: CardTexts; pendulum: boolean }) {
   );
 }
 
-// As the official card database lays it out: the name on top, then the card small beside its stats and the effect text
-// right under them, so a phone shows the card and what it does together (엘리스 2026-10-11, the face carries no
-// effect text); a tap shows the card large. Wider screens keep the card in its own column beside all of it.
-const LAYOUT =
-  "grid grid-cols-[40%_1fr] gap-x-3 items-start md:grid-cols-[20rem_1fr] md:grid-rows-[auto_auto_auto_1fr] md:gap-x-6";
+// The card in a box of its frame's colour with Master Duel's icons, as 나무위키 lays a card out (엘리스 2026-10-12): the
+// names on top, the card small beside its stats and the effect text right under them, so a phone shows the card and
+// what it does together (10/11); a tap shows the card large. Wider screens keep the card in its own column, the stats
+// in one line. A pendulum's box turns green where its pendulum effect begins, as the card does.
+const BOX = "grid grid-cols-[40%_1fr] gap-1.5 p-1.5 rounded-xl dark:ring-1 dark:ring-white/10 md:grid-cols-[20rem_1fr] md:grid-rows-[auto_auto_1fr] md:gap-x-2";
 const AREA = {
-  names: "col-span-2 md:col-span-1 md:col-start-2 md:row-start-1",
-  card: "mt-3 md:mt-0 md:col-start-1 md:row-start-1 md:row-span-4",
-  stats: "mt-3 md:col-start-2 md:row-start-2",
-  effect: "col-span-2 mt-5 md:col-span-1 md:col-start-2 md:row-start-3",
-  more: "col-span-2 mt-4 md:col-span-1 md:col-start-2 md:row-start-4",
+  head: "col-span-2 col-start-1 row-start-1 md:col-span-1 md:col-start-2 px-1.5 pt-1 pb-0.5",
+  card: "col-start-1 row-start-2 md:row-start-1 md:row-span-3",
+  stats: "col-start-2 row-start-2 self-start md:self-auto",
+  effect: "col-span-2 col-start-1 row-start-3 md:col-span-1 md:col-start-2",
+  lower: "col-span-2 col-start-1 row-start-3 -mx-1.5 -mb-1.5 -mt-[3px] rounded-b-xl",
 };
+const PANEL = "rounded-lg bg-gray-200 dark:bg-gray-800";
+const PANEL_ON_WHITE = "rounded-lg bg-white dark:bg-gray-800";   // a synchro's frame is as pale as the usual panel
 const ROW = "border-b last:border-b-0 border-gray-300 dark:border-gray-600";
+// Master Duel's frame colours, taken from its card frames so that the box matches the card in it
+const FRAME_COLORS: Record<string, string> = {
+  normal: "#c08e3f", effect: "#b8592f", ritual: "#4c75b5", fusion: "#874095", synchro: "#d7d7d5", xyz: "#0b0b0e",
+  link: "#006bb5", spell: "#008a72", trap: "#a91777", token: "#7d6d65",
+};
+const DARK_NAMES = new Set(["normal", "synchro"]);   // frames light enough for dark names
+// the game's icons (mdpipeline/info_icons.py), served from media: the repo is public
+const ICONS = "/media/md_ui/info";
+const LEVEL_ICONS: Record<string, string> = { 레벨: "level", 랭크: "rank", 링크: "link" };
+const KIND_ICONS = new Set(["quick_play", "continuous", "field", "equip", "ritual", "counter"]);
+
+/** One stat behind its icon (a blank of the same width where the game shows none, so a phone's list stays aligned). */
+function Stat({ icon, label, children }: { icon: string | null; label?: string; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {icon ? <img src={`${ICONS}/${icon}.webp`} alt="" className="w-6 h-6 md:w-7 md:h-7 shrink-0" /> : <span className="w-6 shrink-0 md:hidden" />}
+      {label && <span className="sr-only">{label}</span>}
+      <span className="flex items-center gap-1.5 break-keep">{children}</span>
+    </span>
+  );
+}
+
+/** Stats one under another on a phone, in a line between bars on wider screens. */
+function StatGroup({ items }: { items: ReactNode[] }) {
+  return (
+    <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center">
+      {items.map((it, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span className="hidden md:inline mx-2 text-gray-400 dark:text-gray-500" aria-hidden="true">|</span>}
+          {it}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
 
 function Skeleton() {
-  const bar = "rounded bg-gray-200 dark:bg-gray-700 animate-pulse";
+  const bar = "rounded-lg bg-gray-300 dark:bg-gray-600";
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
-      <div className={LAYOUT}>
-        <div className={`${AREA.names} h-7 w-2/3 ${bar}`} />
-        <div className={AREA.card}>
-          <div className={`w-full aspect-[704/1024] ${bar} rounded-xl`} />
-          {finishSupported() && <div className={`mt-2 h-7 md:h-8 w-full ${bar} rounded-lg`} />}
+      <div className={`${BOX} bg-gray-200 dark:bg-gray-700 animate-pulse`}>
+        {/* the same heading and lines as the names, so the box below starts where it will */}
+        <div className={AREA.head}>
+          <h1 className="text-xl md:text-2xl font-extrabold"><span className={`inline-block align-middle h-[0.9em] w-2/3 ${bar}`} /></h1>
+          <p className="mt-0.5 text-sm leading-5"><span className={`inline-block align-middle h-3.5 w-1/2 ${bar}`} /></p>
+          <p className="text-sm leading-5"><span className={`inline-block align-middle h-3.5 w-1/3 ${bar}`} /></p>
         </div>
-        <div className={`${AREA.stats} h-40 w-full ${bar}`} />
-        <div className={`${AREA.effect} h-32 w-full ${bar}`} />
+        <div className={AREA.card}>
+          <div className={`w-full aspect-[704/1024] ${bar}`} />
+          {finishSupported() && <div className={`mt-2 h-7 md:h-8 w-full ${bar}`} />}
+        </div>
+        <div className={`${AREA.stats} h-32 md:h-10 ${bar}`} />
+        <div className={`${AREA.effect} h-32 ${bar}`} />
       </div>
+      <div className={`mt-3 h-10 w-full ${bar}`} />
     </div>
   );
 }
@@ -202,7 +235,7 @@ export default function CardDetail() {
   // the print picked decides: an N / R card's UR 오버프레임 comes in 로얄, the card itself does not
   const finishes = FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
   const shown = finishes.some((f) => f.key === finish) ? finish : "normal";
-  const [levelName, levelValue] = (card.level_label || "").split(" ");
+  const levelName = (card.level_label || "").split(" ")[0];
   // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
   // after a 150KB download with the old picture still up (엘리스 2026-10-11: "반응이 느리고 가끔 안 눌림").
   const preloadFaces = () => {
@@ -217,18 +250,33 @@ export default function CardDetail() {
       }),
     };
   };
-  const stats: [string, ReactNode][] = [["종류", card.type_line]];
+  const base = card.frame.replace("_pendulum", "");
+  const frameColor = FRAME_COLORS[base] ?? FRAME_COLORS.effect;
+  const panel = base === "synchro" ? PANEL_ON_WHITE : PANEL;
+  const rarity = pickedFace?.rarity || card.rarity;
+  const left: ReactNode[] = [], right: ReactNode[] = [];
   if (card.category === "monster") {
-    stats.push(["속성", card.attribute || "-"]);
-    if (card.level_label) stats.push([levelName, levelValue]);
-    stats.push(["공격력", card.atk ?? "-"]);
-    if (!isLink) stats.push(["수비력", card.def ?? "-"]);
-    if (pendulum) stats.push(["스케일", card.pendulum_scale]);
-    if (isLink) stats.push(["링크 마커", <LinkMarkers on={card.link_markers} />]);
+    left.push(<Stat icon={card.attribute_key ? `attr/${card.attribute_key}` : null}>{card.attribute || "-"}</Stat>);
+    if (card.level_label) {
+      left.push(
+        <Stat icon={LEVEL_ICONS[levelName] ?? null}>
+          {card.level_label}
+          {isLink && <LinkMarkers on={card.link_markers} />}
+        </Stat>,
+      );
+    }
+    if (pendulum) left.push(<Stat icon="scale">스케일 {card.pendulum_scale}</Stat>);
+    right.push(<Stat icon="atk" label="공격력"><span className="font-semibold tabular-nums">{card.atk ?? "-"}</span></Stat>);
+    if (!isLink) right.push(<Stat icon="def" label="수비력"><span className="font-semibold tabular-nums">{card.def ?? "-"}</span></Stat>);
+  } else {
+    left.push(<Stat icon={`attr/${card.category}`}>{card.category === "spell" ? "마법" : "함정"}</Stat>);
+    left.push(<Stat icon={KIND_ICONS.has(card.spell_trap_kind) ? `kind/${card.spell_trap_kind}` : null}>{card.type_line}</Stat>);
   }
-  // The card's 카드군 sit with its stats, near the top (엘리스 2026-10-11: "카드군도 중요한 정보"); each opens its cards.
+  const typeLine = card.category === "monster" ? <Stat icon={card.race ? `race/${card.race}` : null}>{card.type_line}</Stat> : null;
+  const rows: [string, ReactNode][] = [];
+  // The card's 카드군 come first under the box (엘리스 2026-10-11: "카드군도 중요한 정보"); each opens its cards.
   // The row stays when there are none, so it is always in the same place and "none" reads as an answer (44% of cards).
-  stats.splice(1, 0, ["카드군", card.groups.length ? (
+  rows.push(["카드군", card.groups.length ? (
     <div className="flex flex-wrap gap-1">
       {card.groups.map((g) => (
         <Link
@@ -245,7 +293,7 @@ export default function CardDetail() {
   )]);
   // The cards supporting this one (itself included), when any other card names it: its own support list.
   if (card.supporters) {
-    stats.splice(2, 0, ["서포트 카드", (
+    rows.push(["서포트 카드", (
       <Link to={`/cards?card=${card.id}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
         {card.supporters.toLocaleString()}장 보기 →
       </Link>
@@ -254,7 +302,7 @@ export default function CardDetail() {
   // 서포트: the 카드군 (filled, like the row above) and cards (outlined) its text names without being one of them;
   // ⇄ marks a card that names this one back — they support each other (엘리스 2026-10-11).
   if (card.supports.length) {
-    stats.splice(2, 0, ["서포트", (
+    rows.splice(1, 0, ["서포트", (
       <div className="flex flex-wrap gap-1">
         {card.supports.map((t) => (
           <Link
@@ -278,9 +326,22 @@ export default function CardDetail() {
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
-      <div className={LAYOUT}>
-        <div className={AREA.names}>
+      <div className={BOX} style={{ background: frameColor }}>
+        {pendulum && <div aria-hidden="true" className={AREA.lower} style={{ background: FRAME_COLORS.spell }} />}
+        <div className={`${AREA.head} ${DARK_NAMES.has(base) ? "text-gray-900" : "text-white"}`}>
+          {/* the rarity of the print picked (an alternate art can be rarer), in Master Duel's own badge
+              (GUI_Icon_Rarity_Deck0~3 from the game, served from media: the repo is public) — 엘리스 10/12 */}
+          {rarity && (
+            <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}.png`} alt={`레어도 ${rarity}`} title={rarity} className="float-right ml-2 mt-1 h-5 md:h-6 w-auto" />
+          )}
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
+          {card.name_ja && (
+            <p lang="ja" className="mt-0.5 text-sm leading-5 opacity-90">
+              {card.name_ja}
+              {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && <span className="ml-1.5 text-xs opacity-80">{card.name_ja_ruby}</span>}
+            </p>
+          )}
+          {card.name_en && <p lang="en" className="text-sm leading-5 opacity-90">{card.name_en}</p>}
         </div>
 
         <div className={AREA.card}>
@@ -337,7 +398,7 @@ export default function CardDetail() {
                   key={f.id}
                   type="button"
                   onClick={() => setPicked(f.face)}
-                  className={`md:w-12 rounded-sm overflow-hidden ring-2 transition touch-manipulation ${picked === f.face ? "ring-blue-600" : "ring-transparent"}`}
+                  className={`md:w-12 rounded-sm overflow-hidden ring-2 ring-offset-1 transition touch-manipulation ${picked === f.face ? "ring-white ring-offset-black" : "ring-transparent ring-offset-transparent"}`}
                   aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
                 >
                   <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />
@@ -347,78 +408,53 @@ export default function CardDetail() {
           )}
         </div>
 
-        <table className={`${AREA.stats} w-full border border-gray-300 dark:border-gray-600 text-left text-sm`}>
+        <div className={`${AREA.stats} ${panel} px-2 py-2 md:px-3 md:py-1.5 flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}>
+          <StatGroup items={left} />
+          {right.length > 0 && <StatGroup items={right} />}
+        </div>
+
+        <div className={`${AREA.effect} ${panel} p-3`}>
+          {(typeLine || card.texts.ja) && (
+            <div className={`flex items-center justify-between gap-2 ${typeLine ? "pb-2 mb-2 border-b border-gray-400/60 dark:border-gray-600" : "mb-1"}`}>
+              {typeLine}
+              {card.texts.ja && (
+                <button
+                  type="button"
+                  onClick={() => setJa(!ja)}
+                  className="ml-auto shrink-0 px-2 py-0.5 rounded-md text-xs font-semibold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                >
+                  {ja ? "한국어" : "일본어 원문"}
+                </button>
+              )}
+            </div>
+          )}
+          <TextBlock t={texts} pendulum={pendulum} />
+        </div>
+      </div>
+
+      <table className="mt-3 w-full border border-gray-300 dark:border-gray-600 text-left text-sm">
+        <tbody>
+          {rows.map(([label, value]) => (
+            <tr key={label} className={ROW}>
+              <th scope="row" className="p-1.5 md:p-2 w-14 md:w-28 align-top text-left break-keep text-xs leading-5 md:text-sm font-semibold bg-gray-200 dark:bg-gray-700">{label}</th>
+              <td className="p-1.5 md:p-2 tabular-nums break-keep">{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {dates.length > 0 && (
+        <table className="mt-3 w-full border border-gray-300 dark:border-gray-600 text-left text-sm">
           <tbody>
-            {stats.map(([label, value]) => (
-              <tr key={label} className={ROW}>
-                <th scope="row" className="p-1.5 md:p-2 w-14 md:w-28 align-top text-left break-keep text-xs leading-5 md:text-sm font-semibold bg-gray-200 dark:bg-gray-700">{label}</th>
-                <td className="p-1.5 md:p-2 tabular-nums break-keep">{value}</td>
-              </tr>
-            ))}
+            <tr className={ROW}>
+              <th scope="row" className={LABEL}>출시일</th>
+              <td className="p-2 tabular-nums">
+                {dates.map(([label, d]) => <div key={label}>{label} {day(d)}</div>)}
+              </td>
+            </tr>
           </tbody>
         </table>
-
-        <section className={AREA.effect}>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-bold">효과</h2>
-            {card.texts.ja && (
-              <button
-                type="button"
-                onClick={() => setJa(!ja)}
-                className="px-3 py-1 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-              >
-                {ja ? "한국어" : "일본어 원문"}
-              </button>
-            )}
-          </div>
-          <div className="rounded-lg border border-gray-300 dark:border-gray-600 p-3">
-            <TextBlock t={texts} pendulum={pendulum} />
-          </div>
-        </section>
-
-        {/* The Japanese and English names are reference, like the dates: down here, so the top holds the Korean name
-            alone (엘리스 2026-10-11: three lines of names were wasted space). */}
-        {(card.name_ja || card.name_en || card.rarity || dates.length > 0) && (
-          <table className={`${AREA.more} w-full border border-gray-300 dark:border-gray-600 text-left text-sm`}>
-            <tbody>
-              {card.name_ja && (
-                <tr className={ROW}>
-                  <th scope="row" className={LABEL}>일본어 이름</th>
-                  <td className="p-2">
-                    {card.name_ja}
-                    {card.name_ja_ruby && card.name_ja_ruby !== card.name_ja && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{card.name_ja_ruby}</div>
-                    )}
-                  </td>
-                </tr>
-              )}
-              {card.name_en && (
-                <tr className={ROW}>
-                  <th scope="row" className={LABEL}>영어 이름</th>
-                  <td className="p-2">{card.name_en}</td>
-                </tr>
-              )}
-              {card.rarity && (
-                <tr className={ROW}>
-                  <th scope="row" className={LABEL}>마듀 레어도</th>
-                  <td className="p-2">
-                    {/* Master Duel's own badge (GUI_Icon_Rarity_Deck0~3 from the game, served from media: the repo is public). */}
-                    <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}.png`} alt={card.rarity} title={card.rarity} className="h-5 w-auto" />
-                  </td>
-                </tr>
-              )}
-              {dates.length > 0 && (
-                <tr className={ROW}>
-                  <th scope="row" className={LABEL}>출시일</th>
-                  <td className="p-2 tabular-nums">
-                    {dates.map(([label, d]) => <div key={label}>{label} {day(d)}</div>)}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      )}
 
       {cutin && (
         <CutinOverlay id={cutin.id} info={cutin.info} attribute={card.cutin_sound} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />

@@ -389,6 +389,9 @@ def card(request, card_id):
         "id": c.id, "name": display_name(c), "name_ko": c.name_ko, "name_ja": c.name_ja, "name_ja_ruby": c.name_ja_ruby,
         "name_en": c.name_en, "category": c.category, "frame": c.frame, "type_line": type_line,
         "attribute": ATTRIBUTES.get(c.attribute, ""), "level_label": level_label,
+        # what the document's Master Duel icons are chosen by
+        "attribute_key": c.attribute if c.category == "monster" else "", "race": c.race if c.category == "monster" else "",
+        "spell_trap_kind": c.spell_trap_subtype if c.category != "monster" else "",
         "atk": _stat(c.atk), "def": None if c.frame == "link" else _stat(c.def_value),
         "link_markers": c.link_markers, "pendulum_scale": c.pendulum_scale, "finish": _finish(c),
         "texts": {"ko": _texts(c, "ko"), "ja": _texts(c, "ja")},
