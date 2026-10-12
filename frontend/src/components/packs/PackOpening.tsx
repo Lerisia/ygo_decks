@@ -183,7 +183,12 @@ export default function PackOpening({ pack, packs, fresh, gems, owed = false, on
         <div className="po-horizon" aria-hidden="true" />
         <canvas ref={bgCanvas} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" />
 
-        {stage === "overview" && <Overview packs={packs} hints={hints} pack={pack} onOpen={() => { unlockPackSound(); setStage("pack"); }} />}
+        {stage === "overview" && <Overview packs={packs} hints={hints} pack={pack} onOpen={() => {
+          // the game's pack-out sound as the ten go and the first comes forward (heard there in its openings, 엘리스 10/13)
+          unlockPackSound();
+          playPackSound("02_packout", 0.8);
+          setStage("pack");
+        }} />}
         {stage === "pack" && (
           <PackScene key={index} pack={pack} hints={hints[index]} framed={total > 1} fx={fx} flash={flashNow} onOpened={() => setStage("cards")} />
         )}
@@ -234,9 +239,6 @@ export default function PackOpening({ pack, packs, fresh, gems, owed = false, on
 
 /** Ten packs laid out on the stage, gold those holding an SR, rainbow those holding a UR; OPEN opens them one by one. */
 function Overview({ packs, hints, pack, onOpen }: { packs: Pulled<PackCard>[][]; hints: Hints[]; pack: PackDetail; onOpen: () => void }) {
-  useEffect(() => {
-    playPackSound("02_packout", 0.8);
-  }, []);
   return (
     <>
       <div className="po-overview">
@@ -591,6 +593,9 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
       { duration: turn, delay, easing: ur ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
     a.onfinish = () => { inner.style.transform = `rotateY(${dir * 180}deg)`; };
     const show = turn * (ur ? 0.72 : 0.5);   // when the face comes round
+    // and the back is put away then: Safari draws a back's moving glow and foil (an SR / UR's whose back showed it) on
+    // their own layers, which ignore its backface hiding, so a turned card came round to its back (엘리스 10/13)
+    window.setTimeout(() => { inner.querySelector<HTMLElement>(".po-back")?.style.setProperty("visibility", "hidden"); }, delay + show);
     let settled = delay + turn + 70;
     if (big) {
       // the leap: up and large, held a moment in its light, then back to its place
