@@ -336,9 +336,10 @@ export default function CardDetail() {
         {pendulum && <div aria-hidden="true" className={AREA.lower} style={{ background: FRAME_COLORS.spell }} />}
         <div className={`${AREA.head} ${DARK_NAMES.has(base) ? "text-gray-900" : "text-white"}`}>
           {/* the rarity of the print picked (an alternate art can be rarer), in Master Duel's own badge
-              (GUI_Icon_Rarity_Deck0~3 from the game, served from media: the repo is public) — 엘리스 10/12 */}
+              (GUI_Icon_Rarity_Deck0~3 from the game, rebuilt at 4× so it is as sharp as the card — 특이점 10/12; served from
+              media: the repo is public) — 엘리스 10/12 */}
           {rarity && (
-            <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}.png`} alt={`레어도 ${rarity}`} title={rarity} className="float-right ml-2 mt-1 h-5 md:h-6 w-auto" />
+            <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}_hd.png`} alt={`레어도 ${rarity}`} title={rarity} className="float-right ml-2 mt-1 h-5 md:h-6 w-auto" />
           )}
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
           {card.name_ja && (

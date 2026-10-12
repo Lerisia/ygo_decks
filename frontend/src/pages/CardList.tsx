@@ -85,7 +85,7 @@ function CardTile({ card }: { card: CardListItem }) {
         />
         {/* the rarity in the top right corner, as Master Duel's own card list shows it (엘리스 10/12) */}
         {card.rarity && (
-          <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}.png`} alt={card.rarity} className="absolute top-0 right-0 h-3.5 sm:h-4 w-auto" />
+          <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}_hd.png`} alt={card.rarity} className="absolute top-0 right-0 h-3.5 sm:h-4 w-auto" />
         )}
       </span>
       <p className="mt-1 h-10 text-xs sm:text-sm leading-5 line-clamp-2 break-keep">{card.name}</p>
