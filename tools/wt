@@ -1,0 +1,67 @@
+#!/bin/bash
+# Each piece of work in its own git worktree and branch, so nobody edits the deploy tree (/home/elyss/ygo_decks) and
+# one person's unfinished work never ships with another's (2026-10-12). Ship a worktree with tools/ship.
+#
+#   tools/wt new <name>   branch wt/<name> from master, at /home/elyss/storage/wt/<name> (prints the path; an
+#                         existing one is reused, so a Discord thread keeps its worktree across requests)
+#   tools/wt rm <name>    remove the worktree and its branch once shipped (refuses unshipped work; --force drops it)
+#   tools/wt list         every worktree
+#
+# The worktree shares the deploy tree's backend/.env, node_modules and card models (links) and its Python
+# (/home/elyss/ygo_decks/backend/venv/bin/python), and has no database of its own: tests make their own, and nothing
+# in a worktree can write the live one by accident.
+set -euo pipefail
+
+MAIN=/home/elyss/ygo_decks
+ROOT=/home/elyss/storage/wt
+cmd=${1:-}
+name=${2:-}
+
+need_name() {
+    [[ "$name" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo "name: lowercase letters, digits, '.', '_' or '-'" >&2; exit 2; }
+}
+
+case "$cmd" in
+new)
+    need_name
+    dir=$ROOT/$name
+    if [ -d "$dir" ]; then
+        echo "$dir"
+        exit 0
+    fi
+    mkdir -p "$ROOT"
+    if git -C "$MAIN" show-ref --quiet "refs/heads/wt/$name"; then
+        git -C "$MAIN" worktree add -q "$dir" "wt/$name"
+    else
+        git -C "$MAIN" worktree add -q -b "wt/$name" "$dir" master
+    fi
+    # (part of backend/venv has been in git since the first commit: the checkout already has that folder, and Python
+    # is run from the deploy tree's venv instead)
+    link() { [ -e "$2" ] || [ -L "$2" ] || ln -s "$1" "$2"; }
+    link "$MAIN/backend/.env" "$dir/backend/.env"
+    link "$MAIN/frontend/node_modules" "$dir/frontend/node_modules"
+    [ -d "$MAIN/node_modules" ] && link "$MAIN/node_modules" "$dir/node_modules"
+    for f in "$MAIN"/backend/card/*.pt "$MAIN"/backend/card/*.pth; do
+        [ -e "$f" ] && link "$f" "$dir/backend/card/$(basename "$f")"
+    done
+    echo "$dir"
+    ;;
+rm)
+    need_name
+    dir=$ROOT/$name
+    if [ "${3:-}" = "--force" ]; then
+        git -C "$MAIN" worktree remove --force "$dir"
+        git -C "$MAIN" branch -D "wt/$name"
+    else
+        git -C "$MAIN" worktree remove "$dir"
+        git -C "$MAIN" branch -d "wt/$name"   # refuses a branch master does not hold yet
+    fi
+    ;;
+list)
+    git -C "$MAIN" worktree list
+    ;;
+*)
+    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac

@@ -1,9 +1,7 @@
-# Backend: Ignore Python cache & migrations
+# Backend: Ignore Python cache. Migrations are kept in git (2026-10-12): each branch carries its own, so two pieces of
+# work making the same number meet at rebase rather than on the live database.
 backend/**/__pycache__/
-backend/**/migrations/
 backend/**/migrations/*.pyc
-backend/**/migrations/*.py
-!backend/**/migrations/__init__.py
 
 # Backend: Ignore database files
 backend/*.sqlite3
@@ -22,6 +20,7 @@ backend/media/*
 
 # Backend: Ignore virtual environment (venv)
 backend/venv/
+backend/venv
 backend/.venv/
 venv/
 .venv/
@@ -45,8 +44,9 @@ Thumbs.db
 frontend/src/data/lookup_table.json
 backend/lookup_table.json
 
-# node_modules
+# node_modules (a worktree's are links to the deploy tree's: no trailing slash, a link is no folder to git)
 node_modules/
+/node_modules
 
 # media files
 media/

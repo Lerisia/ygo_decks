@@ -7,6 +7,12 @@
 
 set -e
 
+# Migrations live in git (2026-10-12): a model changed without its migration stops the deploy here, before anything
+# is built, rather than the deploy tree writing one of its own that no branch has.
+echo "Checking migrations..."
+cd /home/elyss/ygo_decks/backend
+venv/bin/python manage.py makemigrations --check --dry-run
+
 echo "Sending pre-deploy refresh notice to active rooms..."
 cd /home/elyss/ygo_decks/backend
 source venv/bin/activate
@@ -31,7 +37,6 @@ cp -n "$KEEP"/* dist/assets/
 echo "Running backend migrations & collectstatic..."
 cd /home/elyss/ygo_decks/backend
 source venv/bin/activate
-python manage.py makemigrations
 python manage.py migrate
 python manage.py collectstatic --noinput
 deactivate

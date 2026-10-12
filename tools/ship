@@ -1,0 +1,72 @@
+#!/bin/bash
+# Ship a worktree made by tools/wt (2026-10-12): one deploy at a time (a lock; a second ship waits its turn), the
+# branch rebased on master, the migrations and every test checked, master fast-forwarded in the deploy tree,
+# deploy.sh, the site checked, master pushed. It stops at the first failure and says why; the deploy tree is never
+# left half-merged, and nothing uncommitted anywhere goes out.
+#
+#   tools/ship <name>
+set -euo pipefail
+
+MAIN=/home/elyss/ygo_decks
+ROOT=/home/elyss/storage/wt
+LOCK=/tmp/ygo_ship.lock
+PY=$MAIN/backend/venv/bin/python   # a worktree's own backend/venv is only the part git happens to hold
+SITE=https://localhost
+HOST=ygodecks.com
+
+name=${1:?usage: tools/ship <name>}
+dir=$ROOT/$name
+branch=wt/$name
+log=/tmp/ygo_ship_$name.log
+say() { echo "== $*"; }
+fail() { echo "!! $*" >&2; exit 1; }
+
+[ -d "$dir" ] || fail "no worktree $dir (tools/wt new $name)"
+[ "$(git -C "$MAIN" symbolic-ref --short HEAD)" = master ] || fail "the deploy tree is not on master"
+
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    say "another ship is deploying: waiting for it"
+    flock 9
+fi
+
+cd "$dir"
+[ -z "$(git status --porcelain --untracked-files=no)" ] || fail "$dir has uncommitted changes: commit them first"
+say "rebase $branch on master"
+if ! git rebase -q master; then
+    git rebase --abort
+    fail "conflict with master: run 'git rebase master' in $dir, settle it, then ship again"
+fi
+[ "$(git rev-list --count master..HEAD)" != 0 ] || { say "nothing to ship: $branch is master"; exit 0; }
+
+say "migrations"
+(cd backend && "$PY" manage.py makemigrations --check --dry-run >"$log" 2>&1) \
+    || fail "a model changed without its migration: run makemigrations in $dir/backend and commit it ($log)"
+say "backend tests"
+(cd backend && "$PY" manage.py test --parallel 4 --noinput >"$log" 2>&1) \
+    || { tail -30 "$log" >&2; fail "backend tests failed ($log)"; }
+say "frontend checks"
+(cd frontend && npx tsc -b >"$log" 2>&1 && npx vitest run >>"$log" 2>&1) \
+    || { tail -30 "$log" >&2; fail "frontend type check or tests failed ($log)"; }
+
+cd "$MAIN"
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    git status --short --untracked-files=no >&2
+    fail "the deploy tree has uncommitted changes (someone edits it directly): nothing shipped"
+fi
+say "merge into master"
+git merge -q --ff-only "$branch" || fail "master moved during the checks: ship again"
+say "deploy"
+./deploy.sh
+say "check the site"
+code=000
+for _ in 1 2 3 4 5 6; do   # a few seconds of 502 while services restart is normal
+    code=$(curl -sk -o /dev/null -w "%{http_code}" "$SITE/" -H "Host: $HOST")
+    api=$(curl -sk -o /dev/null -w "%{http_code}" "$SITE/api/carddb/cards/options/" -H "Host: $HOST")
+    [ "$code" = 200 ] && [ "$api" = 200 ] && break
+    sleep 5
+done
+[ "$code" = 200 ] && [ "$api" = 200 ] || fail "after the deploy the site answers $code, the API $api: look now (journalctl, nginx)"
+say "push"
+git push -q origin master || echo "!! push failed; the deploy is done: push master by hand" >&2
+say "shipped $branch at $(git log -1 --format='%h %s' | cut -c1-80)"
