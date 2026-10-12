@@ -82,6 +82,7 @@ SORTS = {
     "atk": (lambda r: r.atk, False),
     "def": (lambda r: r.def_, False),
 }
+BAN_FILTERS = {"forbidden", "limited", "semi_limited", "unlimited"}
 HIGH_FIRST = {"new"}   # the way a sort goes when none is asked: the newest first, the rest low to high
 
 _index = {"key": None, "at": 0.0, "type": [], "orders": {}, "face_thumbs": set(), "thumbs": set()}
@@ -265,6 +266,10 @@ def _keep(p):
         tests.append(lambda r: r.cutin)
     if "overframe" in has:
         tests.append(lambda r: r.overframe)
+    # today's Master Duel 금제, any of several: ban=forbidden,limited (엘리스 10/12); not on the list is unlimited
+    bans = {b for b in str(p.get("ban", "")).split(",") if b in BAN_FILTERS}
+    if bans:
+        tests.append(lambda r, v=bans: (r.ban or "unlimited") in v)
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)

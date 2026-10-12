@@ -50,7 +50,7 @@ function rememberSort(f: CardFilters) {
 }
 
 const hasFilter = (f: CardFilters) =>
-  !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has);
+  !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has || f.ban);
 // cards with another art, a monster cut-in, or both: chosen together they narrow to cards with both (엘리스 2026-10-11)
 const HAS = [
   { value: "alt", label: "다른 일러스트" },
@@ -60,6 +60,13 @@ const HAS = [
 ];
 // the filter bar's chips (참혈 2026-10-12); a monster's items don't fit 마법·함정, nor 마법·함정 종류 a monster
 const BAR_KEYS = ["category", "frame", "attribute", "race", "level", "st"] as const;
+// today's Master Duel 금제, the same as the icon in each card's corner; several at once (엘리스 10/12)
+const BANS = [
+  { value: "forbidden", label: "금지" },
+  { value: "limited", label: "제한" },
+  { value: "semi_limited", label: "준제한" },
+  { value: "unlimited", label: "무제한" },
+];
 const MONSTER_KEYS = ["frame", "attribute", "race", "level"];
 const misfit = (key: string, v: DexValues) =>
   MONSTER_KEYS.includes(key) ? ["spell", "trap"].includes(v.category?.[0] ?? "") : key === "st" && v.category?.[0] === "monster";
@@ -239,16 +246,19 @@ export default function CardList() {
       options: (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })),
     },
     { key: "st", label: "마법·함정 종류", options: options?.spell_trap_kinds ?? [] },
+    { key: "ban", label: "금제", multi: true, options: BANS },
   ];
   const barExtras: DexField[] = [{ key: "has", label: "그 외", multi: true, options: HAS }];
   const barValues: DexValues = {
     ...Object.fromEntries(BAR_KEYS.map((k) => [k, filters[k] ? [filters[k]] : []])),
     has: filters.has.split(",").filter(Boolean),
+    ban: filters.ban.split(",").filter(Boolean),
   };
   const applyBar = (v: DexValues) =>
     update({
       ...Object.fromEntries(BAR_KEYS.map((k) => [k, v[k]?.[0] ?? ""])),
       has: HAS.map((h) => h.value).filter((x) => v.has?.includes(x)).join(","),
+      ban: BANS.map((b) => b.value).filter((x) => v.ban?.includes(x)).join(","),
     });
 
   return (

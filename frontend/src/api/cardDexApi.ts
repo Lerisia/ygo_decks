@@ -24,13 +24,15 @@ export type CardFilters = {
   deck: string;
   /** "alt": cards with another art (다른 일러스트), "cutin": cards with a monster cut-in. */
   has: string;
+  /** Today's Master Duel 금제, any of several: "forbidden,limited" (엘리스 10/12). */
+  ban: string;
   sort: string;
   /** "asc" low to high, "desc" high to low; "" the sort's own way (the newest first, the rest low to high). */
   dir: string;
 };
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", deck: "", has: "",
+  q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", deck: "", has: "", ban: "",
   sort: "type", dir: "",   // Master Duel's 디폴트 순 first (엘리스 10/12)
 };
 

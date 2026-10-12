@@ -925,6 +925,11 @@ class CardDexApiTest(TestCase):
         BanlistEntry.objects.create(banlist=ocg, card=self.quick, name="4", status="semi_limited")
         ban = {r["id"]: r["ban"] for r in self.get()["results"]}
         self.assertEqual((ban[1], ban[2], ban[3], ban[4]), ("forbidden", "", "", ""))
+        # and the filter on it, several at once (엘리스 10/12)
+        self.assertEqual(self.ids(ban="forbidden"), [1])
+        self.assertEqual(self.ids(ban="limited,semi_limited"), [])
+        self.assertEqual(sorted(self.ids(ban="unlimited")), [2, 3, 4, 5, 6])
+        self.assertEqual(sorted(self.ids(ban="forbidden,unlimited")), [1, 2, 3, 4, 5, 6])
 
     def test_list_gives_the_rarity(self):
         MdPrint.objects.filter(md_id=2).update(rarity="UR")
