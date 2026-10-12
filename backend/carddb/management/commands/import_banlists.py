@@ -49,6 +49,7 @@ class Command(BaseCommand):
             pages.append((page_title, p))
             page_title = p.next
 
+        filled = banlist.fill_gaps([p for _, p in pages])
         index = banlist.CardIndex()
         lost = {}
         with transaction.atomic():
@@ -69,3 +70,5 @@ class Command(BaseCommand):
         self.stdout.write(f"{fmt}: {len(pages)} lists, {entries.count()} entries, {self.asked} pages asked")
         for name, day in sorted(lost.items(), key=lambda x: x[1]):
             self.stdout.write(f"  no card for {name!r} (first on {day})")
+        for day, name, status in filled:
+            self.stdout.write(f"  put back {name!r} on {day} ({status}): the page left it out")

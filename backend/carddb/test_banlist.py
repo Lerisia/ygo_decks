@@ -194,6 +194,20 @@ class ImportBanlistsTest(TestCase):
         self.run_import()
         self.assertEqual(set(BanlistEntry.objects.filter(name="Lost Card").values_list("card_id", flat=True)), {13})
 
+    def test_a_card_left_out_of_one_list_is_filled_in(self):
+        # on the list before and after, unchanged, but missing between: the page left it out (Pot of Greed, OCG
+        # January 2016); one off the list for good was released and stays out
+        self.pages["May 2022 Lists (Master Duel)"] = page(
+            "May 9, 2022", prev="January 2022 Lists (Master Duel)", next="July 2022 Lists (Master Duel)",
+            cards=["Pot of Desires; Unlimited; Limited"])
+        self.pages["July 2022 Lists (Master Duel)"] = page(
+            "July 11, 2022", prev="May 2022 Lists (Master Duel)", cards=["Pot of Greed; Forbidden", "Pot of Desires; Limited; Unlimited"])
+        out = self.run_import()
+        may = Banlist.objects.get(effective=date(2022, 5, 9))
+        self.assertEqual(sorted(may.entries.values_list("name", "status")),
+                         [("Pot of Desires", "unlimited"), ("Pot of Greed", "forbidden")])   # Lost Card stays out
+        self.assertIn("Pot of Greed", out)
+
     def test_another_game_page_is_refused(self):
         self.pages["January 2022 Lists (Master Duel)"] = page("January 19, 2022", medium="Yu-Gi-Oh! Duel Links")
         with self.assertRaises(Exception):

@@ -102,6 +102,24 @@ def parse_page(text):
     return Page(effective, _field(text, "medium"), title(_field(text, "prev")), title(_field(text, "next")), entries)
 
 
+def fill_gaps(pages):
+    """Cards a page left out: on the list before and on the one after unchanged (no status before, or the same one),
+    but missing between (OCG January 2016 without Pot of Greed). They are put back with the status they kept;
+    [(day, name, status)] put back. A card that does not come back was released, the page only omitting it."""
+    filled = []
+    for before, page, after in zip(pages, pages[1:], pages[2:]):
+        here = {name for name, *_ in page.entries}
+        after_by = {name: (status, prev) for name, status, prev in after.entries}
+        for name, status, _ in before.entries:
+            if status == BanStatus.UNLIMITED or name in here or name not in after_by:
+                continue
+            later, prev = after_by[name]
+            if later == status and prev in ("", status):
+                page.entries.append((name, status, ""))
+                filled.append((page.effective, name, status))
+    return filled
+
+
 def name_key(name, brackets=False):
     """A name to match on: letters and digits alone, case and width folded. Our English names carry a note on some
     cards ("(Updated from: …)"), and lost the bracketed letter on others (Maliss <P> Dormouse, which the OCG / TCG
