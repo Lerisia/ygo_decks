@@ -8,9 +8,6 @@ import { type PackHit, type PackKind, type PackSummary, getPacks, searchPacks } 
 import { makeMatcher, nameKeys } from "@/utils/hangul";
 import { isAuthenticated } from "@/api/accountApi";
 
-const day = (iso: string) => { const [y, m, d] = iso.split("-"); return `${y.slice(2)}.${+m}.${+d}`; };
-/** A campaign's days, short: 26.2.5~4.9 (the year once when both ends share it). */
-const span = ([a, b]: [string, string]) => `${day(a)}~${a.slice(0, 4) === b.slice(0, 4) ? day(b).slice(3) : day(b)}`;
 
 const KINDS: { key: "all" | PackKind; label: string }[] = [
   { key: "all", label: "전체" },
@@ -138,7 +135,7 @@ export default function PackList() {
                     ) : p.period ? (
                       <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 tabular-nums truncate"
                             title={`${p.period[0]} ~ ${p.period[1]} · ${p.featured.join(", ")}`}>
-                        {span(p.period)}
+                        {p.period[0]}
                       </span>
                     ) : special ? (
                       <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 truncate">
