@@ -91,6 +91,9 @@ const LEVEL_ICONS: Record<string, string> = { 레벨: "level", 랭크: "rank", �
 const KIND_ICONS = new Set(["quick_play", "continuous", "field", "equip", "ritual", "counter"]);
 
 /** One stat behind its icon (a blank of the same width where the game shows none, so a phone's list stays aligned). */
+// the phone panel is laid out for this many stat rows, whatever the card has
+const STAT_ROWS = 6;
+
 function Stat({ icon, label, children }: { icon: string | null; label?: string; children: ReactNode }) {
   return (
     <span className="stat-row flex items-center gap-1.5">
@@ -498,14 +501,20 @@ export default function CardDetail() {
         </div>
 
         {/* on a phone the stats fill the panel beside the card: rows spread over its height, sized to its width
-            (stat-fill in index.css; 참혈 2026-10-12), and sized as if there were six rows, so a card with fewer
-            does not get bigger text (참혈 2026-10-13) */}
+            (stat-fill in index.css; 참혈 2026-10-12), sized and spaced as if there were six rows — blank rows make up
+            the rest — so a card with fewer gets neither bigger text nor wider gaps (참혈 2026-10-13) */}
         <div
           className={`${AREA.stats} ${panelWide} stat-fill px-2.5 py-2 md:px-3 md:py-1.5 flex flex-col justify-evenly gap-1 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}
-          style={{ "--rows": Math.max(6, left.length + right.length) } as CSSProperties}
+          style={{ "--rows": Math.max(STAT_ROWS, left.length + right.length) } as CSSProperties}
         >
           <StatGroup items={left} />
           {right.length > 0 && <StatGroup items={right} />}
+          {Array.from({ length: Math.max(0, STAT_ROWS - left.length - right.length) }, (_, i) => (
+            <span key={i} className="stat-row flex items-center gap-1.5 invisible md:hidden" aria-hidden="true">
+              <span className="stat-icon w-6 h-6 shrink-0" />
+              <span>&nbsp;</span>
+            </span>
+          ))}
         </div>
 
         <div className={`${AREA.effect} ${panel} p-3`}>
