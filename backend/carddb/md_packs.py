@@ -326,6 +326,37 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
             for pid, rarity in (master or {}).items():
                 wanted[sid].setdefault(pid, (rarity, 1))
 
+    sale = {}   # the days each pack was sold: a selection pack until it ended, the others ever since
+    for sid, (s, kind) in packs.items():
+        sale[sid] = (_day(s.get("release")) or LAUNCH, _day(s.get("expires")) if kind == MdPack.Kind.SELECTION else None)
+
+    def sold(sid, start, end):
+        """The days a pack was sold in a campaign's span, or None: a pack out on its last day, or gone on its first,
+        was not sold with its arts (엘리스 10/13: 챌린저즈 컬렉션, out on 4/9, had no 4th-anniversary version)."""
+        on, off = sale[sid]
+        if on >= end or (off and off <= start):
+            return None
+        return max(start, on), min(end, off) if off else end
+
+    def spans(camp):
+        return [(date.fromisoformat(a), date.fromisoformat(b)) for a, b in camp["spans"]]
+
+    # an art MDM lists as a pack's own though Yugipedia says it came only for a while: the usual art in the usual pack,
+    # and that art in the version for those days (도미나스 임펄스's 오버프레임 in 챌린저즈 컬렉션 from 6/4)
+    usual = {}
+    for p in prints.values():
+        if not p.is_alt_art:
+            usual.setdefault(p.card_id, p.md_id)
+    for sid, (s, kind) in packs.items():
+        if kind not in (MdPack.Kind.SECRET, MdPack.Kind.SELECTION):
+            continue
+        for pid in list(wanted.get(sid, {})):
+            camp = campaigns.get(pid)
+            base = usual.get(prints[pid].card_id)
+            if camp and not camp["source"] and base and base not in wanted[sid] and any(
+                    sold(sid, a, b) for a, b in spans(camp)):
+                wanted[sid][base] = wanted[sid].pop(pid)
+
     def base_of(sid, art):
         return next((pid for pid in wanted.get(sid, {}) if prints[pid].card_id == art.card_id and not prints[pid].is_alt_art),
                     None)
@@ -348,9 +379,6 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
     # campaigns: one from a set named for it comes in that set; one from the packs makes a version of each selection
     # or secret pack on sale then that holds the card
     by_name = {s.get("name"): sid for sid, (s, _) in packs.items()}
-    sale = {}
-    for sid, (s, kind) in packs.items():
-        sale[sid] = (_day(s.get("release")) or LAUNCH, _day(s.get("expires")) if kind == MdPack.Kind.SELECTION else None)
     versions = defaultdict(dict)   # (set id, start, end) → {base print: art print}
     for art_id, camp in campaigns.items():
         art = prints.get(art_id)
@@ -363,15 +391,12 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (art.rarity or rarity, amount)
             continue
-        for start, end in camp["spans"]:
-            start, end = date.fromisoformat(start), date.fromisoformat(end)
+        for start, end in spans(camp):
             for sid, (s, kind) in packs.items():
-                on, off = sale[sid]
-                if kind not in (MdPack.Kind.SECRET, MdPack.Kind.SELECTION) or on > end or (off and off < start):
-                    continue
-                base = base_of(sid, art)
+                days = kind in (MdPack.Kind.SECRET, MdPack.Kind.SELECTION) and sold(sid, start, end)
+                base = days and base_of(sid, art)
                 if base:
-                    versions[(sid, start, end)][base] = art_id
+                    versions[(sid, *days)][base] = art_id
     # a pack whose cover shows such an art though it was not on sale while the art came (it came out with it later):
     # the usual pack has it, as the cover says
     for sid, art_id in pending:

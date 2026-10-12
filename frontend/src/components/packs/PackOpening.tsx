@@ -34,17 +34,19 @@ const high = (r: Rarity) => r === "SR" || r === "UR";
 const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK[c.rarity] > RANK[b] ? c.rarity : b), "N");
 
 /** What a pack shows of what it holds, as counted in the game's openings (엘리스 10/13; its server decides, so the odds are
- *  ours): its tier (a gold pack for an SR, a rainbow one for a UR); the lightning, two or three strikes every time it is
- *  opened, one of them red in an SR / UR pack three times in five (never in a plain one); Hope tearing it, only for a UR,
- *  one time in two, so it never lies; and, face down, an SR / UR's gold / rainbow back in one pack of two (the others
- *  leave them plain), such a card rattling before it turns. */
+ *  ours): its tier — the gold or rainbow its pack, frame, floor and curtain take — gold for an SR, and for a UR rainbow
+ *  only one time in two, gold the other (a UR pack opened under a gold curtain; "SR UR 정직하게 알려주지 않을 건데");
+ *  the lightning, two or three strikes every time it is opened, one of them red in an SR / UR pack three times in five
+ *  (never in a plain one); Hope tearing it, only for a UR, one time in two, so it never lies; and, face down, an SR /
+ *  UR's gold / rainbow back in one pack of two (the others leave them plain), such a card rattling before it turns. */
 type Tier = "N" | "SR" | "UR";
 type Hints = { tier: Tier; strikes: number; red: number; monster: boolean; marked: boolean };
 const hintsFor = (cards: Pulled<PackCard>[]): Hints => {
   const top = best(cards);
-  const tier: Tier = top === "UR" ? "UR" : top === "SR" ? "SR" : "N";
-  return { tier, strikes: Math.random() < 0.5 ? 2 : 3, red: tier !== "N" && Math.random() < 0.6 ? 1 : -1,
-           monster: tier === "UR" && Math.random() < 0.5, marked: tier !== "N" && Math.random() < 0.5 };
+  const rare = top === "SR" || top === "UR";
+  const tier: Tier = top === "UR" && Math.random() < 0.5 ? "UR" : rare ? "SR" : "N";
+  return { tier, strikes: Math.random() < 0.5 ? 2 : 3, red: rare && Math.random() < 0.6 ? 1 : -1,
+           monster: top === "UR" && Math.random() < 0.5, marked: rare && Math.random() < 0.5 };
 };
 const frameOf = (tier: Tier) => (tier === "UR" ? "po-frame-ur" : tier === "SR" ? "po-frame-sr" : "");
 

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import SearchForm from "@/components/SearchForm";
 import { Input } from "@/components/ui/input";
 import CardZoom from "@/components/CardZoom";
-import { GemIcon, PackTopBar } from "@/components/packs/Gem";
+import { GemIcon, PackListLink, PackTopBar } from "@/components/packs/Gem";
 import { setGems } from "@/lib/gems";
 import { type Collection, type CollectionCard, getCollection } from "@/api/packApi";
 import { getCard } from "@/api/cardDexApi";
@@ -78,7 +78,7 @@ export default function PackCollection() {
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
       <PackTopBar>
-        <Link to="/packs" className="text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+        <PackListLink />
       </PackTopBar>
       <h1 className="mt-2 text-2xl md:text-4xl font-bold">카드 모음</h1>
       {!signedIn ? (

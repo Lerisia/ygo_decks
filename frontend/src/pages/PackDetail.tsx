@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
-import { GemIcon, PackTopBar } from "@/components/packs/Gem";
+import { GemIcon, PackListLink, PackTopBar } from "@/components/packs/Gem";
 import { setGems } from "@/lib/gems";
 import { type PackCard, type PackDetail as Pack, type PackMine, type PackVersion, getPack, getPackMine, openPack } from "@/api/packApi";
 import { isAuthenticated } from "@/api/accountApi";
@@ -129,7 +129,7 @@ export default function PackDetail() {
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-4xl mx-auto">
       <PackTopBar>
-        <Link to="/packs" className="text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
+        <PackListLink />
         {mine?.signed_in && <Link to="/packs/collection" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
       </PackTopBar>
       {error && !pack ? (

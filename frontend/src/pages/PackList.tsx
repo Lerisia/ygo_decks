@@ -74,7 +74,7 @@ export default function PackList() {
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
       <PackTopBar>
         <button onClick={() => navigate("/playground")} className="text-blue-600 dark:text-blue-400 hover:underline">← 놀이터</button>
-        {isAuthenticated() && <Link to="/packs/collection" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
+        {isAuthenticated() && <Link to="/packs/collection" state={{ fromList: true }} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
       </PackTopBar>
       <h1 className="mt-2 text-2xl md:text-4xl font-bold">팩깡 시뮬레이터</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-keep">
@@ -118,7 +118,7 @@ export default function PackList() {
                 const hit = byCard.get(p.id);
                 return (
                 <li key={`${p.id}-${p.version ?? 0}`}>
-                  <Link to={`/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`} className="group block">
+                  <Link to={`/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`} state={{ fromList: true }} className="group block">
                     <span className="relative block">
                       <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
                       {p.period && (

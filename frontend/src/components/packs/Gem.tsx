@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useGems } from "@/lib/gems";
 
 const GEM = "/media/md_ui/packopen/gem.webp";
@@ -34,5 +34,17 @@ export function PackTopBar({ children }: { children: ReactNode }) {
       <div className="min-w-0 flex items-center gap-3 text-sm">{children}</div>
       <GemCount />
     </div>
+  );
+}
+
+/** "← 팩 목록": when the list led here, back to it as it was left — its search, filter and scroll — rather than the list
+ *  afresh at its top (엘리스 10/13: "뒤로가기 시 스크롤 위치가 대폭 틀려요"). */
+export function PackListLink() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromList = (location.state as { fromList?: boolean } | null)?.fromList;
+  return (
+    <Link to="/packs" onClick={(e) => { if (fromList) { e.preventDefault(); navigate(-1); } }}
+          className="text-blue-600 dark:text-blue-400 hover:underline">← 팩 목록</Link>
   );
 }

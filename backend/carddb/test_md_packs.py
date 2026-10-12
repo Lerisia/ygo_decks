@@ -193,7 +193,7 @@ class CampaignTest(TestCase):
 
     def test_versions_of_the_packs_on_sale_then(self):
         got = self.sync({50: {"spans": [("2024-06-01", "2024-06-30"), ("2026-02-05", "2026-04-09")], "source": ""}})
-        self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-04-09", {"5": 50})]))
+        self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-03-01", {"5": 50})]))   # until its sale ended
         self.assertEqual(got["sec"][1], [("2024-06-01", "2024-06-30", {"5": 50}), ("2026-02-05", "2026-04-09", {"5": 50})])
         self.assertEqual(got["sec"][0], [5, 7])                          # the usual pack keeps the usual art
         self.assertEqual(got["off"][1], [("2024-06-01", "2024-06-30", {"5": 50})])
@@ -219,6 +219,24 @@ class CampaignTest(TestCase):
         self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}}, pack_map=pack_map)
         v = MdPack.objects.get(mdm_id="sec").versions.get()
         self.assertEqual((v.swaps, v.cover), ({"5": 50}, "03_50"))
+
+    def test_a_pack_out_the_day_a_campaign_ends(self):
+        # out on the campaign's last day: it was not sold with that art
+        self.sets.append(dict(mdm_set("new", "Out That Day", kind="Selection Pack", release="2026-04-09T07:00:00.000Z"),
+                              expires="2026-09-03T00:00:00.000Z"))
+        self.cards = [mdm_card(5, "UR", "new")]
+        got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}})
+        self.assertEqual(got["new"], ([5], []))
+
+    def test_days_within_the_packs_sale(self):
+        got = self.sync({50: {"spans": [("2025-12-01", "2026-06-30")], "source": ""}})
+        self.assertEqual(got["on"][1], [("2026-01-08", "2026-03-01", {"5": 50})])   # from its release to its end
+
+    def test_an_art_mdm_puts_in_the_pack_comes_in_its_version(self):
+        # MDM lists the campaign art as the pack's own; Yugipedia says when it came: the usual art in the usual pack
+        self.cards = [mdm_card(5, "UR", "on", alt=True, release="2026-02-01T00:00:00.000Z")]
+        got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}})
+        self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-03-01", {"5": 50})]))
 
     def test_resolve_names_to_prints(self):
         MdPrint.objects.create(md_id=52, card_id=5, is_alt_art=True, rarity="UR")
