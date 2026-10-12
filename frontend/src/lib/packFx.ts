@@ -6,6 +6,7 @@ import type { Rarity } from "@/utils/packDraw";
 
 const FX = "/media/md_ui/packopen/";
 const TEXTURES = ["star", "star_big", "dot", "shards", "burst", "soft", "cross", "glow_soft", "bg_particle", "card_light"] as const;
+export const CYAN = "#5fe3ff";
 type Tex = (typeof TEXTURES)[number];
 const GRIDS = new Set<Tex>(["shards"]);   // sprite sheets: their cells are cut, not faded
 
@@ -250,6 +251,53 @@ export class FxLayer {
                  life: rand(0.35, 0.7), size: w * rand(0.05, 0.12), fadeIn: 0.01, color: i % 2 ? "#fff3c0" : WHITE });
     }
     this.add({ tex: "glow_soft", x: (x0 + x1) / 2, y, size: w * 2.2, life: 0.35, alpha: 0.8, fadeIn: 0.02 });
+  }
+
+  /** The glint that runs along a row of cards once they land (and after a finger drawn across them): a streak of
+   *  light from x0 to x1 at y over `ms`, leaving stars behind it. */
+  sweep(x0: number, x1: number, y: number, w: number, ms = 520) {
+    let t = 0;
+    const dur = ms / 1000;
+    let acc = 0;
+    this.emit((dt) => {
+      t += dt;
+      const u = Math.min(1, t / dur);
+      const x = x0 + (x1 - x0) * (1 - (1 - u) ** 2);
+      this.add({ tex: "glow_soft", x, y, size: w * 1.1, life: 0.12, alpha: 0.7, fadeIn: 0.01, color: "#dff3ff" });
+      acc += dt * 40;
+      while (acc >= 1) {
+        acc -= 1;
+        this.add({ tex: Math.random() < 0.3 ? "cross" : "star", x: x + rand(-w * 0.4, w * 0.1), y: y + rand(-w * 0.6, w * 0.6),
+                   vx: rand(-20, 20), vy: rand(-30, 10), size: w * rand(0.12, 0.26), grow: -0.4, life: rand(0.35, 0.8), fadeIn: 0.05,
+                   color: Math.random() < 0.6 ? "#bfefff" : WHITE, twinkle: rand(10, 18) });
+      }
+      return u < 1;
+    });
+  }
+
+  /** A bolt's foot on the floor at (x, y): a flash, cyan shards thrown out, a glow spreading on the floor. */
+  strike(x: number, y: number, s: number) {
+    this.add({ tex: "glow_soft", x, y, size: s * 2.4, grow: 0.4, life: 0.35, alpha: 1, fadeIn: 0.01, color: "#cfefff" });
+    this.add({ tex: "star_big", x, y, size: s * 1.8, grow: 0.3, life: 0.3, alpha: 0.9, fadeIn: 0.01, color: CYAN });
+    for (let i = 0; i < 14; i++) {
+      const a = rand(Math.PI * 1.05, Math.PI * 1.95);
+      const v = s * rand(3, 7);
+      this.add({ tex: "shards", grid: 3, frame: Math.floor(rand(0, 9)), x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, ay: s * 9,
+                 drag: 1.2, life: rand(0.5, 0.9), size: s * rand(0.12, 0.22), rot: rand(0, 6), vr: rand(-10, 10), color: CYAN });
+    }
+  }
+
+  /** Gold (or rainbow) dust around a card that has leapt up, drifting slowly down. */
+  dust(x: number, y: number, w: number, rarity: Rarity) {
+    const n = rarity === "UR" ? 46 : 30;
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2);
+      const r = w * rand(0.3, 1.1);
+      this.add({ tex: i % 4 ? "dot" : "star", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 1.3, vx: Math.cos(a) * w * rand(0.2, 0.9),
+                 vy: Math.sin(a) * w * rand(0.2, 0.9) - w * 0.4, ay: w * 0.9, drag: 1.4, life: rand(0.9, 1.7), size: w * rand(0.05, 0.13),
+                 fadeIn: 0.05, twinkle: rand(8, 16),
+                 color: rarity === "UR" ? RAINBOW[Math.floor(rand(0, RAINBOW.length))] : i % 3 ? GOLD : "#fff3b0" });
+    }
   }
 
   /** Light drifting up behind everything, now and then. */

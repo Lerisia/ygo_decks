@@ -2,7 +2,9 @@
  *  tap, so the ones that follow a tap by a moment (the tear, the cards coming out) still play on a phone. The viewer
  *  can turn them off; that is remembered. */
 const BASE = "/media/md_ui/packopen/sound/";
-const NAMES = ["01_op", "03_cut", "05_cardout", "card_move_01", "card_sr", "card_ur", "card_shake", "hope"] as const;
+const NAMES = ["01_op", "02_packout", "02_packout_1pack", "03_cut", "04_cardin", "05_cardout", "card_move_01", "card_move_02", "card_move_03", "card_move_04",
+               "card_sr", "card_ur", "card_shake", "hope", "kaminari_01", "kaminari_02", "kaminari_03", "proc_rare",
+               "proc_rare_02"] as const;
 export type PackSoundName = (typeof NAMES)[number];
 const OFF = "pack_sound_off";
 
@@ -52,7 +54,8 @@ export function unlockPackSound() {
   }
 }
 
-export function playPackSound(name: PackSoundName, volume = 0.8) {
+/** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time). */
+export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
   if (!ctx || !soundOn()) return;
   const audio = ctx;
   load(name).then((buf) => {
@@ -60,8 +63,15 @@ export function playPackSound(name: PackSoundName, volume = 0.8) {
     const src = audio.createBufferSource();
     const gain = audio.createGain();
     src.buffer = buf;
+    src.playbackRate.value = rate;
     gain.gain.value = volume;
     src.connect(gain).connect(audio.destination);
     src.start();
   });
+}
+
+/** A card's move: one of the game's four, at a pitch a little different each time (SE_PACK_CARD_MOVE). */
+export function playCardMove(volume = 0.7) {
+  const n = 1 + Math.floor(Math.random() * 4);
+  playPackSound(`card_move_0${n}` as PackSoundName, volume, 0.92 + Math.random() * 0.25);
 }

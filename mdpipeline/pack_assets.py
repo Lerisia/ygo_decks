@@ -22,10 +22,13 @@ EFFECTS = {   # opening textures → the names the page asks for
     "fxt_msk_001": "glow_soft", "CardPackOpenParticle01": "bg_particle", "CardOpenScroll01": "streaks",
     "thunderTest02": "thunder", "fxt_tnd_2x2_002": "lightning", "PackOpenMonsFrare01": "mons_flare",
     "EfDuelHighlight00_01_02": "card_light", "EffectLine01": "line", "fxt_msk_006": "fade_mask",
+    "fxt_msk_007": "cone", "PackHighlight01": "pack_light", "PackOpenMons01": "monster", "Gradation001": "grad_band",
 }
 SOUNDS = ["se_packopen_01_op", "se_packopen_02_packout", "se_packopen_02_packout_1pack", "se_packopen_03_cut",
           "se_packopen_04_cardin", "se_packopen_05_cardout", "se_packopen_card_sr", "se_packopen_card_ur",
-          "se_packopen_hope", "se_pack_card_move_01", "se_pack_card_shake"]
+          "se_packopen_hope", "se_pack_card_move_01", "se_pack_card_shake", "se_pack_card_move_02", "se_pack_card_move_03",
+          "se_pack_card_move_04", "se_packopen_kaminari_01", "se_packopen_kaminari_02", "se_packopen_kaminari_03",
+          "se_pack_proc_rare", "se_pack_proc_rare_02", "se_pack_upgrad_01", "se_pack_upgrad_01_ur"]
 
 
 def webp(src, dst, size=None, quality=85):
@@ -47,7 +50,8 @@ def main():
         done += 1
     opening = os.path.join(media, "md_ui/packopen")
     for name, out in EFFECTS.items():
-        webp(os.path.join(src, "open/textures", name + ".png"), os.path.join(opening, out + ".webp"), size=(512, 512), quality=90)
+        size = (1280, 1280) if out == "monster" else (512, 512)   # the monster fills the screen
+        webp(os.path.join(src, "open/textures", name + ".png"), os.path.join(opening, out + ".webp"), size=size, quality=90)
     webp(os.path.join(src, "card_back/ProtectorIcon1070001.png"), os.path.join(opening, "back.webp"), size=(352, 704))
     os.makedirs(os.path.join(opening, "sound"), exist_ok=True)
     for name in SOUNDS:
