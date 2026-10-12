@@ -55,7 +55,7 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups", "supports", "as_cards", "named", "names", "alt", "cutin", "rarity", "type_key", "number", "atk",
+                 "groups", "supports", "as_cards", "named", "names", "alt", "cutin", "overframe", "rarity", "type_key", "number", "atk",
                  "def_")
 
 
@@ -131,6 +131,7 @@ def _card_index():
     with_art = art_names()
     alt_of = dict(MdPrint.objects.filter(is_alt_art=True).values_list("md_id", "card_id"))
     alt_cards = {cid for md_id, cid in alt_of.items() if md_id in with_art}
+    overframe_cards = {cid for md_id, cid in alt_of.items() if md_id in with_art and _overframe(md_id)}
     cutin_cards = {alt_of.get(md_id, md_id) for md_id in _cutins()}
     rows = []
     for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
@@ -149,7 +150,7 @@ def _card_index():
         r.supports = supports.get(cid, set())
         r.as_cards = as_cards.get(cid, set()) | {cid}
         r.named, r.names = named.get(cid, set()), names.get(cid, set())
-        r.alt, r.cutin = cid in alt_cards, cid in cutin_cards
+        r.alt, r.cutin, r.overframe = cid in alt_cards, cid in cutin_cards, cid in overframe_cards
         r.rarity = md_rarity.get(cid, "")
         kind = frame if category == "monster" else f"{category}:{st}"
         number = rank if frame.startswith("xyz") else link if frame == "link" else level
@@ -236,12 +237,14 @@ def _keep(p):
     if category in ("spell", "trap") and kind:
         tests.append(lambda r, v=(category, kind): (r.category, r.st) == v)
     # cards with another art (다른 일러스트), with a monster cut-in (소환 연출), or with both: has=alt,cutin
-    # (엘리스 2026-10-11)
+    # (엘리스 2026-10-11); with an 오버프레임 print: has=overframe (특이점 2026-10-12)
     has = set(str(p.get("has", "")).split(","))
     if "alt" in has:
         tests.append(lambda r: r.alt)
     if "cutin" in has:
         tests.append(lambda r: r.cutin)
+    if "overframe" in has:
+        tests.append(lambda r: r.overframe)
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)

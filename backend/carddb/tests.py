@@ -1006,6 +1006,17 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.ids(has="alt"), [3])
         self.assertEqual(self.ids(has="cutin"), [3, 2])
         self.assertEqual(self.ids(has="alt,cutin"), [3])
+        # cards with an 오버프레임 print (특이점 2026-10-12): an alternate art covering the whole card (taller than 1.5×)
+        from PIL import Image
+        os.makedirs(os.path.join(settings.MEDIA_ROOT, "cards/art/common"), exist_ok=True)
+        Image.new("RGB", (512, 1024)).save(os.path.join(settings.MEDIA_ROOT, "cards/art/common/3902.webp"), "WEBP")
+        Image.new("RGB", (624, 624)).save(os.path.join(settings.MEDIA_ROOT, "cards/art/common/3901.webp"), "WEBP")
+        of = MdPrint.objects.create(md_id=3902, card=self.dm, is_alt_art=True, rarity="UR")
+        MdArt.objects.create(md_print=of, version="common", image="cards/art/common/3902.webp")
+        display.forget_art()
+        self.assertEqual(self.ids(has="overframe"), [1])
+        self.assertEqual(self.ids(has="alt"), [3, 1])
+        self.assertEqual(self.ids(has="overframe,cutin"), [])
 
     def test_dex_counts(self):
         from deck.models import Deck

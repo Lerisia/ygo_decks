@@ -58,6 +58,8 @@ const hasSet = (has: string) => new Set(has.split(",").filter(Boolean));
 const HAS = [
   { value: "alt", label: "다른 일러스트 있음" },
   { value: "cutin", label: "소환 연출 있음" },
+  // an alternate print whose art covers the whole card (특이점 2026-10-12)
+  { value: "overframe", label: "오버프레임 있음" },
 ];
 
 function TileSkeleton() {
@@ -298,7 +300,7 @@ export default function CardList() {
             {select("마법·함정 종류", "st", options?.spell_trap_kinds ?? [], filters.category === "monster")}
           </div>
           <div className="text-left">
-            <span className="block text-sm font-semibold mb-1">일러스트·소환 연출</span>
+            <span className="block text-sm font-semibold mb-1">일러스트·소환 연출·오버프레임</span>
             <div className="flex flex-wrap items-center gap-2">
               {HAS.map((h) => {
                 const on = hasSet(filters.has).has(h.value);
