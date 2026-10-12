@@ -14,6 +14,10 @@ By answering a few questions, you will receive a deck recommendation tailored to
 
 ## ⚙️ Installation & Usage
 
+## 🧑‍💻 Working on it
+On the server every piece of work gets its own branch and worktree, and ships one at a time:
+`tools/wt new <name>` → commit in `/home/elyss/storage/wt/<name>` → `tools/ship <name>`. See `CLAUDE.md`.
+
 ## 📜 License
 This project is licensed under a **modified MIT License for non-commercial use only**.  
 All forms of **commercial use are strictly prohibited**, including but not limited to:  
