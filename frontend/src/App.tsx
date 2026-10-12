@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './App.css'
 import Navbar from "./components/Navbar";
@@ -6,73 +6,89 @@ import BottomTabBar from "./components/BottomTabBar";
 import { useDrawingMode } from "./lib/drawingMode";
 import TrackerBanner from "./components/TrackerBanner";
 import TrackerConfirmModal from "./components/TrackerConfirmModal";
-import Recommend from './pages/Recommend'
-import QuestionPage from "./pages/QuestionPage";
-import ResultPage from "./pages/ResultPage";
 import Footer from "./components/Footer";
-import Terms from "./pages/Terms";
-import NotFound from "./pages/NotFound";
 import Info from "./pages/Info";
-import Unauthorized from "./pages/Unauthorized";
-import Register from "./pages/Register";
-import Login from "./pages/Login";
-import Mypage from "./pages/Mypage";
-import PointsHistory from "./pages/PointsHistory";
-import NotificationHistory from "./pages/NotificationHistory";
-import AdminPointsGrant from "./pages/AdminPointsGrant";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminCharts from "./pages/AdminCharts";
 import { usePageTracking } from "./hooks/usePageTracking";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
-import AdminIndex from "./pages/AdminIndex";
-import Mydecks from "./pages/Mydecks";
-import Noresults from "./pages/Noresults";
-import DatabasePage from "./pages/Database";
-import DeckDetail from "./pages/DeckDetail";
-import CardList from "./pages/CardList";
-import CardDetail from "./pages/CardDetail";
-import RecordGroups from "./pages/RecordGroups";
-import RecordGroupDetail from "./pages/RecordGroupDetail";
-import RecordGroupStatistics from "./pages/RecordGroupStatistics";
-import Tournaments from "./pages/Tournaments";
-import TournamentHub from "./pages/TournamentHub";
-import CreateTournament from "./pages/CreateTournament";
-import TournamentDetailPage from "./pages/TournamentDetail";
-import DeckScanner from "./pages/DeckScanner";
-import CardQuiz from "./pages/CardQuiz";
-import Playground from "./pages/Playground";
-import AllMenu from "./pages/AllMenu";
-import Tools from "./pages/Tools";
-import Solo from "./pages/Solo";
-import SoloDuchmind from "./pages/SoloDuchmind";
-import SoloDraw from "./pages/SoloDraw";
-import SoloDrawingDetail from "./pages/SoloDrawingDetail";
-import SoloTwenty from "./pages/SoloTwenty";
-import SkillNames from "./pages/SkillNames";
-import TierListMaker from "./pages/TierListMaker";
-import Multiplayer from "./pages/Multiplayer";
-import MultiplayerRoom from "./pages/MultiplayerRoom";
-import AdminCardIcons from "./pages/AdminCardIcons";
-import AdminBorders from "./pages/AdminBorders";
-import AdminEffectTags from "./pages/AdminEffectTags";
-import AdminCardGroups from "./pages/AdminCardGroups";
-import AdminScanLabels from "./pages/AdminScanLabels";
-import AdminDuchMindWords from "./pages/AdminDuchMindWords";
-import DuchMindWordPacks from "./pages/DuchMindWordPacks";
-import DuchMindWordPackDetail from "./pages/DuchMindWordPackDetail";
-import MyAvatar from "./pages/MyAvatar";
-import IconShop from "./pages/IconShop";
-import Changelog from "./pages/Changelog";
-import InquiryHome from "./pages/InquiryHome";
-import InquiryBoardPage from "./pages/InquiryBoardPage";
-import InquiryPostPage from "./pages/InquiryPostPage";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import EmailVerified from "./pages/EmailVerified";
-import Tracker from "./pages/Tracker";
 import NoticePopup from "./components/NoticePopup";
 import StaffInquiryAlert from "./components/StaffInquiryAlert";
 import TournamentNoticePopup from "./components/TournamentNoticePopup";
+
+// Every page but the home page is fetched when it is first opened (2026-10-12, 엘리스: the site was one 1.5 MB
+// bundle, so opening a card page also fetched the charts, the markdown editor, the tier list maker and the games).
+const Recommend = lazy(() => import("./pages/Recommend"));
+const QuestionPage = lazy(() => import("./pages/QuestionPage"));
+const ResultPage = lazy(() => import("./pages/ResultPage"));
+const Terms = lazy(() => import("./pages/Terms"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const Register = lazy(() => import("./pages/Register"));
+const Login = lazy(() => import("./pages/Login"));
+const Mypage = lazy(() => import("./pages/Mypage"));
+const PointsHistory = lazy(() => import("./pages/PointsHistory"));
+const NotificationHistory = lazy(() => import("./pages/NotificationHistory"));
+const AdminPointsGrant = lazy(() => import("./pages/AdminPointsGrant"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const AdminCharts = lazy(() => import("./pages/AdminCharts"));
+const AdminIndex = lazy(() => import("./pages/AdminIndex"));
+const Mydecks = lazy(() => import("./pages/Mydecks"));
+const Noresults = lazy(() => import("./pages/Noresults"));
+const DatabasePage = lazy(() => import("./pages/Database"));
+const DeckDetail = lazy(() => import("./pages/DeckDetail"));
+const CardList = lazy(() => import("./pages/CardList"));
+const CardDetail = lazy(() => import("./pages/CardDetail"));
+const RecordGroups = lazy(() => import("./pages/RecordGroups"));
+const RecordGroupDetail = lazy(() => import("./pages/RecordGroupDetail"));
+const RecordGroupStatistics = lazy(() => import("./pages/RecordGroupStatistics"));
+const Tournaments = lazy(() => import("./pages/Tournaments"));
+const TournamentHub = lazy(() => import("./pages/TournamentHub"));
+const CreateTournament = lazy(() => import("./pages/CreateTournament"));
+const TournamentDetailPage = lazy(() => import("./pages/TournamentDetail"));
+const DeckScanner = lazy(() => import("./pages/DeckScanner"));
+const CardQuiz = lazy(() => import("./pages/CardQuiz"));
+const Playground = lazy(() => import("./pages/Playground"));
+const AllMenu = lazy(() => import("./pages/AllMenu"));
+const Tools = lazy(() => import("./pages/Tools"));
+const Solo = lazy(() => import("./pages/Solo"));
+const SoloDuchmind = lazy(() => import("./pages/SoloDuchmind"));
+const SoloDraw = lazy(() => import("./pages/SoloDraw"));
+const SoloDrawingDetail = lazy(() => import("./pages/SoloDrawingDetail"));
+const SoloTwenty = lazy(() => import("./pages/SoloTwenty"));
+const SkillNames = lazy(() => import("./pages/SkillNames"));
+const TierListMaker = lazy(() => import("./pages/TierListMaker"));
+const Multiplayer = lazy(() => import("./pages/Multiplayer"));
+const MultiplayerRoom = lazy(() => import("./pages/MultiplayerRoom"));
+const AdminCardIcons = lazy(() => import("./pages/AdminCardIcons"));
+const AdminBorders = lazy(() => import("./pages/AdminBorders"));
+const AdminEffectTags = lazy(() => import("./pages/AdminEffectTags"));
+const AdminCardGroups = lazy(() => import("./pages/AdminCardGroups"));
+const AdminScanLabels = lazy(() => import("./pages/AdminScanLabels"));
+const AdminDuchMindWords = lazy(() => import("./pages/AdminDuchMindWords"));
+const DuchMindWordPacks = lazy(() => import("./pages/DuchMindWordPacks"));
+const DuchMindWordPackDetail = lazy(() => import("./pages/DuchMindWordPackDetail"));
+const MyAvatar = lazy(() => import("./pages/MyAvatar"));
+const IconShop = lazy(() => import("./pages/IconShop"));
+const Changelog = lazy(() => import("./pages/Changelog"));
+const InquiryHome = lazy(() => import("./pages/InquiryHome"));
+const InquiryBoardPage = lazy(() => import("./pages/InquiryBoardPage"));
+const InquiryPostPage = lazy(() => import("./pages/InquiryPostPage"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const EmailVerified = lazy(() => import("./pages/EmailVerified"));
+const Tracker = lazy(() => import("./pages/Tracker"));
+
+// Shown while a page's code arrives: keeps the footer below the fold, as the page will.
+const PAGE_FALLBACK = <div className="min-h-screen" />;
+
+// The book's pages most people open next, fetched once the browser is idle so going there needs no wait.
+function prefetchCommonPages() {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (conn?.saveData) return;
+  for (const load of [() => import("./pages/Database"), () => import("./pages/DeckDetail"), () => import("./pages/CardList"),
+                      () => import("./pages/CardDetail")]) {
+    load().catch(() => {});
+  }
+}
 
 function App() {
   const { pathname } = useLocation();
@@ -103,6 +119,11 @@ function App() {
   // Every move to another page eases the content in, like the tendency test (특이점 2026-10-11). It is an animation
   // on the box around the pages, not a remount, so the kept lists above and every page's state stay as they are;
   // query-only changes (?tab=, filters) don't count as a move.
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
+    idle(prefetchCommonPages);
+  }, []);
+
   const pageRef = useRef<HTMLDivElement>(null);
   const firstPage = useRef(true);
   useLayoutEffect(() => {
@@ -128,14 +149,19 @@ function App() {
       <div ref={pageRef}>
         {keepDeckList && (
           <div hidden={!onDeckList}>
-            <DatabasePage />
+            <Suspense fallback={onDeckList ? PAGE_FALLBACK : null}>
+              <DatabasePage />
+            </Suspense>
           </div>
         )}
         {keepCardList && (
           <div hidden={!onCardList}>
-            <CardList />
+            <Suspense fallback={onCardList ? PAGE_FALLBACK : null}>
+              <CardList />
+            </Suspense>
           </div>
         )}
+        <Suspense fallback={PAGE_FALLBACK}>
         <Routes>
             <Route path="/" element={<Info />} />
             <Route path="/recommend" element ={<Recommend />} />
@@ -205,6 +231,7 @@ function App() {
             <Route path="/inquiry/:board" element={<InquiryBoardPage />} />
             <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </div>
       {!inMultiplayerRoom && !drawingMode && <Footer />}
       {!drawingMode && <BottomTabBar />}

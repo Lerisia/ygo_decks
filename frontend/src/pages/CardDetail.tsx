@@ -1,12 +1,14 @@
-import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import BackToDex from "@/components/BackToDex";
 import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
-import CardFinishCanvas from "@/components/CardFinishCanvas";
-import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
-import { hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
+import { type CutinInfo, hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
 import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
+
+// The finishes' shaders and the summon player arrive when first used, not with the page (2026-10-12)
+const CardFinishCanvas = lazy(() => import("@/components/CardFinishCanvas"));
+const CutinOverlay = lazy(() => import("@/components/CutinOverlay"));
 
 // Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
 const ROYAL_RARITIES = new Set(["SR", "UR", ""]);   // "" for a print whose rarity is not known
@@ -265,7 +267,9 @@ function CardZoom({ src, alt, finish, params, onClose }: {
       {finish === "normal" ? (
         <img src={src} alt={alt} className="max-h-full max-w-full object-contain card-corner" />
       ) : (
-        <CardFinishCanvas faceUrl={src} style={finish} params={params} alt={alt} className="block aspect-[704/1024] w-[min(100%,704px,calc((100svh_-_2rem)*0.6875))] card-corner" />
+        <Suspense fallback={<img src={src} alt={alt} className="max-h-full max-w-full object-contain card-corner" />}>
+          <CardFinishCanvas faceUrl={src} style={finish} params={params} alt={alt} className="block aspect-[704/1024] w-[min(100%,704px,calc((100svh_-_2rem)*0.6875))] card-corner" />
+        </Suspense>
       )}
     </div>
   );
@@ -457,7 +461,9 @@ export default function CardDetail() {
                 {shown === "normal" ? (
                   <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain card-corner" />
                 ) : (
-                  <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024] card-corner" />
+                  <Suspense fallback={<img src={picked} alt={`${card.name} 카드`} className="w-full aspect-[704/1024] object-contain card-corner" />}>
+                    <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024] card-corner" />
+                  </Suspense>
                 )}
                 <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                   <ZoomGlyph />
@@ -553,7 +559,9 @@ export default function CardDetail() {
       <CardHistory key={card.id} history={card.history} />
 
       {cutin && (
-        <CutinOverlay id={cutin.id} info={cutin.info} attribute={card.cutin_sound} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />
+        <Suspense fallback={<div className="fixed inset-0 z-[60] bg-black/85" />}>
+          <CutinOverlay id={cutin.id} info={cutin.info} attribute={card.cutin_sound} sound={cutin.sound} alt={`${card.name} 소환 연출`} onClose={closeCutin} />
+        </Suspense>
       )}
       {zoomed && picked && (
         <CardZoom src={picked} alt={`${card.name} 카드`} finish={shown} params={finishParams} onClose={() => setZoomed(false)} />

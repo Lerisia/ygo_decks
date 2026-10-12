@@ -34,7 +34,9 @@ export default defineConfig({
         // browser always fetches the latest index (which references the new
         // hashed bundles) on every navigation — game pages get the latest
         // build without users needing to manually refresh.
-        globPatterns: ["**/*.{js,css,svg,woff2}"],
+        // Only what the first screen needs: a page's own code arrives when it is first opened (2026-10-12), and
+        // precaching every page would fetch the whole site in the background on a first visit.
+        globPatterns: ["assets/index-*.{js,css}", "assets/react-*.js", "**/*.{svg,woff2}"],
         // Take over open tabs immediately when a new SW is installed and
         // drop stale caches. Critical for fast iteration: a deploy reaches
         // every connected client within seconds.
@@ -95,12 +97,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // React itself in a chunk of its own, which changes far less often than the site. Only React: matching any
+        // package with "react" in its path pulled the markdown editor, CodeMirror and the rest into it (2026-10-12).
         manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("react")) return "react";
-            if (id.includes("lodash")) return "lodash";
-            if (id.includes("tailwindcss")) return "tailwind";
-          }
+          if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router)\//.test(id)) return "react";
         },
       },
     },

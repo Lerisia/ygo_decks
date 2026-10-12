@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
-import { StatRadar } from "@/components/charts";
-import SimpleMDE from "react-simplemde-editor";
-import "easymde/dist/easymde.min.css";
+import { LazyStatRadar } from "@/components/charts/LazyStatRadar";
 import * as Showdown from "showdown";
 import DeckNotesSection from "@/components/DeckNotesSection";
 import EngineBadge from "@/components/EngineBadge";
@@ -12,6 +10,8 @@ import DeckHyeolSection from "@/components/DeckHyeolSection";
 import BackToDex from "@/components/BackToDex";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import StatInfoButton from "@/components/StatInfoButton";
+
+const SimpleMDE = lazy(() => import("@/components/MarkdownEditor"));
 
 interface DeckStats {
   consistency: number;
@@ -207,9 +207,9 @@ export default function DeckDetail() {
           </tbody>
         </table>
 
-        <StatRadar stats={deck.stats} height={300} className="mt-4">
+        <LazyStatRadar stats={deck.stats} height={300} className="mt-4">
           <StatInfoButton className="absolute top-0 right-0 z-20" />
-        </StatRadar>
+        </LazyStatRadar>
         {canEdit && (
           <button
             type="button"
@@ -286,12 +286,14 @@ export default function DeckDetail() {
         {editing ? (
           <>
             {/* react-simplemde-editor로 마크다운 작성 */}
-            <SimpleMDE
-              value={wikiContent}
-              onChange={val => setWikiContent(val)}
-              // ✅ (2) options={mdeOptions}로 전달 (memoized)
-              options={mdeOptions}
-            />
+            <Suspense fallback={<div className="h-72 rounded border border-gray-300 dark:border-gray-600" />}>
+              <SimpleMDE
+                value={wikiContent}
+                onChange={val => setWikiContent(val)}
+                // ✅ (2) options={mdeOptions}로 전달 (memoized)
+                options={mdeOptions}
+              />
+            </Suspense>
 
             <div className="flex gap-4 mt-4">
               <button
