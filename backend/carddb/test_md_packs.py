@@ -230,6 +230,34 @@ class CampaignTest(TestCase):
         self.assertEqual(got, {52: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}, 70: {"spans": [], "source": "x"}})
 
 
+class MasterListTest(TestCase):
+    """The master pack holds what AppMedia's list of it holds (엘리스 2026-10-13: "appmedia를 따라갑시다"), besides what
+    MDM lists — MDM leaves out many cards the game put in it later."""
+
+    HTML = """<tr><td data-val1='S：Pリトルナイト' data-val2='x'>
+        <img src='https://appmedia.jp/wp-content/themes/appmedia/lib/yugioh/yugioh_md_img/ur.png'><a>S：Pリトルナイト</a></td></tr>
+        <tr><td data-val1='灰流うらら' data-val5='効果'>
+        <img src='https://appmedia.jp/x/yugioh_md_img/ur.png'><a>灰流うらら</a></td></tr>
+        <tr><td data-val1='知らないカード'><img src='https://appmedia.jp/x/yugioh_md_img/n.png'></td></tr>"""
+
+    def test_parse(self):
+        self.assertEqual(md_packs.parse_master_list(self.HTML),
+                         {"S：Pリトルナイト": "UR", "灰流うらら": "UR", "知らないカード": "N"})
+
+    def test_the_master_pack_takes_them(self):
+        knight = Card.objects.create(id=19188, category="monster", name_ja="Ｓ：Ｐリトルナイト", name_en="S:P Little Knight", frame="link")
+        MdPrint.objects.create(md_id=19188, card=knight, rarity="UR")
+        MdPrint.objects.create(md_id=22747, card=knight, is_alt_art=True, rarity="UR")
+        Card.objects.create(id=1, category="spell", name_ja="1", name_en="1", frame="spell")
+        MdPrint.objects.create(md_id=1, card_id=1, rarity="N")
+        master = md_packs.master_list_prints({"S：Pリトルナイト": "UR", "知らないカード": "N"})
+        self.assertEqual(master, {19188: "UR"})
+        md_packs.sync([mdm_set("m", "Master Pack", kind="Normal Pack"), mdm_set("s", "Secret")],
+                      [mdm_card(1, "N", "m"), mdm_card(19188, "UR", "s")], master=master)
+        self.assertEqual(sorted(MdPack.objects.get(mdm_id="m").cards.values_list("md_print_id", "rarity")), [(1, "N"), (19188, "UR")])
+        self.assertEqual(list(MdPack.objects.get(mdm_id="s").cards.values_list("md_print_id", flat=True)), [19188])
+
+
 class CommandTest(TestCase):
     def setUp(self):
         import shutil
@@ -241,10 +269,12 @@ class CommandTest(TestCase):
         Card.objects.create(id=1, category="spell", name_ja="1", name_en="1", frame="spell")
         MdPrint.objects.create(md_id=1, card_id=1, rarity="R")
         out = StringIO()
-        with override_settings(MD_PACK_MAP="/nonexistent/pack_map.json", MD_ALT_CAMPAIGNS=f"{self.dir}/campaigns.json"), \
+        with override_settings(MD_PACK_MAP="/nonexistent/pack_map.json", MD_ALT_CAMPAIGNS=f"{self.dir}/campaigns.json",
+                               MD_MASTER_LIST=f"{self.dir}/master.json"), \
              mock.patch.object(md_packs, "fetch_sets", return_value=[mdm_set("s1", "Pack")]), \
              mock.patch.object(md_packs, "fetch_cards", return_value=[mdm_card(1, "R", "s1")]), \
-             mock.patch.object(md_packs, "fetch_campaigns", return_value=[]):
+             mock.patch.object(md_packs, "fetch_campaigns", return_value=[]), \
+             mock.patch.object(md_packs, "fetch_master_list", return_value={}):
             call_command("import_md_packs", stdout=out)
         self.assertIn("md packs: 1 packs, 1 cards", out.getvalue())
         self.assertEqual(MdPackCard.objects.count(), 1)

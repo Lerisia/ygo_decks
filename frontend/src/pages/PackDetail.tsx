@@ -204,7 +204,7 @@ function VersionNote({ version }: { version: PackVersion }) {
   return (
     <section className="mt-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3" aria-label="판매 시기">
       <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 tabular-nums">{version.start} ~ {version.end} 판매분</p>
-      <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">이때는 아래 카드가 신규 일러스트·오버프레임으로 나왔습니다.</p>
+      <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">이때는 아래 카드가 다른 일러스트·오버프레임으로 나왔습니다.</p>
       <ul className="mt-2 flex gap-2 overflow-x-auto pb-1">
         {version.arts.map((c) => (
           <li key={c.print} className="shrink-0 w-16 sm:w-20">

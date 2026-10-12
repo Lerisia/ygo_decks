@@ -9,6 +9,7 @@ leaves out — takes that cover, and the card comes in it as that art (엘리스
 When the campaigns ran comes from Yugipedia (each Master Duel card page's alternate_art / extended_art): an art that
 came for a while in every pack holding the card makes, for each selection or secret pack on sale then, a version of
 that pack (MdPackVersion) beside its usual one; the master pack keeps its usual arts (엘리스 2026-10-13)."""
+import html
 import json
 import os
 import re
@@ -27,6 +28,8 @@ YUGIPEDIA = "https://yugipedia.com/api.php"
 ART_CATEGORIES = ("Category:Yu-Gi-Oh! Master Duel cards with alternate artworks",
                   "Category:Yu-Gi-Oh! Master Duel cards with extended artworks")
 LAUNCH = date(2022, 1, 19)
+APPMEDIA_MASTER = "https://appmedia.jp/master_duel/75590617"   # AppMedia's list of the master pack
+MASTER_LIST_DAYS = 6
 HEADERS = {"User-Agent": "YGODecks card book (+https://ygodecks.com)"}
 KST = timezone(timedelta(hours=9))
 PAGE = 500
@@ -197,6 +200,60 @@ def campaign_prints(entries, overframe=None):
     return out
 
 
+def parse_master_list(page):
+    """{Japanese name: rarity} from AppMedia's list of the master pack (a row a card: its name, then its rarity's
+    icon)."""
+    out = {}
+    for name, rarity in re.findall(r"<td data-val1='([^']*)'.*?yugioh_md_img/(ur|sr|r|n)\.png", page, re.S):
+        out.setdefault(html.unescape(name), rarity.upper())
+    return out
+
+
+def fetch_master_list(get=None):
+    get = get or requests.get
+    r = get(APPMEDIA_MASTER, timeout=120, headers=HEADERS)
+    r.raise_for_status()
+    return parse_master_list(r.text)
+
+
+def load_master_list(path, get=None):
+    """AppMedia's master pack list, kept at path and fetched again when the kept one is older than MASTER_LIST_DAYS;
+    the kept one when AppMedia cannot be reached or its page no longer reads as a list, {} when there is none."""
+    kept = None
+    if os.path.exists(path):
+        with open(path) as f:
+            kept = json.load(f)
+        if time.time() - os.path.getmtime(path) < MASTER_LIST_DAYS * 86400:
+            return kept
+    try:
+        names = fetch_master_list(get=get)
+    except requests.RequestException:
+        names = {}
+    if len(names) < 1000:   # a page that did not read as the list
+        return kept or {}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(names, f, ensure_ascii=False)
+    return names
+
+
+def master_list_prints(names):
+    """{print: rarity} for the master pack list's cards, by their Japanese names: each card's usual print."""
+    def key(name):
+        return re.sub(r"\s", "", unicodedata.normalize("NFKC", name or ""))
+
+    cards = {}
+    for cid, name in Card.objects.exclude(name_ja="").values_list("id", "name_ja"):
+        cards.setdefault(key(name), cid)
+    prints = {p.card_id: p for p in MdPrint.objects.filter(is_alt_art=False, card_id__in=set(cards.values()))}
+    out = {}
+    for name, rarity in names.items():
+        p = prints.get(cards.get(key(name)))
+        if p:
+            out[p.md_id] = p.rarity or rarity
+    return out
+
+
 def load_pack_map(source):
     """{MDM set id: {game_id, name_ko, cover, arts}} from the game's pack map (a dict or a file; {} when there is
     none): cover is its usual one (the first not showing an other art), arts its covers showing an other art,
@@ -228,9 +285,10 @@ def load_pack_map(source):
     return out
 
 
-def sync(sets, cards, pack_map=None, campaigns=None):
-    """Store MDM's packs and their cards, with what the game says of them (load_pack_map) and the versions campaigns
-    made of them (campaign_prints); a pack's cards follow the sources each time. A summary to report."""
+def sync(sets, cards, pack_map=None, campaigns=None, master=None):
+    """Store MDM's packs and their cards, with what the game says of them (load_pack_map), the versions campaigns
+    made of them (campaign_prints) and the master pack's cards MDM leaves out (master_list_prints); a pack's cards
+    follow the sources each time. A summary to report."""
     pack_map = pack_map or {}
     campaigns = campaigns or {}
     out = {"packs": 0, "cards": 0, "added": 0, "removed": 0, "changed": 0, "versions": 0, "unknown_prints": [],
@@ -263,6 +321,11 @@ def sync(sets, cards, pack_map=None, campaigns=None):
                 continue
             p = arts.get(id(c), base)
             wanted[sid][p.md_id] = (c.get("rarity") or p.rarity, o.get("amount") or 1)
+    for sid, (s, kind) in packs.items():   # the master pack as AppMedia lists it, besides what MDM lists
+        if kind == MdPack.Kind.NORMAL and s.get("name") == "Master Pack":
+            for pid, rarity in (master or {}).items():
+                wanted[sid].setdefault(pid, (rarity, 1))
+
     def base_of(sid, art):
         return next((pid for pid in wanted.get(sid, {}) if prints[pid].card_id == art.card_id and not prints[pid].is_alt_art),
                     None)

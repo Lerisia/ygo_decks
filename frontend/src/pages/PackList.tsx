@@ -106,7 +106,7 @@ export default function PackList() {
                 className={`h-8 px-3 rounded-full border text-xs sm:text-sm font-semibold transition ${special
                   ? "bg-blue-600 border-blue-600 text-white"
                   : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"}`}>
-          신규 일러·오버프레임 팩만
+          다른 일러·오버프레임 팩만
         </button>
       </div>
       {error ? (
@@ -123,7 +123,7 @@ export default function PackList() {
                       <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
                       {p.period && (
                         <span className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500/95 shadow">
-                          {p.arts.overframe && !p.arts.new_art ? "오버프레임" : "신규 일러"} {p.featured.length}
+                          {p.arts.overframe && !p.arts.new_art ? "오버프레임" : "다른 일러"} {p.featured.length}
                         </span>
                       )}
                     </span>
@@ -139,7 +139,7 @@ export default function PackList() {
                       </span>
                     ) : special ? (
                       <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 truncate">
-                        {[p.arts.new_art && `신규 일러 ${p.arts.new_art}`, p.arts.overframe && `오버프레임 ${p.arts.overframe}`].filter(Boolean).join(" · ")}
+                        {[p.arts.new_art && `다른 일러 ${p.arts.new_art}`, p.arts.overframe && `오버프레임 ${p.arts.overframe}`].filter(Boolean).join(" · ")}
                       </span>
                     ) : (
                       <span className="block text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">{p.released ?? ""}</span>
