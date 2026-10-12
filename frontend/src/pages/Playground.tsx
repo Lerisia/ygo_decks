@@ -21,7 +21,7 @@ type Tile = {
 const tiles: Tile[] = [
   { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "친구들과 함께 즐기는 다양한 미니게임", rewardBadge: true },
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞히기", rewardBadge: true },
-  { to: "/solo-duchmind", icon: "🎨", title: "솔로 듀치마인드", desc: "그리고, 맞히고", rewardBadge: true },
+  { to: "/solo-duchmind", icon: "🎨", title: "듀치마인드", desc: "그리고, 맞히고", rewardBadge: true },
   { to: "/solo-twenty", icon: "🧩", title: "딱무고개", desc: "20개 질문으로 카드 맞히기", rewardBadge: true },
   { to: "/skill-names", icon: "⌨️", title: "스킬 릴레이", desc: "롤 스킬 이름을 아는 대로 입력하기", beta: true },
   { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", beta: true, adminOnly: true },

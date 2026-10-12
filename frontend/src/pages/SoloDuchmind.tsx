@@ -313,7 +313,7 @@ export default function SoloDuchmind() {
         </button>
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-xl sm:text-2xl font-bold">
-            솔로 듀치마인드
+            듀치마인드
           </h1>
           {isLoggedIn ? (
             <button
