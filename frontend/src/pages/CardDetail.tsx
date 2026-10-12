@@ -59,17 +59,21 @@ function TextBlock({ t, pendulum }: { t: CardTexts; pendulum: boolean }) {
 // The card in a box of its frame's colour with Master Duel's icons, as 나무위키 lays a card out (엘리스 2026-10-12): the
 // names on top, the card small beside its stats and the effect text right under them, so a phone shows the card and
 // what it does together (10/11); a tap shows the card large. Wider screens keep the card in its own column, the stats
-// in one line. A pendulum's box turns green where its pendulum effect begins, as the card does.
+// in one line. The pale panels hold the card too: on a phone the card and its stats share one (엘리스 10/12). A
+// pendulum's box turns green where its pendulum effect begins, as the card does.
 const BOX = "grid grid-cols-[40%_1fr] gap-1.5 p-1.5 rounded-xl dark:ring-1 dark:ring-white/10 md:grid-cols-[20rem_1fr] md:grid-rows-[auto_auto_1fr] md:gap-x-2";
 const AREA = {
   head: "col-span-2 col-start-1 row-start-1 md:col-span-1 md:col-start-2 px-1.5 pt-1 pb-0.5",
-  card: "col-start-1 row-start-2 md:row-start-1 md:row-span-3",
+  card: "col-start-1 row-start-2 p-1.5 md:row-start-1 md:row-span-3",
   stats: "col-start-2 row-start-2 self-start md:self-auto",
   effect: "col-span-2 col-start-1 row-start-3 md:col-span-1 md:col-start-2",
   lower: "col-span-2 col-start-1 row-start-3 -mx-1.5 -mb-1.5 -mt-[3px] rounded-b-xl",
+  pair: "col-span-2 col-start-1 row-start-2 md:hidden",   // a phone's one panel under the card and its stats
 };
 const PANEL = "rounded-lg bg-gray-200 dark:bg-gray-800";
 const PANEL_ON_WHITE = "rounded-lg bg-white dark:bg-gray-800";   // a synchro's frame is as pale as the usual panel
+const PANEL_WIDE = "md:rounded-lg md:bg-gray-200 md:dark:bg-gray-800";   // panels of their own on wider screens only
+const PANEL_WIDE_ON_WHITE = "md:rounded-lg md:bg-white md:dark:bg-gray-800";
 const ROW = "border-b last:border-b-0 border-gray-300 dark:border-gray-600";
 // Master Duel's frame colours, taken from its card frames so that the box matches the card in it
 const FRAME_COLORS: Record<string, string> = {
@@ -118,11 +122,12 @@ function Skeleton() {
           <p className="mt-0.5 text-sm leading-5"><span className={`inline-block align-middle h-3.5 w-1/2 ${bar}`} /></p>
           <p className="text-sm leading-5"><span className={`inline-block align-middle h-3.5 w-1/3 ${bar}`} /></p>
         </div>
-        <div className={AREA.card}>
-          <div className={`w-full aspect-[704/1024] ${bar}`} />
-          {finishSupported() && <div className={`mt-2 h-7 md:h-8 w-full ${bar}`} />}
+        <div className={`${AREA.pair} ${bar}`} />
+        <div className={`${AREA.card} md:rounded-lg md:bg-gray-300 md:dark:bg-gray-600`}>
+          <div className="w-full aspect-[704/1024] rounded bg-gray-400/40 dark:bg-gray-500/50" />
+          {finishSupported() && <div className="mt-2 h-7 md:h-8 w-full rounded-lg bg-gray-400/40 dark:bg-gray-500/50" />}
         </div>
-        <div className={`${AREA.stats} h-32 md:h-10 ${bar}`} />
+        <div className={`${AREA.stats} h-32 md:h-10 md:rounded-lg md:bg-gray-300 md:dark:bg-gray-600`} />
         <div className={`${AREA.effect} h-32 ${bar}`} />
       </div>
       <div className={`mt-3 h-10 w-full ${bar}`} />
@@ -233,7 +238,8 @@ export default function CardDetail() {
     ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame, name: pickedFace?.name_mask ?? null,
   };
   // the print picked decides: an N / R card's UR 오버프레임 comes in 로얄, the card itself does not
-  const finishes = FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
+  // a token comes in neither 샤인 nor 로얄 (엘리스 10/12)
+  const finishes = card.frame === "token" ? [] : FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
   const shown = finishes.some((f) => f.key === finish) ? finish : "normal";
   const levelName = (card.level_label || "").split(" ")[0];
   // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
@@ -252,7 +258,7 @@ export default function CardDetail() {
   };
   const base = card.frame.replace("_pendulum", "");
   const frameColor = FRAME_COLORS[base] ?? FRAME_COLORS.effect;
-  const panel = base === "synchro" ? PANEL_ON_WHITE : PANEL;
+  const [panel, panelWide] = base === "synchro" ? [PANEL_ON_WHITE, PANEL_WIDE_ON_WHITE] : [PANEL, PANEL_WIDE];
   const rarity = pickedFace?.rarity || card.rarity;
   const left: ReactNode[] = [], right: ReactNode[] = [];
   if (card.category === "monster") {
@@ -344,7 +350,8 @@ export default function CardDetail() {
           {card.name_en && <p lang="en" className="text-sm leading-5 opacity-90">{card.name_en}</p>}
         </div>
 
-        <div className={AREA.card}>
+        <div className={`${AREA.pair} ${panel}`} />
+        <div className={`${AREA.card} ${panelWide}`}>
           {picked ? (
             <div className="relative">
               <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
@@ -373,8 +380,8 @@ export default function CardDetail() {
           ) : (
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
-          {picked && canFinish && (
-            <div role="radiogroup" aria-label="가공" className={`mt-2 grid ${finishes.length === 3 ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold`}>
+          {picked && canFinish && finishes.length > 1 && (
+            <div role="radiogroup" aria-label="가공" className={`mt-2 grid ${finishes.length === 3 ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-300 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold`}>
               {finishes.map((f) => (
                 <button
                   key={f.key}
@@ -408,7 +415,7 @@ export default function CardDetail() {
           )}
         </div>
 
-        <div className={`${AREA.stats} ${panel} px-2 py-2 md:px-3 md:py-1.5 flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}>
+        <div className={`${AREA.stats} ${panelWide} px-2 py-2 md:px-3 md:py-1.5 flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 text-sm md:text-base`}>
           <StatGroup items={left} />
           {right.length > 0 && <StatGroup items={right} />}
         </div>
