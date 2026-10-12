@@ -55,7 +55,7 @@ def choseong(s):
 
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
-                 "groups", "supports", "as_cards", "alt", "cutin", "rarity", "type_key")
+                 "groups", "supports", "as_cards", "alt", "cutin", "rarity", "type_key", "number", "atk", "def_")
 
 
 # 몬마함순, Master Duel's 디폴트 순 (엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
@@ -66,9 +66,22 @@ TYPE_ORDER = {kind: i for i, kind in enumerate(
      "synchro", "synchro_pendulum", "xyz", "xyz_pendulum", "link"]
     + [f"spell:{k}" for k in ("normal", "quick_play", "continuous", "equip", "field", "ritual")]
     + [f"trap:{k}" for k in ("normal", "continuous", "counter")] + ["token"])}
-SORTS = ("new", "name", "type")
+RARITY_ORDER = {"N": 0, "R": 1, "SR": 2, "UR": 3}
+# Master Duel's sorts (엘리스 10/12), each either way: the value, and whether high to low turns the whole order round
+# (newest, name, 기본순) or only the value, equal cards keeping the 기본순 (rarity, level / rank / link, ATK, DEF).
+# Cards without the value (None: a spell's level, a link's DEF) come last, in the 기본순.
+SORTS = {
+    "type": (lambda r: r.type_key, True),
+    "new": (lambda r: None if r.released is None else (r.released, r.id), True),
+    "name": (lambda r: (r.name, r.id), True),
+    "rarity": (lambda r: RARITY_ORDER.get(r.rarity), False),
+    "level": (lambda r: r.number, False),
+    "atk": (lambda r: r.atk, False),
+    "def": (lambda r: r.def_, False),
+}
+HIGH_FIRST = {"new"}   # the way a sort goes when none is asked: the newest first, the rest low to high
 
-_index = {"key": None, "at": 0.0, "new": [], "name": [], "type": [], "face_thumbs": set(), "thumbs": set()}
+_index = {"key": None, "at": 0.0, "type": [], "orders": {}, "face_thumbs": set(), "thumbs": set()}
 INDEX_MAX_AGE = 600   # seconds; also rebuilt then, for edits the fingerprint can't see (a bare QuerySet.update)
 
 
@@ -118,9 +131,9 @@ def _card_index():
     cutin_cards = {alt_of.get(md_id, md_id) for md_id in _cutins()}
     rows = []
     for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
-         st) in Card.objects.filter(has_art()).values_list(
+         st, atk, def_value) in Card.objects.filter(has_art()).values_list(
             "id", "name_ko", "name_ja", "name_en", "ocg_date", "tcg_date", "kr_date", "category", "frame", "attribute",
-            "race", "level", "rank", "link_rating", "spell_trap_subtype"):
+            "race", "level", "rank", "link_rating", "spell_trap_subtype", "atk", "def_value"):
         r = _Row()
         r.id, r.name = cid, ko or ja or en
         r.norms = [_norm(n) for n in (ko, ja, en) if n]
@@ -137,15 +150,29 @@ def _card_index():
         kind = frame if category == "monster" else f"{category}:{st}"
         number = rank if frame.startswith("xyz") else link if frame == "link" else level
         r.type_key = (TYPE_ORDER.get(kind, len(TYPE_ORDER)), number or 0, cid)
+        monster = category == "monster"
+        r.number, r.atk, r.def_ = (number, atk, def_value) if monster else (None, None, None)
         rows.append(r)
     _index.update(
         key=key, at=time.monotonic(),
-        new=sorted(rows, key=lambda r: (r.released is None, -(r.released or 0), -r.id)),
-        name=sorted(rows, key=lambda r: (r.name, r.id)),
-        type=sorted(rows, key=lambda r: r.type_key),
+        type=sorted(rows, key=lambda r: r.type_key), orders={},
         face_thumbs=_files(FACE_THUMB_DIR), thumbs=_files(CARD_THUMB_DIR),
     )
     return _index
+
+
+def _ordered(index, sort, high_first):
+    """Every card in a sort, either way; made once per index."""
+    if (sort, high_first) not in index["orders"]:
+        value, whole = SORTS[sort]
+        have = [r for r in index["type"] if value(r) is not None]
+        missing = [r for r in index["type"] if value(r) is None]
+        # Python's sort is stable either way round: equal values keep the 기본순 they come in
+        have.sort(key=value, reverse=high_first)
+        if whole and high_first:
+            missing.reverse()
+        index["orders"][sort, high_first] = have + missing
+    return index["orders"][sort, high_first]
 
 
 def _keep(p):
@@ -211,14 +238,17 @@ def _rank(rows, query):
 @permission_classes([AllowAny])
 def cards(request):
     """Card list: filters, then search (exact → prefix → substring over Korean/Japanese/English names, or 초성), in
-    the chosen order (new = latest first by the day the card came to Master Duel, else its first paper release; name;
-    or type, 몬마함순)."""
+    the chosen order (SORTS: new = by the day the card came to Master Duel, else its first paper release; name;
+    type = 기본순; rarity, level, atk, def), low to high or high to low (dir)."""
     p = request.query_params
     index = _card_index()
 
     def found(params):
         keep = _keep(params)
-        rows = [r for r in index[params.get("sort") if params.get("sort") in SORTS else "new"] if keep(r)]
+        sort = params.get("sort") if params.get("sort") in SORTS else "new"
+        way = params.get("dir")
+        high_first = way == "desc" if way in ("asc", "desc") else sort in HIGH_FIRST
+        rows = [r for r in _ordered(index, sort, high_first) if keep(r)]
         return _rank(rows, params.get("q")) if _norm(params.get("q")) else rows
 
     rows = found(p)

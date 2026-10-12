@@ -887,6 +887,26 @@ class CardDexApiTest(TestCase):
                   atk=None, def_value=None, spell_trap_subtype="normal")
         self.assertEqual(self.ids(sort="type"), [1, 2, 9, 3, 5, 12, 6, 4, 11, 10])
 
+    def test_master_duel_sorts_either_way(self):
+        # every sort of Master Duel's card list, low to high or high to low (엘리스 10/12): equal cards keep the
+        # 기본순, cards without the value (a spell's level, a link's DEF) come last
+        for md_id, rarity in ((1, "N"), (2, "UR"), (3, "R"), (4, "UR"), (5, "N"), (6, "SR")):
+            MdPrint.objects.filter(md_id=md_id).update(rarity=rarity)
+        expect = {
+            ("type", "asc"): [1, 2, 3, 5, 6, 4], ("type", "desc"): [4, 6, 5, 3, 2, 1],
+            ("new", "desc"): [4, 6, 5, 3, 2, 1], ("new", "asc"): [1, 2, 3, 5, 6, 4],
+            ("name", "asc"): [6, 1, 3, 4, 5, 2], ("name", "desc"): [2, 5, 4, 3, 1, 6],
+            ("rarity", "asc"): [1, 5, 3, 6, 2, 4], ("rarity", "desc"): [2, 4, 6, 3, 1, 5],
+            ("level", "asc"): [6, 5, 3, 1, 2, 4], ("level", "desc"): [2, 1, 3, 5, 6, 4],
+            ("atk", "asc"): [5, 6, 3, 1, 2, 4], ("atk", "desc"): [2, 1, 3, 5, 6, 4],
+            ("def", "asc"): [5, 3, 1, 2, 6, 4], ("def", "desc"): [2, 1, 3, 5, 6, 4],
+        }
+        for (sort, way), ids in expect.items():
+            self.assertEqual(self.ids(sort=sort, dir=way), ids, (sort, way))
+        # each sort's own way when none is asked: the newest first, the rest low to high
+        self.assertEqual(self.ids(sort="new"), expect["new", "desc"])
+        self.assertEqual(self.ids(sort="rarity"), expect["rarity", "asc"])
+
     def test_list_gives_the_rarity(self):
         MdPrint.objects.filter(md_id=2).update(rarity="UR")
         rarity = {r["id"]: r["rarity"] for r in self.get()["results"]}

@@ -23,12 +23,17 @@ export type CardFilters = {
   /** "alt": cards with another art (다른 일러스트), "cutin": cards with a monster cut-in. */
   has: string;
   sort: string;
+  /** "asc" low to high, "desc" high to low; "" the sort's own way (the newest first, the rest low to high). */
+  dir: string;
 };
 
 export const EMPTY_FILTERS: CardFilters = {
   q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", has: "",
-  sort: "new",
+  sort: "new", dir: "",
 };
+
+/** The way a sort goes when none is chosen. */
+export const sortDir = (f: CardFilters) => f.dir || (f.sort === "new" ? "desc" : "asc");
 
 export type CardListItem = {
   id: number;

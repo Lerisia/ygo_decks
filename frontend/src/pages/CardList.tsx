@@ -6,15 +6,21 @@ import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import {
   type CardFilters, type CardListItem, type CardOptions,
-  EMPTY_FILTERS, filtersToSearch, getCardOptions, listCards, searchToFilters,
+  EMPTY_FILTERS, filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
 } from "@/api/cardDexApi";
 
 const SELECT = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm disabled:opacity-50";
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
+// Master Duel's sorts, each either way (엘리스 10/12); 기본순 is its 디폴트 순: each monster frame before its pendulum,
+// low levels first, then spells and traps
 const SORTS = [
   { value: "new", label: "최신 카드순" },
+  { value: "type", label: "기본순" },
   { value: "name", label: "이름순" },
-  { value: "type", label: "몬마함순" },
+  { value: "rarity", label: "레어리티" },
+  { value: "level", label: "레벨 / 랭크 / 링크" },
+  { value: "atk", label: "공격력" },
+  { value: "def", label: "수비력" },
 ];
 
 const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -215,14 +221,26 @@ export default function CardList() {
         >
           {filterOpen ? "필터 숨기기 ▲" : "필터 보기 ▼"}
         </button>
-        <select
-          aria-label="정렬"
-          value={filters.sort}
-          onChange={(e) => update({ sort: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
-        >
-          {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+        {/* the sort and its way, joined as Master Duel shows them */}
+        <div className="flex items-stretch">
+          <select
+            aria-label="정렬"
+            value={filters.sort}
+            onChange={(e) => update({ sort: e.target.value, dir: "" })}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
+          >
+            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => update({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
+            aria-label={sortDir(filters) === "asc" ? "오름차순 (누르면 내림차순)" : "내림차순 (누르면 오름차순)"}
+            title={sortDir(filters) === "asc" ? "오름차순" : "내림차순"}
+            className="w-10 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg bg-white text-black dark:bg-gray-800 dark:text-white text-base font-bold"
+          >
+            {sortDir(filters) === "asc" ? "↑" : "↓"}
+          </button>
+        </div>
       </div>
 
       {filterOpen && (
