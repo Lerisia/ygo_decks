@@ -47,6 +47,10 @@ function load(name: string) {
 export function unlockPackSound() {
   if (!soundOn()) return;
   try {
+    // an iPhone keeps a page's Web Audio quiet in silent mode unless the page asks to play as media does — as the
+    // 소환 연출's sounds (an Audio element) already play (엘리스 10/13: "소리 왜 안 나지")
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session && session.type !== "playback") session.type = "playback";
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!ctx || ctx.state === "closed") {
       ctx = new Ctx();
