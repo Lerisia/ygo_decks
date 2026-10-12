@@ -1,5 +1,7 @@
 """금제 (Forbidden & Limited lists), every one since a game began (엘리스 2026-10-12): read from Yugipedia, whose page
-for each list holds the whole list ("name; status[; status before]"), linked to the card DB by English name.
+for each list holds the whole list, linked to the card DB by English name. Master Duel's pages write each card as
+"name; status[; status before]"; the OCG's and TCG's write one section a status, a changed card noting its status
+before ("name // prev::Limited").
 
 A card's status on a day is the last list's on or before it, unlimited when that list leaves it out, and 미출시 while
 the card was not yet out in that game (Master Duel: the day its print came, MdPrint.first_seen).
@@ -21,11 +23,16 @@ API = "https://yugipedia.com/api.php"
 USER_AGENT = "ygodecks.com banlist import (contact: rlawodus96@gmail.com)"
 
 # per format: the first list (the rest are found by each page's "next") and the game its pages must be about
-FIRST = {Banlist.Format.MD: "January 2022 Lists (Master Duel)"}
-MEDIUM = {Banlist.Format.MD: "Yu-Gi-Oh! Master Duel"}
+FIRST = {Banlist.Format.MD: "January 2022 Lists (Master Duel)", Banlist.Format.OCG: "August 1999 Lists",
+         Banlist.Format.TCG: "May 2002 Lists (TCG)"}
+MEDIUM = {Banlist.Format.MD: "Yu-Gi-Oh! Master Duel", Banlist.Format.OCG: "OCG", Banlist.Format.TCG: "TCG"}
 
 WORDS = {"Forbidden": BanStatus.FORBIDDEN, "Limited": BanStatus.LIMITED, "Semi-Limited": BanStatus.SEMI_LIMITED,
-         "Unlimited": BanStatus.UNLIMITED, "Did not exist": BanStatus.UNRELEASED}
+         "Unlimited": BanStatus.UNLIMITED, "Did not exist": BanStatus.UNRELEASED,
+         "Not yet released": BanStatus.UNRELEASED}
+# an OCG / TCG page's sections; off the list is unlimited again
+SECTIONS = {"forbidden": BanStatus.FORBIDDEN, "limited": BanStatus.LIMITED, "semi_limited": BanStatus.SEMI_LIMITED,
+            "no_longer_on_list": BanStatus.UNLIMITED}
 
 Page = namedtuple("Page", "effective medium prev next entries")
 
@@ -48,8 +55,40 @@ def title(link):
     return link.replace("_", " ").strip()
 
 
+def _word(word, line):
+    if word not in WORDS:
+        raise ValueError(f"unknown status in {line!r}")
+    return WORDS[word]
+
+
+def _day(text):
+    return datetime.strptime(text.rstrip("."), "%B %d, %Y").date()
+
+
+def _parse_paper(body):
+    """An OCG / TCG {{Limitation list}}: the sections as they come, each card's status before from its note."""
+    entries, status = [], None
+    for line in body.splitlines():
+        head = re.match(r"^\|\s*([\w-]+)\s*=[ \t]*(.*)$", line)
+        if head:
+            status = SECTIONS.get(head.group(1))
+            continue
+        name, _, note = line.partition("//")
+        name = name.split("|")[0]   # a link's shown text ("Allure of Darkness|sc") is no part of the name
+        if status is None or not name.strip():
+            continue
+        before = re.search(r"prev::([^;]+)", note)
+        entries.append((name.strip(), status, _word(before.group(1).strip(), line) if before else ""))
+    return entries
+
+
 def parse_page(text):
     """A list page: its day, game, neighbours and [(name, status, status before or "")]."""
+    paper = re.search(r"\{\{Limitation list\n(.*?)\n\}\}", text, re.S)
+    if paper:
+        body = paper.group(1)
+        return Page(_day(_field(body, "start_date")), _field(body, "medium"), title(_field(body, "prev")),
+                    title(_field(body, "next")), _parse_paper(body))
     m = re.search(r"\|\s*cards\s*=(.*?)\n\}\}", text, re.S)
     entries = []
     for line in (m.group(1) if m else "").splitlines():
@@ -59,18 +98,18 @@ def parse_page(text):
         if len(parts) not in (2, 3) or any(p not in WORDS for p in parts[1:]):
             raise ValueError(f"unknown status line: {line!r}")
         entries.append((parts[0], WORDS[parts[1]], WORDS[parts[2]] if len(parts) == 3 else ""))
-    effective = datetime.strptime(_field(text, "effective_date"), "%B %d, %Y").date()
+    effective = _day(_field(text, "effective_date"))
     return Page(effective, _field(text, "medium"), title(_field(text, "prev")), title(_field(text, "next")), entries)
 
 
 def name_key(name, brackets=False):
     """A name to match on: letters and digits alone, case and width folded. Our English names carry a note on some
-    cards ("(Updated from: …)"), and lost the bracketed letter on others (Maliss <P> Dormouse): with `brackets`
-    that part is left out too."""
+    cards ("(Updated from: …)"), and lost the bracketed letter on others (Maliss <P> Dormouse, which the OCG / TCG
+    pages write "Maliss P Dormouse"): with `brackets` that part, or a lone letter, is left out too."""
     name = unicodedata.normalize("NFKC", name)
     name = re.sub(r"\s*\(Updated from:[^)]*\)", "", name)
     if brackets:
-        name = re.sub(r"<[^>]*>", "", name)
+        name = re.sub(r"<[^>]*>|\b[A-Za-z]\b", "", name)
     return re.sub(r"[^0-9a-z]+", "", name.casefold())
 
 
@@ -123,12 +162,45 @@ def _lists(card, fmt):
                 .prefetch_related(Prefetch("entries", queryset=BanlistEntry.objects.filter(card=card))))
 
 
+def _known(card, fmt):
+    """The game's lists (newest first, with this card's entries) and the day the card came out there; a card on any
+    list was out though the card DB lacks its day (190 cards have no OCG day)."""
+    released, lists = released_on(card, fmt), _lists(card, fmt)
+    if released is None and any(b.entries.all() for b in lists):
+        released = True
+    return released, lists
+
+
 def status_on(card, day, fmt=Banlist.Format.MD):
     """A card's status on a day."""
-    return _status(card, day, fmt, released_on(card, fmt), _lists(card, fmt))
+    released, lists = _known(card, fmt)
+    return _status(card, day, fmt, released, lists)
 
 
 def history(card, fmt=Banlist.Format.MD):
     """[(list day, status)] for every list of the game, oldest first."""
-    released, lists = released_on(card, fmt), _lists(card, fmt)
+    released, lists = _known(card, fmt)
     return [(b.effective, _status(card, b.effective, fmt, released, lists)) for b in reversed(lists)]
+
+
+def runs(card, fmt=Banlist.Format.MD):
+    """[(day, status)] each time the card's status changed, oldest first: on a list's day, or on the day the card
+    came out between two lists (it is 미출시 until then, not until the next list)."""
+    released, lists = _known(card, fmt)
+    days = {b.effective for b in lists}
+    if released not in (None, True) and lists and released > lists[-1].effective:
+        days.add(released)
+    out = []
+    for day in sorted(days):
+        status = _status(card, day, fmt, released, lists)
+        if not out or out[-1][1] != status:
+            out.append((day, status))
+    return out
+
+
+def card_banlists(card):
+    """The card page's 금제 history: each game with lists stored, its runs."""
+    have = set(Banlist.objects.values_list("format", flat=True).distinct())
+    return [{"format": fmt.value, "label": fmt.label,
+             "runs": [{"from": day.isoformat(), "status": str(status)} for day, status in runs(card, fmt)]}
+            for fmt in Banlist.Format if fmt in have]

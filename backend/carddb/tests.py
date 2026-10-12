@@ -1061,6 +1061,7 @@ class CardDexApiTest(TestCase):
         self.assertEqual([d["name"] for d in body["decks"]], ["블랙 매지션"])
         self.assertEqual(body["rarity"], "SR")
         self.assertEqual((body["face_url"], body["faces"]), (None, []))   # not drawn yet
+        self.assertEqual(body["banlists"], [])   # no 금제 lists stored here
         link = self.client.get("/api/carddb/cards/6/").json()
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()

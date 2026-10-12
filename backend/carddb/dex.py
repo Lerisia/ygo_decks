@@ -14,6 +14,7 @@ from rest_framework.response import Response
 
 from PIL import Image
 
+from . import banlist
 from .display import THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
 from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
@@ -538,4 +539,6 @@ def card(request, card_id):
         # how many cards its own support list holds (itself included), or 0 when no other card names it
         "supporters": (lambda n: n + 1 if n else 0)(len(supporters)),
         "decks": decks,
+        # each game's 금제 over time (엘리스 10/12)
+        "banlists": banlist.card_banlists(c),
     })

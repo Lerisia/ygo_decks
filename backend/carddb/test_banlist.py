@@ -59,6 +59,48 @@ class ParsePageTest(SimpleTestCase):
             banlist.parse_page(page("October 6, 2026", cards=["Some Card; Limited 2"]))
 
 
+class ParsePaperPageTest(SimpleTestCase):
+    """OCG and TCG pages: one section a status, each card's line noting its status before when it changed."""
+
+    PAGE = """These are the lists in effect since April 1, 2021.
+
+{{Limitation list
+| start_date   = April 1, 2021.
+| end_date     = June 30, 2021
+| medium       = OCG
+| prev         = February_2021 Lists
+| next         = July 2021 Lists (OCG)
+| forbidden    =
+Amazoness Archer
+Allure of Darkness|sc
+Tempest Magician // prev::Unlimited
+| limited      =
+Card of Demise // prev::Not yet released; force-SMW
+| semi_limited =
+Pot of Desires // prev::Limited; prev-note:: (in Korea)
+| no_longer_on_list =
+Pot of Greed // prev::Forbidden
+}}
+"""
+
+    def test_page(self):
+        p = banlist.parse_page(self.PAGE)
+        self.assertEqual((p.effective, p.medium, p.prev, p.next),
+                         (date(2021, 4, 1), "OCG", "February 2021 Lists", "July 2021 Lists (OCG)"))
+        self.assertEqual(p.entries, [
+            ("Amazoness Archer", BanStatus.FORBIDDEN, ""),
+            ("Allure of Darkness", BanStatus.FORBIDDEN, ""),   # a link's shown text, |sc, is no part of the name
+            ("Tempest Magician", BanStatus.FORBIDDEN, BanStatus.UNLIMITED),
+            ("Card of Demise", BanStatus.LIMITED, BanStatus.UNRELEASED),   # "not yet released": 미출시 before
+            ("Pot of Desires", BanStatus.SEMI_LIMITED, BanStatus.LIMITED),
+            ("Pot of Greed", BanStatus.UNLIMITED, BanStatus.FORBIDDEN),     # off the list: unlimited again
+        ])
+
+    def test_unknown_status_before_is_an_error(self):
+        with self.assertRaises(ValueError):
+            banlist.parse_page(self.PAGE.replace("prev::Limited;", "prev::Limited 2;"))
+
+
 class MatchTest(TestCase):
     def setUp(self):
         for cid, en in ((1, "Pot of Desires"), (2, "Amazoness Archer (Updated from: Amazon Archer)"),
@@ -73,6 +115,7 @@ class MatchTest(TestCase):
         self.assertEqual(self.index.match("Amazoness Archer"), 2)
         self.assertEqual(self.index.match("Maliss ＜P＞ Dormouse"), 3)
         self.assertEqual(self.index.match("Maliss <P> White Rabbit"), 4)
+        self.assertEqual(self.index.match("Maliss P Dormouse"), 3)   # the OCG / TCG pages write the letter bare
         self.assertIsNone(self.index.match("Card That Is Not Here"))
 
 
@@ -192,3 +235,44 @@ class StatusOnTest(TestCase):
                                                      (date(2022, 5, 9), BanStatus.SEMI_LIMITED)])
         self.assertEqual(banlist.history(self.old), [(date(2022, 1, 19), BanStatus.FORBIDDEN),
                                                      (date(2022, 5, 9), BanStatus.LIMITED)])
+
+
+class RunsTest(TestCase):
+    """A card's 금제 as runs, each from the day it began: what the card page shows for each game."""
+
+    def setUp(self):
+        self.jan = Banlist.objects.create(format="md", effective=date(2022, 1, 19))
+        self.may = Banlist.objects.create(format="md", effective=date(2022, 5, 9))
+        self.ocg = Banlist.objects.create(format="ocg", effective=date(2020, 1, 1))
+
+    def card(self, cid, md_day=None, **dates):
+        c = Card.objects.create(id=cid, category="spell", name_ja=str(cid), name_en=str(cid), frame="spell", **dates)
+        if md_day:
+            MdPrint.objects.create(md_id=cid, card=c, first_seen=md_day)
+        return c
+
+    def test_runs(self):
+        old = self.card(1, date(2022, 1, 19))
+        BanlistEntry.objects.create(banlist=self.jan, card=old, name="1", status="forbidden")
+        BanlistEntry.objects.create(banlist=self.may, card=old, name="1", status="forbidden")
+        self.assertEqual(banlist.runs(old), [(date(2022, 1, 19), BanStatus.FORBIDDEN)])   # one run, however many lists
+        # out between two lists: 미출시 until the day it came, not until the next list
+        mid = self.card(2, date(2022, 3, 1))
+        self.assertEqual(banlist.runs(mid), [(date(2022, 1, 19), BanStatus.UNRELEASED), (date(2022, 3, 1), BanStatus.UNLIMITED)])
+
+    def test_a_listed_card_without_its_day_was_out(self):
+        # no OCG day in the card DB, but on an OCG list: it was out, not 미출시
+        c = self.card(3, ocg_date=None)
+        BanlistEntry.objects.create(banlist=self.ocg, card=c, name="3", status="limited")
+        self.assertEqual(banlist.runs(c, "ocg"), [(date(2020, 1, 1), BanStatus.LIMITED)])
+        self.assertEqual(banlist.runs(self.card(4), "ocg"), [(date(2020, 1, 1), BanStatus.UNRELEASED)])   # never out there
+
+    def test_card_page(self):
+        c = self.card(5, date(2022, 1, 19), ocg_date=date(2019, 1, 1))
+        BanlistEntry.objects.create(banlist=self.may, card=c, name="5", status="limited", previous="unlimited")
+        body = banlist.card_banlists(c)
+        self.assertEqual(body, [
+            {"format": "md", "label": "마스터 듀얼", "runs": [{"from": "2022-01-19", "status": "unlimited"},
+                                                             {"from": "2022-05-09", "status": "limited"}]},
+            {"format": "ocg", "label": "OCG", "runs": [{"from": "2020-01-01", "status": "unlimited"}]},
+        ])   # a game with no lists stored (TCG here) is left out

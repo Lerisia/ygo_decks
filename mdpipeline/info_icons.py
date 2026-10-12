@@ -1,5 +1,5 @@
 """Master Duel's card-info icons (엘리스 2026-10-12): the attribute, race, spell / trap kind, level / rank / link /
-pendulum scale and ATK / DEF icons of the game's card detail, for the card document's info box. Saved under the names
+pendulum scale, ATK / DEF and 금제 icons of the game's card detail, for the card document's info box. Saved under the names
 the site asks for (carddb's attribute, race and spell / trap keys), as lossless WebP. Konami's assets: they go to media
 (md_ui/info/), never to the public repository.
 
@@ -19,13 +19,15 @@ KINDS = {1: "counter", 2: "field", 3: "equip", 4: "continuous", 5: "quick_play",
 NAMES = {f"GUI_T_Icon1_Attr{i + 1:02d}": f"attr/{a}" for i, a in enumerate(ATTRIBUTES)}
 NAMES |= {f"GUI_T_Icon1_Type{i + 1:02d}": f"race/{r}" for i, r in enumerate(RACES)}
 NAMES |= {f"GUI_T_Icon1_Icon{i:02d}": f"kind/{k}" for i, k in KINDS.items()}
+NAMES |= {f"GUI_T_Icon1_Limit{k}": f"limit/{v}" for k, v in
+          (("00", "forbidden"), ("01", "limited"), ("02", "semi_limited"), ("None", "unlimited"))}   # 금제 (0 1 2 3 copies)
 NAMES |= {"GUI_T_Icon1_Other_Level": "level", "GUI_T_Icon1_Other_Rank": "rank", "GUI_T_Icon1_Other_link": "link",
           "GUI_T_Icon1_Other_Pendulum": "scale", "GUI_Icon_Atk": "atk", "GUI_Icon_Def": "def"}
 
 
 def main():
     data, out = sys.argv[1:3]
-    for sub in ("attr", "race", "kind"):
+    for sub in ("attr", "race", "kind", "limit"):
         os.makedirs(os.path.join(out, sub), exist_ok=True)
     done = set()
     for obj in UnityPy.load(data).objects:

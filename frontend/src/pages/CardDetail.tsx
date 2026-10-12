@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
+import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
 import { hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
@@ -153,6 +153,88 @@ function ZoomGlyph() {
 }
 
 /** The card face over the whole screen, in the finish picked on the page; a tap anywhere or Escape closes it. */
+const BAN_LABELS: Record<BanStatus, string> = {
+  forbidden: "금지", limited: "제한", semi_limited: "준제한", unlimited: "무제한", unreleased: "미출시",
+};
+const BAN_TAB_KEY = "card_banlist_format";
+const BAN_SHOWN = 8;   // runs shown before 전체 보기
+
+/** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media), none for 미출시. */
+function BanIcon({ status }: { status: BanStatus }) {
+  return status === "unreleased" ? (
+    <span className="w-6 h-6 shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600" aria-hidden="true" />
+  ) : (
+    <img src={`${ICONS}/limit/${status}.webp`} alt="" className="w-6 h-6 shrink-0" />
+  );
+}
+
+/** A card's 금제 in each game, as it changed over time (엘리스 2026-10-12): the game picked last time first. */
+function BanlistHistory({ banlists }: { banlists: CardDoc["banlists"] }) {
+  const [picked, setPicked] = useState(() => {
+    try {
+      return localStorage.getItem(BAN_TAB_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [all, setAll] = useState(false);
+  if (!banlists.length) return null;
+  const shown = banlists.find((b) => b.format === picked) ?? banlists[0];
+  const runs = [...shown.runs].reverse();   // the latest first
+  const now = runs[0];
+  const pick = (format: string) => {
+    setPicked(format);
+    setAll(false);
+    try {
+      localStorage.setItem(BAN_TAB_KEY, format);
+    } catch {
+      /* private mode: the choice lasts while the page is open */
+    }
+  };
+  return (
+    <section className="mt-6">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h2 className="text-lg font-bold">금제</h2>
+        {banlists.length > 1 && (
+          <div role="tablist" aria-label="금제 형식" className="flex rounded-lg bg-gray-200 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold">
+            {banlists.map((b) => (
+              <button
+                key={b.format}
+                type="button"
+                role="tab"
+                aria-selected={b.format === shown.format}
+                onClick={() => pick(b.format)}
+                className={`px-3 py-1 rounded-md transition ${
+                  b.format === shown.format ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <ol className="rounded-lg border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+        {(all ? runs : runs.slice(0, BAN_SHOWN)).map((r, i) => (
+          <li key={r.from} className={`flex items-center gap-2.5 px-3 py-2 ${i === 0 ? "font-semibold" : ""} ${r.status === "unreleased" ? "text-gray-500 dark:text-gray-400" : ""}`}>
+            <BanIcon status={r.status} />
+            <span className="w-12 shrink-0">{BAN_LABELS[r.status]}</span>
+            <span className="tabular-nums text-gray-600 dark:text-gray-300 font-normal">
+              {day(r.from)} ~ {i === 0 ? "현재" : day(runs[i - 1].from)}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {runs.length > BAN_SHOWN && (
+        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">
+          {all ? "접기" : `전체 보기 (${runs.length}번)`}
+        </button>
+      )}
+      <p className="sr-only">현재 {BAN_LABELS[now.status]}</p>
+    </section>
+  );
+}
+
 function CardZoom({ src, alt, finish, params, onClose }: {
   src: string; alt: string; finish: "normal" | FinishStyle; params: FinishParams; onClose: () => void;
 }) {
@@ -450,6 +532,8 @@ export default function CardDetail() {
           ))}
         </tbody>
       </table>
+
+      <BanlistHistory key={card.id} banlists={card.banlists} />
 
       {dates.length > 0 && (
         <table className="mt-3 w-full border border-gray-300 dark:border-gray-600 text-left text-sm">

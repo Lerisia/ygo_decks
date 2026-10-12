@@ -73,6 +73,8 @@ export type CardOptions = {
   support_cards: { id: number; name: string; count: number }[];
 };
 
+export type BanStatus = "forbidden" | "limited" | "semi_limited" | "unlimited" | "unreleased";
+
 export type CardTexts = { materials: string; effect: string; pendulum_effect: string; flavor: string } | null;
 
 export type CardDoc = {
@@ -124,6 +126,8 @@ export type CardDoc = {
   supporters: number;
   /** Decks of its own groups ("member") first, then of the groups it supports. */
   decks: { id: number; name: string; cover: string | null; via: "member" | "support" }[];
+  /** Each game's 금제 over time: runs from the day each status began, oldest first (games with lists stored). */
+  banlists: { format: string; label: string; runs: { from: string; status: BanStatus }[] }[];
 };
 
 export function filtersToSearch(f: CardFilters): string {
