@@ -72,8 +72,9 @@ export function unlockPackSound() {
   }
 }
 
-/** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time). */
-export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
+/** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time);
+ *  offset skips the silence a sound starts with, in seconds. */
+export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1, offset = 0) {
   if (!ctx || !soundOn()) return;
   const audio = ctx;
   if (audio.state !== "running") audio.resume().catch(() => {});
@@ -85,7 +86,7 @@ export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1) {
     src.playbackRate.value = rate;
     gain.gain.value = volume;
     src.connect(gain).connect(audio.destination);
-    src.start();
+    src.start(0, offset);
   });
 }
 

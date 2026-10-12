@@ -16,7 +16,7 @@ const T = {
   // 1.3 s, the pack gone at 2.3 s, the cards dealt at 3.2 s
   out: 1320, gone: 2300, dealt: 3200,
   strikeAt: 120, tearAt: 1000,                  // from the tap: the first strike, then the tear (or Hope)
-  rattle: 380, rattleWait: { SR: 40, UR: 620 }, // a marked SR / UR shaking before it turns, a UR then held a moment
+  rattle: 480, rattleWait: { SR: 40, UR: 620 }, // a marked SR / UR shaking before it turns, a UR then held a moment
   stream: 240, streamGap: 95,                   // out of the opened pack and off the top, one after the next
   deal: 320, dealGap: 50,                       // up into place from below, one after the next
   turn: { N: 400, R: 400, SR: 520, UR: 900 },   // face down to face up (a UR twisting the wrong way first)
@@ -568,7 +568,9 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     const wait = rattleOf(i);
     if (wait) {
       el.animate([0, 7, -7, 6, -6, 5, -4, 2, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: T.rattle, delay: start });
-      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.7); }, start);
+      // the game's rattle sound is silent for its first 0.4 s: from there, so the "챠카챠카" comes with the shake
+      // (엘리스 10/13: "흔들릴 때 챠카챠카만 안 들려요")
+      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.85, 1, 0.4); }, start);
     }
     const delay = start + wait;
     // a UR first twists the wrong way, then whips round
