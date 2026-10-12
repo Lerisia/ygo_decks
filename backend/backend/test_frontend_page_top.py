@@ -19,7 +19,9 @@ TOP_SPACING = re.compile(r"^(?:[a-z]+:)?-?(?:p|py|pt|m|my|mt)-")
 
 def routed_pages(src):
     app = (src / "App.tsx").read_text(encoding="utf-8")
+    # pages load as they are opened (2026-10-12): const X = lazyChunk(() => import("./pages/X")), or a plain import
     imports = dict(re.findall(r'import (\w+) from "\./pages/([\w/]+)"', app))
+    imports |= dict(re.findall(r'const (\w+) = lazyChunk\(\(\) => import\("\./pages/([\w/]+)"\)', app))
     used = set(re.findall(r"element=\{<([A-Z]\w*)", app)) | set(re.findall(r"^\s*<([A-Z]\w*) />", app, re.M))
     return {name: src / "pages" / f"{imports[name]}.tsx" for name in sorted(used) if name in imports}
 
