@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import ComboBox, { type ComboItem } from "@/components/ComboBox";
 import DexFilterBar from "@/components/DexFilterBar";
@@ -58,7 +59,7 @@ const HAS = [
   // an alternate print whose art covers the whole card (특이점 2026-10-12)
   { value: "overframe", label: "오버프레임" },
 ];
-// the filter bar's chips (참혈 2026-10-12); a monster's items don't fit 마법·함정, nor 마법·함정 종류 a monster
+// the filter bar's chips (참혈 2026-10-12); a monster's items don't fit 마법·함정, nor 마법·함정 a monster
 const BAR_KEYS = ["category", "frame", "attribute", "race", "level", "st"] as const;
 // today's Master Duel 금제, the same as the icon in each card's corner; several at once (엘리스 10/12)
 const BANS = [
@@ -238,17 +239,17 @@ export default function CardList() {
   );
   const barFields: DexField[] = [
     { key: "category", label: "종류", primary: true, options: options?.categories ?? [] },
-    { key: "frame", label: "몬스터 형태", options: options?.frames ?? [] },
+    { key: "frame", label: "몬스터", options: options?.frames ?? [] },
     { key: "attribute", label: "속성", options: options?.attributes ?? [] },
     { key: "race", label: "종족", options: options?.races ?? [] },
     {
       key: "level", label: "레벨·랭크·링크", format: (l) => `레벨·랭크·링크 ${l}`,
       options: (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })),
     },
-    { key: "st", label: "마법·함정 종류", options: options?.spell_trap_kinds ?? [] },
+    { key: "st", label: "마법·함정", options: options?.spell_trap_kinds ?? [] },
     { key: "ban", label: "금제", multi: true, options: BANS },
   ];
-  const barExtras: DexField[] = [{ key: "has", label: "그 외", multi: true, options: HAS }];
+  const barExtra: DexField = { key: "has", label: "그 외", multi: true, options: HAS };
   const barValues: DexValues = {
     ...Object.fromEntries(BAR_KEYS.map((k) => [k, filters[k] ? [filters[k]] : []])),
     has: filters.has.split(",").filter(Boolean),
@@ -292,21 +293,25 @@ export default function CardList() {
       <div className="mb-4">
         <DexFilterBar
           fields={barFields}
-          extras={barExtras}
+          extra={barExtra}
           values={barValues}
           onChange={applyBar}
           isDisabled={misfit}
           active={onList}
           right={
             <div className="flex items-stretch h-9">
-              <select
-                aria-label="정렬"
-                value={filters.sort}
-                onChange={(e) => update({ sort: e.target.value, dir: "" })}
-                className="max-w-[6.5rem] sm:max-w-none max-sm:[field-sizing:content] px-2 sm:px-3 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
-              >
-                {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
+              {/* its own caret, a little in from the edge (참혈 2026-10-12) */}
+              <span className="relative flex">
+                <select
+                  aria-label="정렬"
+                  value={filters.sort}
+                  onChange={(e) => update({ sort: e.target.value, dir: "" })}
+                  className="appearance-none max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
+                >
+                  {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden />
+              </span>
               <button
                 type="button"
                 onClick={() => update({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}

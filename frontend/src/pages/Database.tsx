@@ -47,8 +47,9 @@ const options = (labels: string[]) => labels.map((l) => ({ value: l, label: l })
 const SUMMONING_METHODS = ["융합", "의식", "싱크로", "엑시즈", "펜듈럼", "링크", "다양"];
 const ETC = [
   { value: "engine", label: "엔진" },
-  { value: "upcoming", label: "신규 업데이트 덱" },
+  { value: "upcoming", label: "신규 업데이트" },
 ];
+const ETC_VALUES = ETC.map((e) => e.value);
 const one = (v: string | null) => (v ? [v] : []);
 // How wide a tile is drawn (3 / 4 / 5 columns inside the page gutters), so a phone picks the 320px cover over the 480px one.
 const COVER_SIZES =
@@ -70,7 +71,7 @@ type SavedFilters = {
   selectedDifficulty?: string | null;
   selectedDeckType?: string | null;
   selectedArtStyle?: string | null;
-  selectedEtc?: string | null;
+  selectedEtc?: string[] | string | null;   // one string until 2026-10-12 (참혈: 엔진 and 신규 업데이트 together)
 };
 // Search and filters last only for this visit (sessionStorage): closing the site starts the next visit fresh
 // (특이점 2026-10-02). They used to live in localStorage, so drop that old copy once.
@@ -82,6 +83,8 @@ const readSavedFilters = (): SavedFilters => {
     return {};
   }
 };
+const savedEtc = (etc: SavedFilters["selectedEtc"]): string[] =>
+  (Array.isArray(etc) ? etc : etc ? [etc] : []).filter((e) => ETC_VALUES.includes(e));
 // /database?q=… (the home search's 전체 보기, 엘리스 2026-10-11) opens the list on that search alone, so it shows
 // exactly the decks the search counted.
 const queryInAddress = (search: string) => new URLSearchParams(search).get("q");
@@ -102,8 +105,8 @@ export default function DatabasePage() {
   const [performanceTags, setPerformanceTags] = useState<string[]>(() => cachedTags?.performance ?? []);
   const [aestheticTags, setAestheticTags] = useState<string[]>(() => cachedTags?.aesthetic ?? []);
   const [selectedStrength, setSelectedStrength] = useState<string | null>(saved.selectedStrength || null);
-  // 기타: 엔진 / 신규 업데이트 덱 (특이점 2026-10-03, 예전 '구축 형태'·'업데이트' 필터를 합침)
-  const [selectedEtc, setSelectedEtc] = useState<string | null>(saved.selectedEtc || null);  // "engine" | "upcoming"
+  // 기타: 엔진 / 신규 업데이트 (특이점 2026-10-03, 예전 '구축 형태'·'업데이트' 필터를 합침); both at once since 참혈 10/12
+  const [selectedEtc, setSelectedEtc] = useState<string[]>(() => savedEtc(saved.selectedEtc));  // "engine", "upcoming"
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(saved.selectedArtStyle || null);
@@ -142,7 +145,7 @@ export default function DatabasePage() {
     setSelectedDifficulty(null);
     setSelectedDeckType(null);
     setSelectedArtStyle(null);
-    setSelectedEtc(null);
+    setSelectedEtc([]);
     navigate("/database", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onList, location.search]);
@@ -227,9 +230,10 @@ export default function DatabasePage() {
       );
     }
 
-    if (selectedEtc === "engine") {
+    if (selectedEtc.includes("engine")) {
       filtered = filtered.filter((deck) => deck.is_engine);
-    } else if (selectedEtc === "upcoming") {
+    }
+    if (selectedEtc.includes("upcoming")) {
       filtered = filtered.filter((deck) => deck.is_upcoming);
     }
     if (selectedStrength) {
@@ -264,7 +268,7 @@ export default function DatabasePage() {
     decks, selectedEtc]);
 
   // The filter bar's items (참혈 2026-10-12): 파워 always on top, the 성능 tags as 기믹 (several at once), and 기타
-  // (one of the two) with the 비성능 tags as 그 외 toggles.
+  // with the 비성능 tags as one group of 그 외 toggles, any of them together, a deck having them all.
   const filterFields: DexField[] = [
     { key: "strength", label: "파워", primary: true, options: options(POWER_COLORS.map((p) => p.label)) },
     { key: "difficulty", label: "난이도", options: options(["쉬움", "보통", "어려움"]) },
@@ -273,10 +277,10 @@ export default function DatabasePage() {
     { key: "summoning", label: "소환법", options: options(SUMMONING_METHODS) },
     { key: "gimmick", label: "기믹", multi: true, options: options(performanceTags) },
   ];
-  const filterExtras: DexField[] = [
-    { key: "etc", label: "기타", options: ETC },
-    { key: "aesthetic", label: "태그", multi: true, options: options(aestheticTags) },
-  ];
+  const filterExtra: DexField = {
+    key: "other", label: "그 외", multi: true,
+    options: [...ETC, ...aestheticTags.map((t) => ({ value: `tag:${t}`, label: t }))],
+  };
   const filterValues: DexValues = {
     strength: one(selectedStrength),
     difficulty: one(selectedDifficulty),
@@ -284,8 +288,7 @@ export default function DatabasePage() {
     art_style: one(selectedArtStyle),
     summoning: one(selectedSummoningMethod),
     gimmick: selectedPerformanceTags,
-    etc: one(selectedEtc),
-    aesthetic: selectedAestheticTags,
+    other: [...selectedEtc, ...selectedAestheticTags.map((t) => `tag:${t}`)],
   };
   const applyFilters = (v: DexValues) => {
     setSelectedStrength(v.strength?.[0] ?? null);
@@ -294,8 +297,8 @@ export default function DatabasePage() {
     setSelectedArtStyle(v.art_style?.[0] ?? null);
     setSelectedSummoningMethod(v.summoning?.[0] ?? null);
     setSelectedPerformanceTags(v.gimmick ?? []);
-    setSelectedEtc(v.etc?.[0] ?? null);
-    setSelectedAestheticTags(v.aesthetic ?? []);
+    setSelectedEtc(ETC_VALUES.filter((e) => v.other?.includes(e)));
+    setSelectedAestheticTags((v.other ?? []).filter((t) => t.startsWith("tag:")).map((t) => t.slice(4)));
   };
 
   return (
@@ -330,7 +333,7 @@ export default function DatabasePage() {
       <div className="mb-4">
         <DexFilterBar
           fields={filterFields}
-          extras={filterExtras}
+          extra={filterExtra}
           values={filterValues}
           onChange={applyFilters}
           active={onList}

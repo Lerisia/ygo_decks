@@ -5,7 +5,7 @@ export type DexField = {
   key: string;
   label: string;
   options: DexOption[];
-  /** Several values at once (기믹, the 그 외 toggles of tags and art). */
+  /** Several values at once (기믹, 금제, 그 외): each chosen value is a chip of its own. */
   multi?: boolean;
   /** The base chip (종류 / 파워): always in the top row, whatever its value. */
   primary?: boolean;
@@ -14,13 +14,34 @@ export type DexField = {
 };
 /** Every item's chosen values; an item left out or empty is 전체. */
 export type DexValues = Record<string, string[]>;
+/** A chip of the top row: a one-value item (value left out), or one chosen value of a multi item. */
+export type TopChip = { field: DexField; value?: string };
 
-/** The item's name while it is 전체, else its value, or the first of several and how many more ("드로우 외 2"). */
+const label = (field: DexField, o: DexOption) => (field.format ? field.format(o.label) : o.label);
+
+/** A one-value item's chip: its name while it is 전체, else its value; a multi item's always reads its name. */
 export function chipText(field: DexField, values: string[]): string {
-  const chosen = field.options.filter((o) => values.includes(o.value));
-  if (!chosen.length) return field.label;
-  const first = field.format ? field.format(chosen[0].label) : chosen[0].label;
-  return chosen.length > 1 ? `${first} 외 ${chosen.length - 1}` : first;
+  const chosen = field.multi ? undefined : field.options.find((o) => o.value === values[0]);
+  return chosen ? label(field, chosen) : field.label;
+}
+
+/** One chosen value of a multi item, as its own chip reads it. */
+export function valueText(field: DexField, value: string): string {
+  const o = field.options.find((x) => x.value === value);
+  return o ? label(field, o) : value;
+}
+
+/** The top row (참혈 2026-10-12 round 2): the base chip, each one-value item with a value, then every chosen value
+ *  of the multi items and of 그 외, each its own chip, in the options' order (a value whose options have not come yet
+ *  waits for them). */
+export function topChips(fields: DexField[], extra: DexField | undefined, values: DexValues): TopChip[] {
+  const out: TopChip[] = [];
+  for (const f of [...fields, ...(extra ? [extra] : [])]) {
+    const v = values[f.key] ?? [];
+    if (f.multi) out.push(...f.options.filter((o) => v.includes(o.value)).map((o) => ({ field: f, value: o.value })));
+    else if (f.primary || v.length) out.push({ field: f });
+  }
+  return out;
 }
 
 export function toggleValue(values: string[], value: string, multi = false): string[] {
@@ -28,7 +49,7 @@ export function toggleValue(values: string[], value: string, multi = false): str
   return multi ? [...values, value] : [value];
 }
 
-/** Clears what no longer fits (종류 마법 leaves no 몬스터 형태). */
+/** Clears what no longer fits (종류 마법 leaves no 몬스터). */
 export function normalizeValues(fields: DexField[], values: DexValues, isDisabled?: (key: string, v: DexValues) => boolean): DexValues {
   if (!isDisabled) return values;
   const next = { ...values };
@@ -37,14 +58,14 @@ export function normalizeValues(fields: DexField[], values: DexValues, isDisable
 }
 
 /** Something to reset besides the base chip: another item or a 그 외 toggle. */
-export const hasResettable = (fields: DexField[], extras: DexField[], values: DexValues) =>
-  [...fields.filter((f) => !f.primary), ...extras].some((f) => (values[f.key]?.length ?? 0) > 0);
+export const hasResettable = (fields: DexField[], extra: DexField | undefined, values: DexValues) =>
+  [...fields.filter((f) => !f.primary), ...(extra ? [extra] : [])].some((f) => (values[f.key]?.length ?? 0) > 0);
 
-export const resetValues = (fields: DexField[], extras: DexField[]): DexValues =>
-  Object.fromEntries([...fields, ...extras].map((f) => [f.key, []]));
+export const resetValues = (fields: DexField[], extra: DexField | undefined): DexValues =>
+  Object.fromEntries([...fields, ...(extra ? [extra] : [])].map((f) => [f.key, []]));
 
 /** How many chips fit in one row: all of them, or as many as leave room for the "그 외 n종" chip after them.
- *  fixed: the rest of the row (funnel, + button); each chip and the 그 외 chip take their width and one gap. */
+ *  fixed: the rest of the row (the + button); each chip and the 그 외 chip take their width and one gap. */
 export function fitCount(widths: number[], moreWidth: number, fixed: number, gap: number, avail: number): number {
   const all = widths.reduce((s, w) => s + w + gap, fixed);
   if (all <= avail || !widths.length) return widths.length;
