@@ -284,3 +284,42 @@ class BanlistEntry(models.Model):
 def has_art(card_field="pk"):
     """Filter for cards (or rows pointing at one) with Master Duel art — the site leaves out cards outside Master Duel."""
     return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))
+
+
+class MdPack(models.Model):
+    """A Master Duel pack or deck, as masterduelmeta.com lists it, and the cards it holds (엘리스 2026-10-12, the pack
+    simulator). A pack the source stops listing is kept."""
+
+    class Kind(models.TextChoices):
+        NORMAL = "normal", "노멀 팩"
+        SECRET = "secret", "시크릿 팩"
+        SELECTION = "selection", "셀렉션 팩"
+        BONUS = "bonus", "보너스 팩"
+        STRUCTURE = "structure", "스트럭처 덱"
+
+    mdm_id = models.CharField(max_length=32, unique=True, help_text="masterduelmeta 세트 id")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    name_en = models.CharField(max_length=200)
+    name_ko = models.CharField(max_length=200, blank=True)
+    released = models.DateField(null=True, blank=True)
+    game_id = models.PositiveIntegerField(null=True, blank=True, help_text="게임 속 팩 번호 (팩 그림)")
+
+    class Meta:
+        ordering = ["-released", "name_en"]
+
+    def __str__(self):
+        return self.name_ko or self.name_en
+
+
+class MdPackCard(models.Model):
+    """A print in a pack, at the rarity it comes in there (an other art from a bundle is UR), and how many a deck
+    holds."""
+
+    pack = models.ForeignKey(MdPack, on_delete=models.CASCADE, related_name="cards")
+    md_print = models.ForeignKey(MdPrint, on_delete=models.CASCADE, related_name="packs")
+    rarity = models.CharField(max_length=2, choices=MdPrint.Rarity.choices)
+    amount = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        ordering = ["pack", "md_print"]
+        constraints = [models.UniqueConstraint(fields=["pack", "md_print"], name="carddb_mdpackcard_unique")]
