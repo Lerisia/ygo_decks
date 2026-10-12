@@ -11,6 +11,7 @@ const SCREEN = 16 / 9;   // the game's screen the camera view is made for
 const BG_BASE = "/media/md_ui/summonbg";
 const BG_VERSION = 2;
 const BG_ATTRIBUTES = new Set(["light", "dark", "water", "fire", "earth", "wind", "divine"]);
+const BG_DPR = 1;        // the background's pixels to a CSS pixel, at most
 const CAMERA_SIZE = 5;   // half the height the game's camera shows, in world units: the backgrounds are made for it
 
 const PHONE_MP = 34;   // the most texture (millions of pixels) a phone gets the large pictures for
@@ -50,10 +51,12 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
   useEffect(() => {
     const canvas = canvasRef.current!, bgCanvas = bgRef.current!;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    for (const c of [canvas, bgCanvas]) {
-      c.width = Math.round(window.innerWidth * dpr);
-      c.height = Math.round(window.innerHeight * dpr);
-    }
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    // the background is glow and bloom: one pixel to a CSS pixel is enough, and a phone's GPU draws a quarter of it
+    // (10/12: water, earth and divine dropped frames at the phone's full resolution)
+    bgCanvas.width = Math.round(window.innerWidth * Math.min(dpr, BG_DPR));
+    bgCanvas.height = Math.round(window.innerHeight * Math.min(dpr, BG_DPR));
     let alive = true, raf = 0, player: SpinePlayer | null = null, bg: SummonFx | null = null;
     // the background is a bonus: without it (no WebGL2, a failed file) the cut-in plays alone
     const bgLoad = BG_ATTRIBUTES.has(attribute)

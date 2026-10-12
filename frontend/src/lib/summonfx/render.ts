@@ -94,6 +94,66 @@ const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const GL_BLEND = (gl: WebGL2RenderingContext) => [gl.ZERO, gl.ONE, gl.DST_COLOR, gl.SRC_COLOR, gl.ONE_MINUS_DST_COLOR,
   gl.SRC_ALPHA, gl.ONE_MINUS_SRC_COLOR, gl.DST_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.SRC_ALPHA_SATURATE, gl.ONE_MINUS_SRC_ALPHA];
 
+const NO_STREAMS = new Array(12).fill(0);
+
+/** Vertices, FLOATS each, in one Float32Array that grows as needed and is used again frame after frame. */
+class Verts {
+  data = new Float32Array(FLOATS * 4096);
+  n = 0;
+
+  reset() {
+    this.n = 0;
+  }
+
+  /** One vertex: position, colour, the TEXCOORD streams, and the UV at `uvAt` in them (-1: none). */
+  put(x: number, y: number, z: number, c: number[], tc: number[], uvAt: number, u: number, v: number) {
+    if ((this.n + 1) * FLOATS > this.data.length) {
+      const grown = new Float32Array(this.data.length * 2);
+      grown.set(this.data);
+      this.data = grown;
+    }
+    const d = this.data, o = this.n * FLOATS;
+    d[o] = x; d[o + 1] = y; d[o + 2] = z;
+    d[o + 3] = c[0]; d[o + 4] = c[1]; d[o + 5] = c[2]; d[o + 6] = c[3];
+    for (let i = 0; i < 12; i++) d[o + 7 + i] = tc[i];
+    if (uvAt >= 0) { d[o + 7 + uvAt] = u; d[o + 8 + uvAt] = v; }
+    this.n++;
+  }
+}
+
+/** A mesh's triangles laid out once, vertex by vertex: x, y, z, u, v. */
+function meshFlat(m: Mesh & { _flat?: Float32Array }): Float32Array {
+  if (!m._flat) {
+    const out: number[] = [];
+    for (const t of m.tri) for (const i of t) out.push(m.pos[i][0], m.pos[i][1], m.pos[i][2], m.uv[i]?.[0] ?? 0, m.uv[i]?.[1] ?? 0);
+    m._flat = new Float32Array(out);
+  }
+  return m._flat;
+}
+
+/** A mesh particle's 3×3 (column-major): its size, then its rotation (z, x, y), then the system's turn when the
+ *  particles are aligned to it. */
+function particleMatrix(rot: Vec3, size: number[], world: number[] | null): number[] {
+  const [ax, ay, az] = rot;
+  const cx = Math.cos(ax), sx = Math.sin(ax), cy = Math.cos(ay), sy = Math.sin(ay), cz = Math.cos(az), sz = Math.sin(az);
+  // R = Ry · Rx · Rz, column by column
+  let m = [
+    cy * cz + sy * sx * sz, cx * sz, -sy * cz + cy * sx * sz,
+    -cy * sz + sy * sx * cz, cx * cz, sy * sz + cy * sx * cz,
+    sy * cx, -sx, cy * cx,
+  ];
+  if (world) {
+    const w = [world[0], world[1], world[2], world[4], world[5], world[6], world[8], world[9], world[10]];
+    const r = m;
+    m = new Array(9);
+    for (let col = 0; col < 3; col++) for (let row = 0; row < 3; row++) {
+      m[col * 3 + row] = w[row] * r[col * 3] + w[3 + row] * r[col * 3 + 1] + w[6 + row] * r[col * 3 + 2];
+    }
+  }
+  for (let col = 0; col < 3; col++) for (let row = 0; row < 3; row++) m[col * 3 + row] *= size[col];
+  return m;
+}
+
 type Program = {
   pr: WebGLProgram;
   arrays: { name: string; size: number; cb: number; pixel: boolean }[];
@@ -107,6 +167,7 @@ export class FxRenderer {
   private vbo: WebGLBuffer;
   private white: Texture;
   private depth: Texture;
+  private verts = new Verts();
   private post: Post;
   private sprite: WebGLProgram;
   private made: WebGLTexture[] = [];
@@ -249,15 +310,21 @@ export class FxRenderer {
   }
 
   private drawSystem(s: System, globals: Record<string, number[]>, halfH: number) {
-    if (s.shader && s.data.material) this.drawMesh(s.data.material, s.shader, s.textures, this.geometry(s, halfH), globals);
-    if (s.trail && s.data.trail) this.drawMesh(s.data.trail, s.trail.shader, s.trail.textures, this.trails(s), globals);
+    if (s.shader && s.data.material) {
+      this.geometry(s, halfH);
+      this.drawMesh(s.data.material, s.shader, s.textures, globals);
+    }
+    if (s.trail && s.data.trail) {
+      this.trails(s);
+      this.drawMesh(s.data.trail, s.trail.shader, s.trail.textures, globals);
+    }
   }
 
-  /** Triangles (FLOATS a vertex) through a material's shader. */
-  private drawMesh(m: Json, shader: Shader, textures: Record<string, Texture>, verts: number[], globals: Record<string, number[]>) {
+  /** The vertices in this.verts (FLOATS each) as triangles through a material's shader. */
+  private drawMesh(m: Json, shader: Shader, textures: Record<string, Texture>, globals: Record<string, number[]>) {
     const gl = this.gl;
     const BL = GL_BLEND(gl);
-    if (!verts.length) return;
+    if (!this.verts.n) return;
     const prog = this.program(shader);
     gl.useProgram(prog.pr);
     const value = (name: string): number[] | undefined => {
@@ -299,7 +366,7 @@ export class FxRenderer {
 
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, this.verts.data.subarray(0, this.verts.n * FLOATS), gl.STREAM_DRAW);
     for (let i = 0; i < 8; i++) gl.disableVertexAttribArray(i);
     for (const { loc, sem } of prog.attrs) {
       if (loc < 0) continue;
@@ -315,14 +382,15 @@ export class FxRenderer {
       else if (sem === "TANGENT0") gl.vertexAttrib4f(loc, 1, 0, 0, 1);
       else gl.vertexAttrib4f(loc, 0, 0, 0, 0);
     }
-    gl.drawArrays(gl.TRIANGLES, 0, verts.length / FLOATS);
+    gl.drawArrays(gl.TRIANGLES, 0, this.verts.n);
   }
 
   /** The trails as ribbons facing the camera, from each particle (u 0) back along where it has been (u 1): their width
    *  over the trail times the particle's size, their colour the particle's times the colour over its life and over the
    *  trail. The UV is the only stream a trail gets. */
-  private trails(s: System): number[] {
-    const out: number[] = [];
+  private trails(s: System) {
+    const out = this.verts;
+    out.reset();
     const tm = s.data.ps.TrailModule;
     const W = s.data.world as number[];
     const toWorld = (p: Vec3): Vec3 => [W[0] * p[0] + W[4] * p[1] + W[8] * p[2] + W[12], W[1] * p[0] + W[5] * p[1] + W[9] * p[2] + W[13],
@@ -356,7 +424,7 @@ export class FxRenderer {
           left: [q[0] - ty * w, q[1] + tx * w, q[2]] as Vec3, right: [q[0] + ty * w, q[1] - tx * w, q[2]] as Vec3,
         };
       });
-      const vert = (q: Vec3, c: number[], u: number, v: number) => out.push(q[0], q[1], q[2], c[0], c[1], c[2], c[3], u, v, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      const vert = (q: Vec3, c: number[], u: number, v: number) => out.put(q[0], q[1], q[2], c, NO_STREAMS, 0, u, v);
       for (let i = 0; i + 1 < edges.length; i++) {
         const e0 = edges[i], e1 = edges[i + 1];
         vert(e0.left, e0.color, e0.x, 1); vert(e0.right, e0.color, e0.x, 0); vert(e1.right, e1.color, e1.x, 0);
@@ -365,12 +433,13 @@ export class FxRenderer {
     };
     for (const p of s.emitter.particles) if (p.trail) ribbon(p, true);
     for (const g of s.emitter.ghosts) ribbon(g, false);
-    return out;
   }
 
-  /** Triangles (FLOATS a vertex) for every particle of a system, in the world. */
-  private geometry(s: System, halfH: number): number[] {
-    const out: number[] = [];
+  /** Triangles (FLOATS a vertex) for every particle of a system, in the world, into this.verts. A mesh particle's
+   *  rotation is one matrix (z, then x, then y, Unity's order) for all its vertices. */
+  private geometry(s: System, halfH: number) {
+    const out = this.verts;
+    out.reset();
     const W = s.data.world as number[];
     const toWorld = (p: Vec3): Vec3 => [W[0] * p[0] + W[4] * p[1] + W[8] * p[2] + W[12], W[1] * p[0] + W[5] * p[1] + W[9] * p[2] + W[13],
                                         W[2] * p[0] + W[6] * p[1] + W[10] * p[2] + W[14]];
@@ -378,65 +447,51 @@ export class FxRenderer {
                                          W[2] * p[0] + W[6] * p[1] + W[10] * p[2]];
     const r = s.data.renderer, mode = r.m_RenderMode;
     const slots = (s.data._slots ??= layout(r)) as Slot[];
-    const uvSlot = slots.find((x) => x.stream === UV_STREAM);
+    const uvAt = slots.find((x) => x.stream === UV_STREAM)?.at ?? -1;
     const maxSize = (r.m_MaxParticleSize ?? 10) * halfH * 2;   // a fraction of the screen's height
+    const local = r.m_RenderAlignment === 2;
     for (const p of s.emitter.particles) {
       const look = s.emitter.look(p);
       const c = look.color;
       const [tx, ty] = look.tiles;
       const col = look.frame % tx, row = Math.floor(look.frame / tx);
       const u0 = col / tx, u1 = (col + 1) / tx, v1 = 1 - row / ty, v0 = 1 - (row + 1) / ty;
-      const centre = toWorld(p.pos);
-      const tc = streams(slots, p, look, centre, dirWorld(p.vel));
-      const vert = (q: Vec3, u: number, v: number) => {
-        if (uvSlot) { tc[uvSlot.at] = u; tc[uvSlot.at + 1] = v; }
-        out.push(q[0], q[1], q[2], c[0], c[1], c[2], c[3], ...tc);
-      };
-      const quad = (right: Vec3, up: Vec3) => {
-        const corner = (a: number, b: number): Vec3 => [centre[0] + right[0] * a + up[0] * b, centre[1] + right[1] * a + up[1] * b, centre[2] + right[2] * a + up[2] * b];
-        const A = corner(-.5, -.5), B = corner(.5, -.5), C = corner(.5, .5), D = corner(-.5, .5);
-        vert(A, u0, v0); vert(B, u1, v0); vert(C, u1, v1);
-        vert(A, u0, v0); vert(C, u1, v1); vert(D, u0, v1);
+      const [cx, cy, cz] = toWorld(p.pos);
+      const tc = streams(slots, p, look, [cx, cy, cz], dirWorld(p.vel));
+      const quad = (rx: number, ry: number, rz: number, ux: number, uy: number, uz: number) => {
+        const ax = cx - (rx + ux) / 2, ay = cy - (ry + uy) / 2, az = cz - (rz + uz) / 2;   // corner (-.5, -.5)
+        out.put(ax, ay, az, c, tc, uvAt, u0, v0);
+        out.put(ax + rx, ay + ry, az + rz, c, tc, uvAt, u1, v0);
+        out.put(ax + rx + ux, ay + ry + uy, az + rz + uz, c, tc, uvAt, u1, v1);
+        out.put(ax, ay, az, c, tc, uvAt, u0, v0);
+        out.put(ax + rx + ux, ay + ry + uy, az + rz + uz, c, tc, uvAt, u1, v1);
+        out.put(ax + ux, ay + uy, az + uz, c, tc, uvAt, u0, v1);
       };
       if (mode === 0) {
         const w = Math.min(look.size[0], maxSize), h = Math.min(look.size[1], maxSize);
         let right: Vec3 = [1, 0, 0], up: Vec3 = [0, 1, 0];
-        if (r.m_RenderAlignment === 2) { right = dirWorld([1, 0, 0]); up = dirWorld([0, 1, 0]); }
+        if (local) { right = dirWorld([1, 0, 0]); up = dirWorld([0, 1, 0]); }
         const a = -p.rot[2], ca = Math.cos(a), sa = Math.sin(a);
-        const R: Vec3 = [(right[0] * ca + up[0] * sa) * w, (right[1] * ca + up[1] * sa) * w, (right[2] * ca + up[2] * sa) * w];
-        const U: Vec3 = [(up[0] * ca - right[0] * sa) * h, (up[1] * ca - right[1] * sa) * h, (up[2] * ca - right[2] * sa) * h];
-        quad(R, U);
+        quad((right[0] * ca + up[0] * sa) * w, (right[1] * ca + up[1] * sa) * w, (right[2] * ca + up[2] * sa) * w,
+             (up[0] * ca - right[0] * sa) * h, (up[1] * ca - right[1] * sa) * h, (up[2] * ca - right[2] * sa) * h);
       } else if (mode === 1) {
         const v = dirWorld(p.vel);
         const speed = Math.hypot(v[0], v[1]);
-        const dir: Vec3 = speed > 1e-6 ? [v[0] / speed, v[1] / speed, 0] : [1, 0, 0];
+        const dx = speed > 1e-6 ? v[0] / speed : 1, dy = speed > 1e-6 ? v[1] / speed : 0;
         // the width is the size's x; the length its y (the same, unless the size is 3D) by the length scale, plus the speed
         const len = look.size[1] * (r.m_LengthScale ?? 1) + Math.hypot(...v) * (r.m_VelocityScale ?? 0);
         const w = Math.min(look.size[0], maxSize);
-        quad([dir[0] * len, dir[1] * len, 0], [-dir[1] * w, dir[0] * w, 0]);
+        quad(dx * len, dy * len, 0, -dy * w, dx * w, 0);
       } else if (mode === 4 && s.mesh) {
-        const m = s.mesh;
-        const [ax, ay, az] = p.rot;
-        const rot = (q: Vec3): Vec3 => {
-          let [x, y, z] = q;
-          let cc = Math.cos(az), ss = Math.sin(az);
-          [x, y] = [x * cc - y * ss, x * ss + y * cc];
-          cc = Math.cos(ax); ss = Math.sin(ax);
-          [y, z] = [y * cc - z * ss, y * ss + z * cc];
-          cc = Math.cos(ay); ss = Math.sin(ay);
-          [x, z] = [x * cc + z * ss, -x * ss + z * cc];
-          return [x, y, z];
-        };
-        for (const t of m.tri) {
-          for (const i of t) {
-            const q = rot([m.pos[i][0] * look.size[0], m.pos[i][1] * look.size[1], m.pos[i][2] * look.size[2]]);
-            const w = r.m_RenderAlignment === 2 ? dirWorld(q) : q;
-            vert([centre[0] + w[0], centre[1] + w[1], centre[2] + w[2]], m.uv[i]?.[0] ?? 0, m.uv[i]?.[1] ?? 0);
-          }
+        const flat = meshFlat(s.mesh);
+        const M = particleMatrix(p.rot, look.size, local ? W : null);
+        for (let i = 0; i < flat.length; i += 5) {
+          const x = flat[i], y = flat[i + 1], z = flat[i + 2];
+          out.put(cx + M[0] * x + M[3] * y + M[6] * z, cy + M[1] * x + M[4] * y + M[7] * z, cz + M[2] * x + M[5] * y + M[8] * z,
+                  c, tc, uvAt, flat[i + 3], flat[i + 4]);
         }
       }
     }
-    return out;
   }
 }
 
