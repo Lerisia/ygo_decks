@@ -7,6 +7,8 @@ import DatabaseTrackerPromo from "@/components/DatabaseTrackerPromo";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
+import DexFilterBar from "@/components/DexFilterBar";
+import type { DexField, DexValues } from "@/utils/dexFilter";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 import { matchesDeckQuery } from "@/utils/hangul";
 
@@ -41,6 +43,13 @@ const POWER_COLOR: Record<string, string> = Object.fromEntries(POWER_COLORS.map(
 const POWER_RANK: Record<string, number> = Object.fromEntries(POWER_COLORS.map((p, i) => [p.label, i]));
 const powerRank = (strength: string) => POWER_RANK[strength] ?? POWER_COLORS.length;
 const POWER_SWITCH_KEY = "deck_power_switch";
+const options = (labels: string[]) => labels.map((l) => ({ value: l, label: l }));
+const SUMMONING_METHODS = ["융합", "의식", "싱크로", "엑시즈", "펜듈럼", "링크", "다양"];
+const ETC = [
+  { value: "engine", label: "엔진" },
+  { value: "upcoming", label: "신규 업데이트 덱" },
+];
+const one = (v: string | null) => (v ? [v] : []);
 // How wide a tile is drawn (3 / 4 / 5 columns inside the page gutters), so a phone picks the 320px cover over the 480px one.
 const COVER_SIZES =
   "(min-width: 1280px) 224px, (min-width: 1024px) calc((100vw - 160px) / 5), (min-width: 768px) calc((100vw - 144px) / 4), calc((100vw - 84px) / 3)";
@@ -98,18 +107,6 @@ export default function DatabasePage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(saved.selectedDifficulty || null);
   const [selectedDeckType, setSelectedDeckType] = useState<string | null>(saved.selectedDeckType || null);
   const [selectedArtStyle, setSelectedArtStyle] = useState<string | null>(saved.selectedArtStyle || null);
-  const [filterExpanded, setFilterExpanded] = useState(() =>
-    Boolean(
-      (saved.selectedPerformanceTags?.length ?? 0) > 0 ||
-        (saved.selectedAestheticTags?.length ?? 0) > 0 ||
-        saved.selectedSummoningMethod ||
-        saved.selectedStrength ||
-        saved.selectedDifficulty ||
-        saved.selectedDeckType ||
-        saved.selectedArtStyle ||
-        saved.selectedEtc,
-    ),
-  );
   const [showScrollTop, setShowScrollTop] = useState(false);
   // 덱 파워 switch (colour rings, power order, colour key). Off unless this browser turned it on (특이점 2026-10-09);
   // a new key, so choices saved while it defaulted to on (10/2~10/8) don't carry over and everyone starts off.
@@ -161,8 +158,6 @@ export default function DatabasePage() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const summoningMethods = ["융합", "의식", "싱크로", "엑시즈", "펜듈럼", "링크", "다양"];
 
   const saveFilters = () => {
     const filters = {
@@ -268,17 +263,39 @@ export default function DatabasePage() {
     selectedArtStyle,
     decks, selectedEtc]);
 
-
-  // Filter section toggle
-  const toggleFilterSection = () => {
-    setFilterExpanded(!filterExpanded);
+  // The filter bar's items (참혈 2026-10-12): 파워 always on top, the 성능 tags as 기믹 (several at once), and 기타
+  // (one of the two) with the 비성능 tags as 그 외 toggles.
+  const filterFields: DexField[] = [
+    { key: "strength", label: "파워", primary: true, options: options(POWER_COLORS.map((p) => p.label)) },
+    { key: "difficulty", label: "난이도", options: options(["쉬움", "보통", "어려움"]) },
+    { key: "deck_type", label: "덱 타입", options: options(["전개", "미드레인지", "운영", "특이"]) },
+    { key: "art_style", label: "아트 스타일", options: options(["멋있는", "어두운", "명랑한", "환상적", "웅장한"]) },
+    { key: "summoning", label: "소환법", options: options(SUMMONING_METHODS) },
+    { key: "gimmick", label: "기믹", multi: true, options: options(performanceTags) },
+  ];
+  const filterExtras: DexField[] = [
+    { key: "etc", label: "기타", options: ETC },
+    { key: "aesthetic", label: "태그", multi: true, options: options(aestheticTags) },
+  ];
+  const filterValues: DexValues = {
+    strength: one(selectedStrength),
+    difficulty: one(selectedDifficulty),
+    deck_type: one(selectedDeckType),
+    art_style: one(selectedArtStyle),
+    summoning: one(selectedSummoningMethod),
+    gimmick: selectedPerformanceTags,
+    etc: one(selectedEtc),
+    aesthetic: selectedAestheticTags,
   };
-
-  // Tag selection toggle
-  const toggleTag = (tag: string, setTags: React.Dispatch<React.SetStateAction<string[]>>) => {
-    setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+  const applyFilters = (v: DexValues) => {
+    setSelectedStrength(v.strength?.[0] ?? null);
+    setSelectedDifficulty(v.difficulty?.[0] ?? null);
+    setSelectedDeckType(v.deck_type?.[0] ?? null);
+    setSelectedArtStyle(v.art_style?.[0] ?? null);
+    setSelectedSummoningMethod(v.summoning?.[0] ?? null);
+    setSelectedPerformanceTags(v.gimmick ?? []);
+    setSelectedEtc(v.etc?.[0] ?? null);
+    setSelectedAestheticTags(v.aesthetic ?? []);
   };
 
   return (
@@ -286,44 +303,52 @@ export default function DatabasePage() {
       <DexTabs />
       <DatabaseTrackerPromo />
 
-      {/* Search decks */}
+      {/* Search decks, with 덱 추가 for staff at its right */}
       {/* Enter (the phone keyboard's 검색 key) puts the keyboard away; the list already follows the typing. */}
-      <SearchForm>
-        <Input
-          placeholder="덱 이름 검색..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          enterKeyHint="search"
-          className="mb-4"
-        />
-      </SearchForm>
-
-      {/* Filter expand / fold + deck power border toggle */}
-      <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-        <button onClick={toggleFilterSection} className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition">
-          {filterExpanded ? "필터 숨기기 ▲" : "필터 보기 ▼"}
-        </button>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={powerBorder}
-          onClick={togglePowerBorder}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-        >
-          덱 파워
-          <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${powerBorder ? "bg-blue-600" : "bg-gray-400"}`}>
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${powerBorder ? "translate-x-4" : ""}`} />
-          </span>
-        </button>
+      <div className="mb-4 flex items-center gap-2">
+        <SearchForm>
+          <Input
+            placeholder="덱 이름 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            enterKeyHint="search"
+            className="flex-1 min-w-0"
+          />
+        </SearchForm>
         {staff && (
           <button
             type="button"
             onClick={() => setAddingDeck(true)}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+            className="shrink-0 h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition"
           >
             ➕ 덱 추가
           </button>
         )}
+      </div>
+
+      {/* Filters, with the 덱 파워 switch at the row's right end */}
+      <div className="mb-4">
+        <DexFilterBar
+          fields={filterFields}
+          extras={filterExtras}
+          values={filterValues}
+          onChange={applyFilters}
+          active={onList}
+          right={
+            <button
+              type="button"
+              role="switch"
+              aria-checked={powerBorder}
+              onClick={togglePowerBorder}
+              className="h-9 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+            >
+              덱 파워
+              <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${powerBorder ? "bg-blue-600" : "bg-gray-400"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${powerBorder ? "translate-x-4" : ""}`} />
+              </span>
+            </button>
+          }
+        />
       </div>
       {addingDeck && (
         <DeckInfoEditModal
@@ -346,140 +371,6 @@ export default function DatabasePage() {
               {p.label}
             </span>
           ))}
-        </div>
-      )}
-
-      {/* Single selection filter 필터 */}
-      {filterExpanded && (
-        <div className="flex flex-col gap-4 mb-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">덱 파워</label>
-              <select
-                value={selectedStrength || ""}
-                onChange={(e) => setSelectedStrength(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                {["최상위권", "상위권", "중상위권", "중하위권", "하위권", "최하위권"].map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">난이도</label>
-              <select
-                value={selectedDifficulty || ""}
-                onChange={(e) => setSelectedDifficulty(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                {["쉬움", "보통", "어려움"].map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">덱 타입</label>
-              <select
-                value={selectedDeckType || ""}
-                onChange={(e) => setSelectedDeckType(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                {["전개", "미드레인지", "운영", "특이"].map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">아트 스타일</label>
-              <select
-                value={selectedArtStyle || ""}
-                onChange={(e) => setSelectedArtStyle(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                {["멋있는", "어두운", "명랑한", "환상적", "웅장한"].map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">소환법</label>
-              <select
-                value={selectedSummoningMethod || ""}
-                onChange={(e) => setSelectedSummoningMethod(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                {summoningMethods.map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-left text-sm font-semibold mb-1">기타</label>
-              <select
-                value={selectedEtc || ""}
-                onChange={(e) => setSelectedEtc(e.target.value || null)}
-                className="w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm"
-              >
-                <option value="">전체</option>
-                <option value="engine">엔진</option>
-                <option value="upcoming">신규 업데이트 덱</option>
-              </select>
-            </div>
-          </div>
-          {/* Combined Tag Filter (Aesthetic & Performance) */}
-          <div>
-            {/* Aesthetic Tags */}
-            <p className="text-left font-semibold mb-2">태그 (비성능적)</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {aestheticTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag, setSelectedAestheticTags)}
-                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                    selectedAestheticTags.includes(tag)
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-
-            {/* Performance Tags */}
-            <p className="text-left font-semibold mb-2">태그 (성능적)</p>
-            <div className="flex flex-wrap gap-2">
-              {performanceTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag, setSelectedPerformanceTags)}
-                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                    selectedPerformanceTags.includes(tag)
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-center">
-            <button
-              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
-              onClick={() => {
-                sessionStorage.removeItem("deck_filters");
-                window.location.reload();
-              }}
-            >
-              필터 초기화
-            </button>
-          </div>
         </div>
       )}
 

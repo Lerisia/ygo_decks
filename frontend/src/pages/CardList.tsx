@@ -2,14 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import ComboBox, { type ComboItem } from "@/components/ComboBox";
+import DexFilterBar from "@/components/DexFilterBar";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import {
   type CardFilters, type CardListItem, type CardOptions,
-  EMPTY_FILTERS, filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
+  filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
 } from "@/api/cardDexApi";
+import type { DexField, DexValues } from "@/utils/dexFilter";
 
-const SELECT = "w-full px-3 py-2 border rounded-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm disabled:opacity-50";
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
 // Master Duel's sorts, each either way (엘리스 10/12), under its names; 디폴트 순: each monster frame before its pendulum,
 // low levels first, then spells and traps
@@ -50,17 +51,18 @@ function rememberSort(f: CardFilters) {
 
 const hasFilter = (f: CardFilters) =>
   !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has);
-// The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
-// page shows its name and ✕ above the list instead (엘리스 2026-10-11).
-const panelFilter = (f: CardFilters) => !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.has);
 // cards with another art, a monster cut-in, or both: chosen together they narrow to cards with both (엘리스 2026-10-11)
-const hasSet = (has: string) => new Set(has.split(",").filter(Boolean));
 const HAS = [
   { value: "alt", label: "다른 일러스트" },
   { value: "cutin", label: "소환 연출" },
   // an alternate print whose art covers the whole card (특이점 2026-10-12)
   { value: "overframe", label: "오버프레임" },
 ];
+// the filter bar's chips (참혈 2026-10-12); a monster's items don't fit 마법·함정, nor 마법·함정 종류 a monster
+const BAR_KEYS = ["category", "frame", "attribute", "race", "level", "st"] as const;
+const MONSTER_KEYS = ["frame", "attribute", "race", "level"];
+const misfit = (key: string, v: DexValues) =>
+  MONSTER_KEYS.includes(key) ? ["spell", "trap"].includes(v.category?.[0] ?? "") : key === "st" && v.category?.[0] === "monster";
 
 function TileSkeleton() {
   return (
@@ -114,7 +116,6 @@ export default function CardList() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filterOpen, setFilterOpen] = useState(() => panelFilter(filters));
   const [showScrollTop, setShowScrollTop] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const request = useRef(0);
@@ -128,7 +129,6 @@ export default function CardList() {
     if (filtersToSearch(next) !== key) {
       setFilters(next);
       setQInput(next.q);
-      if (panelFilter(next)) setFilterOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onList, location.search]);
@@ -221,17 +221,27 @@ export default function CardList() {
     ],
     [options],
   );
-  const monsterOnly = filters.category === "spell" || filters.category === "trap";
-
-  const select = (label: string, field: keyof CardFilters, opts: { value: string; label: string }[], disabled = false) => (
-    <div>
-      <label className="block text-left text-sm font-semibold mb-1">{label}</label>
-      <select value={filters[field]} onChange={(e) => update({ [field]: e.target.value })} disabled={disabled} className={SELECT}>
-        <option value="">전체</option>
-        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  );
+  const barFields: DexField[] = [
+    { key: "category", label: "종류", primary: true, options: options?.categories ?? [] },
+    { key: "frame", label: "몬스터 형태", options: options?.frames ?? [] },
+    { key: "attribute", label: "속성", options: options?.attributes ?? [] },
+    { key: "race", label: "종족", options: options?.races ?? [] },
+    {
+      key: "level", label: "레벨·랭크·링크", format: (l) => `레벨·랭크·링크 ${l}`,
+      options: (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })),
+    },
+    { key: "st", label: "마법·함정 종류", options: options?.spell_trap_kinds ?? [] },
+  ];
+  const barExtras: DexField[] = [{ key: "has", label: "그 외", multi: true, options: HAS }];
+  const barValues: DexValues = {
+    ...Object.fromEntries(BAR_KEYS.map((k) => [k, filters[k] ? [filters[k]] : []])),
+    has: filters.has.split(",").filter(Boolean),
+  };
+  const applyBar = (v: DexValues) =>
+    update({
+      ...Object.fromEntries(BAR_KEYS.map((k) => [k, v[k]?.[0] ?? ""])),
+      has: HAS.map((h) => h.value).filter((x) => v.has?.includes(x)).join(","),
+    });
 
   return (
     <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 pt-6 pb-4 text-center">
@@ -260,85 +270,38 @@ export default function CardList() {
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-        <button
-          onClick={() => setFilterOpen(!filterOpen)}
-          className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition"
-        >
-          {filterOpen ? "필터 숨기기 ▲" : "필터 보기 ▼"}
-        </button>
-        {/* the sort and its way, joined as Master Duel shows them */}
-        <div className="flex items-stretch">
-          <select
-            aria-label="정렬"
-            value={filters.sort}
-            onChange={(e) => update({ sort: e.target.value, dir: "" })}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
-          >
-            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-          <button
-            type="button"
-            onClick={() => update({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
-            aria-label={sortDir(filters) === "asc" ? "오름차순 (누르면 내림차순)" : "내림차순 (누르면 오름차순)"}
-            title={sortDir(filters) === "asc" ? "오름차순" : "내림차순"}
-            className="w-10 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg bg-white text-black dark:bg-gray-800 dark:text-white text-base font-bold"
-          >
-            {sortDir(filters) === "asc" ? "↑" : "↓"}
-          </button>
-        </div>
-      </div>
-
-      {filterOpen && (
-        <div className="flex flex-col gap-4 mb-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {select("종류", "category", options?.categories ?? [])}
-            {select("몬스터 형태", "frame", options?.frames ?? [], monsterOnly)}
-            {select("속성", "attribute", options?.attributes ?? [], monsterOnly)}
-            {select("종족", "race", options?.races ?? [], monsterOnly)}
-            {select("레벨·랭크·링크", "level", (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })), monsterOnly)}
-            {select("마법·함정 종류", "st", options?.spell_trap_kinds ?? [], filters.category === "monster")}
-          </div>
-          <div className="text-left">
-            <span className="block text-sm font-semibold mb-1">일러스트·소환 연출·오버프레임</span>
-            <div className="flex flex-wrap items-center gap-2">
-              {HAS.map((h) => {
-                const on = hasSet(filters.has).has(h.value);
-                const toggle = () => {
-                  const next = hasSet(filters.has);
-                  if (on) next.delete(h.value);
-                  else next.add(h.value);
-                  update({ has: HAS.map((x) => x.value).filter((v) => next.has(v)).join(",") });
-                };
-                return (
-                  <button
-                    key={h.value}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={toggle}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                      on ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    {h.label}
-                  </button>
-                );
-              })}
+      {/* Filters, with the sort and its way at the row's right end, joined as Master Duel shows them */}
+      <div className="mb-4">
+        <DexFilterBar
+          fields={barFields}
+          extras={barExtras}
+          values={barValues}
+          onChange={applyBar}
+          isDisabled={misfit}
+          active={onList}
+          right={
+            <div className="flex items-stretch h-9">
+              <select
+                aria-label="정렬"
+                value={filters.sort}
+                onChange={(e) => update({ sort: e.target.value, dir: "" })}
+                className="max-w-[6.5rem] sm:max-w-none max-sm:[field-sizing:content] px-2 sm:px-3 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
+              >
+                {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => update({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
+                aria-label={sortDir(filters) === "asc" ? "오름차순 (누르면 내림차순)" : "내림차순 (누르면 오름차순)"}
+                title={sortDir(filters) === "asc" ? "오름차순" : "내림차순"}
+                className="w-8 sm:w-9 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg rounded-l-none bg-white text-black dark:bg-gray-800 dark:text-white text-base font-bold"
+              >
+                {sortDir(filters) === "asc" ? "↑" : "↓"}
+              </button>
             </div>
-          </div>
-          <div className="flex justify-center">
-            <button
-              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
-              onClick={() => {
-                setQInput("");
-                update({ ...EMPTY_FILTERS, sort: filters.sort, dir: filters.dir });   // the sort is not a filter
-              }}
-            >
-              필터 초기화
-            </button>
-          </div>
-        </div>
-      )}
+          }
+        />
+      </div>
 
       <div className="mb-3 h-6 flex items-center text-sm text-gray-600 dark:text-gray-300 text-left">
         {filters.deck && deckCounts ? (
