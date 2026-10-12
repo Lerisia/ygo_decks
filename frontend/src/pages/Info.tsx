@@ -11,8 +11,9 @@ import { useDexCounts } from "@/components/DexTabs";
 // Home (redesign 2026-10): two pillars, the 도감 (decks and cards) then 레코더; the rest as small tiles; 문의·후원 at the bottom.
 
 const COLLAGE = 6;   // phone shows the first 4
-// How far each picture in the strip overlaps the one before it, as a share of a picture's width.
-const BLEND = 50;
+// How far each picture in the strip overlaps the one before it, as a share of a picture's width
+// (참혈 2026-10-12: 50 was too wide, the pictures barely showed clear; 10 only softens the seams).
+const BLEND = 10;
 
 const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
   { to: "/records", title: "전적 시트", desc: "메타 통계·내 전적" },
