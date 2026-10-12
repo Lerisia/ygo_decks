@@ -1,17 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import SearchForm from "./SearchForm";
 import { Input } from "./ui/input";
-import { matchesDeckQuery } from "@/utils/hangul";
+import { makeMatcher, nameKeys } from "@/utils/hangul";
 
 /** tag: a word before the name saying what it is; searchOnly: listed only once something is typed. */
 export type ComboItem = { key: string; name: string; sub?: string; tag?: string; searchOnly?: boolean };
 
 const STEP = 60;   // rows drawn at a time: drawing all of a long list at once stalls a phone (엘리스 10/12)
-const squash = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 /** Choosing one of many without a modal (엘리스 2026-10-12, the 카드군 filter): the box is a search box, its matches
- *  (name or 초성; the whole name, then its start, first) drop down under it, drawn a screenful at a time as the list
- *  scrolls, and a tap picks one. Arrow keys move through them; Enter — the phone keyboard's 검색 key — picks the one
+ *  (name or 초성, matched jamo by jamo so a half-typed syllable keeps them; the whole name, then its start, first)
+ *  drop down under it, drawn a screenful at a time as the list scrolls, and a tap picks one. The box answers each key
+ *  at once and the list follows. Arrow keys move through them; Enter — the phone keyboard's 검색 key — picks the one
  *  marked and puts the keyboard away. */
 export default function ComboBox({ items, value, onPick, onClear, placeholder, label, emptyText, loading = false }: {
   items: ComboItem[]; value: string; onPick: (key: string) => void; onClear: () => void;
@@ -25,13 +25,16 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
   const list = useRef<HTMLUListElement>(null);
   const id = useId();
   const chosen = items.find((it) => it.key === value);
+  const keyed = useMemo(() => items.map((it) => ({ it, k: nameKeys(it.name) })), [items]);
+  const typed = useDeferredValue(query);
   const matches = useMemo(() => {
-    const q = squash(query);
-    const found = items.filter((it) => (q || !it.searchOnly) && matchesDeckQuery(query, it.name));
-    if (!q) return found;
-    const rank = (it: ComboItem) => (squash(it.name) === q ? 0 : squash(it.name).startsWith(q) ? 1 : 2);
-    return found.map((it, i) => [rank(it), i, it] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
-  }, [items, query]);
+    const match = makeMatcher(typed);
+    const q = nameKeys(typed).jamo;
+    const found = keyed.filter(({ it, k }) => (q || !it.searchOnly) && match(k));
+    if (!q) return found.map((x) => x.it);
+    const rank = (k: { jamo: string }) => (k.jamo === q ? 0 : k.jamo.startsWith(q) ? 1 : 2);
+    return found.map((x, i) => [rank(x.k), i, x.it] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+  }, [keyed, typed]);
 
   useEffect(() => {
     list.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });

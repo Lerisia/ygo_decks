@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import cases from "./deckSearchCases.json";
-import { expandCompoundJamo, getInitials, isInitialsOnly, matchesDeckQuery, matchesInitials } from "./hangul";
+import { expandCompoundJamo, getInitials, isInitialsOnly, makeMatcher, matchesDeckQuery, matchesInitials, nameKeys, toJamo } from "./hangul";
 
 describe("expandCompoundJamo", () => {
   it("expands compound jamo into component consonants", () => {
@@ -65,5 +65,35 @@ describe("matchesDeckQuery", () => {
 describe("shared deck search cases (same file the PC recorder tests against)", () => {
   it.each(cases.cases)("$query → $name", (c) => {
     expect(matchesDeckQuery(c.query, c.name, c.aliases ?? [])).toBe(c.expect);
+  });
+});
+
+describe("toJamo", () => {
+  it("splits syllables, compound vowels and 받침 into single jamo", () => {
+    expect(toJamo("블랙")).toBe("ㅂㅡㄹㄹㅐㄱ");
+    expect(toJamo("괜찮")).toBe("ㄱㅗㅐㄴㅊㅏㄴㅎ");
+    expect(toJamo("ㄺa1")).toBe("ㄹㄱa1");
+  });
+});
+
+describe("makeMatcher (the dropdown's search, 엘리스 10/12)", () => {
+  const names = ["블랙 매지션", "블랙 매지션 걸", "블루아이즈", "매지션즈 소울즈"].map((n) => ({ n, k: nameKeys(n) }));
+  const found = (q: string) => names.filter(({ k }) => makeMatcher(q)(k)).map(({ n }) => n);
+  it("keeps finding the name at every step a Korean keyboard types it", () => {
+    for (const q of ["ㅂ", "브", "블", "블ㄹ", "블래", "블랙", "블랙 ㅁ", "블랙 매", "블랙 맺", "블랙 매지", "블랙 매짓", "블랙 매지셔", "블랙 매지션"]) {
+      expect(found(q), q).toContain("블랙 매지션");
+    }
+  });
+  it("still narrows", () => {
+    expect(found("블랙 매지션 ㄱ")).toEqual(["블랙 매지션 걸"]);
+    expect(found("블루")).toEqual(["블루아이즈"]);
+    expect(found("매지션즈")).toEqual(["매지션즈 소울즈"]);
+  });
+  it("takes bare consonants as initials, from the start", () => {
+    expect(found("ㅂㄹㅁㅈㅅ")).toEqual(["블랙 매지션", "블랙 매지션 걸"]);
+    expect(found("ㅁㅈㅅ")).toEqual(["매지션즈 소울즈"]);
+  });
+  it("matches everything on an empty query", () => {
+    expect(found(" ")).toHaveLength(4);
   });
 });
