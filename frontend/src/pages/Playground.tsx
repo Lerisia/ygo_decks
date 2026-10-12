@@ -8,7 +8,7 @@ const games: Game[] = [
   { to: "/solo", icon: "🐤", title: "솔로 플레이", desc: "혼자 즐기는 미니 게임", rewardBadge: true },
   { to: "/tier-list-maker", icon: "📊", title: "티어표 만들기", desc: "덱 티어리스트 만들고 이미지로 저장" },
   { to: "https://mdarchive.pages.dev/#climb", icon: "📜", title: "등반 덱 기록", desc: "달마다 사용한 덱을 기록하고 자랑하기", external: true },
-  { to: "/icon-shop", icon: "🛍️", title: "아이콘 샵", desc: "포인트로 아이콘 구매" },
+  { to: "/icon-shop", icon: "🛍️", title: "포인트 상점", desc: "포인트로 아이콘·프레임 구매" },
 ];
 
 function Playground() {

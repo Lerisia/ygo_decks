@@ -34,8 +34,8 @@ const tiles = [
   {
     to: "/manage/borders",
     icon: "🖼️",
-    label: "테두리 관리",
-    description: "테두리 올리기·등급·가격",
+    label: "프레임 관리",
+    description: "프레임 올리기·등급·가격",
   },
   {
     to: "/manage/duchmind-words",

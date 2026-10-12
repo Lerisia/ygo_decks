@@ -392,9 +392,9 @@ def set_my_border(request):
     try:
         border = Border.objects.get(id=int(border_id))
     except (Border.DoesNotExist, ValueError, TypeError):
-        return Response({"error": "테두리를 찾을 수 없습니다."}, status=404)
+        return Response({"error": "프레임을 찾을 수 없습니다."}, status=404)
     if not UserBorderUnlock.objects.filter(user=user, border=border).exists():
-        return Response({"error": "잠금 해제되지 않은 테두리입니다."}, status=403)
+        return Response({"error": "잠금 해제되지 않은 프레임입니다."}, status=403)
     user.equipped_border = border
     user.save(update_fields=["equipped_border"])
     return Response({"ok": True, "border": BorderSerializer(border).data})
@@ -413,7 +413,7 @@ def grant_border(request):
         target = User.objects.get(id=int(user_id))
         border = Border.objects.get(id=int(border_id))
     except (User.DoesNotExist, Border.DoesNotExist, ValueError, TypeError):
-        return Response({"error": "유저나 테두리를 찾을 수 없습니다."}, status=404)
+        return Response({"error": "유저나 프레임을 찾을 수 없습니다."}, status=404)
     UserBorderUnlock.objects.get_or_create(user=target, border=border, defaults={"note": note})
     return Response({"ok": True})
 
@@ -446,12 +446,12 @@ def purchase_border(request, border_id):
     try:
         border = Border.objects.get(id=int(border_id))
     except (Border.DoesNotExist, ValueError, TypeError):
-        return Response({"error": "테두리를 찾을 수 없습니다."}, status=404)
+        return Response({"error": "프레임을 찾을 수 없습니다."}, status=404)
     if border.category != "shop":
-        return Response({"error": "구매할 수 없는 테두리입니다."}, status=400)
+        return Response({"error": "구매할 수 없는 프레임입니다."}, status=400)
     price = int(border.price or 0)
     if price <= 0:
-        return Response({"error": "가격이 설정되지 않은 테두리입니다."}, status=400)
+        return Response({"error": "가격이 설정되지 않은 프레임입니다."}, status=400)
     with transaction.atomic():
         u = User.objects.select_for_update().get(pk=request.user.id)
         if UserBorderUnlock.objects.filter(user=u, border=border).exists():
@@ -494,7 +494,7 @@ def update_border(request, border_id):
     try:
         border = Border.objects.get(id=int(border_id))
     except (Border.DoesNotExist, ValueError, TypeError):
-        return Response({"error": "테두리를 찾을 수 없습니다."}, status=404)
+        return Response({"error": "프레임을 찾을 수 없습니다."}, status=404)
     if "name" in request.data:
         name = " ".join(str(request.data.get("name") or "").split())
         if not name or len(name) > BORDER_NAME_MAX:
@@ -604,7 +604,7 @@ def replace_border_image(request, border_id):
     """Admin: a new frame image for an uploaded border. Everyone who has it sees the new one."""
     border = get_object_or_404(Border, id=border_id)
     if not border.is_uploaded:
-        return Response({"error": "기본 제공 테두리는 이미지를 바꿀 수 없습니다."}, status=400)
+        return Response({"error": "기본 제공 프레임은 이미지를 바꿀 수 없습니다."}, status=400)
     try:
         content = _border_image(request.FILES.get("image"))
     except ValueError as e:
@@ -620,7 +620,7 @@ def delete_border(request, border_id):
     """Admin: remove an uploaded border, as long as nobody has it — a border someone bought or was given stays."""
     border = get_object_or_404(Border, id=border_id)
     if not border.is_uploaded:
-        return Response({"error": "기본 제공 테두리는 지울 수 없습니다."}, status=400)
+        return Response({"error": "기본 제공 프레임은 지울 수 없습니다."}, status=400)
     owners = border.user_unlocks.count() + border.equipped_by_users.count()
     if owners:
         return Response({"error": "이미 가진 이용자가 있어 지울 수 없습니다. 비매품으로 돌려 더 풀리지 않게 할 수 있습니다."}, status=409)

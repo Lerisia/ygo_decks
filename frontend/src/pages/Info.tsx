@@ -19,7 +19,7 @@ const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
   { to: "/playground", title: "놀이터", desc: "퀴즈·미니게임" },
   { to: "/tier-list-maker", title: "티어표 만들기", desc: "만들고 이미지로" },
   { to: "/deck-scanner", title: "AI 덱 스캔", desc: "사진으로 덱 알아보기" },
-  { to: "/icon-shop", title: "아이콘 샵", desc: "포인트로 아이콘 사기" },
+  { to: "/icon-shop", title: "포인트 상점", desc: "포인트로 아이콘·프레임 사기" },
   { title: "대회", desc: "준비 중", soon: true },
 ];
 

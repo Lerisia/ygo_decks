@@ -69,7 +69,7 @@ def award_points(user, amount: int, kind: str = "other", note: str = "") -> dict
             )
             unlocked.append(b.key)
             notify(
-                u, f"누적 포인트 {threshold[b.key]:,}P를 돌파하여 {b.name} 아이콘 테두리를 획득하였습니다.",
+                u, f"누적 포인트 {threshold[b.key]:,}P를 돌파하여 {b.name} 아이콘 프레임을 획득하였습니다.",
                 action_label="아이콘 설정으로 이동", action_url="/mypage/avatar", kind="border_unlock",
             )
         return {"newly_unlocked": unlocked}

@@ -71,7 +71,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       { label: "멀티플레이", to: "/multiplayer", desc: "여럿이 함께" },
       { label: "솔로 플레이", to: "/solo", desc: "혼자 즐기는 미니게임" },
-      { label: "아이콘 샵", to: "/icon-shop", desc: "포인트로 아이콘 사기" },
+      { label: "포인트 상점", to: "/icon-shop", desc: "포인트로 아이콘·프레임 사기" },
       { label: "등반 덱 기록", to: "https://mdarchive.pages.dev/#climb", desc: "외부 사이트", external: true },
       { label: "대회", to: "", desc: "준비 중", soon: true },
     ],
@@ -81,7 +81,7 @@ export const MENU_GROUPS: MenuGroup[] = [
 export const ME_ITEMS: MenuItem[] = [
   { label: "마이페이지", to: "/mypage", auth: true },
   { label: "포인트 내역", to: "/mypage/points", auth: true },
-  { label: "아이콘·테두리", to: "/mypage/avatar", auth: true },
+  { label: "아이콘·프레임", to: "/mypage/avatar", auth: true },
 ];
 
 // 더보기 page's 기타 section, under the 화면 밝기 switch (특이점 2026-10-08).

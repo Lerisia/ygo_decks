@@ -62,7 +62,7 @@ class NotificationApiTest(TestCase):
 
 
 class BorderUnlockNotificationTest(TestCase):
-    """누적 포인트로 테두리를 얻으면 시스템 알림이 온다."""
+    """누적 포인트로 프레임을 얻으면 시스템 알림이 온다."""
 
     def test_crossing_a_tier_sends_a_notification(self):
         from avatar.models import Border
@@ -73,7 +73,7 @@ class BorderUnlockNotificationTest(TestCase):
         award_points(me, thr)
         n = Notification.objects.get(user=me)
         self.assertEqual(n.sender, "시스템")
-        self.assertEqual(n.body, f"누적 포인트 {thr:,}P를 돌파하여 아이언 아이콘 테두리를 획득하였습니다.")
+        self.assertEqual(n.body, f"누적 포인트 {thr:,}P를 돌파하여 아이언 아이콘 프레임을 획득하였습니다.")
         self.assertEqual((n.action_label, n.action_url), ("아이콘 설정으로 이동", "/mypage/avatar"))
         award_points(me, 1)  # nothing new crossed
         self.assertEqual(Notification.objects.filter(user=me).count(), 1)

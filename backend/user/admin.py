@@ -37,8 +37,8 @@ class UserBorderUnlockInline(admin.TabularInline):
     fields = ("border", "granted_at", "note")
     readonly_fields = ("granted_at",)
     autocomplete_fields = ("border",)
-    verbose_name = "보유 테두리"
-    verbose_name_plural = "보유 테두리"
+    verbose_name = "보유 프레임"
+    verbose_name_plural = "보유 프레임"
 
 
 class CustomUserAdmin(UserAdmin):

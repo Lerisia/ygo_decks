@@ -56,7 +56,7 @@ export default function MyAvatar() {
       const r = await setMyBorder(b.id);
       setCurrentBorder(r.border);
     } catch (e: any) {
-      setError(e.message || "테두리 변경 실패");
+      setError(e.message || "프레임 변경 실패");
     } finally {
       setSavingBorder(null);
     }
@@ -162,7 +162,7 @@ export default function MyAvatar() {
             {isDefault && " · 기본"}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            테두리: {currentBorder?.name || "없음"}
+            프레임: {currentBorder?.name || "없음"}
           </p>
         </div>
         {!isDefault && current && (
@@ -180,7 +180,7 @@ export default function MyAvatar() {
         <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-2 py-2 sm:p-4 mb-4">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="font-semibold text-sm">
-              테두리{" "}
+              프레임{" "}
               <span className="font-normal text-gray-500 dark:text-gray-400 tabular-nums">
                 {borderCollection.owned} / {borderCollection.total}
               </span>
@@ -189,7 +189,7 @@ export default function MyAvatar() {
               to="/icon-shop?tab=border"
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
             >
-              상점으로 가기
+              포인트 상점으로 가기
             </Link>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">

@@ -9,7 +9,7 @@ import Avatar, { BORDER_THICKNESS_RATIO_IMAGE } from "@/components/Avatar";
 
 const CATEGORY_LABEL: Record<IconCategory, string> = {
   default: "기본 지급",
-  shop: "상점 판매",
+  shop: "포인트 상점 판매",
   exclusive: "비매품",
 };
 const BORDER_RARITIES = ["rare", "epic", "legendary"] as const;
@@ -70,7 +70,7 @@ export default function AdminBorders() {
       .then((d) => setBorders(d.borders))
       .catch((e: Error) => {
         setBorders([]);
-        setError(e.message || "테두리 목록을 불러오지 못했습니다.");
+        setError(e.message || "프레임 목록을 불러오지 못했습니다.");
       });
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function AdminBorders() {
     setUploadMsg(null);
     try {
       const b = await createBorder(name.trim(), picked.file, category, category === "shop" ? rarity : "");
-      setUploadMsg({ ok: true, text: `'${b.name}' 테두리를 올렸습니다.` });
+      setUploadMsg({ ok: true, text: `'${b.name}' 프레임을 올렸습니다.` });
       setPicked(null);
       setName("");
       if (fileRef.current) fileRef.current.value = "";
@@ -130,12 +130,12 @@ export default function AdminBorders() {
   };
 
   const rename = (b: Border) => {
-    const next = window.prompt("테두리 이름", b.name)?.trim();
+    const next = window.prompt("프레임 이름", b.name)?.trim();
     if (next && next !== b.name) change(b.id, () => updateBorder(b.id, { name: next }));
   };
 
   const remove = (b: Border) => {
-    if (window.confirm(`'${b.name}' 테두리를 지울까요? 되돌릴 수 없습니다.`))
+    if (window.confirm(`'${b.name}' 프레임을 지울까요? 되돌릴 수 없습니다.`))
       change(b.id, () => deleteBorder(b.id).then(() => null));
   };
 
@@ -158,10 +158,10 @@ export default function AdminBorders() {
       >
         ← 관리
       </button>
-      <h1 className="text-xl font-bold mb-4 px-2 sm:px-0">🖼️ 테두리 관리</h1>
+      <h1 className="text-xl font-bold mb-4 px-2 sm:px-0">🖼️ 프레임 관리</h1>
 
       <form onSubmit={onUpload} className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-3 py-4 sm:p-5 mb-6">
-        <h2 className="text-base font-semibold mb-3">새 테두리 올리기</h2>
+        <h2 className="text-base font-semibold mb-3">새 프레임 올리기</h2>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <a
@@ -171,7 +171,7 @@ export default function AdminBorders() {
             style={{ background: CHECKER }}
             title="가이드 템플릿 내려받기"
           >
-            <img src="/images/border-template.png" alt="테두리 가이드 템플릿" width={160} height={160} />
+            <img src="/images/border-template.png" alt="프레임 가이드 템플릿" width={160} height={160} />
           </a>
           <ul className="list-disc pl-5 space-y-1 text-sm">
             <li>
@@ -184,10 +184,10 @@ export default function AdminBorders() {
               <b>아이콘 자리</b>: 가운데 지름 {ICON_DIAMETER}px(전체의 {Math.round(ICON_SHARE * 100)}%) 원. 투명하게 비워 둡니다.
             </li>
             <li>
-              <b>테두리 그림</b>: 그 바깥 폭 {RING_WIDTH}px 고리에 그립니다. 네 귀퉁이까지 써도 됩니다.
+              <b>프레임 그림</b>: 그 바깥 폭 {RING_WIDTH}px 고리에 그립니다. 네 귀퉁이까지 써도 됩니다.
             </li>
             <li>
-              테두리는 아이콘 <b>위에</b> 덮어 그려집니다. 구멍을 {ICON_DIAMETER}px보다 조금 작게(370px쯤) 뚫으면 틈이 생기지 않고, 장식이 아이콘 가장자리를 살짝 덮어도 됩니다.
+              프레임은 아이콘 <b>위에</b> 덮어 그려집니다. 구멍을 {ICON_DIAMETER}px보다 조금 작게(370px쯤) 뚫으면 틈이 생기지 않고, 장식이 아이콘 가장자리를 살짝 덮어도 됩니다.
             </li>
             <li>32px로 작게 보이는 곳이 많습니다. 가는 선과 작은 글씨는 뭉개집니다.</li>
             <li>
@@ -237,7 +237,7 @@ export default function AdminBorders() {
             </select>
           </label>
           <label className="text-sm">
-            <span className="block mb-1 font-semibold">등급 (상점 판매일 때)</span>
+            <span className="block mb-1 font-semibold">등급 (포인트 상점 판매일 때)</span>
             <select
               id="border-rarity"
               value={rarity}
@@ -296,7 +296,7 @@ export default function AdminBorders() {
       </form>
 
       <div className="bg-white dark:bg-gray-800 sm:rounded-xl sm:shadow px-3 py-4 sm:p-5">
-        <h2 className="text-base font-semibold mb-3">테두리 목록{borders && ` (${borders.length}개)`}</h2>
+        <h2 className="text-base font-semibold mb-3">프레임 목록{borders && ` (${borders.length}개)`}</h2>
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-3 text-sm text-red-700 dark:text-red-300">
             {error}
@@ -374,7 +374,7 @@ export default function AdminBorders() {
         </div>
         <input ref={replaceRef} type="file" accept="image/png,image/webp" onChange={onReplacePicked} className="hidden" />
         <p className="text-[11px] text-gray-400 mt-3">
-          상점 판매로 바꾸면 등급에서 가격이 자동으로 정해집니다. 올린 테두리는 이름·이미지를 바꿀 수 있고, 가진 이용자가 없을 때만 지울 수 있습니다. 사이트가 직접 그리는 기본 테두리는 등급·가격만 바꿀 수 있습니다.
+          포인트 상점 판매로 바꾸면 등급에서 가격이 자동으로 정해집니다. 올린 프레임은 이름·이미지를 바꿀 수 있고, 가진 이용자가 없을 때만 지울 수 있습니다. 사이트가 직접 그리는 기본 프레임은 등급·가격만 바꿀 수 있습니다.
         </p>
         <button type="button" onClick={() => navigate("/manage/card-icons")} className={`${SECONDARY} mt-4`}>
           아이콘 관리로

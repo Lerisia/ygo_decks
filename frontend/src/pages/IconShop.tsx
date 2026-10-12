@@ -219,7 +219,7 @@ export default function IconShop() {
   return (
     <div className="min-h-screen px-4 py-6 max-w-6xl mx-auto">
       <div className="flex items-baseline justify-between mb-1">
-        <h1 className="text-2xl font-bold">상점</h1>
+        <h1 className="text-2xl font-bold">포인트 상점</h1>
         {loggedIn && points !== null && (
           <span className="text-sm font-semibold">
             내 포인트: <span className="text-blue-600 dark:text-blue-400">{points.toLocaleString()}P</span>
@@ -306,7 +306,7 @@ export default function IconShop() {
             </div>
           )}
           <p className="mt-8 text-xs text-gray-400 text-center">
-            구매한 프레임은 마이페이지 → 아바타 설정에서 장착할 수 있습니다.
+            구매한 프레임은 마이페이지 → 아이콘 설정에서 장착할 수 있습니다.
           </p>
         </div>
       )}
