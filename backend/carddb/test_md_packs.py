@@ -93,3 +93,48 @@ class CommandTest(TestCase):
             call_command("import_md_packs", stdout=out)
         self.assertIn("md packs: 1 packs, 1 cards", out.getvalue())
         self.assertEqual(MdPackCard.objects.count(), 1)
+
+
+class PackApiTest(TestCase):
+    def setUp(self):
+        import tempfile
+        from django.test import override_settings
+        from . import packs
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.media)
+        over = override_settings(MEDIA_ROOT=self.media, MEDIA_URL="/media/")
+        over.enable()
+        self.addCleanup(over.disable)
+        packs._cache.update(key=None)
+        import os
+        os.makedirs(os.path.join(self.media, "cards/face_thumb"))
+        os.makedirs(os.path.join(self.media, "md_ui/packs"))
+        for cid, rarity in ((1, "UR"), (2, "N"), (3, "R")):
+            c = Card.objects.create(id=cid, category="spell", name_ja=f"j{cid}", name_ko=f"카드{cid}", frame="spell")
+            MdPrint.objects.create(md_id=cid, card=c, rarity=rarity)
+            if cid != 3:   # a print with no face drawn yet is left out
+                open(os.path.join(self.media, f"cards/face_thumb/{cid}.webp"), "wb").close()
+        open(os.path.join(self.media, "md_ui/packs/1001.webp"), "wb").close()
+        md_packs.sync([mdm_set("m", "Master Pack", kind="Normal Pack", release="2022-01-19T00:00:00.000Z"),
+                       mdm_set("s", "Cell", release="2026-10-06T00:00:00.000Z"),
+                       mdm_set("d", "Deck", kind="Structure Deck"), mdm_set("b", "Xyz Reward", kind="Bonus Pack")],
+                      [mdm_card(1, "UR", "m", "s", "b"), mdm_card(2, "N", "m", "s", "d"), mdm_card(3, "R", "s")])
+        MdPack.objects.filter(mdm_id="s").update(game_id=1001, name_ko="세포 A")
+
+    def test_list(self):
+        r = self.client.get("/api/carddb/packs/").json()["packs"]
+        self.assertEqual([p["name"] for p in r], ["세포 A", "Master Pack"])   # newest first, openable only
+        self.assertEqual(r[0]["counts"], {"UR": 1, "SR": 0, "R": 1, "N": 1})
+        self.assertEqual(r[0]["image"], "/media/md_ui/packs/1001.webp")
+        self.assertEqual((r[0]["master"], r[1]["master"], r[1]["image"]), (False, True, None))
+
+    def test_pack(self):
+        s = MdPack.objects.get(mdm_id="s")
+        r = self.client.get(f"/api/carddb/packs/{s.id}/").json()
+        self.assertEqual(r["master_pack"], MdPack.objects.get(mdm_id="m").id)
+        self.assertEqual(sorted((c["print"], c["rarity"], c["name"]) for c in r["cards"]), [(1, "UR", "카드1"), (2, "N", "카드2")])
+        self.assertTrue(r["cards"][0]["thumb"].startswith("/media/cards/face_thumb/"))
+
+    def test_not_openable(self):
+        d = MdPack.objects.get(mdm_id="d")
+        self.assertEqual(self.client.get(f"/api/carddb/packs/{d.id}/").status_code, 404)
