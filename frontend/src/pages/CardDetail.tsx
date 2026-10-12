@@ -159,11 +159,11 @@ const BAN_TAB_KEY = "card_banlist_format";
 const EVENT_LABELS = { release: "출시", release_kr: "한국 발매" } as const;
 
 /** Master Duel's own 금제 icon (0 / 1 / 2 / 3 copies; mdpipeline/info_icons.py, served from media). */
-function BanIcon({ status }: { status: BanStatus }) {
+function BanIcon({ status, size = "w-6 h-6" }: { status: BanStatus; size?: string }) {
   return status === "unreleased" ? (
-    <span className="w-6 h-6 shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600" aria-hidden="true" />
+    <span className={`${size} shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600`} aria-hidden="true" />
   ) : (
-    <img src={`${ICONS}/limit/${status}.webp`} alt="" className="w-6 h-6 shrink-0" />
+    <img src={`${ICONS}/limit/${status}.webp`} alt="" className={`${size} shrink-0`} />
   );
 }
 
@@ -212,13 +212,19 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
         )}
       </div>
       {events.length ? (
-        <ol className="rounded-lg border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+        <ol className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
           {/* every line, however long: nothing folded away (엘리스 10/12) */}
           {events.map((e, i) => (
-            <li key={`${e.day}${e.event}`} className="flex items-center gap-2.5 px-3 py-2">
-              <BanIcon status={e.status} />
-              <span className="w-[5.5rem] shrink-0 tabular-nums text-gray-600 dark:text-gray-300">{day(e.day)}</span>
-              <span className={i === 0 ? "font-semibold" : ""}>
+            // the current line stands out: tinted, larger, a 현재 badge (엘리스 10/12)
+            <li
+              key={`${e.day}${e.event}`}
+              className={`flex items-center gap-2.5 px-3 ${i === 0 ? "py-3 bg-blue-50 dark:bg-blue-950/40 text-base" : "py-2"}`}
+            >
+              <BanIcon status={e.status} size={i === 0 ? "w-8 h-8" : "w-6 h-6"} />
+              <span className={`w-[5.5rem] shrink-0 tabular-nums ${i === 0 ? "text-gray-800 dark:text-gray-100 font-semibold text-sm" : "text-gray-600 dark:text-gray-300"}`}>
+                {day(e.day)}
+              </span>
+              <span className={i === 0 ? "font-bold" : ""}>
                 {e.event ? (
                   <>
                     {EVENT_LABELS[e.event]}
@@ -228,7 +234,7 @@ function CardHistory({ history }: { history: CardDoc["history"] }) {
                   BAN_LABELS[e.status]
                 )}
               </span>
-              {i === 0 && <span className="ml-auto shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400">현재</span>}
+              {i === 0 && <span className="ml-auto shrink-0 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-xs font-bold">현재</span>}
             </li>
           ))}
         </ol>
