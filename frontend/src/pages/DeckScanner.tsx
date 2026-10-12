@@ -55,13 +55,13 @@ export default function AIScanner() {
     <div className="min-h-screen px-4 pt-6 pb-4 md:px-8 md:pb-8 max-w-4xl mx-auto">
       <div className="max-w-lg md:max-w-xl mx-auto">
           <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">덱 스캐너</h1>
-          <p className="text-center text-gray-700 dark:text-gray-300 mb-6 text-base md:text-lg">
+          <p className="text-center text-gray-700 dark:text-gray-300 mb-6 text-base md:text-lg break-keep">
             유희왕 마스터 듀얼 '덱 리스트' 사진을 올려주세요.
             <br />
             카드 한 장 사진이나 일러스트만 있는 사진도 됩니다.
           </p>
 
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 md:p-5 mb-6 text-base md:text-base space-y-1">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 md:p-5 mb-6 text-base md:text-base space-y-1 break-keep">
             <p className="text-gray-600 dark:text-gray-400">
               ⚠️ 지나친 저화질, 어둡게 표시된 미보유 카드는 인식이 어렵습니다.
             </p>
