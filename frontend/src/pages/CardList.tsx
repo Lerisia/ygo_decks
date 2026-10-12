@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import PickerModal, { type PickerItem } from "@/components/PickerModal";
+import ComboBox, { type ComboItem } from "@/components/ComboBox";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import {
@@ -48,7 +48,6 @@ function rememberSort(f: CardFilters) {
   }
 }
 
-const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 const hasFilter = (f: CardFilters) =>
   !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has);
 // The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
@@ -114,8 +113,6 @@ export default function CardList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterOpen, setFilterOpen] = useState(() => panelFilter(filters));
-  const [pickingGroup, setPickingGroup] = useState(false);
-  const [groupQuery, setGroupQuery] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const request = useRef(0);
@@ -212,12 +209,10 @@ export default function CardList() {
   }, []);
 
   const groupName = options?.groups.find((g) => String(g.id) === filters.group)?.name;
-  const groupItems: PickerItem[] = useMemo(() => {
-    const q = normalize(groupQuery);
-    return (options?.groups ?? [])
-      .filter((g) => !q || normalize(g.name).includes(q))
-      .map((g) => ({ key: g.id, name: g.name, sub: `${g.count.toLocaleString()}장` }));
-  }, [options, groupQuery]);
+  const groupItems: ComboItem[] = useMemo(
+    () => (options?.groups ?? []).map((g) => ({ key: String(g.id), name: g.name, sub: `${g.count.toLocaleString()}장` })),
+    [options],
+  );
   const monsterOnly = filters.category === "spell" || filters.category === "trap";
 
   const select = (label: string, field: keyof CardFilters, opts: { value: string; label: string }[], disabled = false) => (
@@ -235,15 +230,27 @@ export default function CardList() {
       <DexTabs />
       {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
       {/* Enter (the phone keyboard's 검색 key) searches at once and puts the keyboard away. */}
-      <SearchForm onSearch={() => qInput.trim() !== filters.q && update({ q: qInput.trim() })}>
-        <Input
-          placeholder="카드 이름 검색 (한국어·일본어·영어)"
-          value={qInput}
-          onChange={(e) => setQInput(e.target.value)}
-          enterKeyHint="search"
-          className="mb-4"
+      {/* 카드군 sit beside the name search, out of the filter panel: they are used often (엘리스 10/12) */}
+      <div className="mb-4 grid gap-2 sm:grid-cols-[3fr_2fr]">
+        <SearchForm onSearch={() => qInput.trim() !== filters.q && update({ q: qInput.trim() })}>
+          <Input
+            placeholder="카드 이름 검색 (한국어·일본어·영어)"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            enterKeyHint="search"
+          />
+        </SearchForm>
+        <ComboBox
+          label="카드군"
+          placeholder="카드군 검색 (이름·초성)"
+          items={groupItems}
+          value={filters.group}
+          onPick={(group) => update({ group })}
+          onClear={() => update({ group: "" })}
+          emptyText="맞는 카드군이 없습니다."
+          loading={!options}
         />
-      </SearchForm>
+      </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
         <button
@@ -309,30 +316,6 @@ export default function CardList() {
                   </button>
                 );
               })}
-            </div>
-          </div>
-          <div className="text-left">
-            <span className="block text-sm font-semibold mb-1">카드군</span>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPickingGroup(true)}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                  filters.group ? "bg-blue-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-              >
-                {filters.group ? groupName ?? "카드군" : "카드군 고르기"}
-              </button>
-              {filters.group && (
-                <button
-                  type="button"
-                  onClick={() => update({ group: "" })}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  aria-label="카드군 지우기"
-                >
-                  ✕
-                </button>
-              )}
             </div>
           </div>
           <div className="flex justify-center">
@@ -451,23 +434,6 @@ export default function CardList() {
       )}
       <div ref={sentinel} className="h-px" />
 
-      <PickerModal
-        open={pickingGroup}
-        onClose={() => setPickingGroup(false)}
-        title="카드군 고르기"
-        placeholder="카드군 이름"
-        query={groupQuery}
-        onQueryChange={setGroupQuery}
-        items={groupItems}
-        status={!options ? "loading" : groupItems.length ? "ready" : "empty"}
-        emptyText="맞는 카드군이 없습니다."
-        onPick={(item) => {
-          setPickingGroup(false);
-          update({ group: String(item.key) });
-        }}
-        viewKey="card-groups"
-        defaultView="list"
-      />
 
       {showScrollTop && onList && (
         <button
