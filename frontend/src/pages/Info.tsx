@@ -11,6 +11,8 @@ import { useDexCounts } from "@/components/DexTabs";
 // Home (redesign 2026-10): two pillars, the 도감 (decks and cards) then 레코더; the rest as small tiles; 문의·후원 at the bottom.
 
 const COLLAGE = 6;   // phone shows the first 4
+// How far each picture in the strip overlaps the one before it, as a share of a picture's width.
+const BLEND = 50;
 
 const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
   { to: "/records", title: "전적 시트", desc: "메타 통계·내 전적" },
@@ -83,9 +85,23 @@ function Info() {
           <div className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 h-28 md:h-40 rounded-t-[15px] overflow-hidden bg-gray-200 dark:bg-gray-700">
             {Array.from({ length: COLLAGE }, (_, i) => {
               const d = decks[i];
-              const cls = `${i >= 4 ? "hidden md:block" : ""} w-full h-full`;
+              const cls = `${i >= 4 ? "hidden md:block" : ""} relative w-full h-full`;
+              // Each picture reaches back over the one before and fades in across that overlap, which stays solid
+              // beneath it, so one picture turns into the next instead of meeting it at a hard edge (참혈 2026-10-12).
               return d ? (
-                <img key={d.id} src={d.cover_image_phone || d.cover_image} alt="" className={`${cls} object-cover`} />
+                <div key={d.id} className={cls} style={{ zIndex: i }}>
+                  <img
+                    src={d.cover_image_phone || d.cover_image}
+                    alt=""
+                    className="absolute top-0 h-full max-w-none object-cover"
+                    style={i === 0 ? { left: 0, width: `calc(100% + ${BLEND / 2}%)` } : {
+                      left: `-${BLEND / 2}%`,
+                      width: `calc(100% + ${BLEND}%)`,
+                      maskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
+                      WebkitMaskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
+                    }}
+                  />
+                </div>
               ) : (
                 <div key={i} className={`${cls} ${popular ? "" : "animate-pulse"} bg-gray-200 dark:bg-gray-700`} />
               );
