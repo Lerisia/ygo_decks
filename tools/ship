@@ -9,7 +9,7 @@ set -euo pipefail
 
 MAIN=/home/elyss/ygo_decks
 ROOT=/home/elyss/storage/wt
-LOCK=/tmp/ygo_ship.lock
+LOCK=/home/elyss/storage/wt/.ship.lock   # not /tmp: the coding bot has a /tmp of its own (PrivateTmp)
 PY=$MAIN/backend/venv/bin/python   # a worktree's own backend/venv is only the part git happens to hold
 SITE=https://localhost
 HOST=ygodecks.com

@@ -24,7 +24,7 @@ RestartSec=10
 # through the bot's own capabilities.
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/elyss/ygo_decks /home/elyss/.cache /home/elyss/.config /home/elyss/.claude /home/elyss/.local /var/www/frontend
+ReadWritePaths=/home/elyss/ygo_decks /home/elyss/storage/wt /home/elyss/.cache /home/elyss/.config /home/elyss/.claude /home/elyss/.local /var/www/frontend
 PrivateTmp=true
 
 StandardOutput=journal
