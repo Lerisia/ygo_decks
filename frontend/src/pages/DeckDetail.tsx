@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
+import { lazyChunk } from "@/lib/lazyChunk";
 import { Link, useParams } from "react-router-dom";
 import { isAuthenticated, canEditDeckBook } from "@/api/accountApi";
 import { LazyStatRadar } from "@/components/charts/LazyStatRadar";
@@ -11,7 +12,7 @@ import BackToDex from "@/components/BackToDex";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import StatInfoButton from "@/components/StatInfoButton";
 
-const SimpleMDE = lazy(() => import("@/components/MarkdownEditor"));
+const SimpleMDE = lazyChunk(() => import("@/components/MarkdownEditor"));
 
 interface DeckStats {
   consistency: number;

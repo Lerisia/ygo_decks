@@ -1,4 +1,5 @@
-import { lazy, Suspense, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { lazyChunk } from "@/lib/lazyChunk";
 import { Link, useParams } from "react-router-dom";
 import BackToDex from "@/components/BackToDex";
 import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
@@ -7,8 +8,8 @@ import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
 // The finishes' shaders and the summon player arrive when first used, not with the page (2026-10-12)
-const CardFinishCanvas = lazy(() => import("@/components/CardFinishCanvas"));
-const CutinOverlay = lazy(() => import("@/components/CutinOverlay"));
+const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
+const CutinOverlay = lazyChunk(() => import("@/components/CutinOverlay"));
 
 // Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
 const ROYAL_RARITIES = new Set(["SR", "UR", ""]);   // "" for a print whose rarity is not known

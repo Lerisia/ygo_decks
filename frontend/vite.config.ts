@@ -102,6 +102,8 @@ export default defineConfig({
         manualChunks(id) {
           if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router)\//.test(id)) return "react";
         },
+        // a chunk from a package's index.js is not named index: index-* is the entry alone, which the worker precaches
+        chunkFileNames: (chunk) => (chunk.name === "index" ? "assets/chunk-[hash].js" : "assets/[name]-[hash].js"),
       },
     },
   },
