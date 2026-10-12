@@ -189,7 +189,7 @@ export default function MyAvatar() {
               to="/icon-shop?tab=border"
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
             >
-              포인트 상점으로 가기
+              상점으로 가기
             </Link>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">

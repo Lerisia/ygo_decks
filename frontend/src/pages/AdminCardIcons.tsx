@@ -13,7 +13,7 @@ import SearchForm from "@/components/SearchForm";
 
 const CATEGORY_LABEL: Record<IconCategory, string> = {
   default: "기본 지급",
-  shop: "포인트 상점 판매",
+  shop: "상점 판매",
   exclusive: "비매품",
 };
 
@@ -643,7 +643,7 @@ export default function AdminCardIcons() {
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm mb-2"
               >
                 <option value="default">기본 지급 (모든 유저에게 표시)</option>
-                <option value="shop">포인트 상점 판매</option>
+                <option value="shop">상점 판매</option>
                 <option value="exclusive">비매품 (어드민 부여)</option>
               </select>
               {category === "shop" && (

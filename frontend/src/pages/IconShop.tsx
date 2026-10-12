@@ -219,7 +219,7 @@ export default function IconShop() {
   return (
     <div className="min-h-screen px-4 py-6 max-w-6xl mx-auto">
       <div className="flex items-baseline justify-between mb-1">
-        <h1 className="text-2xl font-bold">포인트 상점</h1>
+        <h1 className="text-2xl font-bold">상점</h1>
         {loggedIn && points !== null && (
           <span className="text-sm font-semibold">
             내 포인트: <span className="text-blue-600 dark:text-blue-400">{points.toLocaleString()}P</span>

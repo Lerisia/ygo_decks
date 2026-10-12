@@ -10,7 +10,7 @@ class Border(models.Model):
     # priced — so there's no creation flow, just rarity/category edits.)
     CATEGORY_CHOICES = [
         ("default", "기본 지급"),
-        ("shop", "포인트 상점 판매"),
+        ("shop", "상점 판매"),
         ("exclusive", "비매품"),
     ]
     # Frames start at 희귀 — there's no 일반 tier for borders.
@@ -31,8 +31,8 @@ class Border(models.Model):
     image = models.ImageField(upload_to="border_assets/", blank=True, null=True, help_text="frame drawn over the icon (square, transparent background, the middle left clear)")
     is_default = models.BooleanField(default=False, help_text="auto-grant to all users when they sign up")
     category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default="exclusive")
-    rarity = models.CharField(max_length=16, choices=RARITY_CHOICES, blank=True, default="", help_text="등급 (포인트 상점 판매 시 가격 자동 결정)")
-    price = models.PositiveIntegerField(default=0, help_text="포인트 상점 프레임은 등급에서 자동 결정")
+    rarity = models.CharField(max_length=16, choices=RARITY_CHOICES, blank=True, default="", help_text="등급 (상점 판매 시 가격 자동 결정)")
+    price = models.PositiveIntegerField(default=0, help_text="상점 프레임은 등급에서 자동 결정")
     sort_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -136,7 +136,7 @@ class CardIcon(models.Model):
 
     CATEGORY_CHOICES = [
         ("default", "기본 지급"),
-        ("shop", "포인트 상점 판매"),
+        ("shop", "상점 판매"),
         ("exclusive", "비매품"),
     ]
 

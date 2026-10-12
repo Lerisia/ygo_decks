@@ -9,7 +9,7 @@ import Avatar, { BORDER_THICKNESS_RATIO_IMAGE } from "@/components/Avatar";
 
 const CATEGORY_LABEL: Record<IconCategory, string> = {
   default: "기본 지급",
-  shop: "포인트 상점 판매",
+  shop: "상점 판매",
   exclusive: "비매품",
 };
 const BORDER_RARITIES = ["rare", "epic", "legendary"] as const;
@@ -237,7 +237,7 @@ export default function AdminBorders() {
             </select>
           </label>
           <label className="text-sm">
-            <span className="block mb-1 font-semibold">등급 (포인트 상점 판매일 때)</span>
+            <span className="block mb-1 font-semibold">등급 (상점 판매일 때)</span>
             <select
               id="border-rarity"
               value={rarity}
@@ -374,7 +374,7 @@ export default function AdminBorders() {
         </div>
         <input ref={replaceRef} type="file" accept="image/png,image/webp" onChange={onReplacePicked} className="hidden" />
         <p className="text-[11px] text-gray-400 mt-3">
-          포인트 상점 판매로 바꾸면 등급에서 가격이 자동으로 정해집니다. 올린 프레임은 이름·이미지를 바꿀 수 있고, 가진 이용자가 없을 때만 지울 수 있습니다. 사이트가 직접 그리는 기본 프레임은 등급·가격만 바꿀 수 있습니다.
+          상점 판매로 바꾸면 등급에서 가격이 자동으로 정해집니다. 올린 프레임은 이름·이미지를 바꿀 수 있고, 가진 이용자가 없을 때만 지울 수 있습니다. 사이트가 직접 그리는 기본 프레임은 등급·가격만 바꿀 수 있습니다.
         </p>
         <button type="button" onClick={() => navigate("/manage/card-icons")} className={`${SECONDARY} mt-4`}>
           아이콘 관리로
