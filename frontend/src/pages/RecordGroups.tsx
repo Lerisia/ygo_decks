@@ -124,7 +124,7 @@ const RecordGroups = () => {
         setMetaStats(data.meta_decks || []);
         setTotalMatches(data.total_matches || 0);
         // counted from a reset: named by its Master Duel season rather than the moment (특이점 2026-10-12)
-        if (data.since_reset && data.since) setMetaSince(`시즌 ${mdSeason(new Date(data.since))}`);
+        if (data.since_reset && data.since) setMetaSince(`Season ${mdSeason(new Date(data.since))}`);
       })
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));
   }, []);

@@ -1,4 +1,4 @@
-// Master Duel's ranked seasons run a calendar month each: October 2026 is 시즌 58, November 59, … (특이점 2026-10-12).
+// Master Duel's ranked seasons run a calendar month each: October 2026 is Season 58, November 59, … (특이점 2026-10-12).
 const BASE = { year: 2026, month: 10, season: 58 };
 
 /** The season a moment falls in, by its month in Korea. */
