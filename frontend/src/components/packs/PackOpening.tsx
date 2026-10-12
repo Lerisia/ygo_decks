@@ -570,8 +570,9 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     const wait = rattleOf(i);
     if (wait) {
       el.animate([0, 7, -7, 6, -6, 5, -4, 2, 0].map((d) => ({ transform: `rotate(${d}deg)` })), { duration: T.rattle, delay: start });
-      // played from where it is heard (LEAD), so the "챠카챠카" comes with the shake (엘리스 10/13)
-      window.setTimeout(() => { if (alive.current) playPackSound("proc_rare_02", 0.85); }, start);
+      // the game's card-shake rattle, "챠카챠카" (엘리스 10/13; heard in its openings under each shake once the music is
+      // filtered out — not the rising proc_rare_02 used before)
+      window.setTimeout(() => { if (alive.current) playPackSound("card_shake", 0.85); }, start);
     }
     const delay = start + wait;
     // a UR first twists the wrong way, then whips round
