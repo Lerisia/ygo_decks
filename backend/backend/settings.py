@@ -26,6 +26,7 @@ MD_NAMED_PATH = os.environ.get("MD_NAMED_PATH", "/home/elyss/storage/md/extract/
 BANLIST_CACHE = os.environ.get("BANLIST_CACHE", "/home/elyss/storage/banlists/yugipedia")
 # the game's own pack numbers, Korean names and covers, taken from the Master Duel client (the pack simulator)
 MD_PACK_MAP = os.environ.get("MD_PACK_MAP", "/home/elyss/storage/md/packs/pack_map.json")
+MD_ALT_CAMPAIGNS = os.environ.get("MD_ALT_CAMPAIGNS", "/home/elyss/storage/md/packs/altart/campaigns.json")
 
 from django.conf import settings
 from django.conf.urls.static import static

@@ -326,6 +326,22 @@ class MdPackCard(models.Model):
         constraints = [models.UniqueConstraint(fields=["pack", "md_print"], name="carddb_mdpackcard_unique")]
 
 
+class MdPackVersion(models.Model):
+    """A selection or secret pack as it was sold while a campaign gave cards in it a new art or an 오버프레임 (Yugipedia's
+    record of when each came; 엘리스 2026-10-13: the usual pack and each campaign's, side by side): the days, which of
+    the pack's prints came as which art, and the cover the game gave it then."""
+
+    pack = models.ForeignKey(MdPack, on_delete=models.CASCADE, related_name="versions")
+    start = models.DateField()
+    end = models.DateField()
+    swaps = models.JSONField(default=dict)   # {base print id: art print id}
+    cover = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        ordering = ["pack", "start", "end"]
+        constraints = [models.UniqueConstraint(fields=["pack", "start", "end"], name="carddb_mdpackversion_unique")]
+
+
 class PackPull(models.Model):
     """What a user has pulled in the pack simulator (엘리스 2026-10-13, 카드 모음): how many of a print, in a finish, and
     the rarity it came in (an other art from a bundle comes as UR)."""

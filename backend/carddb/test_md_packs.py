@@ -144,17 +144,120 @@ class PackMapTest(TestCase):
         self.assertEqual(self.sync()["changed"] + self.sync()["added"], 0)
 
 
+class CampaignTest(TestCase):
+    """An other art that came for a while in every pack holding the card (Yugipedia: "Master Packs / Selection Packs /
+    Secret Packs") makes a version of each selection and secret pack on sale then, beside its usual one; the master
+    pack keeps its usual arts; one from a set named for it is in that set (엘리스 2026-10-13)."""
+
+    PAGE = """{{Master Duel card
+| rarity      = UR
+| alternate_art = 2; February 7, 2024 - April 11, 2024 * February 5, 2026 - April 9, 2026; 1st Anniversary Bundle
+3; February 5, 2026 - April 28, 2026
+4; August 19, 2026 - October 6, 2026; WCS 2026 Special Collection
+| extended_art = 1; August 5, 2026 - October 6, 2026
+| ja_name     = ブラック・マジシャン
+
+| fr_name     = x
+}}"""
+
+    def test_parse(self):
+        got = md_packs.parse_campaigns("Dark Magician (Master Duel)", self.PAGE)
+        self.assertEqual([(g["overframe"], g["art"], g["source"]) for g in got],
+                         [(False, 2, "1st Anniversary Bundle"), (False, 3, ""), (False, 4, "WCS 2026 Special Collection"),
+                          (True, 1, "")])
+        self.assertEqual(got[0]["spans"], [("2024-02-07", "2024-04-11"), ("2026-02-05", "2026-04-09")])
+        self.assertEqual((got[0]["card"], got[0]["ja"]), ("Dark Magician", "ブラック・マジシャン"))
+
+    def setUp(self):
+        def card(cid, name):
+            c = Card.objects.create(id=cid, category="monster", name_ja=name, name_en=name, frame="effect")
+            MdPrint.objects.create(md_id=cid, card=c, rarity="UR")
+            MdPrint.objects.create(md_id=cid * 10, card=c, is_alt_art=True, rarity="UR")
+        card(5, "Knight")    # in packs on sale then and not
+        card(7, "Magician")  # its art came from a set named for it
+        self.sets = [
+            mdm_set("m", "Master Pack", kind="Normal Pack", release="2022-01-19T00:00:00.000Z"),
+            dict(mdm_set("on", "On Sale", kind="Selection Pack", release="2026-01-08T00:00:00.000Z"), expires="2026-03-01T00:00:00.000Z"),
+            dict(mdm_set("off", "Long Gone", kind="Selection Pack", release="2024-05-09T00:00:00.000Z"), expires="2024-07-11T00:00:00.000Z"),
+            mdm_set("sec", "Old Secret", release="2022-01-19T00:00:00.000Z"),
+            mdm_set("late", "Later Secret", release="2026-06-01T00:00:00.000Z"),
+            dict(mdm_set("wcs", "WCS 2026 Special Collection", kind="Selection Pack", release="2026-08-19T00:00:00.000Z"),
+                 expires="2026-10-06T00:00:00.000Z"),
+        ]
+        self.cards = [mdm_card(5, "UR", "m", "on", "off", "sec", "late"), mdm_card(7, "UR", "sec", "wcs")]
+
+    def sync(self, campaigns, pack_map=None):
+        md_packs.sync(self.sets, self.cards, pack_map=pack_map, campaigns=campaigns)
+        return {p.mdm_id: (sorted(p.cards.values_list("md_print_id", flat=True)),
+                           [(str(v.start), str(v.end), v.swaps) for v in p.versions.all()]) for p in MdPack.objects.all()}
+
+    def test_versions_of_the_packs_on_sale_then(self):
+        got = self.sync({50: {"spans": [("2024-06-01", "2024-06-30"), ("2026-02-05", "2026-04-09")], "source": ""}})
+        self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-04-09", {"5": 50})]))
+        self.assertEqual(got["sec"][1], [("2024-06-01", "2024-06-30", {"5": 50}), ("2026-02-05", "2026-04-09", {"5": 50})])
+        self.assertEqual(got["sec"][0], [5, 7])                          # the usual pack keeps the usual art
+        self.assertEqual(got["off"][1], [("2024-06-01", "2024-06-30", {"5": 50})])
+        self.assertEqual((got["late"][1], got["m"]), ([], ([5], [])))  # not out yet; the master pack is left alone
+
+    def test_a_set_named_for_it(self):
+        got = self.sync({70: {"spans": [("2026-08-19", "2026-10-06")], "source": "WCS 2026 Special Collection"}})
+        self.assertEqual((got["wcs"], got["sec"][0]), (([70], []), [5, 7]))
+
+    def test_versions_follow_the_source(self):
+        self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}})
+        got = self.sync({})
+        self.assertEqual(got["on"], ([5], []))
+
+    def test_a_cover_shows_it_though_the_pack_came_later(self):
+        # the pack came out after the art's spans with that art on its cover: its usual pack has it
+        pack_map = {"late": {"game_id": 2300, "name_ko": "", "cover": "03_5", "arts": [("03_50", 50)]}}
+        got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}}, pack_map=pack_map)
+        self.assertEqual(got["late"], ([50], []))
+        self.assertEqual(MdPack.objects.get(mdm_id="late").cover, "03_50")
+        # a pack on sale then that shows it: a version, with that cover
+        pack_map = {"sec": {"game_id": 2001, "name_ko": "", "cover": "03_1", "arts": [("03_50", 50)]}}
+        self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}}, pack_map=pack_map)
+        v = MdPack.objects.get(mdm_id="sec").versions.get()
+        self.assertEqual((v.swaps, v.cover), ({"5": 50}, "03_50"))
+
+    def test_resolve_names_to_prints(self):
+        MdPrint.objects.create(md_id=52, card_id=5, is_alt_art=True, rarity="UR")
+        got = md_packs.campaign_prints(
+            [{"card": "Knight", "ja": "", "overframe": False, "art": 3, "spans": [("2026-02-05", "2026-04-09")], "source": ""},
+             {"card": "Nobody", "ja": "Magician", "overframe": False, "art": 2, "spans": [], "source": "x"},
+             {"card": "Nobody", "ja": "", "overframe": False, "art": 2, "spans": [], "source": ""}],
+            overframe=lambda md_id: False)
+        self.assertEqual(got, {52: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}, 70: {"spans": [], "source": "x"}})
+
+
 class CommandTest(TestCase):
-    @override_settings(MD_PACK_MAP="/nonexistent/pack_map.json")
+    def setUp(self):
+        import shutil
+        import tempfile
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+
     def test_command(self):
         Card.objects.create(id=1, category="spell", name_ja="1", name_en="1", frame="spell")
         MdPrint.objects.create(md_id=1, card_id=1, rarity="R")
         out = StringIO()
-        with mock.patch.object(md_packs, "fetch_sets", return_value=[mdm_set("s1", "Pack")]), \
-             mock.patch.object(md_packs, "fetch_cards", return_value=[mdm_card(1, "R", "s1")]):
+        with override_settings(MD_PACK_MAP="/nonexistent/pack_map.json", MD_ALT_CAMPAIGNS=f"{self.dir}/campaigns.json"), \
+             mock.patch.object(md_packs, "fetch_sets", return_value=[mdm_set("s1", "Pack")]), \
+             mock.patch.object(md_packs, "fetch_cards", return_value=[mdm_card(1, "R", "s1")]), \
+             mock.patch.object(md_packs, "fetch_campaigns", return_value=[]):
             call_command("import_md_packs", stdout=out)
         self.assertIn("md packs: 1 packs, 1 cards", out.getvalue())
         self.assertEqual(MdPackCard.objects.count(), 1)
+
+    def test_campaigns_kept_for_when_yugipedia_is_away(self):
+        import requests
+        path = f"{self.dir}/campaigns.json"
+        entry = {"card": "x", "ja": "", "overframe": False, "art": 2, "spans": [["2026-02-05", "2026-04-09"]], "source": ""}
+        with mock.patch.object(md_packs, "fetch_campaigns", return_value=[entry]):
+            self.assertEqual(md_packs.load_campaigns(path), [entry])
+        with mock.patch.object(md_packs, "fetch_campaigns", side_effect=requests.ConnectionError):
+            self.assertEqual(md_packs.load_campaigns(path), [entry])
+            self.assertEqual(md_packs.load_campaigns(f"{self.dir}/none.json"), [])
 
 
 class PackApiTest(TestCase):

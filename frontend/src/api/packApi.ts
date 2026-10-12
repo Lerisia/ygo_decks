@@ -4,10 +4,19 @@ export type PackKind = "normal" | "secret" | "selection";
 export type PackSummary = {
   id: number; kind: PackKind; name: string; name_en: string; released: string | null; image: string | null;
   master: boolean; counts: Record<Rarity, number>;
-  arts: { new_art: number; overframe: number };   // cards that came in a new art / an 오버프레임 with this pack
+  arts: { new_art: number; overframe: number };   // cards that came in a new art / an 오버프레임 in it
+  // a campaign's version of the pack, listed as a pack of its own (엘리스 10/13): its id, days and the cards in their art then
+  version: number | null; period: [string, string] | null; featured: string[];
 };
 export type PackCard = { print: number; card: number; name: string; rarity: Rarity; thumb: string; face: string | null };
-export type PackDetail = Omit<PackSummary, "counts" | "arts"> & { image_hd: string | null; cards: PackCard[]; master_pack?: number | null };
+/** The pack as a campaign sold it (엘리스 10/13): its days, its cover then, and the cards that came in their campaign art
+ *  (each naming the usual print it stands in for). */
+export type PackVersion = {
+  id: number; start: string; end: string; image: string | null; image_hd: string | null; arts: (PackCard & { base: number })[];
+};
+export type PackDetail = Omit<PackSummary, "counts" | "arts" | "version" | "period" | "featured"> & {
+  image_hd: string | null; cards: PackCard[]; master_pack?: number | null; versions: PackVersion[];
+};
 
 let list: Promise<PackSummary[]> | null = null;
 const details = new Map<number, Promise<PackDetail>>();
@@ -72,9 +81,9 @@ export async function getPackMine(id: number): Promise<PackMine> {
 }
 
 /** Buy one or ten packs with gems; the server draws them into the user's collection. */
-export async function openPack(id: number, count: 1 | 10): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
+export async function openPack(id: number, count: 1 | 10, version: number | null = null): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
   const r = await fetch(`/api/carddb/packs/${id}/open/`, {
-    method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count }),
+    method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count, version }),
   });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || body.detail || `HTTP ${r.status}`), { gems: body.gems });

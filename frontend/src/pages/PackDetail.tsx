@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
 import { GemIcon, PackTopBar } from "@/components/packs/Gem";
 import { setGems } from "@/lib/gems";
-import { type PackCard, type PackDetail as Pack, type PackMine, getPack, getPackMine, openPack } from "@/api/packApi";
+import { type PackCard, type PackDetail as Pack, type PackMine, type PackVersion, getPack, getPackMine, openPack } from "@/api/packApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { unlockPackSound } from "@/lib/packSound";
 import { type Pool, type Pulled, type Rarity, GEMS_PER_PACK, RATES } from "@/utils/packDraw";
@@ -14,6 +14,14 @@ const RARITIES: Rarity[] = ["UR", "SR", "R", "N"];
 const STEP = 60;
 const pct = (x: number) => `${+(x * 100).toFixed(3)}%`;
 const NO_TALLY = { gems: 0, packs: 0, ur: 0, sr: 0, owed: false };
+
+/** The pack as a version sold it: its cover then, and its cards with those of the campaign in their art. */
+const asSold = (pack: Pack, version: PackVersion | null): Pack => {
+  if (!version) return pack;
+  const art = new Map(version.arts.map(({ base, ...c }) => [base, c]));
+  return { ...pack, image: version.image ?? pack.image, image_hd: version.image_hd ?? pack.image_hd,
+           cards: pack.cards.map((c) => art.get(c.print) ?? c) };
+};
 
 const byRarity = (cards: PackCard[]): Pool<PackCard> => {
   const pool: Pool<PackCard> = { N: [], R: [], SR: [], UR: [] };
@@ -26,7 +34,8 @@ const byRarity = (cards: PackCard[]): Pool<PackCard> => {
 export default function PackDetail() {
   const id = Number(useParams().packId);
   const navigate = useNavigate();
-  const [pack, setPack] = useState<Pack | null>(null);
+  const [params] = useSearchParams();
+  const [loaded, setPack] = useState<Pack | null>(null);
   const [master, setMaster] = useState<Pack | null>(null);
   const [error, setError] = useState(false);
   const [mine, setMine] = useState<PackMine | null>(null);
@@ -79,6 +88,9 @@ export default function PackDetail() {
 
   const tally = mine?.tally ?? NO_TALLY;
   const gems = mine?.gems ?? 0;
+  // the usual pack, or a campaign's version of it as the list shows it (?v=, 엘리스 10/13)
+  const version = loaded?.versions.find((v) => v.id === Number(params.get("v"))) ?? null;
+  const pack = useMemo(() => loaded && asSold(loaded, version), [loaded, version]);
 
   const open = async (count: 1 | 10) => {
     if (!pack || busy) return;
@@ -94,7 +106,7 @@ export default function PackDetail() {
     setBusy(true);
     setNotice("");
     try {
-      const r = await openPack(id, count);
+      const r = await openPack(id, count, version?.id ?? null);
       const packs = r.packs.map((p) => p.map((c) => ({
         card: { print: c.print, card: c.card, name: c.name, rarity: c.rarity, thumb: c.thumb, face: c.face }, rarity: c.rarity, finish: c.finish,
       })));
@@ -158,6 +170,7 @@ export default function PackDetail() {
               </div>
             </div>
           </div>
+          {version && <VersionNote version={version} />}
           <p className="mt-2 min-h-[20px] text-sm text-red-600 dark:text-red-400" role="status">{notice}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm min-h-[24px]">
@@ -182,6 +195,26 @@ export default function PackDetail() {
       )}
       {rates && pack && <Rates pack={pack} master={master} onClose={() => setRates(false)} />}
     </div>
+  );
+}
+
+/** A campaign's version of the pack, a pack of its own in the list (엘리스 10/13): the days it was sold, and the cards that
+ *  came in their campaign art then. */
+function VersionNote({ version }: { version: PackVersion }) {
+  return (
+    <section className="mt-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3" aria-label="판매 시기">
+      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 tabular-nums">{version.start} ~ {version.end} 판매분</p>
+      <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">이때는 아래 카드가 신규 일러스트·오버프레임으로 나왔습니다.</p>
+      <ul className="mt-2 flex gap-2 overflow-x-auto pb-1">
+        {version.arts.map((c) => (
+          <li key={c.print} className="shrink-0 w-16 sm:w-20">
+            <Link to={`/cards/${c.card}`} title={c.name} className="block">
+              <img src={c.thumb} alt={c.name} loading="lazy" className="w-full aspect-[704/1024] rounded object-cover shadow" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

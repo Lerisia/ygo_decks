@@ -2,7 +2,7 @@
 the server (pack_draw), into the user's 카드 모음 (엘리스 10/13)."""
 import os
 import random
-from collections import Counter
+from collections import Counter, defaultdict
 
 from django.conf import settings
 from django.db import transaction
@@ -18,7 +18,7 @@ from user.gems import NotEnoughGems, change_gems
 from . import dex
 from .display import display_name
 from .face import face_thumb_url, face_url
-from .models import Card, MdPack, MdPackCard, PackPull, PackTally
+from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackPull, PackTally
 from .pack_draw import GEMS_PER_PACK, draw_pack, draw_ten
 
 RARITY_RANK = {"N": 0, "R": 1, "SR": 2, "UR": 3}
@@ -27,28 +27,30 @@ OPENABLE = [MdPack.Kind.NORMAL, MdPack.Kind.SECRET, MdPack.Kind.SELECTION]
 MASTER_PACK = "Master Pack"
 PACK_IMAGE_DIR = "md_ui/packs"   # the game's pack pictures, by their file name (MdPack.cover); hd/ for the opening
 
-_cache = {"key": None, "packs": None, "cards": {}, "pickups": None}
+_cache = {"key": None, "packs": None, "cards": {}, "pickups": None, "lineups": {}}
 
 
 def _key():
     agg = MdPackCard.objects.aggregate(n=Count("id"), last=Max("id"))
+    versions = MdPackVersion.objects.aggregate(n=Count("id"), last=Max("id"))
     try:
         pictures = os.stat(os.path.join(settings.MEDIA_ROOT, PACK_IMAGE_DIR)).st_mtime
     except OSError:
         pictures = None
-    return (MdPack.objects.count(), agg["n"], agg["last"], pictures)
+    return (MdPack.objects.count(), agg["n"], agg["last"], versions["n"], versions["last"], pictures)
 
 
 def _fresh():
     key = _key()
     if _cache["key"] != key:
-        _cache.update(key=key, packs=None, cards={}, pickups=None)
+        _cache.update(key=key, packs=None, cards={}, pickups=None, lineups={})
 
 
-def _image(pack, hd=False):
-    if not pack.cover:
+def _image(pack, hd=False, cover=None):
+    cover = cover or pack.cover
+    if not cover:
         return None
-    rel = f"{PACK_IMAGE_DIR}/{'hd/' if hd else ''}{pack.cover}.webp"
+    rel = f"{PACK_IMAGE_DIR}/{'hd/' if hd else ''}{cover}.webp"
     return settings.MEDIA_URL + rel if os.path.exists(os.path.join(settings.MEDIA_ROOT, rel)) else None
 
 
@@ -64,20 +66,42 @@ def _row(pack, counts=None):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def packs(request):
-    """The packs one can open (master, secret and selection packs), newest first, with how many cards of each rarity
-    and how many came in a new art or an 오버프레임."""
+    """The packs one can open (master, secret and selection packs) and the versions campaigns sold of them, newest
+    first, with how many cards of each rarity and how many came in a new art or an 오버프레임."""
     _fresh()
     if _cache["packs"] is None:
         rarities = ("UR", "SR", "R", "N")
         rows = (MdPack.objects.filter(kind__in=OPENABLE)
                 .annotate(**{r: Count("cards", filter=Q(cards__rarity=r)) for r in rarities}).order_by("-released", "name_en"))
         # the cards a pack brought in a new art or an 오버프레임 (엘리스 10/13: to pick those packs out)
-        arts = {}
+        def count(prints):
+            out = {"new_art": 0, "overframe": 0}
+            for md_id in prints:
+                out["overframe" if dex._overframe(md_id) else "new_art"] += 1
+            return out
+
+        usual = defaultdict(set)
         for pack_id, md_id in MdPackCard.objects.filter(md_print__is_alt_art=True).values_list("pack_id", "md_print_id"):
-            kind = "overframe" if dex._overframe(md_id) else "new_art"
-            arts.setdefault(pack_id, {"new_art": 0, "overframe": 0})[kind] += 1
-        _cache["packs"] = [{**_row(p, {r: getattr(p, r) for r in rarities}),
-                            "arts": arts.get(p.id, {"new_art": 0, "overframe": 0})} for p in rows]
+            usual[pack_id].add(md_id)
+        listed, by_id = [], {}
+        for p in rows:
+            row = by_id[p.id] = {**_row(p, {r: getattr(p, r) for r in rarities}), "version": None, "period": None,
+                                 "featured": [], "arts": count(usual[p.id])}
+            listed.append(row)
+        # each campaign's version of a pack shows as a pack of its own, at the days it was sold, under its cover then
+        # (엘리스 10/13: "표지별로 다른 카드팩마냥")
+        versions = list(MdPackVersion.objects.filter(pack_id__in=by_id).select_related("pack"))
+        names = {m.md_id: display_name(m.card) for m in MdPrint.objects.filter(
+            md_id__in={a for v in versions for a in v.swaps.values()}).select_related("card")}
+        for v in versions:
+            arts = sorted(set(v.swaps.values()))
+            listed.append({**by_id[v.pack_id], "version": v.id, "released": v.start.isoformat(),
+                           "period": [v.start.isoformat(), v.end.isoformat()],
+                           "image": _image(v.pack, cover=v.cover) or by_id[v.pack_id]["image"],
+                           "featured": [names[a] for a in arts if a in names], "arts": count(arts)})
+        listed.sort(key=lambda r: r["name_en"])
+        listed.sort(key=lambda r: r["released"] or "", reverse=True)
+        _cache["packs"] = listed
     return Response({"packs": _cache["packs"]})
 
 
@@ -141,6 +165,7 @@ def _detail(pack_id):
         row = _row(p)
         row["image_hd"] = _image(p, hd=True)
         row["cards"] = [c for c in cards if c["thumb"]]
+        row["versions"], _cache["lineups"][pack_id] = _versions(p, row["cards"])
         if p.kind == MdPack.Kind.SECRET:
             master = MdPack.objects.filter(name_en=MASTER_PACK, kind=MdPack.Kind.NORMAL).first()
             row["master_pack"] = master.id if master else None
@@ -148,11 +173,37 @@ def _detail(pack_id):
     return _cache["cards"][pack_id]
 
 
+def _versions(pack, cards):
+    """The pack as campaigns sold it (MdPackVersion): each version's days, cover and the cards that came in their
+    campaign art, and its whole lineup — the usual one with those cards in that art (a card whose art has no face
+    drawn keeps the usual one)."""
+    versions = list(pack.versions.all())
+    arts = {p.md_id: p for p in MdPrint.objects.filter(
+        md_id__in={a for v in versions for a in v.swaps.values()}).select_related("card")}
+    shown_rows, lineups = [], {}
+    for v in versions:
+        swaps = {int(base): art for base, art in v.swaps.items()}
+        lineup, shown = [], []
+        for c in cards:
+            art = arts.get(swaps.get(c["print"]))
+            if art and face_thumb_url(art.md_id):
+                c = {"print": art.md_id, "card": art.card_id, "name": display_name(art.card), "rarity": c["rarity"],
+                     "thumb": face_thumb_url(art.md_id), "face": face_url(art.md_id), "base": c["print"]}
+                shown.append(c)
+            lineup.append(c)
+        if shown:
+            shown_rows.append({"id": v.id, "start": v.start.isoformat(), "end": v.end.isoformat(),
+                               "image": _image(pack, cover=v.cover), "image_hd": _image(pack, hd=True, cover=v.cover),
+                               "arts": shown})
+            lineups[v.id] = lineup
+    return shown_rows, lineups
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def pack(request, pack_id):
-    """A pack and its cards, each at the rarity it comes in there, with its face; a secret pack names the master pack
-    its first four cards come from."""
+    """A pack and its cards, each at the rarity it comes in there, with its face, and the versions campaigns sold of
+    it; a secret pack names the master pack its first four cards come from."""
     row = _detail(pack_id)
     if row is None:
         raise Http404
@@ -189,13 +240,19 @@ def open_pack(request, pack_id):
     row = _detail(pack_id)
     if row is None:
         raise Http404
-    pools = {"main": _pool(row["cards"]), "master": None}
+    cards = row["cards"]
+    version = request.data.get("version")
+    if version not in (None, ""):   # the pack as a campaign sold it
+        cards = _cache["lineups"].get(pack_id, {}).get(int(version)) if str(version).isdigit() else None
+        if cards is None:
+            return Response({"error": "그 시기의 팩을 찾지 못했습니다."}, status=400)
+    pools = {"main": _pool(cards), "master": None}
     if row["kind"] == MdPack.Kind.SECRET:
         master = _detail(row.get("master_pack")) if row.get("master_pack") else None
         if not master:
             return Response({"error": "마스터 팩을 찾지 못했습니다."}, status=503)
         pools["master"] = _pool(master["cards"])
-    if not row["cards"]:
+    if not cards:
         return Response({"error": "이 팩에는 열 수 있는 카드가 없습니다."}, status=400)
     user = request.user
     with transaction.atomic():

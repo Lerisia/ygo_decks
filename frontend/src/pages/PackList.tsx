@@ -8,6 +8,10 @@ import { type PackHit, type PackKind, type PackSummary, getPacks, searchPacks } 
 import { makeMatcher, nameKeys } from "@/utils/hangul";
 import { isAuthenticated } from "@/api/accountApi";
 
+const day = (iso: string) => { const [y, m, d] = iso.split("-"); return `${y.slice(2)}.${+m}.${+d}`; };
+/** A campaign's days, short: 26.2.5~4.9 (the year once when both ends share it). */
+const span = ([a, b]: [string, string]) => `${day(a)}~${a.slice(0, 4) === b.slice(0, 4) ? day(b).slice(3) : day(b)}`;
+
 const KINDS: { key: "all" | PackKind; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "selection", label: "셀렉션 팩" },   // the main packs, ahead of the secret ones (엘리스 10/13)
@@ -16,7 +20,7 @@ const KINDS: { key: "all" | PackKind; label: string }[] = [
 ];
 
 /** 팩깡 시뮬레이터 (엘리스 2026-10-12, the name 10/13): every master, selection and secret pack Master Duel has had, newest first
- *  (the master pack ahead), by kind, by name or by a pickup card (10/13: the packs whose names match, then those
+ *  (the master pack last), by kind, by name or by a pickup card (10/13: the packs whose names match, then those
  *  holding a card that does, with the cards named). */
 export default function PackList() {
   const navigate = useNavigate();
@@ -61,7 +65,7 @@ export default function PackList() {
     const en = q.toLowerCase();
     const rows = packs.filter((p) => (kind === "all" || p.kind === kind) && (!special || p.arts.new_art + p.arts.overframe > 0));
     const named = rows.filter((p) => !en || match(nameKeys(p.name)) || p.name_en.toLowerCase().includes(en))
-      .sort((a, b) => Number(b.master) - Number(a.master));
+      .sort((a, b) => Number(a.master) - Number(b.master));   // the master pack last: no one opens it (엘리스 10/13)
     const found = q && hits?.q === q ? hits.byPack : null;
     if (!found) return { shown: named, byCard: new Map<number, PackHit>() };
     const ids = new Set(named.map((p) => p.id));
@@ -116,13 +120,25 @@ export default function PackList() {
             ? shown.map((p) => {
                 const hit = byCard.get(p.id);
                 return (
-                <li key={p.id}>
-                  <Link to={`/packs/${p.id}`} className="group block">
-                    <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
+                <li key={`${p.id}-${p.version ?? 0}`}>
+                  <Link to={`/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`} className="group block">
+                    <span className="relative block">
+                      <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
+                      {p.period && (
+                        <span className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500/95 shadow">
+                          {p.arts.overframe && !p.arts.new_art ? "오버프레임" : "신규 일러"} {p.featured.length}
+                        </span>
+                      )}
+                    </span>
                     <span className="mt-1.5 block text-xs sm:text-sm font-semibold leading-snug break-keep line-clamp-2 min-h-[2.5em]">{p.name}</span>
                     {hit ? (
                       <span className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 truncate" title={hit.cards.join(", ")}>
                         {hit.cards.join(", ")}{hit.count > hit.cards.length ? ` 외 ${hit.count - hit.cards.length}장` : ""}
+                      </span>
+                    ) : p.period ? (
+                      <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 tabular-nums truncate"
+                            title={`${p.period[0]} ~ ${p.period[1]} · ${p.featured.join(", ")}`}>
+                        {span(p.period)}
                       </span>
                     ) : special ? (
                       <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 truncate">

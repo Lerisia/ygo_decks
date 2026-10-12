@@ -11,7 +11,7 @@ from user.gems import change_gems
 from user.models import User
 
 from . import pack_draw, packs
-from .models import Card, MdPack, MdPackCard, MdPrint, PackPull, PackTally
+from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackPull, PackTally
 
 BAND = {"UR": 0.001, "SR": 0.05, "R": 0.3, "N": 0.99}
 
@@ -164,6 +164,26 @@ class OpenTest(TestCase):
     def test_the_list_counts_new_arts_and_overframes(self):
         MdPrint.objects.filter(md_id=203).update(is_alt_art=True)
         with mock.patch("carddb.dex._overframe", lambda md_id: False):
-            rows = {p["id"]: p for p in self.client.get("/api/carddb/packs/").json()["packs"]}
+            rows = {p["id"]: p for p in self.client.get("/api/carddb/packs/").json()["packs"] if p["version"] is None}
         self.assertEqual(rows[self.secret.id]["arts"], {"new_art": 1, "overframe": 0})
         self.assertEqual(rows[self.master.id]["arts"], {"new_art": 0, "overframe": 0})
+
+    def test_a_campaign_version(self):
+        MdPrint.objects.create(md_id=2030, card_id=203, is_alt_art=True, rarity="UR")
+        open(os.path.join(self.media, "cards/face_thumb/2030.webp"), "wb").close()
+        v = MdPackVersion.objects.create(pack=self.secret, start="2026-02-05", end="2026-04-09", swaps={"203": 2030})
+        r = self.client.get(f"/api/carddb/packs/{self.secret.id}/").json()
+        self.assertEqual([(x["id"], x["start"], [(a["print"], a["base"]) for a in x["arts"]]) for x in r["versions"]],
+                         [(v.id, "2026-02-05", [(2030, 203)])])
+        self.assertEqual(sorted(c["print"] for c in r["cards"]), [200, 201, 202, 203])   # the usual pack
+        self.client.force_authenticate(self.user)
+        change_gems(self.user, 200, "admin_grant")
+        with mock.patch.object(packs, "_rng", always("UR")):
+            got = self.client.post(f"/api/carddb/packs/{self.secret.id}/open/", {"count": 1, "version": v.id}, format="json").json()
+            self.assertEqual([c["print"] for c in got["packs"][0]], [103] * 4 + [2030] * 4)
+            bad = self.client.post(f"/api/carddb/packs/{self.secret.id}/open/", {"count": 1, "version": 999}, format="json")
+        self.assertEqual(bad.status_code, 400)
+        listed = [(p["id"], p["version"], p["released"], p["period"], p["featured"]) for p in self.client.get("/api/carddb/packs/").json()["packs"]
+                  if p["id"] == self.secret.id]
+        self.assertEqual(listed, [(self.secret.id, v.id, "2026-02-05", ["2026-02-05", "2026-04-09"], ["카드203"]),
+                                  (self.secret.id, None, None, None, [])])

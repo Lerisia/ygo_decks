@@ -4,19 +4,29 @@ art is listed under its base print's id and is matched to our other-art print by
 
 What the game itself says of a pack comes from its client (storage/md/packs/pack_map.json, settings.MD_PACK_MAP): its
 number, Korean name and covers. A pack whose cover shows an other art — an 오버프레임 or new-art campaign, which MDM
-leaves out — takes that cover, and the card comes in it as that art (엘리스 2026-10-13)."""
+leaves out — takes that cover, and the card comes in it as that art (엘리스 2026-10-13).
+
+When the campaigns ran comes from Yugipedia (each Master Duel card page's alternate_art / extended_art): an art that
+came for a while in every pack holding the card makes, for each selection or secret pack on sale then, a version of
+that pack (MdPackVersion) beside its usual one; the master pack keeps its usual arts (엘리스 2026-10-13)."""
 import json
 import os
+import re
 import time
+import unicodedata
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import requests
 from django.db import transaction
 
-from .models import MdPack, MdPackCard, MdPrint
+from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint
 
 MDM = "https://www.masterduelmeta.com/api/v1"
+YUGIPEDIA = "https://yugipedia.com/api.php"
+ART_CATEGORIES = ("Category:Yu-Gi-Oh! Master Duel cards with alternate artworks",
+                  "Category:Yu-Gi-Oh! Master Duel cards with extended artworks")
+LAUNCH = date(2022, 1, 19)
 HEADERS = {"User-Agent": "YGODecks card book (+https://ygodecks.com)"}
 KST = timezone(timedelta(hours=9))
 PAGE = 500
@@ -73,9 +83,124 @@ def _other_arts(cards, prints, others):
     return out
 
 
+def _wiki_day(text):
+    return datetime.strptime(text.strip(), "%B %d, %Y").date().isoformat()
+
+
+def parse_campaigns(title, wikitext):
+    """A Master Duel card page's other arts as Yugipedia records them (`alternate_art` / `extended_art`, an art a line:
+    its number; the spans it came, ` * ` between; and where from, when not from the packs): [{card, ja, overframe,
+    art, spans, source}]."""
+    name = title.removesuffix(" (Master Duel)")
+    ja = re.search(r"\|\s*ja_name\s*=\s*([^\n]*)", wikitext)
+    ja = ja and re.sub(r"\{\{.*?\}\}|<[^>]+>", "", re.sub(r"\{\{Ruby\|([^|}]*)\|[^}]*\}\}", r"\1", ja.group(1))).strip()
+    out = []
+    for key in ("alternate_art", "extended_art"):
+        m = re.search(r"\|\s*" + key + r"\s*=(.*?)(?=\n\s*\||\n\}\})", wikitext, re.S)
+        for line in (m.group(1).strip().splitlines() if m else []):
+            parts = [x.strip() for x in line.split(";")]
+            if len(parts) < 2 or not parts[0].isdigit():
+                continue
+            spans = []
+            for span in parts[1].split("*"):
+                start, _, end = span.partition(" - ")
+                try:
+                    spans.append((_wiki_day(start), _wiki_day(end or start)))
+                except ValueError:
+                    continue
+            out.append({"card": name, "ja": ja or "", "overframe": key == "extended_art",
+                        "art": int(parts[0]), "spans": spans, "source": parts[2] if len(parts) > 2 else ""})
+    return out
+
+
+def fetch_campaigns(get=None, pause=1.0):
+    """Every Master Duel other art Yugipedia records (its card pages in the two categories), as parse_campaigns reads
+    them."""
+    get = get or requests.get
+
+    def api(**params):
+        r = get(YUGIPEDIA, params={**params, "format": "json"}, timeout=60, headers=HEADERS)
+        r.raise_for_status()
+        return r.json()
+
+    titles = []
+    for category in ART_CATEGORIES:
+        more = {}
+        while True:
+            d = api(action="query", list="categorymembers", cmtitle=category, cmlimit=500, **more)
+            titles += [m["title"] for m in d["query"]["categorymembers"]]
+            if "continue" not in d:
+                break
+            more = {"cmcontinue": d["continue"]["cmcontinue"]}
+            time.sleep(pause)
+    def pages(names):
+        for i in range(0, len(names), 50):
+            d = api(action="query", prop="revisions", rvprop="content", titles="|".join(names[i:i + 50]))
+            for page in d["query"]["pages"].values():
+                rev = (page.get("revisions") or [{}])[0]
+                yield page["title"], rev.get("*") or rev.get("slots", {}).get("main", {}).get("*", "")
+            time.sleep(pause)
+
+    out = []
+    for title, text in pages(titles):
+        out += parse_campaigns(title, text)
+    # a Master Duel page may leave out the Japanese name (the card book matches by it when it has no English one):
+    # the card's own page has it
+    missing = sorted({e["card"] for e in out if not e["ja"]})
+    ja = {}
+    for title, text in pages(missing):
+        m = re.search(r"\|\s*ja_name\s*=\s*([^\n]*)", text)
+        if m:
+            ja[title] = re.sub(r"\{\{.*?\}\}|<[^>]+>", "", re.sub(r"\{\{Ruby\|([^|}]*)\|[^}]*\}\}", r"\1", m.group(1))).strip()
+    for e in out:
+        e["ja"] = e["ja"] or ja.get(e["card"], "")
+    return out
+
+
+def load_campaigns(path, get=None):
+    """Yugipedia's campaigns, fetched and kept at path; the kept copy when Yugipedia cannot be reached, [] when there
+    is none."""
+    try:
+        entries = fetch_campaigns(get=get)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(entries, f, ensure_ascii=False)
+        return entries
+    except (requests.RequestException, ValueError, KeyError):
+        if not os.path.exists(path):
+            return []
+        with open(path) as f:
+            return json.load(f)
+
+
+def campaign_prints(entries, overframe=None):
+    """{other-art print: {spans, source}} for Yugipedia's entries: the card by its English (else Japanese) name, the
+    art by its number among the card's other-art prints in print order — an 오버프레임 among the 오버프레임 ones, which
+    count from 1, a new art among the rest, which count from 2."""
+    if overframe is None:
+        from .dex import _overframe as overframe
+    def key(name):
+        return re.sub(r"\s", "", unicodedata.normalize("NFKC", name or ""))
+
+    en = {c.name_en: c.id for c in Card.objects.exclude(name_en="").only("id", "name_en")}
+    ja = {key(c.name_ja): c.id for c in Card.objects.exclude(name_ja="").only("id", "name_ja")}
+    others = defaultdict(list)
+    for p in MdPrint.objects.filter(is_alt_art=True).order_by("md_id"):
+        others[p.card_id].append(p.md_id)
+    out = {}
+    for e in entries:
+        cid = en.get(e["card"]) or (ja.get(key(e.get("ja"))) if e.get("ja") else None)
+        pool = [md for md in others.get(cid, []) if bool(overframe(md)) == e["overframe"]]
+        i = e["art"] - (1 if e["overframe"] else 2)
+        if 0 <= i < len(pool):
+            out[pool[i]] = {"spans": [tuple(s) for s in e["spans"]], "source": e["source"]}
+    return out
+
+
 def load_pack_map(source):
     """{MDM set id: {game_id, name_ko, cover, arts}} from the game's pack map (a dict or a file; {} when there is
-    none): arts are its covers showing an other art, [(cover, print id)]."""
+    none): cover is its usual one (the first not showing an other art), arts its covers showing an other art,
+    [(cover, print id)]."""
     if isinstance(source, str):
         if not os.path.exists(source):
             return {}
@@ -96,22 +221,28 @@ def load_pack_map(source):
             if by_pack_id.get(pid) and key not in out[by_pack_id[pid]]["covers"]:
                 out[by_pack_id[pid]]["covers"].append(key)
     for row in out.values():
-        row["arts"] = [(k, images[k]["file_card_id"]) for k in row.pop("covers")
+        covers = row.pop("covers")
+        row["cover"] = next((k for k in covers if not images.get(k, {}).get("alt_art")), row["cover"])
+        row["arts"] = [(k, images[k]["file_card_id"]) for k in covers
                        if images.get(k, {}).get("alt_art") and images[k].get("file_card_id")]
     return out
 
 
-def sync(sets, cards, pack_map=None):
-    """Store MDM's packs and their cards, with what the game says of them (load_pack_map); a pack's cards follow the
-    sources each time. A summary to report."""
+def sync(sets, cards, pack_map=None, campaigns=None):
+    """Store MDM's packs and their cards, with what the game says of them (load_pack_map) and the versions campaigns
+    made of them (campaign_prints); a pack's cards follow the sources each time. A summary to report."""
     pack_map = pack_map or {}
-    out = {"packs": 0, "cards": 0, "added": 0, "removed": 0, "changed": 0, "unknown_prints": [], "unknown_kinds": []}
+    campaigns = campaigns or {}
+    out = {"packs": 0, "cards": 0, "added": 0, "removed": 0, "changed": 0, "versions": 0, "unknown_prints": [],
+           "unknown_kinds": []}
     packs = {}
     for s in sets:
         kind = KINDS.get(s.get("type"))
         if not kind:
             out["unknown_kinds"].append(s.get("type"))
             continue
+        if 1000 < (pack_map.get(s["_id"], {}).get("game_id") or 0) < 2000:
+            kind = MdPack.Kind.SELECTION   # the game numbers it a selection pack (MDM: Mighty Contenders, a normal pack)
         packs[s["_id"]] = (s, kind)
     prints = {p.md_id: p for p in MdPrint.objects.all()}
     others = defaultdict(list)
@@ -132,26 +263,69 @@ def sync(sets, cards, pack_map=None):
                 continue
             p = arts.get(id(c), base)
             wanted[sid][p.md_id] = (c.get("rarity") or p.rarity, o.get("amount") or 1)
-    covers = {}
+    def base_of(sid, art):
+        return next((pid for pid in wanted.get(sid, {}) if prints[pid].card_id == art.card_id and not prints[pid].is_alt_art),
+                    None)
+
+    def in_packs(art_id):   # an art Yugipedia says came for a while from the packs: it goes into versions instead
+        return art_id in campaigns and not campaigns[art_id]["source"]
+
+    art_covers, pending = {}, []
     for sid, game in pack_map.items():
-        covers[sid] = game["cover"]
-        shown = []
         for cover, art_id in game["arts"]:
             art = prints.get(art_id)
-            base = art and art.is_alt_art and next(
-                (pid for pid in wanted.get(sid, {}) if prints[pid].card_id == art.card_id and not prints[pid].is_alt_art), None)
-            if base:   # the campaign's art in place of the usual one
+            art_covers[(sid, art_id)] = cover
+            base = art and art.is_alt_art and base_of(sid, art)
+            if base and not in_packs(art_id):   # the campaign's art in place of the usual one
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (art.rarity or rarity, amount)
-            if art_id in wanted.get(sid, {}):
-                shown.append((art_id, cover))
-        if shown:
-            covers[sid] = max(shown)[1]   # the latest campaign's cover
+            elif base:
+                pending.append((sid, art_id))
+
+    # campaigns: one from a set named for it comes in that set; one from the packs makes a version of each selection
+    # or secret pack on sale then that holds the card
+    by_name = {s.get("name"): sid for sid, (s, _) in packs.items()}
+    sale = {}
+    for sid, (s, kind) in packs.items():
+        sale[sid] = (_day(s.get("release")) or LAUNCH, _day(s.get("expires")) if kind == MdPack.Kind.SELECTION else None)
+    versions = defaultdict(dict)   # (set id, start, end) → {base print: art print}
+    for art_id, camp in campaigns.items():
+        art = prints.get(art_id)
+        if not art:
+            continue
+        if camp["source"]:
+            sid = by_name.get(camp["source"])
+            base = sid and base_of(sid, art)
+            if base:
+                rarity, amount = wanted[sid].pop(base)
+                wanted[sid][art_id] = (art.rarity or rarity, amount)
+            continue
+        for start, end in camp["spans"]:
+            start, end = date.fromisoformat(start), date.fromisoformat(end)
+            for sid, (s, kind) in packs.items():
+                on, off = sale[sid]
+                if kind not in (MdPack.Kind.SECRET, MdPack.Kind.SELECTION) or on > end or (off and off < start):
+                    continue
+                base = base_of(sid, art)
+                if base:
+                    versions[(sid, start, end)][base] = art_id
+    # a pack whose cover shows such an art though it was not on sale while the art came (it came out with it later):
+    # the usual pack has it, as the cover says
+    for sid, art_id in pending:
+        if not any(art_id in swaps.values() for (vsid, _, _), swaps in versions.items() if vsid == sid):
+            art = prints[art_id]
+            base = base_of(sid, art)
+            if base:
+                rarity, amount = wanted[sid].pop(base)
+                wanted[sid][art_id] = (art.rarity or rarity, amount)
+    # the usual pack's cover: the latest campaign's when its art is in the usual pack, else the usual one
+    covers = {}
+    for sid, game in pack_map.items():
+        held = [(art_id, cover) for cover, art_id in game["arts"] if art_id in wanted.get(sid, {})]
+        covers[sid] = max(held)[1] if held else game["cover"]
     with transaction.atomic():
         for sid, (s, kind) in packs.items():
             game = pack_map.get(sid, {})
-            if 1000 < (game.get("game_id") or 0) < 2000:
-                kind = MdPack.Kind.SELECTION   # the game numbers it a selection pack (MDM: Mighty Contenders, a normal pack)
             pack, _ = MdPack.objects.update_or_create(
                 mdm_id=sid, defaults={"kind": kind, "name_en": s.get("name", ""), "released": _day(s.get("release")),
                                       "game_id": game.get("game_id"), "name_ko": game.get("name_ko", ""),
@@ -170,6 +344,13 @@ def sync(sets, cards, pack_map=None):
                     changed.append(e)
             MdPackCard.objects.bulk_create(new, batch_size=1000)
             MdPackCard.objects.bulk_update(changed, ["rarity", "amount"], batch_size=1000)
+            mine = {(start, end): swaps for (vsid, start, end), swaps in versions.items() if vsid == sid}
+            pack.versions.exclude(pk__in=[v.pk for v in pack.versions.all() if (v.start, v.end) in mine]).delete()
+            for (start, end), swaps in mine.items():
+                cover = max(((art, art_covers[(sid, art)]) for art in swaps.values() if (sid, art) in art_covers), default=(0, ""))[1]
+                MdPackVersion.objects.update_or_create(pack=pack, start=start, end=end, defaults={
+                    "swaps": {str(base): art for base, art in sorted(swaps.items())}, "cover": cover})
+            out["versions"] += len(mine)
             out["packs"] += 1
             out["cards"] += len(want)
             out["added"] += len(new) if have else 0
