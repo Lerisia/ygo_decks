@@ -103,8 +103,9 @@ def parse_page(text):
 
 
 def fill_gaps(pages):
-    """Cards a page left out: on the list before and on the one after unchanged (no status before, or the same one),
-    but missing between (OCG January 2016 without Pot of Greed). They are put back with the status they kept;
+    """Cards a page left out: on the list before, and on the one after either unchanged or noted as having had that
+    status (TCG October 2013's Return from the Different Dimension, limited, then forbidden "from limited"), but
+    missing between (OCG January 2016 without Pot of Greed). They are put back with the status they kept;
     [(day, name, status)] put back. A card that does not come back was released, the page only omitting it."""
     filled = []
     for before, page, after in zip(pages, pages[1:], pages[2:]):
@@ -114,7 +115,8 @@ def fill_gaps(pages):
             if status == BanStatus.UNLIMITED or name in here or name not in after_by:
                 continue
             later, prev = after_by[name]
-            if later == status and prev in ("", status):
+            # the one after says what it was on this list: its status before, or unchanged
+            if prev == status or (not prev and later == status):
                 page.entries.append((name, status, ""))
                 filled.append((page.effective, name, status))
     return filled

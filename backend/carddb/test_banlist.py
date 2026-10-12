@@ -201,11 +201,13 @@ class ImportBanlistsTest(TestCase):
             "May 9, 2022", prev="January 2022 Lists (Master Duel)", next="July 2022 Lists (Master Duel)",
             cards=["Pot of Desires; Unlimited; Limited"])
         self.pages["July 2022 Lists (Master Duel)"] = page(
-            "July 11, 2022", prev="May 2022 Lists (Master Duel)", cards=["Pot of Greed; Forbidden", "Pot of Desires; Limited; Unlimited"])
+            "July 11, 2022", prev="May 2022 Lists (Master Duel)",
+            cards=["Pot of Greed; Forbidden", "Pot of Desires; Limited; Unlimited", "Lost Card; Forbidden; Semi-Limited"])
         out = self.run_import()
         may = Banlist.objects.get(effective=date(2022, 5, 9))
+        # Lost Card is back too: the list after says it was semi-limited before
         self.assertEqual(sorted(may.entries.values_list("name", "status")),
-                         [("Pot of Desires", "unlimited"), ("Pot of Greed", "forbidden")])   # Lost Card stays out
+                         [("Lost Card", "semi_limited"), ("Pot of Desires", "unlimited"), ("Pot of Greed", "forbidden")])
         self.assertIn("Pot of Greed", out)
 
     def test_another_game_page_is_refused(self):
