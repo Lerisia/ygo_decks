@@ -23,6 +23,31 @@ const SORTS = [
   { value: "def", label: "수비력" },
 ];
 
+const SORT_KEY = "card_list_sort";
+
+/** The viewer's last sort and its way, kept in this browser (엘리스 10/12); an address that names one wins. */
+function withRememberedSort(f: CardFilters, search: string): CardFilters {
+  const qs = new URLSearchParams(search);
+  if (qs.has("sort") || qs.has("dir")) return f;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_KEY) || "null");
+    if (SORTS.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) {
+      return { ...f, sort: saved.sort, dir: saved.dir };
+    }
+  } catch {
+    /* no storage: the default sort */
+  }
+  return f;
+}
+
+function rememberSort(f: CardFilters) {
+  try {
+    localStorage.setItem(SORT_KEY, JSON.stringify({ sort: f.sort, dir: f.dir }));
+  } catch {
+    /* private mode: the choice lasts while the page is open */
+  }
+}
+
 const hasFilter = (f: CardFilters) =>
   !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has);
 // The filter panel opens by itself only for what is chosen in it: a 카드군 or a card's support list reached from a card
@@ -76,7 +101,7 @@ export default function CardList() {
   const location = useLocation();
   const navigate = useNavigate();
   const onList = location.pathname === "/cards";
-  const [filters, setFilters] = useState<CardFilters>(() => searchToFilters(location.search));
+  const [filters, setFilters] = useState<CardFilters>(() => withRememberedSort(searchToFilters(location.search), location.search));
   const [qInput, setQInput] = useState(filters.q);
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [items, setItems] = useState<CardListItem[]>([]);
@@ -99,7 +124,7 @@ export default function CardList() {
   // The address is the source of truth while the list is on screen (a 카드군 chip links here with ?group=).
   useEffect(() => {
     if (!onList) return;
-    const next = searchToFilters(location.search);
+    const next = withRememberedSort(searchToFilters(location.search), location.search);
     if (filtersToSearch(next) !== key) {
       setFilters(next);
       setQInput(next.q);
@@ -111,6 +136,7 @@ export default function CardList() {
   const update = (patch: Partial<CardFilters>) => {
     const next = { ...filters, ...patch };
     if (next.group !== filters.group || next.deck !== filters.deck) next.role = "";   // another group or deck starts on its own cards
+    if (next.sort !== filters.sort || next.dir !== filters.dir) rememberSort(next);
     setFilters(next);
     navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
   };

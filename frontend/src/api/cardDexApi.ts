@@ -31,8 +31,7 @@ export type CardFilters = {
 
 export const EMPTY_FILTERS: CardFilters = {
   q: "", category: "", frame: "", attribute: "", race: "", level: "", st: "", group: "", role: "", card: "", deck: "", has: "",
-  // every visit starts on the newest cards, whatever was chosen last time (특이점 2026-10-12; was 디폴트 순, 엘리스 10/12)
-  sort: "new", dir: "",
+  sort: "type", dir: "",   // Master Duel's 디폴트 순 first (엘리스 10/12)
 };
 
 /** The way a sort goes when none is chosen. */
@@ -148,7 +147,6 @@ export function searchToFilters(search: string): CardFilters {
 
 export const listCards = (f: CardFilters, page: number, signal?: AbortSignal) => {
   const qs = new URLSearchParams(filtersToSearch(f));
-  qs.set("sort", f.sort);   // the address leaves the default out; the server's own default differs
   if (page > 1) qs.set("page", String(page));
   return getJson<CardListResponse>(`/?${qs.toString()}`, signal);
 };
