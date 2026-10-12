@@ -909,6 +909,23 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.ids(sort="new"), expect["new", "desc"])
         self.assertEqual(self.ids(sort="rarity"), expect["rarity", "asc"])
 
+    def test_list_gives_the_master_duel_banlist_status(self):
+        # the 금제 icon in each card's corner (엘리스 10/12): the Master Duel list in effect today; one announced for
+        # a later day waits for it, and unlimited shows nothing
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Banlist, BanlistEntry
+        today = timezone.localdate()
+        now = Banlist.objects.create(format="md", effective=today - timedelta(days=3))
+        later = Banlist.objects.create(format="md", effective=today + timedelta(days=3))
+        ocg = Banlist.objects.create(format="ocg", effective=today - timedelta(days=1))
+        BanlistEntry.objects.create(banlist=now, card=self.dm, name="1", status="forbidden")
+        BanlistEntry.objects.create(banlist=now, card=self.bewd, name="2", status="unlimited", previous="limited")
+        BanlistEntry.objects.create(banlist=later, card=self.girl, name="3", status="limited")
+        BanlistEntry.objects.create(banlist=ocg, card=self.quick, name="4", status="semi_limited")
+        ban = {r["id"]: r["ban"] for r in self.get()["results"]}
+        self.assertEqual((ban[1], ban[2], ban[3], ban[4]), ("forbidden", "", "", ""))
+
     def test_list_gives_the_rarity(self):
         MdPrint.objects.filter(md_id=2).update(rarity="UR")
         rarity = {r["id"]: r["rarity"] for r in self.get()["results"]}

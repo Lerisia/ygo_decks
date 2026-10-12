@@ -224,3 +224,12 @@ def card_banlists(card):
     return [{"format": fmt.value, "label": fmt.label,
              "runs": [{"from": day.isoformat(), "status": str(status)} for day, status in runs(card, fmt)]}
             for fmt in Banlist.Format if fmt in have]
+
+
+def current_statuses(fmt, day):
+    """{card id: status} on the game's list in effect on a day, unlimited left out (a list announced for a later day
+    waits for it)."""
+    current = Banlist.objects.filter(format=fmt, effective__lte=day).order_by("-effective").first()
+    if not current:
+        return {}
+    return dict(current.entries.exclude(card=None).exclude(status=BanStatus.UNLIMITED).values_list("card_id", "status"))

@@ -87,6 +87,14 @@ function CardTile({ card }: { card: CardListItem }) {
           alt={card.name}
           className="w-full aspect-[704/1024] object-contain card-corner group-hover:opacity-90 transition"
         />
+        {/* today's Master Duel 금제 in the top left corner, in the game's own icon (엘리스 10/12) */}
+        {card.ban && (
+          <img
+            src={`/media/md_ui/info/limit/${card.ban}.webp`}
+            alt={{ forbidden: "금지", limited: "제한", semi_limited: "준제한" }[card.ban]}
+            className="absolute top-[3%] left-[4%] w-[17%] h-auto drop-shadow"
+          />
+        )}
         {/* the rarity in the top right corner, as Master Duel's own card list shows it (엘리스 10/12) */}
         {card.rarity && (
           <img src={`/media/md_ui/rarity_${card.rarity.toLowerCase()}_hd.png`} alt={card.rarity} className="absolute top-0 right-0 h-3.5 sm:h-4 w-auto" />

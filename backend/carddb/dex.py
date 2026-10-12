@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from django.conf import settings
 from django.db.models import Count, Max
 from django.http import Http404
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -17,7 +18,7 @@ from PIL import Image
 from . import banlist
 from .display import THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
-from .models import Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
+from .models import Banlist, BanlistEntry, Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
 PAGE_SIZE = 60
 
@@ -57,7 +58,7 @@ def choseong(s):
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
                  "groups", "supports", "as_cards", "named", "names", "alt", "cutin", "overframe", "rarity", "type_key", "number", "atk",
-                 "def_")
+                 "def_", "ban")
 
 
 # 디폴트 순, as Master Duel names it (몬마함순; 엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
@@ -107,6 +108,8 @@ def _fingerprint():
             tuple(CardSupport.objects.aggregate(n=Count("id"), m=Max("id")).values()),
             tuple(MdArt.objects.aggregate(n=Count("id"), m=Max("id")).values()),
             tuple(MdPrint.objects.aggregate(n=Count("md_id"), d=Max("first_seen"), u=Count("first_seen")).values()),
+            # a new 금제 list, or the day one comes into effect
+            tuple(BanlistEntry.objects.aggregate(n=Count("id"), m=Max("id")).values()), timezone.localdate(),
             tuple(dirs), settings.MEDIA_ROOT)
 
 
@@ -143,6 +146,7 @@ def _card_index():
         groups[cid].add(gid)
     md_release = dict(MdPrint.objects.filter(is_alt_art=False).exclude(first_seen=None).values_list("md_id", "first_seen"))
     md_rarity = dict(MdPrint.objects.filter(is_alt_art=False).values_list("md_id", "rarity"))
+    md_ban = banlist.current_statuses(Banlist.Format.MD, timezone.localdate())
     with_art = art_names()
     alt_of = dict(MdPrint.objects.filter(is_alt_art=True).values_list("md_id", "card_id"))
     alt_cards = {cid for md_id, cid in alt_of.items() if md_id in with_art}
@@ -167,6 +171,7 @@ def _card_index():
         r.named, r.names = named.get(cid, set()), names.get(cid, set())
         r.alt, r.cutin, r.overframe = cid in alt_cards, cid in cutin_cards, cid in overframe_cards
         r.rarity = md_rarity.get(cid, "")
+        r.ban = md_ban.get(cid, "")   # today's Master Duel 금제, for the icon in the card's corner (엘리스 10/12)
         kind = frame if category == "monster" else f"{category}:{st}"
         number = rank if frame.startswith("xyz") else link if frame == "link" else level
         r.type_key = (TYPE_ORDER.get(kind, len(TYPE_ORDER)), number or 0, cid)
@@ -337,7 +342,7 @@ def cards(request):
         "results": [{"id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
-                     "image_url": art_url(r.id), "rarity": r.rarity} for r in chunk],
+                     "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban} for r in chunk],
         "total": len(rows), "page": page, "has_more": page * PAGE_SIZE < len(rows),
     })
 

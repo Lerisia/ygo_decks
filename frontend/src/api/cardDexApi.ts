@@ -45,6 +45,8 @@ export type CardListItem = {
   image_url: string | null;
   /** The rarity of its Master Duel print ("" when not known). */
   rarity: string;
+  /** Its 금제 in Master Duel today: forbidden / limited / semi_limited, "" when unlimited. */
+  ban: "" | "forbidden" | "limited" | "semi_limited";
 };
 export type CardListResponse = {
   results: CardListItem[];
