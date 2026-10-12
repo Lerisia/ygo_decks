@@ -56,36 +56,36 @@ function Playground() {
       <h1 className="text-2xl md:text-4xl font-bold text-center mb-2">놀이터</h1>
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">다양한 미니게임을 즐겨보세요!</p>
 
-      <div className="grid grid-cols-2 gap-4 md:gap-6">
+      <div className="grid grid-cols-3 gap-2.5 md:gap-5">
         {tiles.filter((g) => !g.adminOnly || isAdminUser).map((g) => (
           <button
             key={g.to}
             onClick={() => (g.external ? window.open(g.to, "_blank", "noopener,noreferrer") : navigate(g.to))}
-            className="relative flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
+            className="relative flex flex-col items-center justify-center px-1.5 pt-7 pb-3 md:px-4 md:pt-9 md:pb-6 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
           >
             {g.rewardBadge && (
-              <span className="absolute top-1.5 left-1.5">
-                <PLogo size={20} />
+              <span className="absolute top-1 left-1 md:top-1.5 md:left-1.5">
+                <PLogo size={18} />
               </span>
             )}
             {g.beta && (
-              <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+              <span className="absolute top-1 right-1 md:top-1.5 md:right-1.5 text-[9px] md:text-xs font-bold px-1 md:px-1.5 py-0.5 rounded bg-amber-500 text-white">
                 BETA
               </span>
             )}
             {g.external && (
-              <span className="absolute top-1.5 right-1.5 text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded bg-gray-500 text-white">
+              <span className="absolute top-1 right-1 md:top-1.5 md:right-1.5 text-[9px] md:text-xs font-bold px-1 md:px-1.5 py-0.5 rounded bg-gray-500 text-white">
                 외부 사이트 ↗
               </span>
             )}
-            <span className="text-3xl md:text-5xl mb-2">{g.icon}</span>
-            <span className="font-semibold md:text-lg break-keep">
+            <span className="text-2xl md:text-4xl mb-1.5 md:mb-2">{g.icon}</span>
+            <span className="font-semibold text-[13px] leading-snug md:text-base break-keep">
               {g.title}
               {g.beta && <span className="text-amber-600 dark:text-amber-400"> (베타)</span>}
             </span>
-            <span className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1 break-keep">{g.desc}</span>
+            <span className="text-[11px] leading-snug md:text-sm text-gray-500 dark:text-gray-400 mt-1 break-keep">{g.desc}</span>
             {g.mode && (
-              <span className={`mt-2 text-[11px] md:text-xs font-semibold px-2 py-0.5 rounded-full ${MODE_CHIP[g.mode]}`}>
+              <span className={`mt-1.5 md:mt-2 text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full ${MODE_CHIP[g.mode]}`}>
                 {MODE_LABEL[g.mode]}
               </span>
             )}
