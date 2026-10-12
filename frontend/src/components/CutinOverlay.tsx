@@ -1,28 +1,47 @@
 import { useEffect, useRef, useState } from "react";
 import type { CutinSound } from "@/lib/cutinSound";
+import { BG_ATTRIBUTES, BG_BASE, BG_VERSION, type CutinInfo, cutinBase, markPlayed } from "@/lib/cutinPrefetch";
 import { SpinePlayer } from "@/lib/spine";
 import { SummonFx, vignetteAlpha } from "@/lib/summonfx";
 
-export type CutinInfo = { anim: string; view: [number, number, number] | null; mp?: number; v?: number };
+export type { CutinInfo };
 
-const BASE = "/media/md_ui/cutin";
 const SCREEN = 16 / 9;   // the game's screen the camera view is made for
-// the attribute's background behind the summon (summonbg_export.py), one folder an attribute (엘리스 2026-10-11)
-const BG_BASE = "/media/md_ui/summonbg";
-const BG_VERSION = 2;
-const BG_ATTRIBUTES = new Set(["light", "dark", "water", "fire", "earth", "wind", "divine"]);
 const BG_DPR = 1;        // the background's pixels to a CSS pixel, at most
 const CAMERA_SIZE = 5;   // half the height the game's camera shows, in world units: the backgrounds are made for it
 
-const PHONE_MP = 34;   // the most texture (millions of pixels) a phone gets the large pictures for
+/** The last summon played, kept ready (엘리스 10/12: people play them one after another): its two canvases, their
+ *  WebGL contexts with the pictures already on the GPU, outlive the overlay. One is kept, the cut-in and the
+ *  background last asked for; another card's replaces it. Loads are held as promises, so a reopening mid-load waits
+ *  for the same one and a load overtaken by another card's is let go when it lands. */
+type Slot = "cutin" | "bg";
+const held: Record<Slot, { key: string; ready: Promise<unknown> } | null> = { cutin: null, bg: null };
+const canvases: Partial<Record<Slot, HTMLCanvasElement>> = {};
 
-/** The small pictures (a quarter of the pixels) only for a heavy cut-in on a phone, whose browser could run out of
- *  memory: the rest look sharp in their large pictures on a phone too (엘리스 10/11). */
-function wantsSmall(info: CutinInfo): boolean {
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  if (memory !== undefined && memory >= 6) return false;
-  const phone = Math.min(window.screen.width, window.screen.height) < 600 || (memory !== undefined && memory <= 4);
-  return phone && (info.mp ?? 0) > PHONE_MP;
+function keptCanvas(slot: Slot): HTMLCanvasElement {
+  let c = canvases[slot];
+  if (!c) {
+    c = canvases[slot] = document.createElement("canvas");
+    c.className = "absolute inset-0 w-full h-full";
+    // a context the browser takes back (memory, a long while in the background) is gone for good: a new canvas then
+    c.addEventListener("webglcontextlost", () => {
+      delete canvases[slot];
+      held[slot] = null;
+    });
+  }
+  return c;
+}
+
+function keep<T>(slot: Slot, key: string, load: () => Promise<T>, dispose: (x: T) => void): Promise<T> {
+  const was = held[slot];
+  if (was?.key === key) return was.ready as Promise<T>;
+  was?.ready.then((x) => dispose(x as T), () => {});
+  const ready = load();
+  held[slot] = { key, ready };
+  ready.catch(() => {
+    if (held[slot]?.ready === ready) held[slot] = null;
+  });
+  return ready;
 }
 
 /** A monster's cut-in played once over the whole screen, as Master Duel plays it when the monster is summoned, with the
@@ -32,8 +51,7 @@ function wantsSmall(info: CutinInfo): boolean {
 export default function CutinOverlay({ id, info, attribute, sound, alt, onClose }: {
   id: number; info: CutinInfo; attribute: string; sound: CutinSound | null; alt: string; onClose: () => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bgRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const vignetteRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<"loading" | "playing" | "failed">("loading");
 
@@ -49,7 +67,9 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
   }, [onClose]);
 
   useEffect(() => {
-    const canvas = canvasRef.current!, bgCanvas = bgRef.current!;
+    const canvas = keptCanvas("cutin"), bgCanvas = keptCanvas("bg");
+    bgCanvas.style.visibility = "hidden";
+    hostRef.current!.append(bgCanvas, canvas);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
@@ -57,18 +77,21 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
     // (10/12: water, earth and divine dropped frames at the phone's full resolution)
     bgCanvas.width = Math.round(window.innerWidth * Math.min(dpr, BG_DPR));
     bgCanvas.height = Math.round(window.innerHeight * Math.min(dpr, BG_DPR));
-    let alive = true, raf = 0, player: SpinePlayer | null = null, bg: SummonFx | null = null;
+    markPlayed();
+    let alive = true, raf = 0;
+    const base = cutinBase(id, info);
+    const cutinLoad = keep("cutin", `${base}@${info.v ?? 0}`, () => SpinePlayer.load(canvas, base, info.v), (p) => p.dispose());
     // the background is a bonus: without it (no WebGL2, a failed file) the cut-in plays alone
     const bgLoad = BG_ATTRIBUTES.has(attribute)
-      ? SummonFx.load(bgCanvas, `${BG_BASE}/${attribute}`, BG_VERSION, { vignette: false }).catch(() => null)
+      ? keep("bg", `${attribute}@${BG_VERSION}`, () => SummonFx.load(bgCanvas, `${BG_BASE}/${attribute}`, BG_VERSION, { vignette: false }),
+             (fx) => fx.dispose()).catch(() => null)
       : Promise.resolve(null);
-    Promise.all([SpinePlayer.load(canvas, `${BASE}/${id}${wantsSmall(info) ? "/sd" : ""}`, info.v), bgLoad])
+    Promise.all([cutinLoad, bgLoad])
       // the sound is let loose first (at most a moment's wait), so that all start together
       .then((loaded) => Promise.race([sound?.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => loaded))
       .then(([p, loadedFx]) => {
+        if (!alive) return;
         let fx = loadedFx;
-        player = p;
-        bg = fx;
         // the game's vignette darkens the corners of the whole picture, the cut-in too: a small black layer, stretched
         if (fx) {
           const v = vignetteRef.current!, ctx = v.getContext("2d")!;
@@ -79,10 +102,6 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
             }
           }
           ctx.putImageData(img, 0, 0);
-        }
-        if (!alive) {
-          fx?.dispose();
-          return p.dispose();
         }
         const anim = p.animation(info.anim);
         if (!anim) throw new Error("no animation");
@@ -110,6 +129,7 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
         p.restart();
         fx?.restart();
         setState("playing");
+        if (fx) bgCanvas.style.visibility = "";
         sound?.audio.play().catch(() => {});
         let start = -1, last = 0;
         const frame = (now: number) => {
@@ -121,6 +141,7 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
               fx.draw(t, (cx - vx) * k, (cy - vy) * k, halfW * k, halfH * k);
             } catch {
               fx = null;   // a background that cannot draw leaves the cut-in alone
+              bgCanvas.style.visibility = "hidden";
             }
           }
           p.draw(anim, Math.min(t, anim.duration), (now - last) / 1000, cx, cy, halfW, halfH);
@@ -134,15 +155,15 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
     return () => {
       alive = false;
       cancelAnimationFrame(raf);
-      player?.dispose();
-      bg?.dispose();
+      // the canvases leave with the overlay; what is on them stays for the next play
+      canvas.remove();
+      bgCanvas.remove();
     };
   }, [id, info, attribute, sound, onClose]);
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/85 cursor-pointer" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
-      <canvas ref={bgRef} className={`absolute inset-0 w-full h-full ${state === "playing" ? "" : "invisible"}`} />
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+      <div ref={hostRef} className="absolute inset-0" />
       <canvas ref={vignetteRef} width={64} height={64} className={`absolute inset-0 w-full h-full ${state === "playing" ? "" : "invisible"}`} />
       {state !== "playing" && (
         <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-white/80" aria-live="polite">

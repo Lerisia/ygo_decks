@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
+import { hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
 import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
 
@@ -172,6 +173,14 @@ export default function CardDetail() {
     };
   }, [cardId]);
 
+  // someone who has played a summon in this visit likely plays this one too: its files are fetched ahead (10/12)
+  useEffect(() => {
+    const face = card?.faces.find((f) => f.face === picked);
+    if (!card || !face?.cutin || !hasPlayed()) return;
+    const t = setTimeout(() => prefetchSummon(face.id, face.cutin!, card.cutin_sound), 800);
+    return () => clearTimeout(t);
+  }, [card, picked]);
+
   if (error) {
     return (
       <div className="min-h-screen px-4 pt-6 pb-16 text-center">
@@ -290,6 +299,7 @@ export default function CardDetail() {
               {pickedFace?.cutin ? (
                 <button
                   type="button"
+                  onPointerEnter={() => prefetchSummon(pickedFace.id, pickedFace.cutin!, card.cutin_sound)}
                   onClick={() => setCutin({ id: pickedFace.id, info: pickedFace.cutin!, sound: primeCutinSound(card.cutin_sound) })}
                   className="absolute left-1 bottom-1 h-7 px-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold whitespace-nowrap shadow-md ring-1 ring-white/70 flex items-center gap-1"
                   aria-label="소환 연출 재생"
