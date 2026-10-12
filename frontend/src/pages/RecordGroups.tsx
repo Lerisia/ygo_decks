@@ -54,8 +54,8 @@ const RecordGroups = () => {
   const [pieMeta, setPieMeta] = useState<number | null>(null);
   const [rowMeta, setRowMeta] = useState<number | null>(null);
   const [totalMatches, setTotalMatches] = useState<number>(0);
-  // "최근 7일", or "10/6 18:00 이후" while a reset (balance update) is less than a week old
-  const [metaSince, setMetaSince] = useState("최근 7일");
+  // the Master Duel season the counting started in: the latest 금제, or a later reset (특이점 2026-10-13)
+  const [metaSince, setMetaSince] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinMsg, setJoinMsg] = useState("");
   const [showJoin, setShowJoin] = useState(false);
@@ -123,8 +123,8 @@ const RecordGroups = () => {
       .then((data) => {
         setMetaStats(data.meta_decks || []);
         setTotalMatches(data.total_matches || 0);
-        // counted from a reset: named by its Master Duel season rather than the moment (특이점 2026-10-12)
-        if (data.since_reset && data.since) setMetaSince(`Season ${mdSeason(new Date(data.since))}`);
+        // named by its Master Duel season rather than the moment (특이점 2026-10-12)
+        if (data.since) setMetaSince(`Season ${mdSeason(new Date(data.since))}`);
       })
       .catch((err) => console.error("메타 덱 불러오기 실패:", err));
   }, []);
@@ -287,7 +287,7 @@ const RecordGroups = () => {
           className="w-full grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3.5 py-3 rounded-xl text-left border border-blue-100 dark:border-blue-900/60 bg-gradient-to-br from-blue-50 to-violet-50 dark:from-blue-950/40 dark:to-violet-950/30 hover:border-blue-300 dark:hover:border-blue-700 transition"
         >
           <span className="flex flex-col min-w-0">
-            <span className="text-[11px] text-gray-500 dark:text-gray-400">메타 통계 · {metaSince}</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">메타 통계{metaSince && ` · ${metaSince}`}</span>
             <b className="text-[14px] min-[375px]:text-[15px] truncate">
               {/* Phones drop the lead-in so the three deck names fit (특이점 2026-10-10). */}
               {top3.length ? (
@@ -313,10 +313,10 @@ const RecordGroups = () => {
         {showMetaStats && metaStats.length > 0 && (
           <div className="mt-2 px-2 py-3 sm:p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
             <p className="text-xs text-gray-700 dark:text-gray-300">
-              ※ {metaSince === "최근 7일" ? "최근 1주일" : metaSince} · 다이아 이상 / 레이팅 / 듀컵 기반
+              ※ {metaSince} · 다이아 이상 / 레이팅 / 듀컵 기반
             </p>
             <p className="text-xs text-gray-700 dark:text-gray-300">
-              ※ 월초 셀렉션 팩 출시 시 초기화
+              ※ 금제 갱신 시 초기화
             </p>
             <div className="flex items-center justify-end mb-3">
               {/* Phones open on the pie alone and 더보기 brings the numbers. PC already shows 1~10위 and nothing below 10위 is
@@ -350,7 +350,7 @@ const RecordGroups = () => {
                   deckCovers={deckCovers}
                   showUpdateKey={metaStats.some((d) => d.is_upcoming)}
                   total={totalMatches}
-                  since={metaSince === "최근 7일" ? "최근 1주일" : metaSince}
+                  since={metaSince}
                   active={rowMeta}
                   onActive={setPieMeta}
                 />

@@ -1150,3 +1150,58 @@ class StatisticsPeriodTest(TestCase):
         self.assertEqual(len(r["matches"]), 3)
         agg = self.client.get("/api/record-groups/statistics/full/", {"period": "today"}).json()
         self.assertEqual(agg["basic"]["total_games"], 1)
+
+
+from datetime import datetime as _dt, time as _time
+from carddb.models import Banlist
+from .models import SiteConfig
+
+
+class MetaStatsWindowTest(TestCase):
+    """The site-wide meta stats count from the latest Master Duel 금제 (from 03:00 KST on its day) or a later admin reset,
+    no longer from a week ago (특이점 2026-10-13)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        user = User.objects.create_user(email="w@test.com", username="window1", password="pass1234")
+        self.group = RecordGroup.objects.create(user=user, name="기간")
+        self.my, self.opp = _create_deck(name="내덱"), _create_deck(name="상대")
+
+    def match_at(self, when):
+        m = _create_match(self.group, self.my, self.opp, rank="diamond3")
+        MatchRecord.objects.filter(pk=m.pk).update(created_at=when)
+
+    def stats(self):
+        return self.client.get("/api/recent-meta-deck-stats/").json()
+
+    def test_counts_from_the_latest_banlist_day_at_three(self):
+        day = _tz.localdate() - _td(days=20)
+        Banlist.objects.create(format="md", effective=day - _td(days=30))
+        Banlist.objects.create(format="md", effective=day)
+        Banlist.objects.create(format="ocg", effective=day + _td(days=5))  # other games' lists don't count
+        start = _tz.make_aware(_dt.combine(day, _time(3)))
+        self.match_at(start - _td(minutes=1))
+        self.match_at(start + _td(minutes=1))
+        self.match_at(_tz.now() - _td(days=10))  # more than a week old, still after the list
+        data = self.stats()
+        self.assertEqual(data["total_matches"], 2)
+        self.assertEqual(_dt.fromisoformat(data["since"]), start)
+
+    def test_a_list_not_yet_in_effect_is_ignored(self):
+        past = _tz.localdate() - _td(days=10)
+        Banlist.objects.create(format="md", effective=past)
+        Banlist.objects.create(format="md", effective=_tz.localdate() + _td(days=3))
+        self.match_at(_tz.now() - _td(days=1))
+        data = self.stats()
+        self.assertEqual(data["total_matches"], 1)
+        self.assertEqual(_dt.fromisoformat(data["since"]).date(), past)
+
+    def test_a_later_admin_reset_wins(self):
+        Banlist.objects.create(format="md", effective=_tz.localdate() - _td(days=10))
+        reset = _tz.localtime(_tz.now() - _td(days=2)).replace(microsecond=0)
+        SiteConfig.objects.create(key="meta_stats_reset_time", value=reset.replace(tzinfo=None).isoformat())
+        self.match_at(reset - _td(hours=1))
+        self.match_at(reset + _td(hours=1))
+        data = self.stats()
+        self.assertEqual(data["total_matches"], 1)
+        self.assertEqual(_dt.fromisoformat(data["since"]), reset)

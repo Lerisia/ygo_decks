@@ -10,9 +10,10 @@ from .models import RecordGroup, RecordGroupMember, MatchRecord, SiteConfig
 from .permissions import allows, role_of, user_brief
 from user.models import User
 from deck.models import Deck
+from carddb.models import Banlist
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
 from django.utils import timezone
 from django.utils.timezone import make_aware
 
@@ -438,12 +439,23 @@ RANK_RANGE = [
     "master5", "master4", "master3", "master2"
 ]
 
+def meta_stats_since():
+    """Where the site-wide meta stats start: the day the latest Master Duel 금제 took effect, from 03:00 KST when
+    Master Duel's day turns, or a later reset from the admin button (특이점 2026-10-13; it was the last 7 days)."""
+    since = make_aware(datetime.fromisoformat(SiteConfig.get("meta_stats_reset_time", "2025-12-05T16:50:00")))
+    md_today = (timezone.localtime() - timedelta(hours=3)).date()
+    latest = (
+        Banlist.objects.filter(format=Banlist.Format.MD, effective__lte=md_today)
+        .order_by("-effective").values_list("effective", flat=True).first()
+    )
+    if latest:
+        since = max(since, make_aware(datetime.combine(latest, time(3))))
+    return since
+
+
 @api_view(["GET"])
 def recent_meta_deck_stats(request):
-    reset_str = SiteConfig.get("meta_stats_reset_time", "2025-12-05T16:50:00")
-    reset_time = make_aware(datetime.fromisoformat(reset_str))
-    one_week_ago = timezone.now() - timedelta(days=7)
-    time_threshold = max(reset_time, one_week_ago)  # 둘 중 더 최근 시각
+    time_threshold = meta_stats_since()
 
     qs = MatchRecord.objects.filter(
         ~Q(opponent_deck__name=""),
@@ -490,9 +502,7 @@ def recent_meta_deck_stats(request):
     return Response({
         "total_matches": total_matches,
         "meta_decks": results,
-        # where counting starts: a week ago, or the last reset (e.g. a balance update) when that is more recent
         "since": time_threshold.isoformat(),
-        "since_reset": reset_time > one_week_ago,
     }, status=status.HTTP_200_OK)
 
 @api_view(["GET"])

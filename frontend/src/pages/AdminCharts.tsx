@@ -91,7 +91,7 @@ export default function AdminCharts() {
         if (d.meta_decks?.length) {
           setMeta(d.meta_decks);
           setTotal(d.total_matches || 0);
-          if (d.since_reset && d.since) {
+          if (d.since) {
             const t = new Date(d.since);
             setSince(`${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")} 이후`);
           }
