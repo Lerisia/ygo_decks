@@ -33,10 +33,15 @@ function load(name: string) {
   if (!ctx) return Promise.resolve(null);
   const audio = ctx;
   if (!buffers.has(name)) {
+    // a sound that failed to come (the site restarting for a deploy, a dropped connection) is asked for again at the
+    // next tap, not left silent for the rest of the visit
     buffers.set(name, fetch(`${BASE}${name}.mp3`)
-      .then((r) => r.arrayBuffer())
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((b) => audio.decodeAudioData(b))
-      .catch(() => null));
+      .catch(() => {
+        buffers.delete(name);
+        return null;
+      }));
   }
   return buffers.get(name)!;
 }
