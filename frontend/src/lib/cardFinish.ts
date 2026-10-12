@@ -44,12 +44,28 @@ function loadBundle(): Promise<Bundle> {
   return bundle;
 }
 
+let supported: boolean | null = null;
+
+/** Whether the browser draws WebGL 2, asked once: each asking made a context it never let go of, and a phone keeps
+ *  only so many — the pack simulator, asking for every finished card, made Safari drop the ones on screen (엘리스 10/13:
+ *  "결과창의 로얄카드가 갑자기 사라졌어요"). */
 export function finishSupported(): boolean {
-  try {
-    return !!document.createElement("canvas").getContext("webgl2");
-  } catch {
-    return false;
+  if (supported === null) {
+    try {
+      const gl = document.createElement("canvas").getContext("webgl2");
+      supported = !!gl;
+      gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    } catch {
+      supported = false;
+    }
   }
+  return supported;
+}
+
+/** Let a canvas's context go now rather than when the page is collected (a phone keeps only so many). */
+export function releaseContext(canvas: HTMLCanvasElement) {
+  const gl = canvas.getContext("webgl2");
+  gl?.getExtension("WEBGL_lose_context")?.loseContext();
 }
 
 function vertexSource(inputs: Record<string, number>): string {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CardFinish, type FinishParams, type FinishStyle } from "@/lib/cardFinish";
+import { CardFinish, type FinishParams, type FinishStyle, releaseContext } from "@/lib/cardFinish";
 
 /** A card face in Master Duel's Shine or Royal finish, animated as in the deck screen (the game moves it with time,
  *  not with tilting). It pauses off screen, in a hidden tab and when paused (holding its last frame); it moves even
@@ -33,6 +33,12 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(canvas);
+    // a context the browser takes back (too many at once on a phone) leaves the plain face, not a blank
+    const lost = (e: Event) => {
+      e.preventDefault();
+      setFailed(true);
+    };
+    canvas.addEventListener("webglcontextlost", lost);
     let alive = true;
     let made: CardFinish | null = null;
     CardFinish.create(canvas)
@@ -45,7 +51,10 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
     return () => {
       alive = false;
       ro.disconnect();
+      canvas.removeEventListener("webglcontextlost", lost);
       made?.dispose();
+      // gone from the page: its context goes now (a canvas still in the page may get a new renderer, so not then)
+      window.setTimeout(() => { if (made && !canvas.isConnected) releaseContext(canvas); }, 0);
     };
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
