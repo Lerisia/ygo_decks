@@ -10,6 +10,7 @@ import DeckNotesSection from "@/components/DeckNotesSection";
 import EngineBadge from "@/components/EngineBadge";
 import UpdateBadge from "@/components/UpdateBadge";
 import DeckHyeolSection from "@/components/DeckHyeolSection";
+import BackToDex from "@/components/BackToDex";
 import DeckInfoEditModal from "@/components/DeckInfoEditModal";
 import StatInfoButton from "@/components/StatInfoButton";
 
@@ -117,6 +118,7 @@ export default function DeckDetail() {
 
   return (
     <div className="h-auto min-h-screen w-full mx-auto max-w-4xl px-4 pt-6">
+      <BackToDex to="/database" label="덱 도감으로" />
       {/* 
         1) 모바일(기본)에서는 테이블이 먼저, 이어서 본문.
         2) PC(큰 화면)에서는 테이블이 float-right로 뜨며,

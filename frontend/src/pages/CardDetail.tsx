@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import BackToDex from "@/components/BackToDex";
 import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import CardFinishCanvas from "@/components/CardFinishCanvas";
 import CutinOverlay, { type CutinInfo } from "@/components/CutinOverlay";
@@ -114,6 +115,7 @@ function Skeleton() {
   const bar = "rounded-lg bg-gray-300 dark:bg-gray-600";
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
+      <BackToDex to="/cards" label="카드 도감으로" />
       <div className={`${BOX} bg-gray-200 dark:bg-gray-700 animate-pulse`}>
         {/* the same heading and lines as the names, so the box below starts where it will */}
         <div className={AREA.head}>
@@ -423,6 +425,7 @@ export default function CardDetail() {
 
   return (
     <div className="h-auto min-h-screen w-full max-w-4xl mx-auto px-4 pt-6 pb-4">
+      <BackToDex to="/cards" label="카드 도감으로" />
       <div className={BOX} style={{ background: frameColor }}>
         {pendulum && <div aria-hidden="true" className={AREA.lower} style={{ background: FRAME_COLORS.spell }} />}
         <div className={`${AREA.head} ${DARK_NAMES.has(base) ? "text-gray-900" : "text-white"}`}>

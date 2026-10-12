@@ -85,7 +85,7 @@ function TileSkeleton() {
 
 function CardTile({ card }: { card: CardListItem }) {
   return (
-    <Link to={`/cards/${card.id}`} className="block text-center group">
+    <Link to={`/cards/${card.id}`} state={{ fromList: true }} className="block text-center group">
       {/* the corner rounds the rarity badge off with the card */}
       <span className="relative block card-corner overflow-hidden">
         <img

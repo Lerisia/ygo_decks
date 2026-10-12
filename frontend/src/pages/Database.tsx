@@ -359,7 +359,7 @@ export default function DatabasePage() {
           onSaved={(deck) => {
             setAddingDeck(false);
             window.dispatchEvent(new Event("deck-info-changed"));
-            navigate(`/database/${deck.id}`);
+            navigate(`/database/${deck.id}`, { state: { fromList: true } });
           }}
         />
       )}
@@ -380,7 +380,7 @@ export default function DatabasePage() {
       {/* List of available decks */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filteredDecks.map((deck) => (
-          <div key={deck.id} className="text-center cursor-pointer" onClick={() => navigate(`/database/${deck.id}`)}>
+          <div key={deck.id} className="text-center cursor-pointer" onClick={() => navigate(`/database/${deck.id}`, { state: { fromList: true } })}>
             <div className="relative">
               <img
                 loading="lazy"
