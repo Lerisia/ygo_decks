@@ -64,7 +64,7 @@ const HAS = [
 function TileSkeleton() {
   return (
     <div>
-      <div className="w-full aspect-[704/1024] rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
+      <div className="w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700 animate-pulse" />
       <div className="mt-1 h-10 flex items-start justify-center">
         <div className="mt-1 h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
       </div>
@@ -75,13 +75,14 @@ function TileSkeleton() {
 function CardTile({ card }: { card: CardListItem }) {
   return (
     <Link to={`/cards/${card.id}`} className="block text-center group">
-      <span className="relative block">
+      {/* the corner rounds the rarity badge off with the card */}
+      <span className="relative block card-corner overflow-hidden">
         <img
           loading="lazy"
           decoding="async"
           src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
           alt={card.name}
-          className="w-full aspect-[704/1024] object-contain group-hover:opacity-90 transition"
+          className="w-full aspect-[704/1024] object-contain card-corner group-hover:opacity-90 transition"
         />
         {/* the rarity in the top right corner, as Master Duel's own card list shows it (엘리스 10/12) */}
         {card.rarity && (

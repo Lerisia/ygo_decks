@@ -32,6 +32,8 @@ interface PickerPanelProps {
   imageFit?: "contain" | "cover";
   /** Tailwind aspect class of a grid picture (cards are taller than they are wide). */
   imageAspect?: string;
+  /** The corners of a grid picture: Tailwind "rounded", or "card-corner" for a card (index.css). */
+  imageCorner?: string;
   /** "inline": drawn in the page (wider grid, fixed height, no overlay); "modal": inside PickerModal. */
   variant?: "modal" | "inline";
   /** A page listing every match of the query, offered above the results (the home search, 엘리스 2026-10-11):
@@ -113,7 +115,7 @@ export default function PickerModal({ open, ...panel }: PickerModalProps) {
 export function PickerPanel({
   onClose, title, hint, placeholder, query, onQueryChange, onSubmit, items, status,
   idleText = "이름을 입력하세요.", emptyText = "결과 없음", onPick, viewKey, defaultView, imageFit = "contain",
-  imageAspect = "aspect-square",
+  imageAspect = "aspect-square", imageCorner = "rounded",
   variant = "modal", allResults,
 }: PickerPanelProps) {
   const [view, setView] = useState<View>(() =>
@@ -165,9 +167,9 @@ export function PickerPanel({
   );
   const thumb = (it: PickerItem, cls: string) =>
     it.image ? (
-      <img loading="lazy" src={it.image} alt="" className={`${cls} ${imageFit === "cover" ? "object-cover" : "object-contain"} rounded bg-gray-100 dark:bg-gray-900`} onError={onImgErrorRetry} />
+      <img loading="lazy" src={it.image} alt="" className={`${cls} ${imageFit === "cover" ? "object-cover" : "object-contain"} ${imageCorner} bg-gray-100 dark:bg-gray-900`} onError={onImgErrorRetry} />
     ) : (
-      <div className={`${cls} rounded bg-gray-100 dark:bg-gray-900`} />
+      <div className={`${cls} ${imageCorner} bg-gray-100 dark:bg-gray-900`} />
     );
 
   return (

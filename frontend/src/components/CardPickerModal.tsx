@@ -53,6 +53,7 @@ export default function CardPickerModal({
     viewKey: "card",
     imageFit: "contain" as const,
     imageAspect: "aspect-[704/1024]",
+    imageCorner: "card-corner",
     allResults: { to: `/cards?q=${encodeURIComponent(query.trim())}`, count: total, unit: "장" },
   };
   // Inline: drawn where the caller puts it (the home page on desktop opens the search out in place).

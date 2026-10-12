@@ -314,3 +314,9 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .fade-in { animation: none; }
 }
+
+/* A card face gets a real card's slightly rounded corners (특이점 2026-10-12): 3.5% of the width across and the same
+   length down (2.4% of a 704×1024 card's height), so each corner is a true quarter circle. */
+.card-corner {
+  border-radius: 3.5% / 2.4%;
+}

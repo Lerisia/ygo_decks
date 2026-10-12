@@ -124,7 +124,7 @@ function Skeleton() {
         </div>
         <div className={`${AREA.pair} ${bar}`} />
         <div className={`${AREA.card} md:rounded-lg md:bg-gray-300 md:dark:bg-gray-600`}>
-          <div className="w-full aspect-[704/1024] rounded bg-gray-400/40 dark:bg-gray-500/50" />
+          <div className="w-full aspect-[704/1024] card-corner bg-gray-400/40 dark:bg-gray-500/50" />
           {finishSupported() && <div className="mt-2 h-7 md:h-8 w-full rounded-lg bg-gray-400/40 dark:bg-gray-500/50" />}
         </div>
         <div className={`${AREA.stats} h-32 md:h-10 md:rounded-lg md:bg-gray-300 md:dark:bg-gray-600`} />
@@ -169,9 +169,9 @@ function CardZoom({ src, alt, finish, params, onClose }: {
   return (
     <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 cursor-zoom-out" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
       {finish === "normal" ? (
-        <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
+        <img src={src} alt={alt} className="max-h-full max-w-full object-contain card-corner" />
       ) : (
-        <CardFinishCanvas faceUrl={src} style={finish} params={params} alt={alt} className="block aspect-[704/1024] w-[min(100%,704px,calc((100svh_-_2rem)*0.6875))]" />
+        <CardFinishCanvas faceUrl={src} style={finish} params={params} alt={alt} className="block aspect-[704/1024] w-[min(100%,704px,calc((100svh_-_2rem)*0.6875))] card-corner" />
       )}
     </div>
   );
@@ -356,9 +356,9 @@ export default function CardDetail() {
             <div className="relative">
               <button type="button" onClick={() => setZoomed(true)} className="relative block w-full cursor-zoom-in" aria-label="카드 크게 보기">
                 {shown === "normal" ? (
-                  <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain" />
+                  <img src={picked} alt={`${card.name} 카드`} onLoad={preloadFaces} className="w-full aspect-[704/1024] object-contain card-corner" />
                 ) : (
-                  <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024]" />
+                  <CardFinishCanvas faceUrl={picked} style={shown} params={finishParams} paused={zoomed} alt={`${card.name} 카드 (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024] card-corner" />
                 )}
                 <span className="absolute right-1 bottom-1 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                   <ZoomGlyph />
@@ -405,7 +405,7 @@ export default function CardDetail() {
                   key={f.id}
                   type="button"
                   onClick={() => setPicked(f.face)}
-                  className={`md:w-12 rounded-sm overflow-hidden ring-2 ring-offset-1 transition touch-manipulation ${picked === f.face ? "ring-white ring-offset-black" : "ring-transparent ring-offset-transparent"}`}
+                  className={`md:w-12 card-corner overflow-hidden ring-2 ring-offset-1 transition touch-manipulation ${picked === f.face ? "ring-white ring-offset-black" : "ring-transparent ring-offset-transparent"}`}
                   aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
                 >
                   <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />
