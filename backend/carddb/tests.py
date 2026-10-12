@@ -931,6 +931,17 @@ class CardDexApiTest(TestCase):
         self.assertEqual(sorted(self.ids(ban="unlimited")), [2, 3, 4, 5, 6])
         self.assertEqual(sorted(self.ids(ban="forbidden,unlimited")), [1, 2, 3, 4, 5, 6])
 
+    def test_card_page_gives_its_master_duel_banlist_status(self):
+        # the 금제 icon at the top left of the card page, as the rarity is at its top right (엘리스 10/12)
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Banlist, BanlistEntry
+        now = Banlist.objects.create(format="md", effective=timezone.localdate() - timedelta(days=3))
+        BanlistEntry.objects.create(banlist=now, card=self.dm, name="1", status="semi_limited")
+        BanlistEntry.objects.create(banlist=now, card=self.bewd, name="2", status="unlimited", previous="limited")
+        self.assertEqual(self.client.get("/api/carddb/cards/1/").json()["ban"], "semi_limited")
+        self.assertEqual(self.client.get("/api/carddb/cards/2/").json()["ban"], "")   # unlimited: no icon
+
     def test_list_gives_the_rarity(self):
         MdPrint.objects.filter(md_id=2).update(rarity="UR")
         rarity = {r["id"]: r["rarity"] for r in self.get()["results"]}
@@ -1084,6 +1095,7 @@ class CardDexApiTest(TestCase):
         self.assertEqual(body["rarity"], "SR")
         self.assertEqual((body["face_url"], body["faces"]), (None, []))   # not drawn yet
         self.assertEqual(body["history"], [])   # no 금제 lists stored here
+        self.assertEqual(body["ban"], "")         # nor a Master Duel 금제 for the icon beside its name
         link = self.client.get("/api/carddb/cards/6/").json()
         self.assertEqual((link["level_label"], link["def"], link["link_markers"]), ("링크 2", None, ["bottom_left", "bottom_right"]))
         spell = self.client.get("/api/carddb/cards/4/").json()

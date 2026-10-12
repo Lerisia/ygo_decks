@@ -560,4 +560,6 @@ def card(request, card_id):
         "decks": decks,
         # each game's 연혁: its release and 금제 changes (엘리스 10/12)
         "history": banlist.card_history(c),
+        # today's Master Duel 금제 for the icon beside its name, "" when unlimited (엘리스 10/12)
+        "ban": banlist.current_statuses(Banlist.Format.MD, timezone.localdate(), card=c.id).get(c.id, ""),
     })

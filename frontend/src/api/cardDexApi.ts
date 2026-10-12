@@ -121,6 +121,8 @@ export type CardDoc = {
   /** The attribute whose sound goes with a cut-in. */
   cutin_sound: string;
   rarity: string;
+  /** Its 금제 in Master Duel today, for the icon beside its name; "" when unlimited. */
+  ban: "" | "forbidden" | "limited" | "semi_limited";
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];

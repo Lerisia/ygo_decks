@@ -435,6 +435,10 @@ export default function CardDetail() {
           {rarity && (
             <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}_hd.png`} alt={`레어도 ${rarity}`} title={rarity} className="float-right ml-2 mt-1 h-5 md:h-6 w-auto" />
           )}
+          {/* today's Master Duel 금제 at the top left, as the rarity is at the top right (엘리스 10/12) */}
+          {card.ban && (
+            <img src={`${ICONS}/limit/${card.ban}.webp`} alt={BAN_LABELS[card.ban]} title={`마스터 듀얼 ${BAN_LABELS[card.ban]}`} className="float-left mr-2 mt-0.5 w-7 h-7 md:w-8 md:h-8" />
+          )}
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>
           {card.name_ja && (
             <p lang="ja" className="mt-0.5 text-sm leading-5 opacity-90">

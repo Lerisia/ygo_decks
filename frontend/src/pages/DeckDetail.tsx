@@ -51,6 +51,8 @@ const DESC_TILE =
 // 덱 설명 제보(기여하기 → 구글 폼) — 특이점 2026-10-03: 일반 이용자에게는 숨김. 다시 쓰게 되면 true로 바꾸면 된다.
 // 운영진의 "설명 수정하기"는 이 값과 상관없이 보인다.
 const SHOW_DESCRIPTION_REPORT = false;
+// 이 덱의 카드 보기 (덱 문서 → 카드 도감): hidden until the decks' 카드군 links are audited (엘리스 2026-10-12)
+const SHOW_CARD_BOOK = false;
 
 // Showdown 설정 - 테이블, 자동 링크, 할 일 목록 등을 지원
 const converter = new Showdown.Converter({
@@ -235,6 +237,8 @@ export default function DeckDetail() {
       
       {/* 본문 섹션 */}
       <div className="text-left rounded-lg">
+        {/* 이 덱의 카드 보기 is off until the decks' 카드군 links are sorted out (엘리스 2026-10-12); flip SHOW_CARD_BOOK to bring it back */}
+        {SHOW_CARD_BOOK && (
         <div className="overflow-hidden mb-4">
           {/* 플레이 영상 보러 가기 is off for now (특이점 2026-10-12); DeckVideosModal and the API stay for its return. */}
           {/* The deck's cards in the card book: its 테마 카드, then the cards supporting them (특이점 2026-10-12) */}
@@ -262,6 +266,7 @@ export default function DeckDetail() {
             </button>
           )}
         </div>
+        )}
         <DeckNotesSection deckId={deck.id} />
         {deck.has_hyeol && <DeckHyeolSection deckId={deck.id} />}
         <section className="mb-5 overflow-hidden">
