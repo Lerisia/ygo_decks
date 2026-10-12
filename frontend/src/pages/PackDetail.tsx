@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
@@ -28,6 +28,29 @@ export default function PackDetail() {
   const [tally, setTally] = useState(() => tallyOf(id));
   const [run, setRun] = useState<{ key: number; packs: Pulled<PackCard>[][]; fresh: Set<number> } | null>(null);
   const [rates, setRates] = useState(false);
+  const openStage = useRef("pack");
+  const running = !!run;
+
+  // A phone's back gesture (an iPhone takes a stroke from the screen's left edge as one) must not leave the page in
+  // the middle of an opening (엘리스 10/13): the opening holds a history entry of its own; a back while packs are opening
+  // only gives it up and takes it again, and on the ten laid out or the results it closes the opening.
+  useEffect(() => {
+    if (!running) return;
+    const mark = () => window.history.pushState({ ...window.history.state, packOpening: true }, "");
+    mark();
+    let closing = false;
+    const onPop = () => {
+      if (openStage.current === "overview" || openStage.current === "result") {
+        closing = true;
+        setRun(null);
+      } else mark();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (!closing && window.history.state?.packOpening) window.history.back();
+    };
+  }, [running]);
 
   useEffect(() => {
     setPack(null);
@@ -113,7 +136,8 @@ export default function PackDetail() {
       )}
 
       {run && pack && (
-        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} onClose={() => setRun(null)} onAgain={open} />
+        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} onClose={() => setRun(null)} onAgain={open}
+                     onStage={(st) => { openStage.current = st; }} />
       )}
       {rates && pack && <Rates pack={pack} master={master} onClose={() => setRates(false)} />}
     </div>

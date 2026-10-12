@@ -18,6 +18,7 @@ const T = {
   allGap: { low: 200, high: 700 },              // 전부 넘긴다: between one card and the next
 };
 const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
+const MAX_SHADED = 12;
 const RANK: Record<Rarity, number> = { N: 0, R: 1, SR: 2, UR: 3 };
 const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
 // The opening plays in full whatever the device's reduced-motion setting says: it is what a visitor comes to watch
@@ -51,9 +52,9 @@ type Fx = MutableRefObject<FxLayer | null>;
  *  running along them; a tap or a finger drawn across turns them — N and R whisk over, SR and UR leap up in light and
  *  dust (a UR twisting the wrong way first, a ring spreading), and a shine or royal card turns once more into its finish
  *  in the game's shader. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
-export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
+export default function PackOpening({ pack, packs, fresh, onClose, onAgain, onStage }: {
   pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>;
-  onClose: () => void; onAgain: (count: 1 | 10) => void;
+  onClose: () => void; onAgain: (count: 1 | 10) => void; onStage?: (stage: string) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [stage, setStage] = useState<Stage>(packs.length > 1 ? "overview" : "pack");
@@ -90,7 +91,9 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
 
   useEffect(() => {
     const prev = document.body.style.overflow;
+    const prevOverscroll = document.documentElement.style.overscrollBehavior;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";   // no pull-to-refresh under a stroke
     const front = new FxLayer(fxCanvas.current!);
     const back = new FxLayer(bgCanvas.current!);
     fx.current = front;
@@ -108,8 +111,13 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
       back.destroy();
       window.removeEventListener("resize", onResize);
       document.body.style.overflow = prev;
+      document.documentElement.style.overscrollBehavior = prevOverscroll;
     };
   }, [packs]);
+
+  useEffect(() => {
+    onStage?.(stage);
+  }, [stage, onStage]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -169,7 +177,7 @@ export default function PackOpening({ pack, packs, fresh, onClose, onAgain }: {
           <Cards key={index} cards={packs[index]} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
-        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} onOpen={open} onAgain={onAgain} onClose={onClose} />}
+        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} onOpen={open} onAgain={onAgain} onClose={onClose} />}
 
         <div className="absolute left-0 right-0 top-0 z-40 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <span className="po-count">{stage === "result" ? "팩 개봉 결과" : stage === "overview" ? pack.name : `${index + 1}/${total}`}</span>
@@ -650,7 +658,7 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
     <>
       {shader ? (
         <Suspense fallback={plain}>
-          <CardFinishCanvas faceUrl={card.face ?? card.thumb} style={finish as "shine" | "royal"} params={params!} alt="" className="absolute inset-0 w-full h-full card-corner" />
+          <CardFinishCanvas faceUrl={card.face ?? card.thumb} style={finish as "shine" | "royal"} params={params!} alt="" sharp={2} className="absolute inset-0 w-full h-full card-corner" />
         </Suspense>
       ) : plain}
       {showFinish && !shader && <span className={`po-sheen ${finish === "royal" ? "po-royal" : ""}`} style={finish === "royal" ? { backgroundImage: `url(${FX}rainbow.webp)` } : undefined} />}
@@ -666,8 +674,8 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
 }
 
 /** 팩 개봉 결과: every card pulled, UR first, a royal or shine one before a plain one, popping in; a tap shows it large. */
-function Result({ pack, packs, fresh, onOpen, onAgain, onClose }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>;
+function Result({ pack, packs, fresh, finishes, onOpen, onAgain, onClose }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>;
   onOpen: (c: Pulled<PackCard>) => void; onAgain: (count: 1 | 10) => void; onClose: () => void;
 }) {
   const all = useMemo(() => {
@@ -677,6 +685,9 @@ function Result({ pack, packs, fresh, onOpen, onAgain, onClose }: {
       .map((x) => x.c);
   }, [packs]);
   const count = (r: Rarity) => all.filter((c) => c.rarity === r).length;
+  // the finishes in the game's shader, as in the opening (엘리스 10/13: the sheen standing in for them looked off); a
+  // browser keeps about sixteen such drawings at once, so past twelve the sheen stands in
+  const shaded = useMemo(() => new Set(all.filter((c) => c.finish !== "basic").slice(0, MAX_SHADED)), [all]);
   return (
     <div className="absolute inset-0 z-30 flex flex-col bg-black/55 pt-[max(56px,calc(env(safe-area-inset-top)+44px))]">
       <div className="px-4 pb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -693,7 +704,7 @@ function Result({ pack, packs, fresh, onOpen, onAgain, onClose }: {
             <button key={i} type="button" onClick={() => onOpen(c)} className={`po-result relative aspect-[704/1024] ${high(c.rarity) ? `po-result-${c.rarity.toLowerCase()}` : ""}`}
                     style={{ animationDelay: `${Math.min(i, 40) * 22}ms` }}
                     aria-label={`${c.card.name} ${c.rarity}${c.finish !== "basic" ? ` ${FINISH_LABEL[c.finish]}` : ""}`}>
-              <CardFace pulled={c} isNew={fresh.has(c.card.print)} />
+              <CardFace pulled={c} isNew={fresh.has(c.card.print)} params={shaded.has(c) ? finishes.get(c.card.print) : undefined} />
             </button>
           ))}
         </div>
@@ -738,7 +749,7 @@ const CSS = `
 @media (hover: hover) { .po-cmd:hover { background: linear-gradient(90deg, transparent, rgba(255,255,255,.24) 22%, rgba(255,255,255,.24) 78%, transparent); } }
 
 .po-overview { position: absolute; left: 50%; bottom: calc(100% - var(--horizon)); translate: -50% 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
-  width: min(92vw, calc((var(--horizon) - 0%) * 0 + (60svh - 110px) / 2 * .488 * 5 + 40px)); -webkit-box-reflect: below 4px linear-gradient(transparent 60%, rgba(255,255,255,.25)); }
+  width: min(calc(100vw - 64px), calc((60svh - 110px) / 2 * .488 * 5 + 40px)); -webkit-box-reflect: below 4px linear-gradient(transparent 60%, rgba(255,255,255,.25)); }
 @media (orientation: landscape) and (min-aspect-ratio: 4/3) { .po-overview { grid-template-columns: repeat(10, 1fr); width: min(94vw, calc((64svh - 120px) * .488 * 10 + 90px)); } }
 .po-mini { position: relative; aspect-ratio: 250 / 512; animation: po-slide-in .45s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes po-slide-in { from { transform: translateX(60vw); opacity: 0; } }
@@ -808,7 +819,7 @@ const CSS = `
 @keyframes po-monster-bg { 0% { background: #000; } 6% { background: #000; } 9% { background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56); } 92% { opacity: 1; } 100% { opacity: 0; } }
 
 .po-grid { position: absolute; left: 50%; bottom: calc(100% - var(--horizon) - .5%); translate: -50% 0; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
-  width: min(92vw, calc((60svh - 110px) / 2 * .6875 * 4 + 30px)); perspective: 1100px; touch-action: none;
+  width: min(calc(100vw - 64px), calc((60svh - 110px) / 2 * .6875 * 4 + 30px)); perspective: 1100px; touch-action: none;
   -webkit-box-reflect: below 4px linear-gradient(transparent 58%, rgba(255,255,255,.22)); }
 @media (orientation: landscape) and (min-aspect-ratio: 4/3) { .po-grid { grid-template-columns: repeat(8, 1fr); width: min(94vw, calc((64svh - 130px) * .6875 * 8 + 70px)); } }
 .po-card { position: relative; aspect-ratio: 704 / 1024; cursor: pointer; will-change: transform; }

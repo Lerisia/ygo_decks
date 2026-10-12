@@ -5,8 +5,8 @@ import { CardFinish, type FinishParams, type FinishStyle } from "@/lib/cardFinis
  *  not with tilting). It pauses off screen, in a hidden tab and when paused (holding its last frame); it moves even
  *  for reduced motion, since the motion is what the viewer tapped the finish to see. The renderer is made once for
  *  the canvas and another face only swaps its texture; the plain face shows until the finish has it. */
-export default function CardFinishCanvas({ faceUrl, style, params, alt, paused = false, className = "" }: {
-  faceUrl: string; style: FinishStyle; params: FinishParams; alt: string; paused?: boolean; className?: string;
+export default function CardFinishCanvas({ faceUrl, style, params, alt, paused = false, sharp = 1, className = "" }: {
+  faceUrl: string; style: FinishStyle; params: FinishParams; alt: string; paused?: boolean; sharp?: number; className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const start = useRef(performance.now());
@@ -18,10 +18,21 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const box = canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(box.width * dpr);
-    canvas.height = Math.round(box.height * dpr);
+    // its laid-out size, not its size on screen: the pack simulator puts a finish on a card in the middle of a turn,
+    // when it shows as a sliver, and a canvas sized then drew a few pixels stretched (엘리스 10/13 "샤인이 되는 순간
+    // 초저화질"); `sharp` draws finer for a card that will be shown larger than it is laid out
+    const fit = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2) * sharp;
+      const w = Math.round(canvas.offsetWidth * dpr);
+      const h = Math.round(canvas.offsetHeight * dpr);
+      if (w && h && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(canvas);
     let alive = true;
     let made: CardFinish | null = null;
     CardFinish.create(canvas)
@@ -33,9 +44,10 @@ export default function CardFinishCanvas({ faceUrl, style, params, alt, paused =
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
+      ro.disconnect();
       made?.dispose();
     };
-  }, []);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!finish) return;
