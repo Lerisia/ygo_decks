@@ -907,11 +907,12 @@ const CSS = `
 .po-pack.po-pour, .po-pack.po-rise, .po-pack.po-leave, .po-pack.po-cut { outline-color: transparent !important; box-shadow: none !important; }
 .po-leave { opacity: 0; transform: translateY(6%); transition: opacity .3s, transform .3s; }
 .po-stream { position: absolute; inset: 0; pointer-events: none; }
-/* the pack jolts and flares white with each card it lets go, a tenth of a second apart (the game's openings, at 60
-   frames a second; 엘리스 10/13): one beat a card, as long as T.streamGap */
-.po-rise .po-body { animation: po-jolt 95ms linear 8; }
-@keyframes po-jolt { 0% { transform: translate(-2.4%, .5%); filter: brightness(1.8) saturate(.5); }
-  35% { transform: translate(2%, -.4%); filter: brightness(1.3) saturate(.8); } 70% { transform: translate(-.8%, .2%); filter: brightness(1.05); }
+/* the pack kicks down and flares white with each card it fires up, springing back, a tenth of a second apart (the game's
+   openings at 60 frames a second: some 2% down each time; 엘리스 10/13 "발사하듯 위아래로"): one beat a card, as long
+   as T.streamGap */
+.po-rise .po-body, .po-rise .po-mouth { animation: po-recoil 95ms cubic-bezier(.2,.7,.3,1) 8; }
+@keyframes po-recoil { 0% { transform: translateY(3.2%) scaleY(.982); filter: brightness(1.8) saturate(.5); }
+  45% { transform: translateY(-1%) scaleY(1.004); filter: brightness(1.3) saturate(.8); } 80% { transform: translateY(.3%); filter: brightness(1.05); }
   100% { transform: none; filter: none; } }
 .po-stream i { position: absolute; left: 22%; top: 20%; width: 56%; aspect-ratio: 0.6875; border-radius: 3px; background: #fff;
   box-shadow: 0 0 10px 3px rgba(255,255,255,.95), 0 0 30px 10px rgba(175,210,255,.6); }
