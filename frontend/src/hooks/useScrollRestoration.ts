@@ -35,8 +35,9 @@ export function useScrollRestoration() {
     let cancelled = false;
     const started = performance.now();
     const stop = () => (cancelled = true);
+    // the user scrolling stops it; a finger merely set down (an iPhone's back swipe ends on the page) does not
     window.addEventListener("wheel", stop, { passive: true, once: true });
-    window.addEventListener("touchstart", stop, { passive: true, once: true });
+    window.addEventListener("touchmove", stop, { passive: true, once: true });
     const attempt = () => {
       if (cancelled) return;
       window.scrollTo(0, target);
@@ -46,7 +47,7 @@ export function useScrollRestoration() {
     return () => {
       cancelled = true;
       window.removeEventListener("wheel", stop);
-      window.removeEventListener("touchstart", stop);
+      window.removeEventListener("touchmove", stop);
     };
   }, [location.key, location.pathname, navType]);
 }

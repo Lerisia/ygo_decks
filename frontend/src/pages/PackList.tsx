@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import SearchForm from "@/components/SearchForm";
 import { Input } from "@/components/ui/input";
 import PackFront from "@/components/packs/PackFront";
@@ -8,6 +8,18 @@ import { type PackHit, type PackKind, type PackSummary, getPacks, searchPacks } 
 import { makeMatcher, nameKeys } from "@/utils/hangul";
 import { isAuthenticated } from "@/api/accountApi";
 
+
+/** The pack tapped on the way out, and where on the screen it was: Back puts it there again once the list is drawn
+ *  (엘리스 10/13: on an iPhone, Back found the list far from where it was left). */
+const ANCHOR = "packs_anchor";
+type Anchor = { list: string; tile: string; top: number; y: number };
+const readAnchor = (): Anchor | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ANCHOR) ?? "null");
+  } catch {
+    return null;
+  }
+};
 
 const KINDS: { key: "all" | PackKind; label: string }[] = [
   { key: "all", label: "전체" },
@@ -55,6 +67,18 @@ export default function PackList() {
     return () => { window.clearTimeout(wait); stop.abort(); };
   }, [query]);
 
+  const location = useLocation();
+  const back = useNavigationType() === "POP";
+  const listUrl = location.pathname + location.search;
+  const mounted = useRef(performance.now());
+  const keep = (tile: string, el: HTMLElement) => {
+    try {
+      sessionStorage.setItem(ANCHOR, JSON.stringify({ list: listUrl, tile, top: el.getBoundingClientRect().top, y: window.scrollY }));
+    } catch {
+      /* Back then relies on the site's own scroll memory */
+    }
+  };
+
   const { shown, byCard } = useMemo(() => {
     if (!packs) return { shown: [], byCard: new Map<number, PackHit>() };
     const q = query.trim();
@@ -69,6 +93,16 @@ export default function PackList() {
     const carded = rows.filter((p) => !ids.has(p.id) && found.has(p.id)).sort((a, b) => found.get(a.id)!.rank - found.get(b.id)!.rank);
     return { shown: [...named, ...carded], byCard: new Map(carded.map((p) => [p.id, found.get(p.id)!])) };
   }, [packs, kind, query, hits, special]);
+
+  // back from a pack: the tapped pack where it was on the screen, once the list is drawn — again as search results come
+  // in, for a moment after coming back
+  useLayoutEffect(() => {
+    if (!back || !packs || performance.now() - mounted.current > 2500) return;
+    const a = readAnchor();
+    if (!a || a.list !== listUrl) return;
+    const el = document.querySelector<HTMLElement>(`[data-tile="${a.tile}"]`);
+    window.scrollTo(0, el ? window.scrollY + el.getBoundingClientRect().top - a.top : a.y);
+  }, [back, packs, shown, listUrl]);
 
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
@@ -117,8 +151,9 @@ export default function PackList() {
             ? shown.map((p) => {
                 const hit = byCard.get(p.id);
                 return (
-                <li key={`${p.id}-${p.version ?? 0}`}>
-                  <Link to={`/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`} state={{ fromList: true }} className="group block">
+                <li key={`${p.id}-${p.version ?? 0}`} data-tile={`${p.id}-${p.version ?? 0}`}>
+                  <Link to={`/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`} state={{ fromList: true }} className="group block"
+                        onClick={(e) => keep(`${p.id}-${p.version ?? 0}`, e.currentTarget)}>
                     <span className="relative block">
                       <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
                       {p.period && (
