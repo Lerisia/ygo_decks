@@ -434,7 +434,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
           </>
         )}
       </div>
-      {monster && <Monster onDone={monsterDone} flash={flash} />}
+      {monster && <Monster onDone={monsterDone} />}
     </div>
   );
 }
@@ -463,18 +463,35 @@ function Stream() {
   );
 }
 
-/** The monster bursting across the screen in yellow lightning — the game's sign of a pack with a UR. */
-function Monster({ onDone, flash }: { onDone: () => void; flash: (white: boolean) => void }) {
+/** Hope tearing the pack, as the game plays it (its openings, frame by frame; 엘리스 10/13: "너무 피피티 같대요"): the
+ *  screen goes black; a yellow sword-arc is drawn across it, then another, crossing; a grey, then a white flash; Hope
+ *  comes out of the white burnt bright, its colour returning as the white sinks to a dim grey-violet, a golden flare
+ *  bursting under it and jagged yellow lightning crackling across the screen; a moment held; then it burns out white and
+ *  the pack is back. */
+const ZAPS = [
+  { y: 16, r: -7, d: 0 }, { y: 31, r: 5, d: 90 }, { y: 55, r: -4, d: 40 }, { y: 70, r: 8, d: 130 }, { y: 86, r: -6, d: 70 },
+];
+function Monster({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     playPackSound("hope", 0.75);
-    const a = window.setTimeout(() => flash(true), 150);
-    const b = window.setTimeout(() => flash(true), 1750);
-    const c = window.setTimeout(onDone, 1950);
-    return () => [a, b, c].forEach(clearTimeout);
+    const done = window.setTimeout(onDone, 2150);
+    return () => window.clearTimeout(done);
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="po-monster" aria-hidden="true">
-      <img src={`${FX}monster.webp`} alt="" />
+      <span className="po-mglow" />
+      <svg className="po-slash" viewBox="0 0 100 178" preserveAspectRatio="xMidYMid slice">
+        <path className="po-slash-a" d="M 30 -14 Q 104 70 50 196" pathLength={1} />
+        <path className="po-slash-b" d="M -12 132 Q 46 50 112 86" pathLength={1} />
+      </svg>
+      <img className="po-mflare" src={`${FX}mons_flare.webp`} alt="" />
+      <img className="po-hope" src={`${FX}monster.webp`} alt="" />
+      <span className="po-zaps">
+        {ZAPS.map((z, i) => (
+          <i key={i} style={{ top: `${z.y}%`, rotate: `${z.r}deg`, animationDelay: `${z.d}ms`, backgroundImage: `url(${FX}line.webp)` }} />
+        ))}
+      </span>
+      <span className="po-whiteout" />
     </div>
   );
 }
@@ -926,17 +943,48 @@ const CSS = `
 .po-bolt-red { filter: sepia(1) hue-rotate(295deg) saturate(6) brightness(1.2) drop-shadow(0 0 10px #ff3d8b); }
 @keyframes po-bolt { 0% { opacity: 1; } 18% { opacity: .35; } 30% { opacity: 1; } 55% { opacity: .8; } 100% { opacity: 0; } }
 
-.po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56);
-  animation: po-monster-bg 1.95s linear forwards; }
+.po-monster { position: fixed; inset: 0; z-index: 45; overflow: hidden; background: #000; animation: po-monster-bg 2.15s linear forwards; }
+@keyframes po-monster-bg { 0%, 14% { background-color: #000; } 15% { background-color: #7a7a84; } 16.5%, 20% { background-color: #fff; }
+  42%, 100% { background-color: #3b3848; } 0%, 86% { opacity: 1; } 100% { opacity: 0; } }
+/* the lighter side of the grey-violet it sinks to */
+.po-mglow { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 70% at 22% 40%, rgba(214,212,226,.85), transparent 70%);
+  animation: po-mglow 2.15s linear forwards; }
+@keyframes po-mglow { 0%, 20% { opacity: 0; } 42%, 100% { opacity: 1; } }
+/* the sword-arcs drawn on the black, then given over to Hope's own */
+.po-slash { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; animation: po-slash-out 2.15s linear forwards; }
+.po-slash path { fill: none; stroke: #fff6a0; stroke-width: 3.4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 6px #ffe14a) drop-shadow(0 0 18px #ffb400); }
+.po-slash-a { animation: po-slash-draw 2.15s cubic-bezier(.3,.6,.4,1) forwards; }
+.po-slash-b { animation: po-slash-draw-b 2.15s cubic-bezier(.3,.6,.4,1) forwards; }
+@keyframes po-slash-draw { 0%, 7% { stroke-dashoffset: 1; } 12.5%, 100% { stroke-dashoffset: 0; } }
+@keyframes po-slash-draw-b { 0%, 10% { stroke-dashoffset: 1; } 15%, 100% { stroke-dashoffset: 0; } }
+@keyframes po-slash-out { 0%, 22% { opacity: 1; } 32%, 100% { opacity: 0; } }
 /* Hope's head (37.5% down its picture, a little left of the middle) a third of the way down, all of it from its horns to
-   its legs in view on a phone held upright (엘리스 10/13: "여전히 아래에 박혀요 … 크기를 좀 줄여야"). Its box is square
-   before the picture comes and the move to its head is in the animation itself: Safari worked out a translate in % of
-   the picture before it had come (0) and kept it, leaving Hope low and to the right. */
-.po-monster img { position: absolute; left: 50%; top: 33%; width: min(max(105vw, 88svh), 200svh); aspect-ratio: 1; height: auto; max-width: none;
-  transform-origin: 47% 37.5%; animation: po-monster 1.95s cubic-bezier(.2,.7,.3,1) forwards; }
-@keyframes po-monster { 0% { transform: translate(-47%, -37.5%) scale(1.5) translateX(14%); opacity: 0; } 8% { opacity: 1; }
-  70% { transform: translate(-47%, -37.5%) scale(1.08); } 100% { transform: translate(-47%, -37.5%) scale(1.03) translateX(-2%); opacity: 1; } }
-@keyframes po-monster-bg { 0% { background: #000; } 6% { background: #000; } 9% { background: radial-gradient(circle at 50% 45%, #dcdce4, #8b8b98 60%, #4a4a56); } 92% { opacity: 1; } 100% { opacity: 0; } }
+   its legs in view on a phone held upright (엘리스 10/13). Its box is square before the picture comes and the move to its
+   head is in the animation itself: Safari worked out a translate in % of the picture before it had come (0) and kept it,
+   leaving Hope low and to the right. It comes out of the white burnt bright, its colour returning as the white sinks. */
+.po-hope { position: absolute; left: 50%; top: 33%; width: min(max(105vw, 88svh), 200svh); aspect-ratio: 1; height: auto; max-width: none;
+  transform-origin: 47% 37.5%; opacity: 0; animation: po-hope 2.15s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes po-hope {
+  0%, 17% { opacity: 0; transform: translate(-47%, -37.5%) scale(1.16); filter: brightness(3.4) saturate(.4); }
+  19% { opacity: 1; }
+  42% { transform: translate(-47%, -37.5%) scale(1.06); filter: brightness(1) saturate(1); }
+  74% { opacity: 1; transform: translate(-47%, -37.5%) scale(1.03); filter: brightness(1) saturate(1); }
+  84%, 100% { opacity: 1; transform: translate(-47%, -37.5%) scale(1.02); filter: brightness(2.6) saturate(.5); } }
+/* the golden flare that bursts under it as it comes */
+.po-mflare { position: absolute; left: 50%; top: 58%; width: min(120vw, 90svh); max-width: none; aspect-ratio: 1; mix-blend-mode: screen; opacity: 0;
+  translate: -50% -50%; animation: po-mflare 2.15s ease-out forwards; }
+@keyframes po-mflare { 0%, 17% { opacity: 0; transform: scale(.4); } 20% { opacity: 1; transform: scale(1.2); } 36%, 100% { opacity: 0; transform: scale(2); } }
+/* jagged yellow lightning crackling across while it is held */
+.po-zaps { position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen; animation: po-zaps 2.15s linear forwards; }
+@keyframes po-zaps { 0%, 19% { opacity: 0; } 22%, 72% { opacity: 1; } 77%, 100% { opacity: 0; } }
+.po-zaps i { position: absolute; left: -15%; width: 130%; height: 4.6svh; background-size: 100% 100%; background-repeat: no-repeat;
+  filter: sepia(1) saturate(9) hue-rotate(8deg) brightness(1.6) drop-shadow(0 0 5px #ffd21e);
+  animation: po-zap .14s steps(1) infinite; }
+@keyframes po-zap { 0% { opacity: 1; transform: scaleY(1); } 33% { opacity: .35; transform: scaleY(-1.2); } 66% { opacity: .85; transform: scaleX(-1); } }
+/* and it burns out white, the pack behind as the white goes */
+.po-whiteout { position: absolute; inset: 0; background: #fff; opacity: 0; animation: po-whiteout 2.15s ease-in forwards; }
+@keyframes po-whiteout { 0%, 72% { opacity: 0; } 83%, 100% { opacity: 1; } }
 
 .po-grid { position: absolute; left: 50%; bottom: calc(100% - var(--horizon) - .5%); translate: -50% 0; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
   width: min(calc(100vw - 64px), calc((60svh - 110px) / 2 * .6875 * 4 + 30px)); perspective: 1100px; touch-action: none;
