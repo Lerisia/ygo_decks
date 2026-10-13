@@ -28,7 +28,8 @@ function TileSkeleton() {
  *  deck, as tall as the screen. On phones and tablets it floats over the bottom of the deck (참혈 2026-10-13): a
  *  rounded see-through card, the box at its bottom and the results one row above it, the row folded away until
  *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. With the keyboard up it
- *  rides on top of the keyboard, and pressing the box does not scroll the page (참혈 2026-10-14). */
+ *  rides on top of the keyboard, gliding up and down with it, and pressing the box does not scroll the page to it
+ *  (참혈 2026-10-14). */
 export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
@@ -48,10 +49,11 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
   const request = useRef(0);
   const results = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLInputElement>(null);
-  const keyboard = useKeyboardInset();
+  const keyboard = useKeyboardInset(box);
 
   // A tap on the box lets the browser scroll the page to it, which below lg throws the deck far down. The tap is
-  // taken over and the box focused without that scroll; a swipe that starts on the box stays a swipe.
+  // taken over and the box focused without that scroll; a swipe that starts on the box stays a swipe. The page still
+  // rises as the keyboard comes up, as the browser moves it (참혈 2026-10-14).
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -65,12 +67,7 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
       const tap = start && t && Math.abs(t.clientX - start.x) < 10 && Math.abs(t.clientY - start.y) < 10;
       if (!tap || document.activeElement === el || window.matchMedia("(min-width: 1024px)").matches) return;
       e.preventDefault();
-      const y = window.scrollY;
       el.focus({ preventScroll: true });
-      // and if the browser still moves the page while the keyboard comes up, it goes back
-      const back = () => Math.abs(window.scrollY - y) > 1 && window.scrollTo(0, y);
-      requestAnimationFrame(back);
-      window.setTimeout(back, 350);
     };
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchend", onEnd, { passive: false });
@@ -127,10 +124,13 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
   return (
     <aside
       aria-label="카드 검색"
-      // above the keyboard while it is up, else above the bottom edge (and the home bar)
-      style={{ "--float-bottom": keyboard ? `${keyboard + 8}px` : "calc(0.75rem + env(safe-area-inset-bottom))" } as CSSProperties}
-      className="fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
-        lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3"
+      // above the keyboard while it is up, else above the bottom edge (and the home bar); gliding as the keyboard does
+      style={{
+        "--float-bottom": keyboard.inset ? `${keyboard.inset + 8}px` : "calc(0.75rem + env(safe-area-inset-bottom))",
+        transition: keyboard.glide ? "bottom 250ms cubic-bezier(0.2, 0.8, 0.2, 1)" : undefined,
+      } as CSSProperties}
+      className={`fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
+        lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3`}
     >
       <h2 className="hidden lg:block m-0 text-base font-bold">카드 검색</h2>
       <div className="order-3 lg:order-none lg:mt-2">
