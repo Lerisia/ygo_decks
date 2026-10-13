@@ -23,10 +23,10 @@ export default function DeckListCard({ deck, to, author }: {
       className={`${CARD_BOX} flex flex-col border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition hover:border-blue-400 dark:hover:border-blue-500`}
     >
       <h2 className="m-0 h-6 text-base font-bold truncate">{deck.name || "이름 없는 덱"}</h2>
-      <p className="mt-1 flex-1 min-h-0 text-sm leading-5 text-gray-600 dark:text-gray-300 line-clamp-3 break-keep whitespace-pre-line">
+      <p className="mt-1 mb-2 text-sm leading-5 text-gray-600 dark:text-gray-300 line-clamp-3 break-keep whitespace-pre-line">
         {deck.description || "설명이 없습니다."}
       </p>
-      <div className="mt-2 h-6 flex items-center justify-between gap-2">
+      <div className="mt-auto h-6 flex items-center justify-between gap-2">
         {/* 공유 게시판에서 등록자 닉네임 자리: the line keeps its height (the icon's) while it is empty */}
         {author ? (
           <span className="min-w-0 flex items-center gap-1.5 text-xs">
