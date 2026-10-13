@@ -9,13 +9,16 @@ export type PackSummary = {
   version: number | null; period: [string, string] | null; featured: string[];
 };
 export type PackCard = { print: number; card: number; name: string; rarity: Rarity; thumb: string; face: string | null };
-/** The pack as a campaign sold it (엘리스 10/13): its days, its cover then, and the cards that came in their campaign art
- *  (each naming the usual print it stands in for). */
+/** The pack as a campaign or an older lineup sold it (엘리스 10/13): its days, its cover then, the cards that came in
+ *  their campaign art (each naming the usual print it stands in for), the cards it held that were removed since, how
+ *  many of today's it did not hold yet, and its whole lineup. */
 export type PackVersion = {
   id: number; start: string; end: string; image: string | null; image_hd: string | null; arts: (PackCard & { base: number })[];
+  gone: PackCard[]; later: number; cards: PackCard[];
 };
 export type PackDetail = Omit<PackSummary, "counts" | "arts" | "version" | "period" | "featured"> & {
   image_hd: string | null; cards: PackCard[]; master_pack?: number | null; versions: PackVersion[];
+  changed: string | null;   // the day today's lineup began, when the pack's cards changed
 };
 
 let list: Promise<PackSummary[]> | null = null;

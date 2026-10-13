@@ -30,12 +30,12 @@ _cache = {"key": None, "packs": None, "cards": {}, "pickups": None, "lineups": {
 
 def _key():
     agg = MdPackCard.objects.aggregate(n=Count("id"), last=Max("id"))
-    versions = MdPackVersion.objects.aggregate(n=Count("id"), last=Max("id"))
+    versions = MdPackVersion.objects.aggregate(n=Count("id"), last=Max("id"), at=Max("updated"))
     try:
         pictures = os.stat(os.path.join(settings.MEDIA_ROOT, PACK_IMAGE_DIR)).st_mtime
     except OSError:
         pictures = None
-    return (MdPack.objects.count(), agg["n"], agg["last"], versions["n"], versions["last"], pictures)
+    return (MdPack.objects.count(), agg["n"], agg["last"], versions["n"], versions["last"], versions["at"], pictures)
 
 
 def _fresh():
@@ -54,7 +54,8 @@ def _image(pack, hd=False, cover=None):
 
 def _row(pack, counts=None):
     row = {"id": pack.id, "kind": pack.kind, "name": pack.name_ko or pack.name_en, "name_en": pack.name_en,
-           "released": pack.released.isoformat() if pack.released else None, "image": _image(pack),
+           "released": pack.released.isoformat() if pack.released else None,
+           "changed": pack.changed.isoformat() if pack.changed else None, "image": _image(pack),
            "master": pack.name_en == MASTER_PACK}
     if counts is not None:
         row["counts"] = counts
@@ -64,8 +65,9 @@ def _row(pack, counts=None):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def packs(request):
-    """The packs one can open (master, secret and selection packs) and the versions campaigns sold of them, newest
-    first, with how many cards of each rarity and how many came in a new art or an 오버프레임."""
+    """The packs one can open (master, secret and selection packs) and the versions campaigns and older lineups sold
+    of them, newest first (today's lineup from its last change), with how many cards of each rarity and how many came
+    in a new art or an 오버프레임."""
     _fresh()
     if _cache["packs"] is None:
         rarities = ("UR", "SR", "R", "N")
@@ -85,15 +87,25 @@ def packs(request):
         for p in rows:
             row = by_id[p.id] = {**_row(p, {r: getattr(p, r) for r in rarities}), "version": None, "period": None,
                                  "featured": [], "arts": count(usual[p.id])}
+            if p.changed:
+                row["released"] = p.changed.isoformat()
             listed.append(row)
         # each campaign's version of a pack shows as a pack of its own, at the days it was sold, under its cover then
         # (엘리스 10/13: "표지별로 다른 카드팩마냥")
         versions = list(MdPackVersion.objects.filter(pack_id__in=by_id).select_related("pack"))
         names = {m.md_id: display_name(m.card) for m in MdPrint.objects.filter(
             md_id__in={a for v in versions for a in v.swaps.values()}).select_related("card")}
+        held = dict(((pack_id, md_id), rarity) for pack_id, md_id, rarity in MdPackCard.objects.filter(
+            pack_id__in={v.pack_id for v in versions if v.missing}).values_list("pack_id", "md_print_id", "rarity"))
         for v in versions:
             arts = sorted(set(v.swaps.values()))
-            listed.append({**by_id[v.pack_id], "version": v.id, "released": v.start.isoformat(),
+            counts = dict(by_id[v.pack_id]["counts"])   # an older lineup: without the cards added since, with those removed
+            for md_id in v.missing:
+                if (v.pack_id, md_id) in held:
+                    counts[held[(v.pack_id, md_id)]] -= 1
+            for rarity in v.extra.values():
+                counts[rarity] = counts.get(rarity, 0) + 1
+            listed.append({**by_id[v.pack_id], "version": v.id, "released": v.start.isoformat(), "counts": counts,
                            "period": [v.start.isoformat(), v.end.isoformat()],
                            "image": _image(v.pack, cover=v.cover) or by_id[v.pack_id]["image"],
                            "featured": [names[a] for a in arts if a in names], "arts": count(arts)})
@@ -118,6 +130,15 @@ def _pickups():
                                       .values_list("pack_id", "md_print__card_id", "pack__released")):
             in_packs.setdefault(card_id, set()).add(pack_id)
             released[pack_id] = day.toordinal() if day else 0
+        # and the cards an older lineup held, removed since
+        gone = defaultdict(set)
+        for pack_id, extra, day in (MdPackVersion.objects.filter(pack__kind__in=OPENABLE).exclude(extra={})
+                                    .values_list("pack_id", "extra", "pack__released")):
+            for md_id in extra:
+                gone[int(md_id)].add(pack_id)
+            released.setdefault(pack_id, day.toordinal() if day else 0)
+        for md_id, card_id in MdPrint.objects.filter(md_id__in=gone).values_list("md_id", "card_id"):
+            in_packs.setdefault(card_id, set()).update(gone[md_id])
         rows = []
         for card in Card.objects.filter(id__in=in_packs):
             r = _Pickup()
@@ -172,30 +193,39 @@ def _detail(pack_id):
 
 
 def _versions(pack, cards):
-    """The pack as campaigns sold it (MdPackVersion): each version's days, cover and the cards that came in their
-    campaign art, and its whole lineup — the usual one with those cards in that art (a card whose art has no face
-    drawn keeps the usual one)."""
+    """The pack as campaigns and its older lineups sold it (MdPackVersion): each version's days, cover, the cards that
+    came in their campaign art, the cards it held that were removed since and how many of today's it did not hold yet,
+    and its whole lineup — today's without the cards added since, with those removed since, and those cards in that
+    art (a card with no face drawn is left out, and an art with none keeps the usual one)."""
     versions = list(pack.versions.all())
-    arts = {p.md_id: p for p in MdPrint.objects.filter(
-        md_id__in={a for v in versions for a in v.swaps.values()}).select_related("card")}
-    shown_rows, lineups = [], {}
+    prints = {p.md_id: p for p in MdPrint.objects.filter(
+        md_id__in={a for v in versions for a in v.swaps.values()} | {int(m) for v in versions for m in v.extra}
+    ).select_related("card")}
+
+    def face(p, rarity, **more):
+        return {"print": p.md_id, "card": p.card_id, "name": display_name(p.card), "rarity": rarity,
+                "thumb": face_thumb_url(p.md_id), "face": face_url(p.md_id), **more}
+
+    rows, lineups = [], {}
     for v in versions:
         swaps = {int(base): art for base, art in v.swaps.items()}
+        missing = set(v.missing) & {c["print"] for c in cards}
+        gone = [face(prints[int(m)], rarity) for m, rarity in v.extra.items()
+                if int(m) in prints and face_thumb_url(int(m))]
         lineup, shown = [], []
-        for c in cards:
-            art = arts.get(swaps.get(c["print"]))
+        for c in [c for c in cards if c["print"] not in missing] + gone:
+            art = prints.get(swaps.get(c["print"]))
             if art and face_thumb_url(art.md_id):
                 # the art at its own rarity: 키스킬's SR comes as a UR in its campaign art (엘리스 10/13)
-                c = {"print": art.md_id, "card": art.card_id, "name": display_name(art.card), "rarity": art.rarity or c["rarity"],
-                     "thumb": face_thumb_url(art.md_id), "face": face_url(art.md_id), "base": c["print"]}
+                c = face(art, art.rarity or c["rarity"], base=c["print"])
                 shown.append(c)
             lineup.append(c)
-        if shown:
-            shown_rows.append({"id": v.id, "start": v.start.isoformat(), "end": v.end.isoformat(),
-                               "image": _image(pack, cover=v.cover), "image_hd": _image(pack, hd=True, cover=v.cover),
-                               "arts": shown})
+        if shown or gone or missing:
+            rows.append({"id": v.id, "start": v.start.isoformat(), "end": v.end.isoformat(),
+                         "image": _image(pack, cover=v.cover), "image_hd": _image(pack, hd=True, cover=v.cover),
+                         "arts": shown, "gone": gone, "later": len(missing), "cards": lineup})
             lineups[v.id] = lineup
-    return shown_rows, lineups
+    return rows, lineups
 
 
 @api_view(["GET"])

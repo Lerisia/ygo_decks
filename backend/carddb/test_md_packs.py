@@ -274,6 +274,107 @@ class CampaignTest(TestCase):
         self.assertEqual(got, {52: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}, 70: {"spans": [], "source": "x"}})
 
 
+class LineupTest(TestCase):
+    """A secret pack whose cards changed: Yugipedia notes each card added or removed and when; each lineup sold before
+    today's is a version of the pack, and today's lineup dates from its last change (엘리스 2026-10-13: "내용물이 변경된
+    카드팩은 모든 버전을 수록")."""
+
+    PAGE = """{{Infobox Master Duel set
+| type            = [[Secret Pack]]
+| internal_number = 2120
+| release_date    = January 19, 2022
+}}
+
+== List ==
+{{Master Duel set list|print=reprint|columns=Notes|
+Alpha (Master Duel); Ultra Rare
+Beta  (Master Duel) ; Super Rare; New
+Gamma (Updated) (Master Duel);Rare
+Delta (Master Duel); Ultra Rare// @Notes::Added on June 4, 2026
+Future (Master Duel); Common // @Notes::Added on January 1, 2099
+}}
+
+=== Removed cards ===
+{{Master Duel set list|columns=Notes|
+Epsilon (Master Duel); Common // @Notes::Removed on June 4, 2026
+Zeta (Master Duel); Rare // @Notes::Added on May 9, 2025. Removed on November 7, 2025
+}}
+"""
+
+    def test_parse(self):
+        game_id, entries = md_packs.parse_set_list(self.PAGE)
+        self.assertEqual(game_id, 2120)
+        self.assertEqual([(e["card"], e["rarity"], e["added"], e["removed"]) for e in entries], [
+            ("Alpha", "UR", None, None), ("Beta", "SR", None, None), ("Gamma (Updated)", "R", None, None),
+            ("Delta", "UR", "2026-06-04", None), ("Future", "N", "2099-01-01", None),
+            ("Epsilon", "N", None, "2026-06-04"), ("Zeta", "R", "2025-05-09", "2025-11-07")])
+
+    def setUp(self):
+        for cid, name, rarity in ((1, "Alpha", "UR"), (2, "Beta", "SR"), (3, "Gamma (Updated) (Updated from: Gamma)", "R"),
+                                  (4, "Delta", "UR"), (5, "Epsilon", "N"), (6, "Zeta", "R"), (7, "Future", "N")):
+            c = Card.objects.create(id=cid, category="monster", name_ja=name, name_en=name, frame="effect")
+            MdPrint.objects.create(md_id=cid, card=c, rarity=rarity)
+        MdPrint.objects.create(md_id=20, card_id=2, is_alt_art=True, rarity="UR")
+        self.sets = [mdm_set("sec", "Old Secret", release="2022-01-19T00:00:00.000Z")]
+        self.cards = [mdm_card(i, r, "sec") for i, r in ((1, "UR"), (2, "SR"), (3, "R"), (4, "UR"))]
+        self.pack_map = {"sec": {"game_id": 2120, "name_ko": "", "cover": "03_1", "arts": []}}
+        self.lineups = {2120: md_packs.parse_set_list(self.PAGE)[1]}
+
+    def sync(self, campaigns=None):
+        out = md_packs.sync(self.sets, self.cards, pack_map=self.pack_map, campaigns=campaigns, lineups=self.lineups)
+        p = MdPack.objects.get(mdm_id="sec")
+        return out, p, [(str(v.start), str(v.end), v.swaps, v.missing, v.extra, v.cover) for v in p.versions.all()]
+
+    def test_each_lineup_sold_before_today_is_a_version(self):
+        out, p, versions = self.sync()
+        self.assertEqual(sorted(p.cards.values_list("md_print_id", flat=True)), [1, 2, 3, 4])   # today's, as MDM lists it
+        self.assertEqual(str(p.changed), "2026-06-04")
+        self.assertEqual(versions, [
+            ("2022-01-19", "2025-05-09", {}, [4], {"5": "N"}, "03_1"),
+            ("2025-05-09", "2025-11-07", {}, [4], {"5": "N", "6": "R"}, "03_1"),
+            ("2025-11-07", "2026-06-04", {}, [4], {"5": "N"}, "03_1")])
+        self.assertEqual(out["lineups"], 1)
+
+    def test_names_yugipedia_spells_otherwise_are_reported_and_left_out(self):
+        self.lineups[2120].append({"card": "Nobody", "rarity": "N", "added": "2026-06-04", "removed": None})
+        out, p, versions = self.sync()
+        self.assertEqual(out["unresolved"], ["Nobody"])
+        self.assertEqual(versions[0][3:5], ([4], {"5": "N"}))
+
+    def test_a_card_with_no_english_name_by_its_japanese_one(self):
+        c = Card.objects.create(id=8, category="monster", name_ja="紅き龍", name_en="", frame="effect")
+        MdPrint.objects.create(md_id=8, card=c, rarity="UR")
+        self.cards.append(mdm_card(8, "UR", "sec"))
+        self.lineups[2120].append({"card": "Crimson Dragon", "ja": "紅き 龍", "rarity": "UR", "added": "2026-06-04", "removed": None})
+        out, p, versions = self.sync()
+        self.assertEqual((out["unresolved"], versions[0][3]), ([], [4, 8]))
+
+    def test_fetch(self):
+        # the pack pages in the two categories, then the card pages of names the card DB lacks, for their Japanese names
+        pages = {"Old Secret": self.PAGE.replace("Delta (Master Duel)", "Crimson Dragon (Master Duel)"),
+                 "Crimson Dragon": "{{CardTable2\n| ja_name = {{Ruby|紅|あか}}き龍\n}}"}
+        def get(url, params, **kw):
+            if params.get("list") == "categorymembers":
+                body = {"query": {"categorymembers": [{"title": "Old Secret"}] if "Secret" in params["cmtitle"] else []}}
+            else:
+                body = {"query": {"pages": {t: {"title": t, "revisions": [{"*": pages[t]}]} for t in params["titles"].split("|")}}}
+            return mock.Mock(json=lambda: body, raise_for_status=lambda: None)
+        got = md_packs.fetch_set_lists(get=get, pause=0)
+        self.assertEqual([(e["card"], e.get("ja")) for e in got[2120] if e["added"] == "2026-06-04"], [("Crimson Dragon", "紅き龍")])
+
+    def test_a_pack_that_never_changed_has_no_lineup_versions(self):
+        self.lineups = {}
+        out, p, versions = self.sync()
+        self.assertEqual((p.changed, versions), (None, []))
+
+    def test_a_campaign_comes_in_the_lineup_sold_then(self):
+        out, p, versions = self.sync({20: {"spans": [("2024-08-08", "2024-10-10"), ("2026-05-01", "2026-07-01")], "source": ""}})
+        self.assertIn(("2024-08-08", "2024-10-10", {"2": 20}, [4], {"5": "N"}, "03_1"), versions)
+        # one running when the lineup changed: a version for each lineup
+        self.assertIn(("2026-05-01", "2026-06-04", {"2": 20}, [4], {"5": "N"}, "03_1"), versions)
+        self.assertIn(("2026-06-04", "2026-07-01", {"2": 20}, [], {}, "03_1"), versions)
+
+
 class MasterListTest(TestCase):
     """The master pack holds what AppMedia's list of it holds (엘리스 2026-10-13: "appmedia를 따라갑시다"), besides what
     MDM lists — MDM leaves out many cards the game put in it later."""
@@ -314,7 +415,8 @@ class CommandTest(TestCase):
         MdPrint.objects.create(md_id=1, card_id=1, rarity="R")
         out = StringIO()
         with override_settings(MD_PACK_MAP="/nonexistent/pack_map.json", MD_ALT_CAMPAIGNS=f"{self.dir}/campaigns.json",
-                               MD_MASTER_LIST=f"{self.dir}/master.json"), \
+                               MD_MASTER_LIST=f"{self.dir}/master.json", MD_SET_LISTS=f"{self.dir}/set_lists.json"), \
+             mock.patch.object(md_packs, "fetch_set_lists", return_value={}), \
              mock.patch.object(md_packs, "fetch_sets", return_value=[mdm_set("s1", "Pack")]), \
              mock.patch.object(md_packs, "fetch_cards", return_value=[mdm_card(1, "R", "s1")]), \
              mock.patch.object(md_packs, "fetch_campaigns", return_value=[]), \
@@ -322,6 +424,15 @@ class CommandTest(TestCase):
             call_command("import_md_packs", stdout=out)
         self.assertIn("md packs: 1 packs, 1 cards", out.getvalue())
         self.assertEqual(MdPackCard.objects.count(), 1)
+
+    def test_set_lists_kept_for_when_yugipedia_is_away(self):
+        import requests
+        path = f"{self.dir}/set_lists.json"
+        with mock.patch.object(md_packs, "fetch_set_lists", return_value={2120: [{"card": "x"}]}):
+            self.assertEqual(md_packs.load_set_lists(path), {2120: [{"card": "x"}]})
+        with mock.patch.object(md_packs, "fetch_set_lists", side_effect=requests.ConnectionError):
+            self.assertEqual(md_packs.load_set_lists(path), {2120: [{"card": "x"}]})
+            self.assertEqual(md_packs.load_set_lists(f"{self.dir}/none.json"), {})
 
     def test_campaigns_kept_for_when_yugipedia_is_away(self):
         import requests

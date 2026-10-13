@@ -28,6 +28,7 @@ BANLIST_CACHE = os.environ.get("BANLIST_CACHE", "/home/elyss/storage/banlists/yu
 MD_PACK_MAP = os.environ.get("MD_PACK_MAP", "/home/elyss/storage/md/packs/pack_map.json")
 MD_ALT_CAMPAIGNS = os.environ.get("MD_ALT_CAMPAIGNS", "/home/elyss/storage/md/packs/altart/campaigns.json")
 MD_MASTER_LIST = os.environ.get("MD_MASTER_LIST", "/home/elyss/storage/md/packs/altart/appmedia_master.json")
+MD_SET_LISTS = os.environ.get("MD_SET_LISTS", "/home/elyss/storage/md/packs/altart/set_lists.json")
 FRONTEND_INDEX = os.environ.get("FRONTEND_INDEX", "/var/www/frontend/index.html")   # the built app page carddb.seo fills in
 
 from django.conf import settings

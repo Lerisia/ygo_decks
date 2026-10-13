@@ -304,6 +304,7 @@ class MdPack(models.Model):
     released = models.DateField(null=True, blank=True)
     game_id = models.PositiveIntegerField(null=True, blank=True, help_text="게임 속 팩 번호")
     cover = models.CharField(max_length=24, blank=True, help_text="게임 속 팩 그림 (md_ui/packs/<cover>.webp)")
+    changed = models.DateField(null=True, blank=True, help_text="지금 구성이 시작된 날 (카드가 추가·제외된 마지막 날, Yugipedia)")
 
     class Meta:
         ordering = ["-released", "name_en"]
@@ -327,15 +328,20 @@ class MdPackCard(models.Model):
 
 
 class MdPackVersion(models.Model):
-    """A selection or secret pack as it was sold while a campaign gave cards in it a new art or an 오버프레임 (Yugipedia's
-    record of when each came; 엘리스 2026-10-13: the usual pack and each campaign's, side by side): the days, which of
-    the pack's prints came as which art, and the cover the game gave it then."""
+    """A selection or secret pack as it was sold while a campaign gave cards in it a new art or an 오버프레임, or before its
+    cards last changed (Yugipedia's record of when each came, and of each card added or removed; 엘리스 2026-10-13: the
+    usual pack and each version, side by side): the days, which of the pack's prints came as which art, the cards of
+    today's lineup it did not hold yet and the ones it held that were removed since, and the cover the game gave it
+    then."""
 
     pack = models.ForeignKey(MdPack, on_delete=models.CASCADE, related_name="versions")
     start = models.DateField()
     end = models.DateField()
     swaps = models.JSONField(default=dict)   # {base print id: art print id}
+    missing = models.JSONField(default=list)   # [print id] of today's lineup, added since
+    extra = models.JSONField(default=dict)     # {print id: rarity} held then, removed since
     cover = models.CharField(max_length=40, blank=True)
+    updated = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["pack", "start", "end"]

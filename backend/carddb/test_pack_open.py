@@ -197,6 +197,29 @@ class OpenTest(TestCase):
         self.assertEqual(listed, [(self.secret.id, v.id, "2026-02-05", ["2026-02-05", "2026-04-09"], ["카드203"]),
                                   (self.secret.id, None, None, None, [])])
 
+    def test_an_older_lineup(self):
+        # sold until 2026-06-04 without 203 (added then) and with 299 (removed then) (엘리스 10/13)
+        c = Card.objects.create(id=299, category="spell", name_ja="299", name_ko="카드299", frame="spell")
+        MdPrint.objects.create(md_id=299, card=c, rarity="SR")
+        open(os.path.join(self.media, "cards/face_thumb/299.webp"), "wb").close()
+        MdPack.objects.filter(pk=self.secret.pk).update(released="2022-01-19", changed="2026-06-04")
+        v = MdPackVersion.objects.create(pack=self.secret, start="2022-01-19", end="2026-06-04", missing=[203], extra={"299": "SR"})
+        rows = [p for p in self.client.get("/api/carddb/packs/").json()["packs"] if p["id"] == self.secret.id]
+        self.assertEqual([(p["version"], p["released"], p["period"], p["counts"]["UR"], p["counts"]["SR"]) for p in rows], [
+            (None, "2026-06-04", None, 1, 1),   # today's lineup, from its last change
+            (v.id, "2022-01-19", ["2022-01-19", "2026-06-04"], 0, 2)])
+        r = self.client.get(f"/api/carddb/packs/{self.secret.id}/").json()
+        self.assertEqual((r["released"], r["changed"]), ("2022-01-19", "2026-06-04"))
+        x = r["versions"][0]
+        self.assertEqual((sorted(c["print"] for c in x["cards"]), [c["print"] for c in x["gone"]], x["later"], x["arts"]),
+                         ([200, 201, 202, 299], [299], 1, []))
+        self.client.force_authenticate(self.user)
+        with mock.patch.object(packs, "_rng", always("SR")):
+            got = self.client.post(f"/api/carddb/packs/{self.secret.id}/open/", {"count": 1, "version": v.id}, format="json").json()
+        self.assertTrue({c["print"] for c in got["packs"][0][4:]} <= {202, 299})
+        hit = self.client.get("/api/carddb/packs/search/", {"q": "카드299"}).json()["packs"]
+        self.assertEqual([h["id"] for h in hit], [self.secret.id])   # a card the pack once held finds it
+
     def test_a_campaign_art_at_its_own_rarity(self):
         MdPrint.objects.create(md_id=2020, card_id=202, is_alt_art=True, rarity="UR")   # 202 is the SR
         open(os.path.join(self.media, "cards/face_thumb/2020.webp"), "wb").close()

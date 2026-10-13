@@ -15,12 +15,10 @@ const STEP = 60;
 const pct = (x: number) => `${+(x * 100).toFixed(3)}%`;
 const NO_TALLY = { gems: 0, packs: 0, ur: 0, sr: 0, owed: false };
 
-/** The pack as a version sold it: its cover then, and its cards with those of the campaign in their art. */
+/** The pack as a version sold it: its cover then, and its lineup then, with the cards of a campaign in their art. */
 const asSold = (pack: Pack, version: PackVersion | null): Pack => {
   if (!version) return pack;
-  const art = new Map(version.arts.map(({ base, ...c }) => [base, c]));
-  return { ...pack, image: version.image ?? pack.image, image_hd: version.image_hd ?? pack.image_hd,
-           cards: pack.cards.map((c) => art.get(c.print) ?? c) };
+  return { ...pack, image: version.image ?? pack.image, image_hd: version.image_hd ?? pack.image_hd, cards: version.cards };
 };
 
 const byRarity = (cards: PackCard[]): Pool<PackCard> => {
@@ -146,9 +144,11 @@ export default function PackDetail() {
               <h1 className="text-xl sm:text-3xl font-extrabold leading-tight break-keep min-h-[1.25em]">{pack?.name ?? ""}</h1>
               <p className="h-5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">{pack?.released ? `${pack.released} 출시` : ""}</p>
               <p className="h-5 text-sm tabular-nums">
-                {mine === null || mine.signed_in ? "" : (
+                {mine !== null && !mine.signed_in ? (
                   <Link to="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">로그인하면 팩을 열 수 있습니다</Link>
-                )}
+                ) : !version && pack?.changed ? (
+                  <span className="text-gray-500 dark:text-gray-400">{pack.changed} 구성 변경</span>
+                ) : ""}
               </p>
               <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button type="button" disabled={!can(1)} onClick={() => open(1)}
@@ -197,23 +197,39 @@ export default function PackDetail() {
   );
 }
 
-/** A campaign's version of the pack, a pack of its own in the list (엘리스 10/13): the days it was sold, and the cards that
- *  came in their campaign art then. */
+/** A version of the pack, a pack of its own in the list (엘리스 10/13): the days it was sold, the cards that came in their
+ *  campaign art then, and how its lineup then differs from today's. */
 function VersionNote({ version }: { version: PackVersion }) {
+  const { later, gone } = version;
+  const lineup = later && gone.length ? `이후 추가된 ${later}장이 없고, 지금은 빠진 아래 ${gone.length}장이 들어 있었습니다.`
+    : later ? `이후 추가된 ${later}장이 아직 없었습니다.`
+    : gone.length ? `지금은 빠진 아래 ${gone.length}장이 들어 있었습니다.` : "";
   return (
     <section className="mt-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3" aria-label="판매 시기">
       <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 tabular-nums">{version.start} ~ {version.end} 판매분</p>
-      <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">이때는 아래 카드가 다른 일러스트·오버프레임으로 나왔습니다.</p>
-      <ul className="mt-2 flex gap-2 overflow-x-auto pb-1">
-        {version.arts.map((c) => (
-          <li key={c.print} className="shrink-0 w-16 sm:w-20">
-            <Link to={`/cards/${c.card}`} title={c.name} className="block">
-              <img src={c.thumb} alt={c.name} loading="lazy" className="w-full aspect-[704/1024] rounded object-cover shadow" />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {version.arts.length > 0 && <>
+        <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">이때는 아래 카드가 다른 일러스트·오버프레임으로 나왔습니다.</p>
+        <Thumbs cards={version.arts} />
+      </>}
+      {lineup && <>
+        <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80 break-keep">{lineup}</p>
+        {gone.length > 0 && <Thumbs cards={gone} />}
+      </>}
     </section>
+  );
+}
+
+function Thumbs({ cards }: { cards: PackCard[] }) {
+  return (
+    <ul className="mt-2 flex gap-2 overflow-x-auto pb-1">
+      {cards.map((c) => (
+        <li key={c.print} className="shrink-0 w-16 sm:w-20">
+          <Link to={`/cards/${c.card}`} title={c.name} className="block">
+            <img src={c.thumb} alt={c.name} loading="lazy" className="w-full aspect-[704/1024] rounded object-cover shadow" />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
