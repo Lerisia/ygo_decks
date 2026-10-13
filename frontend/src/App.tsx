@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { lazyChunk } from "@/lib/lazyChunk";
+import { DECK_EDITOR_ROOM, isDeckEditorPath } from "@/lib/deckListPaths";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './App.css'
 import Navbar from "./components/Navbar";
@@ -78,6 +79,9 @@ const ForgotPassword = lazyChunk(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyChunk(() => import("./pages/ResetPassword"));
 const EmailVerified = lazyChunk(() => import("./pages/EmailVerified"));
 const Tracker = lazyChunk(() => import("./pages/Tracker"));
+const DeckLists = lazyChunk(() => import("./pages/DeckLists"));
+const DeckListView = lazyChunk(() => import("./pages/DeckListView"));
+const DeckListEdit = lazyChunk(() => import("./pages/DeckListEdit"));
 
 // Shown while a page's code arrives: keeps the footer below the fold, as the page will.
 const PAGE_FALLBACK = <div className="min-h-screen" />;
@@ -97,6 +101,7 @@ function App() {
   useScrollRestoration();
   usePageTracking();
   const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
+  const inDeckEditor = isDeckEditorPath(pathname);
   // The deck database stays mounted (just hidden) while a deck page is open, so Back shows the same list with
   // its pictures already drawn instead of rebuilding it (엘리스 2026-10-02).
   const onDeckList = pathname === "/database";
@@ -234,6 +239,11 @@ function App() {
             <Route path="/inquiry" element={<InquiryHome />} />
             <Route path="/inquiry/post/:id" element={<InquiryPostPage />} />
             <Route path="/inquiry/:board" element={<InquiryBoardPage />} />
+            {/* 덱 구축 (참혈 2026-10-13): operators only while it is laid out, linked from nowhere yet */}
+            <Route path="/decklists" element={<DeckLists />} />
+            <Route path="/decklists/new" element={<DeckListEdit />} />
+            <Route path="/decklists/:code" element={<DeckListView />} />
+            <Route path="/decklists/:code/edit" element={<DeckListEdit />} />
             <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
@@ -241,7 +251,7 @@ function App() {
       {!inMultiplayerRoom && !drawingMode && <Footer />}
       {!drawingMode && <BottomTabBar />}
       <TrackerConfirmModal />
-      {!inMultiplayerRoom && !drawingMode && <div className="sm:hidden h-16" />}
+      {!inMultiplayerRoom && !drawingMode && <div className={inDeckEditor ? DECK_EDITOR_ROOM : "sm:hidden h-16"} />}
     </div>
   );
 }

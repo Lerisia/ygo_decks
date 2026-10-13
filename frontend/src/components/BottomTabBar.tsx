@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { ALL_MENU_PATH, MENU_GROUPS, groupOf } from "@/lib/siteMenu";
+import { isDeckEditorPath } from "@/lib/deckListPaths";
 
 // Pages that live under 전체 rather than under one of the four groups.
 const ALL_MENU_PATHS = [ALL_MENU_PATH, "/mypage", "/changelog", "/terms", "/login", "/register", "/manage"];
@@ -10,6 +11,8 @@ function BottomTabBar() {
 
   // Hide entirely while inside a multiplayer room (games need full screen).
   if (path.startsWith("/multiplayer/rooms/")) return null;
+  // Building a deck: the card search floats where the bar would be (참혈 2026-10-13).
+  if (isDeckEditorPath(path)) return null;
 
   const current = groupOf(path)?.key;
   const inAll = !current && ALL_MENU_PATHS.some((p) => path === p || path.startsWith(p + "/"));

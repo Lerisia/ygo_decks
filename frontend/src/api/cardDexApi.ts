@@ -49,6 +49,9 @@ export type CardListItem = {
   rarity: string;
   /** Its 금제 in Master Duel today: forbidden / limited / semi_limited, "" when unlimited. */
   ban: "" | "forbidden" | "limited" | "semi_limited";
+  category: "monster" | "spell" | "trap";
+  /** normal, effect, ritual, fusion, synchro, xyz, link (each but link also *_pendulum), token; spell / trap. */
+  frame: string;
 };
 export type CardListResponse = {
   results: CardListItem[];
@@ -166,6 +169,10 @@ export const listCards = (f: CardFilters, page: number, signal?: AbortSignal) =>
   if (page > 1) qs.set("page", String(page));
   return getJson<CardListResponse>(`/?${qs.toString()}`, signal);
 };
+
+/** Those cards whole, in the 디폴트 순 (a deck's cards: 200 different ones at most). */
+export const getCardsByIds = (ids: number[], signal?: AbortSignal) =>
+  getJson<CardListResponse>(`/?ids=${[...new Set(ids)].join(",")}`, signal).then((r) => r.results);
 
 let optionsPromise: Promise<CardOptions> | null = null;
 export const getCardOptions = () => {
