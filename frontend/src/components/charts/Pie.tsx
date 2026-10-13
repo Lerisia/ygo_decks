@@ -159,7 +159,7 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
                   {s.is_upcoming && (
                     <g className="pointer-events-none">
                       <circle cx={ux} cy={uy} r={ur} fill={`url(#${uid}-coin)`} stroke="#fff" strokeWidth={1.5} />
-                      <text x={ux} y={uy} textAnchor="middle" dominantBaseline="central" fontSize={ur * 1.1} fontWeight={900} fill="#fff">N</text>
+                      <text x={ux} y={uy} textAnchor="middle" dominantBaseline="central" fontSize={ur * 1.1} fontWeight={900} fill="#260404">N</text>
                     </g>
                   )}
                 </g>

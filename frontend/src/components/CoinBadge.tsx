@@ -19,8 +19,9 @@ const PALETTES: Record<"gold" | "blue" | "red", CSSProperties> = {
   red: {
     background: "radial-gradient(circle at 32% 28%, #ff9b9b 0%, #f03030 30%, #cf1717 64%, #7f0b0b 100%)",
     boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(100,10,10,0.55), 0 1px 3px rgba(0,0,0,0.35)",
-    color: "#ffffff",
-    textShadow: "0 1px 1px rgba(100,10,10,0.9)",
+    // a near-black letter, pressed in like the gold E's (특이점 2026-10-13: white at first)
+    color: "#260404",
+    textShadow: "0 1px 0 rgba(255,255,255,0.35)",
   },
 };
 
