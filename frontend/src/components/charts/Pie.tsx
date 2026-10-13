@@ -6,7 +6,7 @@ import { MEDALS, winRateTint } from "./theme";
 type Props = {
   data: MetaDeckStat[];
   deckCovers: Record<number, string>;
-  /** Show what the U mark means — only while a ranked deck carries it. */
+  /** Show what the N mark means — only while a ranked deck carries it. */
   showUpdateKey?: boolean;
   total?: number;
   since?: string;
@@ -95,7 +95,7 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
     <div className={`w-full md:h-full md:relative md:flex md:flex-col md:justify-center ${showUpdateKey ? "md:py-14" : "md:py-9"}`}>
       <div className="mb-2 flex flex-col gap-1 md:absolute md:top-0 md:left-0 md:right-0">
         <h3 className="text-lg font-semibold">사용률 차트</h3>
-        {/* What the U mark on slices and rows means, right under the title (특이점 2026-10-10). */}
+        {/* What the N mark on slices and rows means, right under the title (특이점 2026-10-10). */}
         {showUpdateKey && (
           <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <UpdateBadge className="w-4 h-4 text-[9px] shrink-0" />
@@ -108,10 +108,10 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
           <svg width={boxWidth} height={height} className="block overflow-visible">
             <defs>
               <radialGradient id={`${uid}-coin`} cx="32%" cy="28%" r="75%">
-                <stop offset="0%" stopColor="#7aa7ff" />
-                <stop offset="30%" stopColor="#1f5cff" />
-                <stop offset="64%" stopColor="#0b3fd6" />
-                <stop offset="100%" stopColor="#0a2a8f" />
+                <stop offset="0%" stopColor="#ff9b9b" />
+                <stop offset="30%" stopColor="#f03030" />
+                <stop offset="64%" stopColor="#cf1717" />
+                <stop offset="100%" stopColor="#7f0b0b" />
               </radialGradient>
               {slices.map((s) => (
                 <clipPath key={s.id} id={`${uid}-${s.id}`}>
@@ -155,11 +155,11 @@ export const UsagePie = ({ data, deckCovers, showUpdateKey = false, total, since
                       </text>
                     );
                   })()}
-                  {/* 신규 업데이트 덱: the deck book's blue U coin on the slice's outer edge (특이점 2026-10-10) */}
+                  {/* 신규 업데이트 덱: the deck book's red N coin on the slice's outer edge (특이점 2026-10-10) */}
                   {s.is_upcoming && (
                     <g className="pointer-events-none">
                       <circle cx={ux} cy={uy} r={ur} fill={`url(#${uid}-coin)`} stroke="#fff" strokeWidth={1.5} />
-                      <text x={ux} y={uy} textAnchor="middle" dominantBaseline="central" fontSize={ur * 1.1} fontWeight={900} fill="#fff">U</text>
+                      <text x={ux} y={uy} textAnchor="middle" dominantBaseline="central" fontSize={ur * 1.1} fontWeight={900} fill="#fff">N</text>
                     </g>
                   )}
                 </g>

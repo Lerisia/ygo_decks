@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 
-// Round "coin" mark on deck covers — gold E for engines (특이점 2026-10-02), blue U for upcoming decks (2026-10-03).
-const PALETTES: Record<"gold" | "blue", CSSProperties> = {
+// Round "coin" mark on deck covers — gold E for engines (특이점 2026-10-02), red N for upcoming decks (2026-10-13; a
+// blue U from 10-03).
+const PALETTES: Record<"gold" | "blue" | "red", CSSProperties> = {
   gold: {
     background: "radial-gradient(circle at 32% 28%, #fff7d1 0%, #fcd34d 30%, #f59e0b 64%, #b45309 100%)",
     boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.55), inset 0 -2px 3px rgba(120,53,15,0.35), 0 1px 3px rgba(0,0,0,0.35)",
@@ -15,11 +16,17 @@ const PALETTES: Record<"gold" | "blue", CSSProperties> = {
     color: "#ffffff",
     textShadow: "0 1px 1px rgba(10,30,100,0.9)",
   },
+  red: {
+    background: "radial-gradient(circle at 32% 28%, #ff9b9b 0%, #f03030 30%, #cf1717 64%, #7f0b0b 100%)",
+    boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(100,10,10,0.55), 0 1px 3px rgba(0,0,0,0.35)",
+    color: "#ffffff",
+    textShadow: "0 1px 1px rgba(100,10,10,0.9)",
+  },
 };
 
 interface Props {
   letter: string;
-  palette: "gold" | "blue";
+  palette: "gold" | "blue" | "red";
   title: string;
   label: string;
   className?: string;

@@ -259,7 +259,7 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
               </Field>
               <Field label="신규 업데이트">
                 <button type="button" className={chipClass(form.is_upcoming)} onClick={() => set("is_upcoming", !form.is_upcoming)}>
-                  Update — 신규 업데이트 덱
+                  New — 신규 업데이트 덱
                 </button>
               </Field>
               <div>

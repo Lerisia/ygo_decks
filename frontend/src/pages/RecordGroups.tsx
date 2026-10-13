@@ -181,7 +181,7 @@ const RecordGroups = () => {
             </div>
           )}
           <span className="font-medium text-gray-800 dark:text-gray-200">{deck.meta_deck_name}</span>
-          {/* Phones hide the cover, so the U mark sits after the name there. */}
+          {/* Phones hide the cover, so the N mark sits after the name there. */}
           {deck.is_upcoming && (
             <UpdateBadge className={`w-5 h-5 text-[10px] shrink-0 ${deckCovers[deck.meta_deck_id] ? "sm:hidden" : ""}`} />
           )}
