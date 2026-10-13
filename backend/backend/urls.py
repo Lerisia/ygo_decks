@@ -17,7 +17,9 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+
+from carddb import seo
 from django.http import HttpResponse
 
 def health_check(request):
@@ -25,6 +27,12 @@ def health_check(request):
 
 urlpatterns = [
     path('', health_check),
+    # pages as search engines and link previews see them (nginx hands these here; carddb.seo)
+    re_path(r'^cards/?$', seo.list_page, {'which': 'cards'}),
+    re_path(r'^cards/(?P<card_id>[0-9]+)/?$', seo.card_page),
+    re_path(r'^database/?$', seo.list_page, {'which': 'database'}),
+    re_path(r'^database/(?P<deck_id>[0-9]+)/?$', seo.deck_page),
+    path('sitemap.xml', seo.sitemap),
     path('admin/', admin.site.urls),
     path('api/', include('question.urls')),
     path('api/', include('deck.urls')),

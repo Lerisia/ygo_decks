@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /manage/
+Disallow: /mypage
+
+Sitemap: https://ygodecks.com/sitemap.xml
