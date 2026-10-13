@@ -513,6 +513,13 @@ class PackApiTest(TestCase):
         self.assertEqual(sorted((c["print"], c["rarity"], c["name"]) for c in r["cards"]), [(1, "UR", "카드1"), (2, "N", "카드2")])
         self.assertTrue(r["cards"][0]["thumb"].startswith("/media/cards/face_thumb/"))
 
+    def test_showcase(self):
+        # the home page's (엘리스 10/13: "크게, 도감처럼"): how many packs, and the newest with a picture, each once
+        r = self.client.get("/api/carddb/packs/showcase/").json()
+        s = MdPack.objects.get(mdm_id="s")
+        self.assertEqual(r, {"count": 2, "packs": [{"id": s.id, "version": None, "name": "세포 A",
+                                                     "image": "/media/md_ui/packs/03_8039.webp"}]})
+
     def test_not_openable(self):
         d = MdPack.objects.get(mdm_id="d")
         self.assertEqual(self.client.get(f"/api/carddb/packs/{d.id}/").status_code, 404)

@@ -3,17 +3,29 @@ import { Link, useNavigate } from "react-router-dom";
 import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
+import { getPackShowcase, type PackShowcase } from "@/api/packApi";
 import { CONTACT_PATH, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
 import DeckPickerModal from "@/components/DeckPickerModal";
 import CardPickerModal from "@/components/CardPickerModal";
 import { useDexCounts } from "@/components/DexTabs";
 
-// Home (redesign 2026-10): two pillars, the 도감 (decks and cards) then 레코더; the rest as small tiles; 문의·후원 at the bottom.
+// Home (redesign 2026-10): the pillars, the 도감 (decks and cards), 레코더 and the 팩깡 시뮬레이터 (as big as the 도감,
+// 엘리스 2026-10-13); the rest as small tiles; 문의·후원 at the bottom.
 
 const COLLAGE = 6;   // phone shows the first 4
 // How far each picture in the strip overlaps the one before it, as a share of a picture's width
 // (참혈 2026-10-12: 50 was too wide, the pictures barely showed clear; 10 only softened the seams, then 20).
 const BLEND = 20;
+const PACK_STRIP = 8;   // phone shows the first 4, tablet 6
+
+// A picture in a strip: it reaches back over the one before and fades in across that overlap (see the deck strip).
+const blendStyle = (i: number) => (i === 0 ? { left: 0, width: `calc(100% + ${BLEND / 2}%)` } : {
+  left: `-${BLEND / 2}%`,
+  width: `calc(100% + ${BLEND}%)`,
+  maskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
+  WebkitMaskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
+});
+const packLink = (p: { id: number; version: number | null }) => `/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`;
 
 const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
   { to: "/records", title: "전적 시트", desc: "메타 통계·내 전적" },
@@ -32,6 +44,7 @@ function Info() {
   const [dismissed, setDismissed] = useState(false);
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
+  const [show, setShow] = useState<PackShowcase | null>(null);
   const counts = useDexCounts();
   const [picker, setPicker] = useState<"deck" | "card" | null>(null);
   // Desktop opens the search out in place; phones keep the modal (특이점 2026-10-08). Cards search the same way (엘리스 2026-10-11).
@@ -60,6 +73,7 @@ function Info() {
       .catch(() => {});
     getPopularDecks(COLLAGE).then(setPopular).catch(() => setPopular({ total: 0, decks: [] }));
     getRecorderStats().then(setRec).catch(() => {});
+    getPackShowcase().then(setShow).catch(() => setShow({ count: 0, packs: [] }));
   }, []);
 
   const handleDismiss = () => {
@@ -95,12 +109,7 @@ function Info() {
                     src={d.cover_image_phone || d.cover_image}
                     alt=""
                     className="absolute top-0 h-full max-w-none object-cover"
-                    style={i === 0 ? { left: 0, width: `calc(100% + ${BLEND / 2}%)` } : {
-                      left: `-${BLEND / 2}%`,
-                      width: `calc(100% + ${BLEND}%)`,
-                      maskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
-                      WebkitMaskImage: `linear-gradient(to right, transparent, #000 ${(BLEND / (100 + BLEND)) * 100}%)`,
-                    }}
+                    style={blendStyle(i)}
                   />
                 </div>
               ) : (
@@ -197,6 +206,52 @@ function Info() {
               무료{rec ? ` · ${rec.version}` : ""}
               <Link to="/recorder" className="ml-2 underline">자세히</Link>
             </span>
+          </div>
+        </section>
+
+        {/* Pillar 3: the pack simulator, built as the deck book is (엘리스 2026-10-13: "크게 넣고 싶어요 도감처럼") */}
+        <section aria-labelledby="home-packs" className="lg:col-span-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <Link to="/packs" tabIndex={-1} aria-hidden="true" className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 h-28 md:h-40 rounded-t-[15px] overflow-hidden bg-gray-200 dark:bg-gray-700">
+            {Array.from({ length: PACK_STRIP }, (_, i) => {
+              const p = show?.packs[i];
+              const cls = `${i >= 6 ? "hidden lg:block" : i >= 4 ? "hidden md:block" : ""} relative w-full h-full`;
+              return p ? (
+                <div key={`${p.id}-${p.version ?? 0}`} className={cls} style={{ zIndex: i }}>
+                  {/* the pack's picture above its logo */}
+                  <img src={p.image} alt="" className="absolute top-0 h-full max-w-none object-cover object-[50%_22%]" style={blendStyle(i)} />
+                </div>
+              ) : (
+                <div key={i} className={`${cls} ${show ? "" : "animate-pulse"} bg-gray-200 dark:bg-gray-700`} />
+              );
+            })}
+          </Link>
+          <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
+            <span className="text-xs font-bold tracking-wide text-violet-600 dark:text-violet-400">팩깡 시뮬레이터 · 베타</span>
+            <h2 id="home-packs" className="text-[17px] leading-6 sm:text-2xl md:text-3xl font-extrabold tracking-tight">
+              팩{" "}
+              {show ? <span className="tabular-nums">{show.count.toLocaleString()}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
+              종, 게임과 같은 확률로.
+            </h2>
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-4 text-[13px] sm:text-sm h-6 md:h-7 overflow-hidden">
+              <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mr-0.5 md:mr-1">새로 나온 팩</span>
+              {(show?.packs ?? []).slice(0, 5).map((p, i) => (
+                <Link
+                  key={`${p.id}-${p.version ?? 0}`}
+                  to={packLink(p)}
+                  className={`${i >= 3 ? "hidden md:inline-flex" : "inline-flex"} items-center gap-1 md:gap-1.5 pl-0.5 md:pl-1 pr-2 md:pr-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold whitespace-nowrap transition`}
+                >
+                  <img src={p.image} alt="" className="w-5 h-5 md:w-6 md:h-6 rounded-full object-cover object-[50%_22%]" />
+                  {p.name}
+                </Link>
+              ))}
+            </div>
+            <Link
+              to="/packs"
+              className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-dashed border-violet-400 dark:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"
+            >
+              <span className="text-sm break-keep">젬도 로그인도 필요 없어요</span>
+              <span className="text-sm font-bold text-violet-600 dark:text-violet-400 whitespace-nowrap">팩 열러 가기 →</span>
+            </Link>
           </div>
         </section>
       </div>

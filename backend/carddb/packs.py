@@ -70,12 +70,10 @@ def _row(pack, counts=None):
     return row
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def packs(request):
+def _listed():
     """The packs one can open (master, secret and selection packs) and the versions campaigns and older lineups sold
     of them, newest first (today's lineup from its last change), with how many cards of each rarity and how many came
-    in a new art or an 오버프레임."""
+    in a new art or an 오버프레임; kept until the packs change."""
     _fresh()
     if _cache["packs"] is None:
         rarities = ("UR", "SR", "R", "N")
@@ -132,7 +130,30 @@ def packs(request):
         listed.sort(key=lambda r: r["name_en"])
         listed.sort(key=lambda r: r["released"] or "", reverse=True)
         _cache["packs"] = listed
-    return Response({"packs": _cache["packs"]})
+    return _cache["packs"]
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def packs(request):
+    """The pack list (_listed)."""
+    return Response({"packs": _listed()})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def pack_showcase(request):
+    """The pack simulator on the home page (엘리스 2026-10-13: "크게, 도감처럼"): how many packs one can open, and the
+    newest of the list with a picture, each pack once, the master pack left out."""
+    listed, seen, newest = _listed(), set(), []
+    for r in listed:
+        if r["master"] or not r["image"] or r["id"] in seen:
+            continue
+        seen.add(r["id"])
+        newest.append({"id": r["id"], "version": r["version"], "name": r["name"], "image": r["image"]})
+        if len(newest) == 8:
+            break
+    return Response({"count": len({r["id"] for r in listed}), "packs": newest})
 
 
 class _Pickup:

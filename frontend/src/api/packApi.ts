@@ -85,3 +85,11 @@ export async function openPack(id: number, count: 1 | 10, version: number | null
   if (!r.ok) throw Object.assign(new Error(body.error || body.detail || `HTTP ${r.status}`), { gems: body.gems });
   return body;
 }
+
+/** The pack simulator on the home page (엘리스 10/13): how many packs one can open, and the newest with a picture. */
+export type PackShowcase = { count: number; packs: { id: number; version: number | null; name: string; image: string }[] };
+export async function getPackShowcase(): Promise<PackShowcase> {
+  const r = await fetch("/api/carddb/packs/showcase/");
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
