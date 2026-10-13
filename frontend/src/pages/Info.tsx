@@ -37,11 +37,21 @@ const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
 ];
 
 const DISMISSED_KEY = "dismissed_changelog_id";
+// The notice last fetched, shown at once on the next visit so the page does not drop down when it arrives.
+const LATEST_KEY = "home_latest_notice";
+type Notice = Pick<ChangelogEntry, "id" | "title" | "kind">;
+const cachedNotice = (): Notice | null => {
+  try {
+    return JSON.parse(localStorage.getItem(LATEST_KEY) || "null");
+  } catch {
+    return null;
+  }
+};
 
 function Info() {
   const navigate = useNavigate();
-  const [latest, setLatest] = useState<ChangelogEntry | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [latest, setLatest] = useState<Notice | null>(cachedNotice);
+  const [dismissed, setDismissed] = useState(() => latest !== null && localStorage.getItem(DISMISSED_KEY) === String(latest.id));
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
   const [show, setShow] = useState<PackShowcase | null>(null);
@@ -67,8 +77,14 @@ function Info() {
   useEffect(() => {
     getLatestChangelog()
       .then((d) => {
-        setLatest(d.entry);
-        if (d.entry) setDismissed(localStorage.getItem(DISMISSED_KEY) === String(d.entry.id));
+        const notice = d.entry && { id: d.entry.id, title: d.entry.title, kind: d.entry.kind };
+        setLatest(notice);
+        if (notice) {
+          localStorage.setItem(LATEST_KEY, JSON.stringify(notice));
+          setDismissed(localStorage.getItem(DISMISSED_KEY) === String(notice.id));
+        } else {
+          localStorage.removeItem(LATEST_KEY);
+        }
       })
       .catch(() => {});
     getPopularDecks(COLLAGE).then(setPopular).catch(() => setPopular({ total: 0, decks: [] }));
@@ -89,6 +105,22 @@ function Info() {
       <h1 className="sr-only">YGO Decks · 유희왕 마스터 듀얼 덱 도감과 전적 기록</h1>
       <DeckPickerModal open={picker === "deck"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/database/${id}`)} />
       <CardPickerModal open={picker === "card"} onClose={() => setPicker(null)} onPick={(id) => navigate(`/cards/${id}`)} />
+
+      {/* The latest notice leads the page (특이점 2026-10-13; it sat under the pillars). */}
+      {latest && !dismissed && (
+        <div
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm ${
+            latest.kind === "deck"
+              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
+              : "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/40"
+          }`}
+        >
+          <Link to="/changelog" className="flex-1 min-w-0 truncate hover:underline">
+            {latest.kind === "deck" ? "📦" : "📢"} <b>{latest.title}</b>
+          </Link>
+          <button type="button" onClick={handleDismiss} aria-label="공지 닫기" className="shrink-0 w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-800/30">×</button>
+        </div>
+      )}
 
       <div className="grid gap-4 md:gap-5 lg:grid-cols-[2fr_1fr]">
         {/* Pillar 1: the deck book */}
@@ -254,21 +286,6 @@ function Info() {
           </div>
         </section>
       </div>
-
-      {latest && !dismissed && (
-        <div
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm ${
-            latest.kind === "deck"
-              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
-              : "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/40"
-          }`}
-        >
-          <Link to="/changelog" className="flex-1 min-w-0 truncate hover:underline">
-            {latest.kind === "deck" ? "📦" : "📢"} <b>{latest.title}</b>
-          </Link>
-          <button type="button" onClick={handleDismiss} aria-label="공지 닫기" className="shrink-0 w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-800/30">×</button>
-        </div>
-      )}
 
       <section aria-labelledby="home-more">
         <div className="flex items-baseline justify-between mb-2">
