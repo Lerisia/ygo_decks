@@ -342,27 +342,6 @@ class MdPackVersion(models.Model):
         constraints = [models.UniqueConstraint(fields=["pack", "start", "end"], name="carddb_mdpackversion_unique")]
 
 
-class PackPull(models.Model):
-    """What a user has pulled in the pack simulator (엘리스 2026-10-13, 카드 모음): how many of a print, in a finish, and
-    the rarity it came in (an other art from a bundle comes as UR)."""
-
-    class Finish(models.TextChoices):
-        BASIC = "basic", "베이직"
-        SHINE = "shine", "샤인"
-        ROYAL = "royal", "로얄"
-
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pack_pulls")
-    md_print = models.ForeignKey(MdPrint, on_delete=models.CASCADE, related_name="pulls")
-    finish = models.CharField(max_length=5, choices=Finish.choices)
-    rarity = models.CharField(max_length=2, choices=MdPrint.Rarity.choices)
-    count = models.PositiveIntegerField(default=0)
-    first_at = models.DateTimeField(auto_now_add=True)
-    last_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [models.UniqueConstraint(fields=["user", "md_print", "finish"], name="carddb_packpull_unique")]
-
-
 class PackTally(models.Model):
     """A user's opening of one pack: gems spent, packs opened, URs and SRs pulled, and whether the next ten are owed a
     UR (ten without one)."""

@@ -11,7 +11,7 @@ from user.gems import change_gems
 from user.models import User
 
 from . import pack_draw, packs
-from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackPull, PackTally
+from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackTally
 
 BAND = {"UR": 0.001, "SR": 0.05, "R": 0.3, "N": 0.99}
 
@@ -109,22 +109,19 @@ class OpenTest(TestCase):
         change_gems(self.user, 50, "admin_grant")
         r = self.open(self.master, 1, always("N"))
         self.assertEqual((r.status_code, r.json()["gems"]), (400, 50))
-        self.assertFalse(PackPull.objects.exists())
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.gems, 50)
 
-    def test_a_pack_costs_gems_and_goes_to_the_collection(self):
+    def test_a_pack_costs_gems_and_its_cards_are_not_kept(self):
+        # 엘리스 2026-10-13: the beta opens packs for the thrill alone, with no 카드 모음
         self.client.force_authenticate(self.user)
         change_gems(self.user, 1000, "admin_grant")
         r = self.open(self.master, 1, always("N")).json()
         self.assertEqual(r["gems"], 900)
         cards = r["packs"][0]
         self.assertEqual([c["print"] for c in cards], [100] * 7 + [101])
-        self.assertTrue(all(c["new"] for c in cards))
-        self.assertEqual(sorted(PackPull.objects.values_list("md_print_id", "finish", "count")), [(100, "basic", 7), (101, "basic", 1)])
+        self.assertFalse(any("new" in c for c in cards))
         self.assertEqual(r["tally"], {"gems": 100, "packs": 1, "ur": 0, "sr": 0, "owed": False})
-        # pulled before: no longer new; counts add up
-        r = self.open(self.master, 1, always("N")).json()
-        self.assertFalse(any(c["new"] for c in r["packs"][0]))
-        self.assertEqual(PackPull.objects.get(md_print_id=100).count, 14)
 
     def test_ten_without_a_ur_owe_one(self):
         self.client.force_authenticate(self.user)
@@ -141,7 +138,7 @@ class OpenTest(TestCase):
         r = self.open(self.secret, 1, always("SR")).json()
         self.assertEqual([c["print"] for c in r["packs"][0]], [102] * 4 + [202] * 4)
 
-    def test_mine_and_collection(self):
+    def test_mine(self):
         r = self.client.get(f"/api/carddb/packs/{self.master.id}/mine/").json()
         self.assertFalse(r["signed_in"])
         self.client.force_authenticate(self.user)
@@ -149,9 +146,7 @@ class OpenTest(TestCase):
         self.open(self.master, 1, cycle(BAND["UR"], 0.005, 0))   # all UR, royal
         r = self.client.get(f"/api/carddb/packs/{self.master.id}/mine/").json()
         self.assertEqual((r["gems"], r["tally"]["ur"]), (900, 8))
-        c = self.client.get("/api/carddb/packs/collection/").json()
-        self.assertEqual(c["summary"], {"kinds": 1, "total": 8, "ur": 1, "sr": 0, "shine": 0, "royal": 8, "gems_spent": 100, "packs": 1})
-        self.assertEqual((c["cards"][0]["print"], c["cards"][0]["royal"], c["cards"][0]["name"]), (103, 8, "카드103"))
+        self.assertEqual(self.client.get("/api/carddb/packs/collection/").status_code, 404)
 
     def test_search_by_pickup_cards_not_the_master_packs(self):
         search = lambda q: self.client.get("/api/carddb/packs/search/", {"q": q}).json()["packs"]

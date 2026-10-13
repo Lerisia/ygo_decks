@@ -1,14 +1,13 @@
 """The pack simulator (엘리스 2026-10-12): the packs one can open and the cards in each; buying them with gems, drawn on
-the server (pack_draw), into the user's 카드 모음 (엘리스 10/13)."""
+the server (pack_draw), for the thrill alone: the cards are not kept (엘리스 10/13)."""
 import os
 import random
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, F, Max, Q, Sum
+from django.db.models import Count, Max, Q
 from django.http import Http404
-from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -18,10 +17,9 @@ from user.gems import NotEnoughGems, change_gems
 from . import dex
 from .display import display_name
 from .face import face_thumb_url, face_url
-from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackPull, PackTally
+from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackTally
 from .pack_draw import GEMS_PER_PACK, draw_pack, draw_ten
 
-RARITY_RANK = {"N": 0, "R": 1, "SR": 2, "UR": 3}
 
 OPENABLE = [MdPack.Kind.NORMAL, MdPack.Kind.SECRET, MdPack.Kind.SELECTION]
 MASTER_PACK = "Master Pack"
@@ -229,9 +227,9 @@ _rng = random.SystemRandom().random
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def open_pack(request, pack_id):
-    """Buy one or ten packs with gems (100 a pack): the server draws them (pack_draw), the cards go to the user's
-    collection, and the pack's tally (and the UR owed after ten without one) is kept; the cards, each marked new when
-    the user had never pulled that print, the gems left and the tally."""
+    """Buy one or ten packs with gems (100 a pack): the server draws them (pack_draw) and keeps the pack's tally (and
+    the UR owed after ten without one); the cards, the gems left and the tally. The cards are not kept: the beta opens
+    packs for the thrill alone (엘리스 2026-10-13)."""
     try:
         count = int(request.data.get("count", 1))
     except (TypeError, ValueError):
@@ -267,17 +265,6 @@ def open_pack(request, pack_id):
         else:
             packs, owed = draw_ten(pools, tally.owed, _rng)
         flat = [c for p in packs for c in p]
-        prints = {c["card"]["print"] for c in flat}
-        had = set(PackPull.objects.filter(user=user, md_print_id__in=prints).values_list("md_print_id", flat=True))
-        want = Counter((c["card"]["print"], c["finish"]) for c in flat)
-        rarity = {c["card"]["print"]: c["rarity"] for c in flat}
-        rows = {(p.md_print_id, p.finish): p for p in PackPull.objects.filter(user=user, md_print_id__in=prints)}
-        now = timezone.now()
-        for (pid, finish), n in want.items():
-            if (pid, finish) in rows:
-                PackPull.objects.filter(pk=rows[(pid, finish)].pk).update(count=F("count") + n, last_at=now)
-            else:
-                PackPull.objects.create(user=user, md_print_id=pid, finish=finish, rarity=rarity[pid], count=n)
         tally.gems += GEMS_PER_PACK * count
         tally.packs += count
         tally.ur += sum(c["rarity"] == "UR" for c in flat)
@@ -285,8 +272,7 @@ def open_pack(request, pack_id):
         tally.owed = owed
         tally.save()
     return Response({
-        "packs": [[{**c["card"], "rarity": c["rarity"], "finish": c["finish"], "new": c["card"]["print"] not in had}
-                   for c in p] for p in packs],
+        "packs": [[{**c["card"], "rarity": c["rarity"], "finish": c["finish"]} for c in p] for p in packs],
         "gems": gems, "tally": _tally_row(tally),
     })
 
@@ -299,33 +285,3 @@ def pack_mine(request, pack_id):
         return Response({"signed_in": False, "gems": 0, "tally": _tally_row(None)})
     t = PackTally.objects.filter(user=request.user, pack_id=pack_id).first()
     return Response({"signed_in": True, "gems": request.user.gems, "tally": _tally_row(t)})
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def collection(request):
-    """The user's 카드 모음: every print pulled, how many in each finish, the rarity it came in and when, with a summary."""
-    user = request.user
-    by_print = {}
-    for p in PackPull.objects.filter(user=user).select_related("md_print__card"):
-        row = by_print.setdefault(p.md_print_id, {
-            "print": p.md_print_id, "card": p.md_print.card_id, "name": display_name(p.md_print.card), "rarity": p.rarity,
-            "thumb": face_thumb_url(p.md_print_id), "face": face_url(p.md_print_id), "basic": 0, "shine": 0, "royal": 0,
-            "first": p.first_at, "last": p.last_at})
-        row[p.finish] += p.count
-        row["first"] = min(row["first"], p.first_at)
-        row["last"] = max(row["last"], p.last_at)
-        if RARITY_RANK[p.rarity] > RARITY_RANK[row["rarity"]]:
-            row["rarity"] = p.rarity
-    cards = sorted(by_print.values(), key=lambda r: r["last"], reverse=True)
-    for r in cards:
-        r["first"], r["last"] = r["first"].isoformat(), r["last"].isoformat()
-    tallies = PackTally.objects.filter(user=user).aggregate(gems=Sum("gems"), packs=Sum("packs"))
-    return Response({
-        "gems": user.gems,
-        "summary": {"kinds": len(cards), "total": sum(r["basic"] + r["shine"] + r["royal"] for r in cards),
-                    "ur": sum(r["rarity"] == "UR" for r in cards), "sr": sum(r["rarity"] == "SR" for r in cards),
-                    "shine": sum(r["shine"] for r in cards), "royal": sum(r["royal"] for r in cards),
-                    "gems_spent": tallies["gems"] or 0, "packs": tallies["packs"] or 0},
-        "cards": cards,
-    })

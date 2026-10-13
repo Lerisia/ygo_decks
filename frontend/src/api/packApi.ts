@@ -58,15 +58,7 @@ export async function searchPacks(q: string, signal?: AbortSignal): Promise<Pack
 
 export type PackTally = { gems: number; packs: number; ur: number; sr: number; owed: boolean };
 export type PackMine = { signed_in: boolean; gems: number; tally: PackTally };
-export type OpenedCard = PackCard & { finish: "basic" | "shine" | "royal"; new: boolean };
-export type CollectionCard = {
-  print: number; card: number; name: string; rarity: Rarity; thumb: string | null; face: string | null;
-  basic: number; shine: number; royal: number; first: string; last: string;
-};
-export type Collection = {
-  gems: number; cards: CollectionCard[];
-  summary: { kinds: number; total: number; ur: number; sr: number; shine: number; royal: number; gems_spent: number; packs: number };
-};
+export type OpenedCard = PackCard & { finish: "basic" | "shine" | "royal" };
 
 const auth = (): Record<string, string> => {
   const token = localStorage.getItem("access_token");
@@ -80,7 +72,7 @@ export async function getPackMine(id: number): Promise<PackMine> {
   return r.json();
 }
 
-/** Buy one or ten packs with gems; the server draws them into the user's collection. */
+/** Buy one or ten packs with gems; the server draws them. */
 export async function openPack(id: number, count: 1 | 10, version: number | null = null): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
   const r = await fetch(`/api/carddb/packs/${id}/open/`, {
     method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count, version }),
@@ -88,11 +80,4 @@ export async function openPack(id: number, count: 1 | 10, version: number | null
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || body.detail || `HTTP ${r.status}`), { gems: body.gems });
   return body;
-}
-
-/** The signed-in user's 카드 모음. */
-export async function getCollection(): Promise<Collection> {
-  const r = await fetch("/api/carddb/packs/collection/", { headers: auth() });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
 }

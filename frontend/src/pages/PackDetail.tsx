@@ -30,7 +30,7 @@ const byRarity = (cards: PackCard[]): Pool<PackCard> => {
 };
 
 /** A pack: buy one or ten with gems (엘리스 10/13 — the server draws them, by the game's guarantees and its UR owed after
- *  ten without one, into the user's 카드 모음), what it holds by rarity, and its 제공 확률 in the game's own words. */
+ *  ten without one, and keeps none of them), what it holds by rarity, and its 제공 확률 in the game's own words. */
 export default function PackDetail() {
   const id = Number(useParams().packId);
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ export default function PackDetail() {
   const [mine, setMine] = useState<PackMine | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [run, setRun] = useState<{ key: number; packs: Pulled<PackCard>[][]; fresh: Set<number> } | null>(null);
+  const [run, setRun] = useState<{ key: number; packs: Pulled<PackCard>[][] } | null>(null);
   const [rates, setRates] = useState(false);
   const openStage = useRef("pack");
   const running = !!run;
@@ -112,7 +112,7 @@ export default function PackDetail() {
       })));
       setMine({ signed_in: true, gems: r.gems, tally: r.tally });
       setGems(r.gems);
-      setRun({ key: Date.now(), packs, fresh: new Set(r.packs.flat().filter((c) => c.new).map((c) => c.print)) });
+      setRun({ key: Date.now(), packs });
     } catch (e) {
       const err = e as Error & { gems?: number };
       setNotice(err.message || "팩을 열지 못했습니다.");
@@ -130,7 +130,6 @@ export default function PackDetail() {
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-4xl mx-auto">
       <PackTopBar>
         <PackListLink />
-        {mine?.signed_in && <Link to="/packs/collection" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
       </PackTopBar>
       {error && !pack ? (
         <p className="py-16 text-center text-gray-500">팩을 불러오지 못했습니다.</p>
@@ -190,7 +189,7 @@ export default function PackDetail() {
       )}
 
       {run && pack && (
-        <PackOpening key={run.key} pack={pack} packs={run.packs} fresh={run.fresh} gems={gems} owed={tally.owed} onClose={() => setRun(null)} onAgain={open}
+        <PackOpening key={run.key} pack={pack} packs={run.packs} gems={gems} owed={tally.owed} onClose={() => setRun(null)} onAgain={open}
                      onStage={(st) => { openStage.current = st; }} />
       )}
       {rates && pack && <Rates pack={pack} master={master} onClose={() => setRates(false)} />}

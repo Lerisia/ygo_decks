@@ -6,7 +6,6 @@ import PackFront from "@/components/packs/PackFront";
 import { PackTopBar } from "@/components/packs/Gem";
 import { type PackHit, type PackKind, type PackSummary, getPacks, searchPacks } from "@/api/packApi";
 import { makeMatcher, nameKeys } from "@/utils/hangul";
-import { isAuthenticated } from "@/api/accountApi";
 
 
 /** The pack tapped on the way out, and where on the screen it was: Back puts it there again once the list is drawn
@@ -108,11 +107,10 @@ export default function PackList() {
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-5xl mx-auto">
       <PackTopBar>
         <button onClick={() => navigate("/playground")} className="text-blue-600 dark:text-blue-400 hover:underline">← 놀이터</button>
-        {isAuthenticated() && <Link to="/packs/collection" state={{ fromList: true }} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">카드 모음</Link>}
       </PackTopBar>
       <h1 className="mt-2 text-2xl md:text-4xl font-bold">팩깡 시뮬레이터</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-keep">
-        마스터 듀얼의 팩을 게임과 같은 제공 확률로 열어 봅니다. 뽑은 카드는 카드 모음에 쌓입니다.
+        마스터 듀얼의 팩을 게임과 같은 제공 확률로 열어 봅니다.
       </p>
 
       <div className="mt-4 flex flex-col sm:flex-row gap-2">

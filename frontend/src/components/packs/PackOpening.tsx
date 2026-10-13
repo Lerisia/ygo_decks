@@ -75,8 +75,8 @@ type Fx = MutableRefObject<FxLayer | null>;
  *  them — N and R whisk over, SR and UR leap up in light and dust (one whose back showed it rattling first, a UR
  *  twisting the wrong way, a ring spreading), and a shine or royal card turns once more into its finish
  *  in the game's shader. Then the cards slide off, the next pack comes, and the 팩 개봉 결과. */
-export default function PackOpening({ pack, packs, fresh, gems, owed = false, onClose, onAgain, onStage }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; gems: number; owed?: boolean;
+export default function PackOpening({ pack, packs, gems, owed = false, onClose, onAgain, onStage }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; gems: number; owed?: boolean;
   onClose: () => void; onAgain: (count: 1 | 10) => void; onStage?: (stage: string) => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -209,10 +209,10 @@ export default function PackOpening({ pack, packs, fresh, gems, owed = false, on
           <PackScene key={index} pack={pack} hints={hints[index]} framed={total > 1} fx={fx} flash={flashNow} onOpened={() => setStage("cards")} />
         )}
         {stage === "cards" && (
-          <Cards key={index} cards={packs[index]} marked={hints[index].marked} fresh={fresh} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
+          <Cards key={index} cards={packs[index]} marked={hints[index].marked} finishes={finishes} fx={fx} flash={flashNow} shake={shake} onOpen={open}
                  last={index + 1 >= total} onNext={next} />
         )}
-        {stage === "result" && <Result pack={pack} packs={packs} fresh={fresh} finishes={finishes} gems={gems} owed={owed} onOpen={open} onAgain={onAgain} onClose={onClose} />}
+        {stage === "result" && <Result pack={pack} packs={packs} finishes={finishes} gems={gems} owed={owed} onOpen={open} onAgain={onAgain} onClose={onClose} />}
 
         <div className="absolute left-0 right-0 top-0 z-40 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <span className="po-count">{stage === "result" ? "팩 개봉 결과" : stage === "overview" ? pack.name : `${index + 1}/${total}`}</span>
@@ -498,8 +498,8 @@ function Monster({ onDone }: { onDone: () => void }) {
 
 /** The eight cards: they rise from below into place, a glint runs along them, then they turn — a tap, or a
  *  finger drawn across them turning each it passes, in the way it moves. */
-function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last, onNext }: {
-  cards: Pulled<PackCard>[]; marked: boolean; fresh: Set<number>; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
+function Cards({ cards, marked, finishes, fx, flash, shake, onOpen, last, onNext }: {
+  cards: Pulled<PackCard>[]; marked: boolean; finishes: Map<number, FinishParams>; fx: Fx; flash: (white: boolean) => void; shake: () => void;
   onOpen: (c: Pulled<PackCard>) => void; last: boolean; onNext: () => void;
 }) {
   const grid = useRef<HTMLDivElement>(null);
@@ -733,7 +733,7 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
                 {marked && high(c.rarity) && <span className="po-foil" style={{ backgroundImage: `url(${FX}foil_${c.rarity.toLowerCase()}.webp)` }} />}
               </span>
               <span className="po-front">
-                <CardFace pulled={c} isNew={fresh.has(c.card.print)} finishOn={finished[i]} params={finishes.get(c.card.print)} />
+                <CardFace pulled={c} finishOn={finished[i]} params={finishes.get(c.card.print)} />
               </span>
             </span>
           </div>
@@ -755,7 +755,7 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
 
 /** A card's face; once its finish has come round, the finish itself — the game's shader when the browser can draw it
  *  (in the opening), a light sheen otherwise (the results, where there may be many). */
-function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<PackCard>; isNew: boolean; finishOn?: boolean; params?: FinishParams }) {
+function CardFace({ pulled, finishOn = true, params }: { pulled: Pulled<PackCard>; finishOn?: boolean; params?: FinishParams }) {
   const { card, rarity, finish } = pulled;
   const showFinish = finishOn && finish !== "basic";
   const shader = showFinish && !!params && finishSupported();
@@ -769,7 +769,6 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
       ) : plain}
       {showFinish && !shader && <span className={`po-sheen ${finish === "royal" ? "po-royal" : ""}`} style={finish === "royal" ? { backgroundImage: `url(${FX}rainbow.webp)` } : undefined} />}
       <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}_hd.png`} alt="" className="absolute top-0 right-0 h-[11%] w-auto" />
-      {isNew && <img src={`${FX}new.webp`} alt="NEW" className="absolute -top-[4%] -left-[4%] h-[12%] w-auto drop-shadow" />}
       {showFinish && (
         <span className={`absolute bottom-[3%] left-[3%] px-1 rounded text-[9px] sm:text-[11px] font-bold leading-4 ${finish === "royal" ? "bg-fuchsia-600" : "bg-sky-600"}`}>
           {FINISH_LABEL[finish]}
@@ -780,8 +779,8 @@ function CardFace({ pulled, isNew, finishOn = true, params }: { pulled: Pulled<P
 }
 
 /** 팩 개봉 결과: every card pulled, UR first, a royal or shine one before a plain one, popping in; a tap shows it large. */
-function Result({ pack, packs, fresh, finishes, gems, owed, onOpen, onAgain, onClose }: {
-  pack: PackDetail; packs: Pulled<PackCard>[][]; fresh: Set<number>; finishes: Map<number, FinishParams>; gems: number; owed: boolean;
+function Result({ pack, packs, finishes, gems, owed, onOpen, onAgain, onClose }: {
+  pack: PackDetail; packs: Pulled<PackCard>[][]; finishes: Map<number, FinishParams>; gems: number; owed: boolean;
   onOpen: (c: Pulled<PackCard>) => void; onAgain: (count: 1 | 10) => void; onClose: () => void;
 }) {
   const all = useMemo(() => {
@@ -810,7 +809,7 @@ function Result({ pack, packs, fresh, finishes, gems, owed, onOpen, onAgain, onC
             <button key={i} type="button" onClick={() => onOpen(c)} className={`po-result relative aspect-[704/1024] ${high(c.rarity) ? `po-result-${c.rarity.toLowerCase()}` : ""}`}
                     style={{ animationDelay: `${Math.min(i, 40) * 22}ms` }}
                     aria-label={`${c.card.name} ${c.rarity}${c.finish !== "basic" ? ` ${FINISH_LABEL[c.finish]}` : ""}`}>
-              <CardFace pulled={c} isNew={fresh.has(c.card.print)} params={shaded.has(c) ? finishes.get(c.card.print) : undefined} />
+              <CardFace pulled={c} params={shaded.has(c) ? finishes.get(c.card.print) : undefined} />
             </button>
           ))}
         </div>
