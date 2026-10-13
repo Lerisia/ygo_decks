@@ -241,6 +241,22 @@ class CampaignTest(TestCase):
         got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}})
         self.assertEqual(got["on"], ([5], [("2026-02-05", "2026-03-01", {"5": 50})]))
 
+    def test_an_art_mdm_lists_beside_the_usual_one_comes_in_its_version(self):
+        # MDM lists the usual card and the campaign's art both: the usual pack holds the usual one, at its own rarity,
+        # under its own cover (엘리스 10/13: 아르테미스's 2026 art, a UR, stood in 지식을 통괄하는 마도왕 of 2022)
+        c = Card.objects.create(id=9, category="monster", name_ja="Maiden", name_en="Maiden", frame="effect")
+        MdPrint.objects.create(md_id=9, card=c, rarity="SR")
+        MdPrint.objects.create(md_id=90, card=c, is_alt_art=True, rarity="UR")
+        pack_map = {"sec": {"game_id": 2001, "name_ko": "", "cover": "03_9", "arts": [("03_90", 90)]}}
+        camp = {90: {"spans": [("2026-10-06", "2026-12-04")], "source": ""}}
+        art = mdm_card(9, "UR", "sec", alt=True, release="2026-10-06T00:00:00.000Z")
+        for listed in ([mdm_card(9, "SR", "sec"), art], [art]):
+            self.cards = listed
+            got = self.sync(camp, pack_map=pack_map)
+            self.assertEqual(got["sec"], ([9], [("2026-10-06", "2026-12-04", {"9": 90})]))
+            p = MdPack.objects.get(mdm_id="sec")
+            self.assertEqual((p.cover, p.versions.get().cover, p.cards.get().rarity), ("03_9", "03_90", "SR"))
+
     def test_a_pack_sold_only_while_it_ran(self):
         # the campaign ran the whole time the pack was sold: there was never a usual one (엘리스 10/13: 파워업 셀렉션)
         got = self.sync({50: {"spans": [("2026-01-08", "2026-03-01")], "source": ""}})

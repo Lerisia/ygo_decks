@@ -341,8 +341,9 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
     def spans(camp):
         return [(date.fromisoformat(a), date.fromisoformat(b)) for a, b in camp["spans"]]
 
-    # an art MDM lists as a pack's own though Yugipedia says it came only for a while: the usual art in the usual pack,
-    # and that art in the version for those days (도미나스 임펄스's 오버프레임 in 챌린저즈 컬렉션 from 6/4)
+    # an art MDM lists as a pack's own, in place of the usual one or beside it, though Yugipedia says it came only for
+    # a while: the usual art in the usual pack, at its own rarity, and that art in the version for those days (도미나스
+    # 임펄스's 오버프레임 in 챌린저즈 컬렉션 from 6/4; 아르테미스's UR art beside her SR in 지식을 통괄하는 마도왕, 10/13)
     usual = {}
     for p in prints.values():
         if not p.is_alt_art:
@@ -353,9 +354,9 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
         for pid in list(wanted.get(sid, {})):
             camp = campaigns.get(pid)
             base = usual.get(prints[pid].card_id)
-            if camp and not camp["source"] and base and base not in wanted[sid] and any(
-                    sold(sid, a, b) for a, b in spans(camp)):
-                wanted[sid][base] = wanted[sid].pop(pid)
+            if camp and not camp["source"] and base and any(sold(sid, a, b) for a, b in spans(camp)):
+                rarity, amount = wanted[sid].pop(pid)
+                wanted[sid].setdefault(base, (prints[base].rarity or rarity, amount))
 
     def base_of(sid, art):
         return next((pid for pid in wanted.get(sid, {}) if prints[pid].card_id == art.card_id and not prints[pid].is_alt_art),
