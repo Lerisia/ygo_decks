@@ -91,6 +91,7 @@ six==1.17.0
 soupsieve==2.6
 sqlparse==0.5.3
 sympy==1.13.1
+tblib==3.2.2
 tokenizers==0.21.1
 tomli==2.4.1
 torch==2.6.0
