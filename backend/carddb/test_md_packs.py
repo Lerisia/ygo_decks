@@ -349,6 +349,24 @@ Zeta (Master Duel); Rare // @Notes::Added on May 9, 2025. Removed on November 7,
         out, p, versions = self.sync()
         self.assertEqual((out["unresolved"], versions[0][3]), ([], [4, 8]))
 
+    def test_a_lineup_sold_only_while_a_campaign_ran(self):
+        # 엘리스 10/13: 챌린저즈 컬렉션's cards changed on 6/4, the day its 오버프레임 came, which ran till the pack ended;
+        # today's lineup was never sold without it
+        self.sets.append(dict(mdm_set("sel", "Short Selection", kind="Selection Pack", release="2026-01-08T00:00:00.000Z"),
+                              expires="2026-03-01T00:00:00.000Z"))
+        self.cards = [mdm_card(i, r, "sel") for i, r in ((1, "UR"), (2, "SR"), (4, "UR"))]
+        self.pack_map["sel"] = {"game_id": 1100, "name_ko": "", "cover": "02_1", "arts": []}
+        self.lineups[1100] = [{"card": "Alpha", "rarity": "UR", "added": None, "removed": None},
+                              {"card": "Beta", "rarity": "SR", "added": None, "removed": None},
+                              {"card": "Delta", "rarity": "UR", "added": "2026-02-01", "removed": None},
+                              {"card": "Epsilon", "rarity": "N", "added": None, "removed": "2026-02-01"}]
+        md_packs.sync(self.sets, self.cards, pack_map=self.pack_map, lineups=self.lineups,
+                      campaigns={20: {"spans": [("2026-02-01", "2026-04-09")], "source": ""}})
+        p = MdPack.objects.get(mdm_id="sel")
+        self.assertEqual(sorted(p.cards.values_list("md_print_id", flat=True)), [1, 4, 20])
+        self.assertEqual([(str(v.start), str(v.end), v.swaps, v.missing, v.extra) for v in p.versions.all()],
+                         [("2026-01-08", "2026-02-01", {}, [4], {"5": "N"})])
+
     def test_fetch(self):
         # the pack pages in the two categories, then the card pages of names the card DB lacks, for their Japanese names
         pages = {"Old Secret": self.PAGE.replace("Delta (Master Duel)", "Crimson Dragon (Master Duel)"),

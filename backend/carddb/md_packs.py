@@ -536,9 +536,11 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None, lineups=None):
                     base = base_in(sid, lineup(sid, a), art)
                     if base:
                         versions[(sid, a, b)][base] = art_id
-    # a selection pack sold only while a campaign ran was never sold without its arts: they are the usual pack's
+    # today's lineup sold only while a campaign ran was never sold without its arts: they are the usual pack's (a
+    # selection pack sold only then: 파워업 셀렉션; one whose cards changed the day an 오버프레임 came, which ran till the
+    # pack ended: 챌린저즈 컬렉션, 엘리스 10/13)
     for (sid, start, end), swaps in list(versions.items()):
-        if (start, end) == sale[sid]:
+        if (start, end) == (periods[sid][-1][0] if sid in periods else sale[sid][0], sale[sid][1]):
             for base, art_id in swaps.items():
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (prints[art_id].rarity or rarity, amount)
