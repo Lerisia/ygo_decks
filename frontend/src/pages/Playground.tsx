@@ -4,8 +4,8 @@ import PLogo from "@/components/PLogo";
 import { isAdmin } from "@/api/accountApi";
 
 // Every game sits on this page (특이점 2026-10-13; they used to sit on a 솔로 플레이 page): 멀티플레이 first as one
-// tile for its room list (엘리스 2026-10-13), then the 싱글 플레이 games, untagged; the other features follow. The tools
-// (티어표 만들기, 등반 덱 기록) live under 도구 (엘리스 2026-10-13).
+// tile for its room list, 팩깡 시뮬레이터 right after it, then the 싱글 플레이 games, untagged; the other features
+// follow. The tools (티어표 만들기, 등반 덱 기록) live under 도구 (엘리스 2026-10-13).
 type Tile = {
   to: string;
   icon: string;
@@ -18,11 +18,11 @@ type Tile = {
 
 const tiles: Tile[] = [
   { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "친구들과 함께 즐기는 다양한 미니게임", rewardBadge: true },
+  { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", beta: true, adminOnly: true },
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞히기", rewardBadge: true },
   { to: "/solo-duchmind", icon: "🎨", title: "듀치마인드", desc: "그리고, 맞히고", rewardBadge: true },
   { to: "/solo-twenty", icon: "🧩", title: "딱무고개", desc: "20개 질문으로 카드 맞히기", rewardBadge: true },
   { to: "/skill-names", icon: "⌨️", title: "스킬 릴레이", desc: "롤 스킬 이름을 아는 대로 입력하기", beta: true },
-  { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", beta: true, adminOnly: true },
   { to: "/icon-shop", icon: "🛍️", title: "포인트 상점", desc: "포인트로 아이콘·프레임 구매" },
 ];
 
