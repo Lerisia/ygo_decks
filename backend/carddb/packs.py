@@ -187,7 +187,8 @@ def _versions(pack, cards):
         for c in cards:
             art = arts.get(swaps.get(c["print"]))
             if art and face_thumb_url(art.md_id):
-                c = {"print": art.md_id, "card": art.card_id, "name": display_name(art.card), "rarity": c["rarity"],
+                # the art at its own rarity: 키스킬's SR comes as a UR in its campaign art (엘리스 10/13)
+                c = {"print": art.md_id, "card": art.card_id, "name": display_name(art.card), "rarity": art.rarity or c["rarity"],
                      "thumb": face_thumb_url(art.md_id), "face": face_url(art.md_id), "base": c["print"]}
                 shown.append(c)
             lineup.append(c)

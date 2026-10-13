@@ -208,12 +208,13 @@ class CampaignTest(TestCase):
         got = self.sync({})
         self.assertEqual(got["on"], ([5], []))
 
-    def test_a_cover_shows_it_though_the_pack_came_later(self):
-        # the pack came out after the art's spans with that art on its cover: its usual pack has it
+    def test_a_cover_never_puts_a_campaign_art_in_the_usual_pack(self):
+        # Yugipedia's days rule an art it records: a pack out after them keeps the usual art though a cover shows it
+        # (엘리스 10/13: 마스카레나's 2023 art stood in 스타는 가면 속에서 웃는다's usual pack, so its 2026 art had no card to
+        # stand in for)
         pack_map = {"late": {"game_id": 2300, "name_ko": "", "cover": "03_5", "arts": [("03_50", 50)]}}
         got = self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}}, pack_map=pack_map)
-        self.assertEqual(got["late"], ([50], []))
-        self.assertEqual(MdPack.objects.get(mdm_id="late").cover, "03_50")
+        self.assertEqual(got["late"], ([5], []))
         # a pack on sale then that shows it: a version, with that cover
         pack_map = {"sec": {"game_id": 2001, "name_ko": "", "cover": "03_1", "arts": [("03_50", 50)]}}
         self.sync({50: {"spans": [("2026-02-05", "2026-04-09")], "source": ""}}, pack_map=pack_map)

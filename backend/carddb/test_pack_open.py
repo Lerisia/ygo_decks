@@ -187,3 +187,10 @@ class OpenTest(TestCase):
                   if p["id"] == self.secret.id]
         self.assertEqual(listed, [(self.secret.id, v.id, "2026-02-05", ["2026-02-05", "2026-04-09"], ["카드203"]),
                                   (self.secret.id, None, None, None, [])])
+
+    def test_a_campaign_art_at_its_own_rarity(self):
+        MdPrint.objects.create(md_id=2020, card_id=202, is_alt_art=True, rarity="UR")   # 202 is the SR
+        open(os.path.join(self.media, "cards/face_thumb/2020.webp"), "wb").close()
+        MdPackVersion.objects.create(pack=self.secret, start="2026-02-05", end="2026-04-09", swaps={"202": 2020})
+        r = self.client.get(f"/api/carddb/packs/{self.secret.id}/").json()
+        self.assertEqual([(a["print"], a["rarity"]) for a in r["versions"][0]["arts"]], [(2020, "UR")])

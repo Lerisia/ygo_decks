@@ -364,7 +364,7 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
     def in_packs(art_id):   # an art Yugipedia says came for a while from the packs: it goes into versions instead
         return art_id in campaigns and not campaigns[art_id]["source"]
 
-    art_covers, pending = {}, []
+    art_covers = {}
     for sid, game in pack_map.items():
         for cover, art_id in game["arts"]:
             art = prints.get(art_id)
@@ -373,8 +373,6 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
             if base and not in_packs(art_id):   # the campaign's art in place of the usual one
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (art.rarity or rarity, amount)
-            elif base:
-                pending.append((sid, art_id))
 
     # campaigns: one from a set named for it comes in that set; one from the packs makes a version of each selection
     # or secret pack on sale then that holds the card
@@ -404,15 +402,6 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None):
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (prints[art_id].rarity or rarity, amount)
             del versions[(sid, start, end)]
-    # a pack whose cover shows such an art though it was not on sale while the art came (it came out with it later):
-    # the usual pack has it, as the cover says
-    for sid, art_id in pending:
-        if not any(art_id in swaps.values() for (vsid, _, _), swaps in versions.items() if vsid == sid):
-            art = prints[art_id]
-            base = base_of(sid, art)
-            if base:
-                rarity, amount = wanted[sid].pop(base)
-                wanted[sid][art_id] = (art.rarity or rarity, amount)
     # the usual pack's cover: the latest campaign's when its art is in the usual pack, else the usual one
     covers = {}
     for sid, game in pack_map.items():
