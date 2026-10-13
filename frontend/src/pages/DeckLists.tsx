@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import DeckListCard, { DeckListCardSlot } from "@/components/deckbuilder/DeckListCard";
+import DeckListCard, { DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { listDecks } from "@/lib/deckDrafts";
 import { NEW_DECK_PATH, deckListPath } from "@/lib/deckListPaths";
@@ -8,7 +8,7 @@ import { NEW_DECK_PATH, deckListPath } from "@/lib/deckListPaths";
 const ADD_BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
 
 /** 내 덱 리스트 (/decklists): the decks a member has built (덱 구축, 참혈 2026-10-13). Operators only while it is laid
- *  out; linked from nowhere yet. With none, a dashed card holds the button that makes the first. */
+ *  out; linked from nowhere yet. With none, a dashed card is the way to make the first (참혈 2026-10-14). */
 export default function DeckLists() {
   const admin = useAdminOnly();
   const decks = useMemo(() => (admin ? listDecks() : []), [admin]);
@@ -30,9 +30,7 @@ export default function DeckLists() {
           ))
         ) : (
           <li>
-            <DeckListCardSlot>
-              <Link to={NEW_DECK_PATH} className={ADD_BUTTON}>덱 리스트 추가</Link>
-            </DeckListCardSlot>
+            <DeckListAddCard to={NEW_DECK_PATH} />
           </li>
         )}
       </ul>

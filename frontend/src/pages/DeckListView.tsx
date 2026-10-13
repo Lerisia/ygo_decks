@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { useDeckCards } from "@/hooks/useDeckCards";
-import { deckDay, getDeck } from "@/lib/deckDrafts";
+import { deckDay, deckUpdated, getDeck } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
 const BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
@@ -25,7 +25,10 @@ export default function DeckListView() {
           <div className="mt-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-xl font-bold break-keep">{deck.name || "이름 없는 덱"}</h1>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 tabular-nums">등록일 {deckDay(deck.createdAt)}</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                등록일 {deckDay(deck.createdAt)}
+                {deckDay(deckUpdated(deck)) !== deckDay(deck.createdAt) && <> · 갱신일 {deckDay(deckUpdated(deck))}</>}
+              </p>
             </div>
             <Link to={deckListEditPath(deck.code)} className={BUTTON}>수정</Link>
           </div>

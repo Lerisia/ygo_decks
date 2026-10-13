@@ -11,6 +11,8 @@ export type DeckDraft = {
   description: string;
   /** When it was first saved (ISO). */
   createdAt: string;
+  /** When it was last saved (ISO); decks saved before 10-14 have none, so read it through deckUpdated. */
+  updatedAt?: string;
   /** Card ids, an id once per copy. */
   main: number[];
   extra: number[];
@@ -54,16 +56,19 @@ function newCode(taken: Set<string>) {
   return code;
 }
 
-/** Saves a deck: a new one gets its code and its day here. Throws when the browser won't store it (private mode,
- *  full storage). */
+/** Saves a deck: a new one gets its code and its day here, and every save its last-saved time. Throws when the
+ *  browser won't store it (private mode, full storage). */
 export function saveDeck(deck: DeckDraft): DeckDraft {
   const list = stored();
+  const now = new Date().toISOString();
   const saved = deck.code === NEW_CODE
-    ? { ...deck, code: newCode(new Set(list.map((d) => d.code))), createdAt: new Date().toISOString() }
-    : deck;
+    ? { ...deck, code: newCode(new Set(list.map((d) => d.code))), createdAt: now, updatedAt: now }
+    : { ...deck, updatedAt: now };
   localStorage.setItem(KEY, JSON.stringify([...list.filter((d) => d.code !== saved.code), saved]));
   return saved;
 }
+
+export const deckUpdated = (deck: Pick<DeckDraft, "createdAt" | "updatedAt">) => deck.updatedAt || deck.createdAt;
 
 /** 2026.10.13 */
 export function deckDay(iso: string) {

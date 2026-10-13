@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, getDeck, kindCounts, listDecks, removeCard, saveDeck, sortedZone,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, deckUpdated, getDeck, kindCounts, listDecks, removeCard, saveDeck, sortedZone,
 } from "./deckDrafts";
 import { isDeckEditorPath } from "./deckListPaths";
 
@@ -96,10 +96,11 @@ describe("keeping decks in this browser", () => {
     const saved = saveDeck({ ...blankDeck(), name: "새 덱", main: [1] });
     expect(saved.code).toMatch(/^[0-9a-z]{8}$/);
     expect(saved.createdAt).toBe("2026-10-13T12:00:00.000Z");
+    expect(saved.updatedAt).toBe("2026-10-13T12:00:00.000Z");
     expect(getDeck(saved.code)).toEqual(saved);
     vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));
     const again = saveDeck({ ...saved, name: "고친 덱" });
-    expect(again).toEqual({ ...saved, name: "고친 덱" });
+    expect(again).toEqual({ ...saved, name: "고친 덱", updatedAt: "2026-10-14T12:00:00.000Z" });
     expect(listDecks().map((d) => d.name)).toEqual(["고친 덱"]);
   });
 
@@ -109,6 +110,11 @@ describe("keeping decks in this browser", () => {
     saveDeck({ ...blankDeck(), name: "나중" });
     saveDeck(first);
     expect(listDecks().map((d) => d.name)).toEqual(["나중", "먼저"]);
+  });
+
+  it("reads a deck saved before the last-saved time as last saved when it was made", () => {
+    expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z" })).toBe("2026-10-13T12:00:00.000Z");
+    expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z", updatedAt: "2026-10-14T01:00:00.000Z" })).toBe("2026-10-14T01:00:00.000Z");
   });
 
   it("finds no deck under an unknown code, nor under new", () => {
