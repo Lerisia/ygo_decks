@@ -93,9 +93,13 @@ export default function DeckListEdit() {
             </p>
           </div>
           {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <div className="mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-4">
+          {/* From lg the search stands beside the zones, as tall as the two of them (참혈 2026-10-14): it fills its cell
+              without making it taller, so the zones alone decide the row's height. */}
+          <div className="mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch lg:gap-4">
             <DeckZones deck={deck} cards={cards} order={order} loading={loading} onRemove={remove} />
-            <CardSearchPanel deck={deck} cards={cards} onPick={pick} notice={notice} ready={!loading} />
+            <div className="lg:relative">
+              <CardSearchPanel deck={deck} cards={cards} onPick={pick} notice={notice} ready={!loading} />
+            </div>
           </div>
         </>
       ) : (

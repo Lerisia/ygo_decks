@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import SearchForm from "@/components/SearchForm";
 import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
 import { COPIES_MAX, type DeckDraft, type DeckZone, copiesOf } from "@/lib/deckDrafts";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { DeckCardFace } from "./DeckZones";
 
 // Below lg the results are one row that scrolls sideways (a card 64px wide on a phone, 72px on a tablet, the row a
@@ -26,7 +27,8 @@ function TileSkeleton() {
  *  and tokens, are dimmed. notice: a short line on why a card didn't go in. From lg it stands to the right of the
  *  deck, as tall as the screen. On phones and tablets it floats over the bottom of the deck (참혈 2026-10-13): a
  *  rounded see-through card, the box at its bottom and the results one row above it, the row folded away until
- *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. */
+ *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. With the keyboard up it
+ *  rides on top of the keyboard, and pressing the box does not scroll the page (참혈 2026-10-14). */
 export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
@@ -45,6 +47,38 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
   const [error, setError] = useState("");
   const request = useRef(0);
   const results = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLInputElement>(null);
+  const keyboard = useKeyboardInset();
+
+  // A tap on the box lets the browser scroll the page to it, which below lg throws the deck far down. The tap is
+  // taken over and the box focused without that scroll; a swipe that starts on the box stays a swipe.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let start: { x: number; y: number } | null = null;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      start = t ? { x: t.clientX, y: t.clientY } : null;
+    };
+    const onEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      const tap = start && t && Math.abs(t.clientX - start.x) < 10 && Math.abs(t.clientY - start.y) < 10;
+      if (!tap || document.activeElement === el || window.matchMedia("(min-width: 1024px)").matches) return;
+      e.preventDefault();
+      const y = window.scrollY;
+      el.focus({ preventScroll: true });
+      // and if the browser still moves the page while the keyboard comes up, it goes back
+      const back = () => Math.abs(window.scrollY - y) > 1 && window.scrollTo(0, y);
+      requestAnimationFrame(back);
+      window.setTimeout(back, 350);
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchend", onEnd, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, []);
   const filters: CardFilters = { ...EMPTY_FILTERS, q, sort: "new" };
   const noMatch = !loading && total === 0;
 
@@ -93,13 +127,16 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
   return (
     <aside
       aria-label="카드 검색"
-      className="fixed inset-x-3 sm:inset-x-4 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
-        lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-4 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:h-[calc(100svh-2rem)] lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3"
+      // above the keyboard while it is up, else above the bottom edge (and the home bar)
+      style={{ "--float-bottom": keyboard ? `${keyboard + 8}px` : "calc(0.75rem + env(safe-area-inset-bottom))" } as CSSProperties}
+      className="fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
+        lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3"
     >
       <h2 className="hidden lg:block m-0 text-base font-bold">카드 검색</h2>
       <div className="order-3 lg:order-none lg:mt-2">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
           <Input
+            ref={box}
             placeholder="카드 이름 검색 (한국어·일본어·영어·초성)"
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}

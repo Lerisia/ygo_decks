@@ -339,3 +339,30 @@ button:focus-visible {
     height: clamp(1.5rem, min(22cqw, var(--row) * 0.74), 3rem);
   }
 }
+
+/* A deck list's zones (덱 리스트): Master Duel's close grid, its columns and gap as variables, so a zone being built can
+   keep room for --rows rows of cards before any is in (참혈 2026-10-14). A card is (row width − gaps) / columns wide and
+   1024/704 of that tall. */
+.deck-zone {
+  container-type: inline-size;
+  --cols: 5;
+  --gap: 0.25rem;
+}
+@media (min-width: 640px) {
+  .deck-zone { --cols: 6; --gap: 0.375rem; }
+}
+@media (min-width: 768px) {
+  .deck-zone { --cols: 8; }
+}
+@media (min-width: 1024px) {
+  .deck-zone { --cols: 10; }
+}
+.deck-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: var(--gap);
+  align-content: start;
+}
+.deck-zone-reserve {
+  min-height: calc(var(--rows) * (100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) * 1024 / 704 + (var(--rows) - 1) * var(--gap));
+}

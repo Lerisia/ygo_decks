@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, sortedZone } from "@/lib/deckDrafts";
 
-// close together, as Master Duel lays out a deck
-const GRID = "grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 sm:gap-1.5";
+// While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
+// deck two on phones and tablets and three from lg, the extra deck one (deck-zone-reserve in index.css).
+const RESERVE: Record<DeckZone, string> = { main: "[--rows:2] lg:[--rows:3]", extra: "[--rows:1]" };
 const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
 
 /** A card's picture as the card book draws it, its 금제 in the corner. */
@@ -30,12 +31,13 @@ export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: 
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, cards, loading, onRemove }: {
+function Zone({ zone, ids, cards, loading, onRemove, reserve }: {
   zone: DeckZone;
   ids: number[];
   cards: Map<number, CardListItem>;
   loading: boolean;
   onRemove?: (id: number) => void;
+  reserve: boolean;
 }) {
   const counts = kindCounts(ids, cards);
   return (
@@ -60,10 +62,14 @@ function Zone({ zone, ids, cards, loading, onRemove }: {
               </span>
             ))
           )}
+          {/* an empty zone's line still has a baseline, so the header is as tall as with cards in */}
+          {!counts.length && !(loading && ids.length) && "\u200b"}
         </p>
       </header>
+      {/* close together, as Master Duel lays out a deck (deck-zone in index.css) */}
+      <div className={`deck-zone ${reserve ? RESERVE[zone] : ""}`}>
       {ids.length ? (
-        <div className={GRID}>
+        <div className={`deck-zone-grid ${reserve ? "deck-zone-reserve" : ""}`}>
           {ids.map((id, i) => {
             const card = cards.get(id);
             if (!card) {
@@ -88,16 +94,18 @@ function Zone({ zone, ids, cards, loading, onRemove }: {
           })}
         </div>
       ) : (
-        <p className="h-16 flex items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 break-keep">
+        <p className={`${reserve ? "deck-zone-reserve" : "h-16"} m-0 flex items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 break-keep`}>
           {onRemove ? "검색에서 카드를 누르면 여기에 들어갑니다." : "카드가 없습니다."}
         </p>
       )}
+      </div>
     </section>
   );
 }
 
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
- *  built. With onRemove (building) a card pressed comes out; without, a card opens its page. */
+ *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
+ *  card opens its page. */
 export default function DeckZones({ deck, cards, order, loading, onRemove }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
@@ -115,6 +123,7 @@ export default function DeckZones({ deck, cards, order, loading, onRemove }: {
           cards={cards}
           loading={loading}
           onRemove={onRemove && ((id) => onRemove(z, id))}
+          reserve={!!onRemove}
         />
       ))}
     </div>
