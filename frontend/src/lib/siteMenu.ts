@@ -47,6 +47,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       { label: "AI 덱 스캔", to: "/deck-scanner", desc: "사진으로 덱 알아보기" },
       { label: "티어표 만들기", to: "/tier-list-maker", desc: "만들고 이미지로 저장" },
+      { label: "등반 덱 기록", to: "https://mdarchive.pages.dev/#climb", desc: "외부 사이트", external: true },
     ],
   },
   {
@@ -72,7 +73,6 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: "멀티플레이", to: "/multiplayer", desc: "친구들과 함께" },
       { label: "미니게임", to: "/playground", desc: "혼자 즐기는 게임까지 모두" },
       { label: "포인트 상점", to: "/icon-shop", desc: "포인트로 아이콘·프레임 사기" },
-      { label: "등반 덱 기록", to: "https://mdarchive.pages.dev/#climb", desc: "외부 사이트", external: true },
       { label: "대회", to: "", desc: "준비 중", soon: true },
     ],
   },

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { MENU_GROUPS } from "@/lib/siteMenu";
 
-const ICONS: Record<string, string> = { "/deck-scanner": "🪄", "/tier-list-maker": "📊" };
+const ICONS: Record<string, string> = { "/deck-scanner": "🪄", "/tier-list-maker": "📊", "https://mdarchive.pages.dev/#climb": "📜" };
 
 /** 도구: the convenience tools, one tile each (more will join this group). */
 function Tools() {
@@ -16,11 +16,11 @@ function Tools() {
         {tools.map((t) => (
           <button
             key={t.to}
-            onClick={() => navigate(t.to)}
+            onClick={() => (t.external ? window.open(t.to, "_blank", "noopener,noreferrer") : navigate(t.to))}
             className="flex flex-col items-center justify-center p-5 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow hover:shadow-md transition text-center"
           >
             <span className="text-3xl md:text-5xl mb-2">{ICONS[t.to] ?? "🧰"}</span>
-            <span className="font-semibold md:text-lg">{t.label}</span>
+            <span className="font-semibold md:text-lg">{t.label}{t.external && <span className="text-sm text-gray-400"> ↗</span>}</span>
             <span className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">{t.desc}</span>
           </button>
         ))}
