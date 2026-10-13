@@ -114,6 +114,14 @@ class SkillNameRankingTest(TestCase):
         r = self.c.get("/api/solo/names/leaderboard/")
         return [(e["name"], e["count"]) for e in r.data["leaderboard"]], r.data["players"]
 
+    def test_the_board_shows_the_top_ten(self):
+        # 엘리스 2026-10-13: ten rows, not thirty; the count of players is everyone's
+        for i in range(12):
+            self.submit(token=self.token(), nickname=f"플레이어{i}", answers=log(*["여우불", "매혹", "혼령 질주"][: 1 + i % 3]), ip=f"10.0.2.{i}")
+        rows, players = self.board()
+        self.assertEqual((len(rows), players), (10, 12))
+        self.assertEqual([c for _, c in rows], [3] * 4 + [2] * 4 + [1] * 2)
+
     def test_guests_at_one_address_are_one_player(self):
         self.submit(token=self.token(), nickname="부캐1", answers=log("여우불"), ip="10.0.0.7")
         self.submit(token=self.token(), nickname="부캐2", answers=log("여우불", "매혹", "혼령 질주"), ip="10.0.0.7")

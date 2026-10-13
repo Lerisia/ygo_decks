@@ -33,7 +33,7 @@ TURN_GRACE_MS = 1_500     # the page's clock ticks every 100 ms and submits what
 MIN_GAP_MS = 300          # nobody types a name faster
 CLOCK_GRACE_MS = 5_000    # the token is signed a network round trip after the page started its clock
 NICKNAME_MAX = 12
-BOARD_SIZE = 30
+BOARD_SIZE = 10           # the top ten only (엘리스 2026-10-13; it was 30)
 
 
 class GameThrottle(SimpleRateThrottle):
