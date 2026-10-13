@@ -189,12 +189,6 @@ export default function PackDetail() {
           <p className="mt-2 min-h-[20px] text-sm text-red-600 dark:text-red-400" role="status">{notice}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm min-h-[24px]">
-            {tally.packs > 0 && (
-              <>
-                <span className="tabular-nums">이 팩에 쓴 <GemIcon /> <b>{tally.gems.toLocaleString()}</b></span>
-                <span className="tabular-nums">UR <b>{tally.ur}</b> · SR <b>{tally.sr}</b></span>
-              </>
-            )}
             <button type="button" onClick={() => setRates(true)} disabled={!pack} className="ml-auto text-blue-600 dark:text-blue-400 font-semibold hover:underline">
               제공 확률 정보
             </button>
