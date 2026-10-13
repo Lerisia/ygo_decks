@@ -897,8 +897,11 @@ const CSS = `
 .po-cutline { position: absolute; left: -4%; right: -4%; top: 17%; height: 4px; margin-top: -2px; transform-origin: left center; border-radius: 4px; pointer-events: none;
   background: linear-gradient(90deg, rgba(255,255,255,.2), #fff 70%); box-shadow: 0 0 10px 3px rgba(190,230,255,.95), 0 0 26px 8px rgba(110,180,255,.6); transition: transform .08s; }
 .po-cone { position: absolute; left: -75%; right: -75%; bottom: 82%; height: 130%; opacity: 0; pointer-events: none; transform-origin: 50% 100%;
-  clip-path: polygon(41% 100%, 59% 100%, 100% 0, 0 0); background: linear-gradient(to top, rgba(255,255,255,.95), rgba(235,240,255,.45) 45%, transparent 90%); filter: blur(3px); }
-.po-mouth { position: absolute; left: 2%; right: 2%; top: 14%; height: 6%; opacity: 0; border-radius: 40%; background: #fff; filter: blur(5px); pointer-events: none; }
+  clip-path: polygon(30% 100%, 70% 100%, 100% 0, 0 0);   /* from the pack's own width, spreading up (엘리스 10/13) */ background: linear-gradient(to top, rgba(255,255,255,.95), rgba(235,240,255,.45) 45%, transparent 90%); filter: blur(3px); }
+/* the torn edge alight: a flat band of white across the pack's top, as the game's (not a round blob; 엘리스 10/13) */
+.po-mouth { position: absolute; left: 0; right: 0; top: 15.6%; height: 2.8%; opacity: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255,255,255,.35), #fff 10%, #fff 90%, rgba(255,255,255,.35));
+  box-shadow: 0 0 6px 1px rgba(255,255,255,.95), 0 -10px 22px 2px rgba(215,230,255,.55); }
 .po-cut .po-top, .po-pour .po-top, .po-rise .po-top, .po-leave .po-top { animation: po-top-off .5s cubic-bezier(.3,.6,.4,1) forwards; transform-origin: 85% 17%; }
 @keyframes po-top-off { to { transform: translate(18%, -150%) rotate(24deg); opacity: 0; } }
 .po-cut .po-cutline, .po-pour .po-cutline, .po-rise .po-cutline, .po-leave .po-cutline { opacity: 0; transition: opacity .2s; }
