@@ -227,10 +227,9 @@ function Info() {
           </Link>
           <div className="relative -mt-7 md:-mt-9 px-4 md:px-6 pb-5 flex flex-col gap-3">
             <span className="text-xs font-bold tracking-wide text-violet-600 dark:text-violet-400">팩깡 시뮬레이터 · 베타</span>
-            <h2 id="home-packs" className="text-[17px] leading-6 sm:text-2xl md:text-3xl font-extrabold tracking-tight">
-              팩{" "}
-              {show ? <span className="tabular-nums">{show.count.toLocaleString()}</span> : <span className="inline-block w-10 h-6 align-middle rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />}
-              종, 게임과 같은 확률로.
+            {/* 엘리스 2026-10-13 picked the line */}
+            <h2 id="home-packs" className="text-[17px] leading-6 sm:text-2xl md:text-3xl font-extrabold tracking-tight break-keep">
+              마스터 듀얼의 모든 팩을 뽑아 보세요!
             </h2>
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-4 text-[13px] sm:text-sm h-6 md:h-7 overflow-hidden">
               <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mr-0.5 md:mr-1">새로 나온 팩</span>
