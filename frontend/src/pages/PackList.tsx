@@ -27,6 +27,10 @@ const KINDS: { key: "all" | PackKind; label: string }[] = [
   { key: "normal", label: "마스터 팩" },
 ];
 
+// A pack holding other arts or 오버프레임 says so on its cover, the usual pack and each campaign's alike; the line under
+// the name is always its date (엘리스 2026-10-13: the counts once stood there, in place of the date).
+const ART_BADGE = "rounded px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500/95 shadow";
+
 /** 팩깡 시뮬레이터 (엘리스 2026-10-12, the name 10/13): every master, selection and secret pack Master Duel has had, newest first
  *  (the master pack last), by kind, by name or by a pickup card (10/13: the packs whose names match, then those
  *  holding a card that does, with the cards named). */
@@ -154,28 +158,23 @@ export default function PackList() {
                         onClick={(e) => keep(`${p.id}-${p.version ?? 0}`, e.currentTarget)}>
                     <span className="relative block">
                       <PackFront name={p.name} src={p.image} className="w-full rounded-md shadow group-hover:shadow-lg transition" />
-                      {p.period && (
-                        <span className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500/95 shadow">
-                          {p.arts.overframe && !p.arts.new_art ? "오버프레임" : "다른 일러"} {p.featured.length}
+                      {p.arts.new_art + p.arts.overframe > 0 && (
+                        <span className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
+                          {p.arts.new_art > 0 && <span className={ART_BADGE}>다른 일러 {p.arts.new_art}</span>}
+                          {p.arts.overframe > 0 && <span className={ART_BADGE}>오버프레임 {p.arts.overframe}</span>}
                         </span>
                       )}
                     </span>
-                    <span className="mt-1.5 block text-xs sm:text-sm font-semibold leading-snug break-keep line-clamp-2 min-h-[2.5em]">{p.name}</span>
+                    <span className="mt-1.5 block text-xs sm:text-sm font-semibold leading-snug break-keep line-clamp-2 min-h-[2.75em]">{p.name}</span>
                     {hit ? (
                       <span className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 truncate" title={hit.cards.join(", ")}>
                         {hit.cards.join(", ")}{hit.count > hit.cards.length ? ` 외 ${hit.count - hit.cards.length}장` : ""}
                       </span>
-                    ) : p.period ? (
-                      <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 tabular-nums truncate"
-                            title={`${p.period[0]} ~ ${p.period[1]} · ${p.featured.join(", ")}`}>
-                        {p.period[0]}
-                      </span>
-                    ) : special ? (
-                      <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400 truncate">
-                        {[p.arts.new_art && `다른 일러 ${p.arts.new_art}`, p.arts.overframe && `오버프레임 ${p.arts.overframe}`].filter(Boolean).join(" · ")}
-                      </span>
                     ) : (
-                      <span className="block text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">{p.released ?? ""}</span>
+                      <span className="block text-[11px] text-gray-500 dark:text-gray-400 tabular-nums truncate"
+                            title={p.period ? `${p.period[0]} ~ ${p.period[1]} · ${p.featured.join(", ")}` : undefined}>
+                        {p.period ? p.period[0] : p.released ?? ""}
+                      </span>
                     )}
                   </Link>
                 </li>
@@ -184,7 +183,7 @@ export default function PackList() {
             : Array.from({ length: 12 }, (_, i) => (
                 <li key={i} aria-hidden="true">
                   <div className="w-full aspect-[250/512] rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                  <div className="mt-1.5 h-[2.5em] rounded bg-gray-200 dark:bg-gray-700 animate-pulse text-xs sm:text-sm" />
+                  <div className="mt-1.5 h-[2.75em] rounded bg-gray-200 dark:bg-gray-700 animate-pulse text-xs sm:text-sm" />
                   <div className="mt-0.5 h-[14px] w-16 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
                 </li>
               ))}
