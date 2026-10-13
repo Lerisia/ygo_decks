@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from django.test import TestCase
 
+from carddb import display
 from carddb.models import Card, MdArt, MdPrint
 
 from .models import DuchMindWord, DuchMindWordPack
@@ -16,6 +17,9 @@ class WordPackNewCardTest(TestCase):
         card = Card.objects.create(id=4041, category="monster", name_ja="ブラック・マジシャン", name_ko="블랙 매지션", frame="normal")
         MdPrint.objects.create(md_id=4041, card=card)
         MdArt.objects.create(md_print_id=4041, version="common", image="cards/art/common/4041.webp")
+        # the art map is kept per process: another test may have filled it before this art was added
+        display.forget_art()
+        self.addCleanup(display.forget_art)
 
     def test_add_then_read_a_card_by_its_new_id(self):
         url = f"/api/multiplayer/duchmind/packs/{self.pack.id}/add-card/"
