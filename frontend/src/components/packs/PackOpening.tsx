@@ -33,20 +33,32 @@ const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
 const high = (r: Rarity) => r === "SR" || r === "UR";
 const best = (cards: Pulled<PackCard>[]) => cards.reduce<Rarity>((b, c) => (RANK[c.rarity] > RANK[b] ? c.rarity : b), "N");
 
-/** What a pack shows of what it holds, as counted in the game's openings (엘리스 10/13; its server decides, so the odds are
- *  ours): its tier — the gold or rainbow its pack, frame, floor and curtain take — gold for an SR, and for a UR rainbow
- *  only one time in two, gold the other (a UR pack opened under a gold curtain; "SR UR 정직하게 알려주지 않을 건데");
- *  the lightning, two or three strikes every time it is opened, one of them red in an SR / UR pack three times in five
- *  (never in a plain one); Hope tearing it, only for a UR, one time in two, so it never lies; and, face down, an SR /
- *  UR's gold / rainbow back in one pack of two (the others leave them plain), such a card rattling before it turns. */
+/** What a pack shows of what it holds, by what the game's players have found (AppMedia's 확정 연출 page, 2025) and the
+ *  game's openings watched here (엘리스 10/13); the odds are ours, its server deciding:
+ *  - tier: the colour of its floor and of the curtain the cards come out through, which never lies — gold for an SR or
+ *    better (a UR pack one time in two), rainbow only for a UR;
+ *  - aura: the pack itself turning gold or rainbow as it comes on — as its tier, and now and then gold on a pack of N
+ *    and R only (an upgrade is no promise);
+ *  - lightning: one to three bolts each time it is opened, more for an SR or better, the third one red;
+ *  - Hope tearing it: mostly when a card in it comes in a shine or royal finish, whatever its rarity (엘리스: "호프
+ *    나왔는데 쪽박일 때도 많았다");
+ *  - an SR / UR's gold / blue-purple back in one pack of two (a promise); and every SR / UR shakes before it turns. */
 type Tier = "N" | "SR" | "UR";
-type Hints = { tier: Tier; strikes: number; red: number; monster: boolean; marked: boolean };
+type Hints = { tier: Tier; aura: Tier; strikes: number; red: number; monster: boolean; marked: boolean };
+const pick = (weights: number[]) => {
+  let x = Math.random();
+  for (let i = 0; i < weights.length; i++) if ((x -= weights[i]) < 0) return i;
+  return weights.length - 1;
+};
 const hintsFor = (cards: Pulled<PackCard>[]): Hints => {
   const top = best(cards);
   const rare = top === "SR" || top === "UR";
   const tier: Tier = top === "UR" && Math.random() < 0.5 ? "UR" : rare ? "SR" : "N";
-  return { tier, strikes: Math.random() < 0.5 ? 2 : 3, red: rare && Math.random() < 0.6 ? 1 : -1,
-           monster: top === "UR" && Math.random() < 0.5, marked: rare && Math.random() < 0.5 };
+  const aura: Tier = rare ? tier : Math.random() < 0.06 ? "SR" : "N";
+  const strikes = 1 + pick(rare ? [0.25, 0.4, 0.35] : [0.6, 0.35, 0.05]);
+  const finish = cards.some((c) => c.finish !== "basic");
+  return { tier, aura, strikes, red: strikes === 3 ? 2 : -1, monster: Math.random() < (finish ? 0.15 : 0.02),
+           marked: rare && Math.random() < 0.5 };
 };
 const frameOf = (tier: Tier) => (tier === "UR" ? "po-frame-ur" : tier === "SR" ? "po-frame-sr" : "");
 
@@ -307,19 +319,18 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   useEffect(() => {
     if (!framed) playPackSound("02_packout_1pack", 0.8);
     const t = 420;
-    if (hints.tier !== "N") {
-      if (framed) at(t, () => setFloor(true));
-      else {
-        // the upgrade: a sheen runs over it, it draws in and springs out as its gold or rainbow pack
-        // the game's upgrade sound (proc_rare is a finish's, heard as a shine card turns in its openings), from just
-        // before its peak so the peak meets the flash
-        at(t, () => {
-          setUpgrading(true);
-          playPackSound(hints.tier === "UR" ? "upgrad_01_ur" : "upgrad_01", 0.75, 1, hints.tier === "UR" ? 2.675 : 1.24);
-        });
-        at(t + 330, () => { setTier(hints.tier); setFloor(true); flash(false); });
-        at(t + 800, () => setUpgrading(false));
-      }
+    const shown = framed ? hints.tier : "N";   // as it comes on: after the ten laid out, as it was there
+    if (framed && hints.tier !== "N") at(t, () => setFloor(true));
+    if (hints.aura !== shown) {
+      // the upgrade: a sheen runs over it, it draws in and springs out as its gold or rainbow pack, to the game's upgrade
+      // sound from just before its peak so the peak meets the flash (proc_rare is a finish's); the floor lights only for
+      // a real one
+      at(t, () => {
+        setUpgrading(true);
+        playPackSound(hints.aura === "UR" ? "upgrad_01_ur" : "upgrad_01", 0.75, 1, hints.aura === "UR" ? 2.675 : 1.24);
+      });
+      at(t + 330, () => { setTier(hints.aura); if (hints.tier !== "N") setFloor(true); flash(false); });
+      at(t + 800, () => setUpgrading(false));
     }
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -328,7 +339,7 @@ function PackScene({ pack, hints, framed, fx, flash, onOpened }: {
   const cut = () => {
     if (phase !== "stand") return;
     unlockPackSound();
-    setTier(hints.tier);
+    setTier(hints.aura);
     setLine(1);
     setPhase("strike");
     for (let k = 0; k < hints.strikes; k++) at(T.strikeAt + k * 167, () => strike(k));
@@ -564,11 +575,12 @@ function Cards({ cards, marked, fresh, finishes, fx, flash, shake, onOpen, last,
     }, delay + 120 + T.premium);
   }, [cards, fx, flash]);
 
-  /** How long a card rattles (and a UR then waits) before it turns: only an SR / UR whose back showed it. */
+  /** How long a card rattles (and a UR then waits) before it turns: every SR / UR (the game's openings: its shake sound
+   *  before each SR / UR, its back marked or not; a shake promises one). */
   const rattleOf = useCallback((i: number) => {
     const r = cards[i].rarity;
-    return marked && high(r) ? T.rattle + T.rattleWait[r as "SR" | "UR"] : 0;
-  }, [cards, marked]);
+    return high(r) ? T.rattle + T.rattleWait[r as "SR" | "UR"] : 0;
+  }, [cards]);
 
   const flip = useCallback((i: number, dir: 1 | -1, start = 0) => {
     if (turnedRef.current[i]) return;
