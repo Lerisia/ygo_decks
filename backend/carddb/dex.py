@@ -21,6 +21,7 @@ from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_over
 from .models import Banlist, BanlistEntry, Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
 PAGE_SIZE = 60
+IDS_MAX = 200   # ids=…: a deck's cards asked at once (90 at most), all on one page
 
 ATTRIBUTES = {"light": "빛", "dark": "어둠", "water": "물", "fire": "화염", "earth": "땅", "wind": "바람", "divine": "신"}
 # Master Duel's finish shaders draw the attribute icon from an atlas: 光 闇 水 炎 / 地 風 神 魔 / 罠
@@ -244,9 +245,20 @@ def deck_card_counts(deck_id):
     return {**counts, "by_card": True} if by_card else counts
 
 
+def _asked_ids(p):
+    """ids=1,2,3 → {1, 2, 3} (the first IDS_MAX), or None when not asked."""
+    if not p.get("ids"):
+        return None
+    ids = dict.fromkeys(int(x) for x in str(p["ids"]).split(",") if x.strip().isdigit())
+    return set(list(ids)[:IDS_MAX])
+
+
 def _keep(p):
     """The filters of the query string as one test on an index row."""
     tests = []
+    ids = _asked_ids(p)
+    if ids is not None:
+        tests.append(lambda r, v=ids: r.id in v)
     if p.get("category") in CATEGORIES:
         tests.append(lambda r, v=p["category"]: r.category == v)
     frame = p.get("frame")
@@ -334,7 +346,10 @@ def cards(request):
         page = max(1, int(p.get("page") or 1))
     except ValueError:
         page = 1
-    chunk = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
+    if _asked_ids(p) is not None:   # a deck's cards (덱 구축, 참혈 2026-10-13): all of them at once
+        page, chunk, has_more = 1, rows, False
+    else:
+        chunk, has_more = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE], page * PAGE_SIZE < len(rows)
     media = settings.MEDIA_URL
     extra = {}
     if str(p.get("group", "")).isdigit():   # a group's list tells how many members and supporters it has
@@ -356,8 +371,9 @@ def cards(request):
         "results": [{"id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
-                     "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban} for r in chunk],
-        "total": len(rows), "page": page, "has_more": page * PAGE_SIZE < len(rows),
+                     "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban,
+                     "category": r.category, "frame": r.frame} for r in chunk],
+        "total": len(rows), "page": page, "has_more": has_more,
     })
 
 

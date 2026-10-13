@@ -947,6 +947,33 @@ class CardDexApiTest(TestCase):
         rarity = {r["id"]: r["rarity"] for r in self.get()["results"]}
         self.assertEqual((rarity[1], rarity[2]), ("SR", "UR"))
 
+    def test_list_gives_each_cards_category_and_frame(self):
+        # what a deck list counts its cards by and sorts them into the main or extra deck with (덱 구축, 참혈 10/13)
+        rows = {r["id"]: (r["category"], r["frame"]) for r in self.get()["results"]}
+        self.assertEqual(rows[1], ("monster", "normal"))
+        self.assertEqual(rows[4], ("spell", "spell"))
+        self.assertEqual(rows[5], ("monster", "effect_pendulum"))
+        self.assertEqual(rows[6], ("monster", "link"))
+
+    def test_ids_gives_those_cards_whole_in_default_order(self):
+        # a deck's cards in one go (덱 구축, 참혈 10/13): only those, all on one page, in the 디폴트 순; repeated ids,
+        # unknown ones and cards not on the site are let be
+        body = self.get(ids="4,6,1,6,7,8,999,x")
+        self.assertEqual([r["id"] for r in body["results"]], [1, 6, 4])
+        self.assertEqual((body["total"], body["page"], body["has_more"]), (3, 1, False))
+        self.assertEqual([r["id"] for r in self.get(ids="1,4,6", category="monster")["results"]], [1, 6])
+        self.assertEqual(self.get(ids="x")["results"], [])
+        for i in range(100, 170):
+            self.card(i, f"카드 {i}")
+        body = self.get(ids=",".join(str(i) for i in range(100, 170)), page=2)
+        self.assertEqual((len(body["results"]), body["page"], body["has_more"]), (70, 1, False))
+
+    def test_ids_are_capped(self):
+        from unittest.mock import patch
+        from . import dex
+        with patch.object(dex, "IDS_MAX", 2):
+            self.assertEqual([r["id"] for r in self.get(ids="4,2,1")["results"]], [2, 4])
+
     def test_newest_goes_by_the_day_a_card_came_to_master_duel(self):
         MdPrint.objects.filter(md_id=1).update(first_seen=date(2026, 9, 1))   # an old card, newly in Master Duel
         self.assertEqual(self.ids()[:2], [1, 4])
