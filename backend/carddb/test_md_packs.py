@@ -349,6 +349,13 @@ Zeta (Master Duel); Rare // @Notes::Added on May 9, 2025. Removed on November 7,
         out, p, versions = self.sync()
         self.assertEqual((out["unresolved"], versions[0][3]), ([], [4, 8]))
 
+    def test_an_older_lineup_from_the_day_it_sold_plain(self):
+        # a campaign from the day the cards changed: that lineup without the arts sold from when it ended (엘리스 10/13:
+        # 마술의 탐구자들's lineup of 2025-09-10 sold plain from 10/28)
+        out, p, versions = self.sync({20: {"spans": [("2025-05-09", "2025-06-01")], "source": ""}})
+        self.assertEqual(versions[1:3], [("2025-05-09", "2025-06-01", {"2": 20}, [4], {"5": "N", "6": "R"}, "03_1"),
+                                         ("2025-06-01", "2025-11-07", {}, [4], {"5": "N", "6": "R"}, "03_1")])
+
     def test_a_lineup_sold_only_while_a_campaign_ran(self):
         # 엘리스 10/13: 챌린저즈 컬렉션's cards changed on 6/4, the day its 오버프레임 came, which ran till the pack ended;
         # today's lineup was never sold without it

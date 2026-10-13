@@ -545,10 +545,15 @@ def sync(sets, cards, pack_map=None, campaigns=None, master=None, lineups=None):
                 rarity, amount = wanted[sid].pop(base)
                 wanted[sid][art_id] = (prints[art_id].rarity or rarity, amount)
             del versions[(sid, start, end)]
-    # each lineup sold before today's
+    # each lineup sold before today's, from the day it first sold without a campaign's arts; none when it never did
+    # (a campaign from the day the cards changed, 엘리스 10/13: 마술의 탐구자들's lineup of 2025-09-10 sold plain from 10/28)
     for sid, ps in periods.items():
         for (a, _), (b, _) in zip(ps, ps[1:]):
-            versions.setdefault((sid, a, b), {})
+            for _, start, end in sorted(k for k, swaps in versions.items() if k[0] == sid and swaps):
+                if start <= a < end:
+                    a = end
+            if a < b:
+                versions.setdefault((sid, a, b), {})
     # the usual pack's cover: the latest campaign's when its art is in the usual pack, else the usual one
     covers = {}
     for sid, game in pack_map.items():
