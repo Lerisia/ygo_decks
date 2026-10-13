@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PLogo from "@/components/PLogo";
-import { isAdmin } from "@/api/accountApi";
 
 // Every game sits on this page (특이점 2026-10-13; they used to sit on a 솔로 플레이 page): 멀티플레이 first as one
 // tile for its room list, 팩깡 시뮬레이터 right after it, then the 싱글 플레이 games, untagged; the other features
@@ -13,12 +11,11 @@ type Tile = {
   desc: string;
   rewardBadge?: boolean;
   beta?: boolean;
-  adminOnly?: boolean;
 };
 
 const tiles: Tile[] = [
   { to: "/multiplayer", icon: "🎮", title: "멀티플레이", desc: "친구들과 함께 즐기는 다양한 미니게임", rewardBadge: true },
-  { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", beta: true, adminOnly: true },
+  { to: "/packs", icon: "🎴", title: "팩깡 시뮬레이터", desc: "게임과 같은 확률로 팩 열기", beta: true },   // open to all (엘리스 10/13)
   { to: "/card-quiz", icon: "🐤", title: "화질구지 퀴즈", desc: "저화질 일러스트 맞히기", rewardBadge: true },
   { to: "/solo-duchmind", icon: "🎨", title: "듀치마인드", desc: "그리고, 맞히고", rewardBadge: true },
   { to: "/solo-twenty", icon: "🧩", title: "딱무고개", desc: "20개 질문으로 카드 맞히기", rewardBadge: true },
@@ -28,13 +25,6 @@ const tiles: Tile[] = [
 
 function Playground() {
   const navigate = useNavigate();
-  const [isAdminUser, setIsAdminUser] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    isAdmin().then((flag) => { if (!cancelled) setIsAdminUser(!!flag); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   return (
     <div className="min-h-screen px-4 py-6 md:pb-10 max-w-lg md:max-w-2xl mx-auto">
@@ -42,7 +32,7 @@ function Playground() {
       <p className="text-center text-gray-500 dark:text-gray-400 mb-6 md:mb-8 text-sm md:text-base">다양한 미니게임을 즐겨보세요!</p>
 
       <div className="grid grid-cols-3 gap-2.5 md:gap-5">
-        {tiles.filter((g) => !g.adminOnly || isAdminUser).map((g) => (
+        {tiles.map((g) => (
           <button
             key={g.to}
             onClick={() => navigate(g.to)}

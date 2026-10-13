@@ -8,9 +8,10 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.http import Http404
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import SimpleRateThrottle
 
 from user.gems import NotEnoughGems, change_gems
 
@@ -254,12 +255,22 @@ def _tally_row(t):
 _rng = random.SystemRandom().random
 
 
+class OpenThrottle(SimpleRateThrottle):
+    """Per address, members and guests alike: far more packs than a person opens, far fewer than a script wants."""
+    rate = "600/hour"
+
+    def get_cache_key(self, request, view):
+        return f"throttle_pack_open_{self.get_ident(request)}"
+
+
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+@throttle_classes([OpenThrottle])
 def open_pack(request, pack_id):
-    """Buy one or ten packs with gems (100 a pack): the server draws them (pack_draw) and keeps the pack's tally (and
-    the UR owed after ten without one); the cards, the gems left and the tally. The cards are not kept: the beta opens
-    packs for the thrill alone (엘리스 2026-10-13)."""
+    """Buy one or ten packs with gems (GEMS_PER_PACK a pack): the server draws them (pack_draw) and keeps a member's
+    tally of the pack (and the UR owed after ten without one); the cards, the gems left and the tally. The cards are
+    not kept: the beta opens packs for the thrill alone, free and open to guests (엘리스 2026-10-13). A guest's tally
+    lives in their browser, which says whether a UR is owed (`owed`); theirs is this opening's alone."""
     try:
         count = int(request.data.get("count", 1))
     except (TypeError, ValueError):
@@ -284,6 +295,17 @@ def open_pack(request, pack_id):
     if not cards:
         return Response({"error": "이 팩에는 열 수 있는 카드가 없습니다."}, status=400)
     user = request.user
+    if not user.is_authenticated:
+        if GEMS_PER_PACK:
+            return Response({"error": "로그인하면 팩을 열 수 있습니다."}, status=401)
+        owed = request.data.get("owed") is True
+        packs, owed = ([draw_pack(pools, _rng)], owed) if count == 1 else draw_ten(pools, owed, _rng)
+        flat = [c for p in packs for c in p]
+        return Response({
+            "packs": [[{**c["card"], "rarity": c["rarity"], "finish": c["finish"]} for c in p] for p in packs],
+            "gems": 0, "tally": {"gems": 0, "packs": count, "ur": sum(c["rarity"] == "UR" for c in flat),
+                                 "sr": sum(c["rarity"] == "SR" for c in flat), "owed": owed},
+        })
     with transaction.atomic():
         tally, _ = PackTally.objects.get_or_create(user=user, pack_id=pack_id)
         gems = user.gems

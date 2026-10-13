@@ -100,9 +100,20 @@ class OpenTest(TestCase):
         with mock.patch.object(packs, "_rng", rng):
             return self.client.post(f"/api/carddb/packs/{pack.id}/open/", {"count": count}, format="json")
 
-    def test_guests_sign_in_first(self):
+    def test_guests_open_packs_too(self):
+        # 엘리스 2026-10-13: open to all; a guest's tally lives in their browser, which says whether a UR is owed
+        with mock.patch.object(packs, "_rng", always("N")):
+            r = self.client.post(f"/api/carddb/packs/{self.master.id}/open/", {"count": 10}, format="json")
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual((r.json()["gems"], r.json()["tally"]), (0, {"gems": 0, "packs": 10, "ur": 0, "sr": 1, "owed": True}))
+            r = self.client.post(f"/api/carddb/packs/{self.master.id}/open/", {"count": 10, "owed": True}, format="json").json()
+        self.assertEqual((r["packs"][9][7]["rarity"], r["tally"]["owed"]), ("UR", False))
+        self.assertFalse(PackTally.objects.exists())
+
+    @mock.patch.object(packs, "GEMS_PER_PACK", 100)
+    def test_guests_sign_in_when_packs_cost_gems(self):
         r = self.client.post(f"/api/carddb/packs/{self.master.id}/open/", {"count": 1}, format="json")
-        self.assertIn(r.status_code, (401, 403))
+        self.assertEqual(r.status_code, 401)
 
     def test_packs_are_free_for_now(self):
         # 엘리스 2026-10-13: 0 gems a pack while the beta is for the thrill alone; still signed in only

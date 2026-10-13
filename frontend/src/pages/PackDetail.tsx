@@ -4,7 +4,7 @@ import PackFront from "@/components/packs/PackFront";
 import PackOpening from "@/components/packs/PackOpening";
 import { GemIcon, PackListLink, PackTopBar } from "@/components/packs/Gem";
 import { setGems } from "@/lib/gems";
-import { type PackCard, type PackDetail as Pack, type PackMine, type PackVersion, getPack, getPackMine, openPack } from "@/api/packApi";
+import { type PackCard, type PackDetail as Pack, type PackMine, type PackTally, type PackVersion, getPack, getPackMine, openPack } from "@/api/packApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { unlockPackSound } from "@/lib/packSound";
 import { type Pool, type Pulled, type Rarity, GEMS_PER_PACK, RATES } from "@/utils/packDraw";
@@ -14,6 +14,21 @@ const RARITIES: Rarity[] = ["UR", "SR", "R", "N"];
 const STEP = 60;
 const pct = (x: number) => `${+(x * 100).toFixed(3)}%`;
 const NO_TALLY = { gems: 0, packs: 0, ur: 0, sr: 0, owed: false };
+
+// a guest's tally of a pack, kept in their browser (엘리스 10/13: open to guests): what they opened and whether ten are owed a UR
+const guestKey = (id: number) => `pack_tally_${id}`;
+const readGuestTally = (id: number): PackTally => {
+  try {
+    return { ...NO_TALLY, ...JSON.parse(localStorage.getItem(guestKey(id)) ?? "{}") };
+  } catch {
+    return NO_TALLY;
+  }
+};
+const keepGuestTally = (id: number, tally: PackTally) => {
+  try {
+    localStorage.setItem(guestKey(id), JSON.stringify(tally));
+  } catch { /* the tally lasts the visit */ }
+};
 
 /** The pack as a version sold it: its cover then, and its lineup then, with the cards of a campaign in their art. */
 const asSold = (pack: Pack, version: PackVersion | null): Pack => {
@@ -78,10 +93,10 @@ export default function PackDetail() {
       .catch(() => setError(true));
     getPackMine(id)
       .then((m) => {
-        setMine(m);
+        setMine(m.signed_in ? m : { ...m, tally: readGuestTally(id) });
         if (m.signed_in) setGems(m.gems);
       })
-      .catch(() => setMine({ signed_in: isAuthenticated(), gems: 0, tally: NO_TALLY }));
+      .catch(() => setMine({ signed_in: isAuthenticated(), gems: 0, tally: isAuthenticated() ? NO_TALLY : readGuestTally(id) }));
   }, [id]);
 
   const tally = mine?.tally ?? NO_TALLY;
@@ -92,7 +107,7 @@ export default function PackDetail() {
 
   const open = async (count: 1 | 10) => {
     if (!pack || busy) return;
-    if (!mine?.signed_in) {
+    if (!mine?.signed_in && GEMS_PER_PACK) {
       navigate("/login");
       return;
     }
@@ -104,12 +119,19 @@ export default function PackDetail() {
     setBusy(true);
     setNotice("");
     try {
-      const r = await openPack(id, count, version?.id ?? null);
+      const r = await openPack(id, count, version?.id ?? null, mine?.signed_in ? undefined : tally.owed);
       const packs = r.packs.map((p) => p.map((c) => ({
         card: { print: c.print, card: c.card, name: c.name, rarity: c.rarity, thumb: c.thumb, face: c.face }, rarity: c.rarity, finish: c.finish,
       })));
-      setMine({ signed_in: true, gems: r.gems, tally: r.tally });
-      setGems(r.gems);
+      if (mine?.signed_in) {
+        setMine({ signed_in: true, gems: r.gems, tally: r.tally });
+        setGems(r.gems);
+      } else {
+        const next = { gems: tally.gems + r.tally.gems, packs: tally.packs + r.tally.packs, ur: tally.ur + r.tally.ur,
+                       sr: tally.sr + r.tally.sr, owed: r.tally.owed };
+        keepGuestTally(id, next);
+        setMine({ signed_in: false, gems: 0, tally: next });
+      }
       setRun({ key: Date.now(), packs });
     } catch (e) {
       const err = e as Error & { gems?: number };
@@ -143,13 +165,7 @@ export default function PackDetail() {
               <span className="h-4 text-xs font-bold text-blue-600 dark:text-blue-400">{pack ? KIND_LABEL[pack.kind] : ""}</span>
               <h1 className="text-xl sm:text-3xl font-extrabold leading-tight break-keep min-h-[1.25em]">{pack?.name ?? ""}</h1>
               <p className="h-5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">{pack?.released ? `${pack.released} 출시` : ""}</p>
-              <p className="h-5 text-sm tabular-nums">
-                {mine !== null && !mine.signed_in ? (
-                  <Link to="/login" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">로그인하면 팩을 열 수 있습니다</Link>
-                ) : !version && pack?.changed ? (
-                  <span className="text-gray-500 dark:text-gray-400">{pack.changed} 구성 변경</span>
-                ) : ""}
-              </p>
+              <p className="h-5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">{!version && pack?.changed ? `${pack.changed} 구성 변경` : ""}</p>
               <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button type="button" disabled={!can(1)} onClick={() => open(1)}
                         className="h-12 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold">

@@ -75,10 +75,11 @@ export async function getPackMine(id: number): Promise<PackMine> {
   return r.json();
 }
 
-/** Buy one or ten packs with gems; the server draws them. */
-export async function openPack(id: number, count: 1 | 10, version: number | null = null): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
+/** Buy one or ten packs with gems; the server draws them. A guest says whether their ten are owed a UR (their tally
+ *  lives in their browser); the tally that comes back is then this opening's alone. */
+export async function openPack(id: number, count: 1 | 10, version: number | null = null, owed?: boolean): Promise<{ packs: OpenedCard[][]; gems: number; tally: PackTally }> {
   const r = await fetch(`/api/carddb/packs/${id}/open/`, {
-    method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count, version }),
+    method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ count, version, owed }),
   });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || body.detail || `HTTP ${r.status}`), { gems: body.gems });
