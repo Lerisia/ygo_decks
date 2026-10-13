@@ -2,12 +2,14 @@
 the server (pack_draw), for the thrill alone: the cards are not kept (엘리스 10/13)."""
 import os
 import random
+from datetime import timedelta
 from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.http import Http404
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -36,7 +38,12 @@ def _key():
         pictures = os.stat(os.path.join(settings.MEDIA_ROOT, PACK_IMAGE_DIR)).st_mtime
     except OSError:
         pictures = None
-    return (MdPack.objects.count(), agg["n"], agg["last"], versions["n"], versions["last"], versions["at"], pictures)
+    return (MdPack.objects.count(), agg["n"], agg["last"], versions["n"], versions["last"], versions["at"], pictures,
+            _today())
+
+
+def _today():
+    return (timezone.localtime() - timedelta(hours=3)).date()   # Master Duel's day turns at 03:00
 
 
 def _fresh():
@@ -84,16 +91,28 @@ def packs(request):
         usual = defaultdict(set)
         for pack_id, md_id in MdPackCard.objects.filter(md_print__is_alt_art=True).values_list("pack_id", "md_print_id"):
             usual[pack_id].add(md_id)
+        rows = list(rows)
+        # each campaign's version and each older lineup of a pack shows as a pack of its own, at the days it was sold,
+        # under its cover then (엘리스 10/13: "표지별로 다른 카드팩마냥")
+        versions = list(MdPackVersion.objects.filter(pack_id__in=[p.id for p in rows]).select_related("pack"))
+        # today's lineup came in a campaign's art from the day it began: the usual pack dates from the day it first
+        # sold without, and waits out a campaign still running (엘리스 10/13)
+        dressed = defaultdict(list)
+        for v in versions:
+            if v.swaps and not v.missing and not v.extra:
+                dressed[v.pack_id].append((v.start, v.end))
         listed, by_id = [], {}
         for p in rows:
             row = by_id[p.id] = {**_row(p, {r: getattr(p, r) for r in rarities}), "version": None, "period": None,
                                  "featured": [], "arts": count(usual[p.id])}
-            if p.changed:
-                row["released"] = p.changed.isoformat()
-            listed.append(row)
-        # each campaign's version of a pack shows as a pack of its own, at the days it was sold, under its cover then
-        # (엘리스 10/13: "표지별로 다른 카드팩마냥")
-        versions = list(MdPackVersion.objects.filter(pack_id__in=by_id).select_related("pack"))
+            since = p.changed or p.released
+            for start, end in sorted(dressed[p.id]):
+                if since and start <= since < end:
+                    since = end
+            if since:
+                row["released"] = since.isoformat()
+            if not since or since <= _today():
+                listed.append(row)
         names = {m.md_id: display_name(m.card) for m in MdPrint.objects.filter(
             md_id__in={a for v in versions for a in v.swaps.values()}).select_related("card")}
         held = dict(((pack_id, md_id), rarity) for pack_id, md_id, rarity in MdPackCard.objects.filter(

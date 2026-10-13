@@ -208,6 +208,21 @@ class OpenTest(TestCase):
         self.assertEqual(listed, [(self.secret.id, v.id, "2026-02-05", ["2026-02-05", "2026-04-09"], ["카드203"]),
                                   (self.secret.id, None, None, None, [])])
 
+    def test_the_usual_pack_from_the_day_it_sold_plain(self):
+        # 엘리스 10/13: a campaign from the day the cards changed: the usual pack's tile dates from when it ended, and
+        # waits out one still running
+        MdPrint.objects.create(md_id=2030, card_id=203, is_alt_art=True, rarity="UR")
+        open(os.path.join(self.media, "cards/face_thumb/2030.webp"), "wb").close()
+        MdPack.objects.filter(pk=self.secret.pk).update(released="2022-01-19", changed="2026-08-05")
+        v = MdPackVersion.objects.create(pack=self.secret, start="2026-08-05", end="2026-10-06", swaps={"203": 2030})
+        MdPackVersion.objects.create(pack=self.secret, start="2022-01-19", end="2026-08-05", missing=[203])   # an older lineup
+        listed = lambda: [(p["version"], p["released"]) for p in self.client.get("/api/carddb/packs/").json()["packs"]
+                          if p["id"] == self.secret.id]
+        self.assertEqual(listed(), [(None, "2026-10-06"), (v.id, "2026-08-05"), (v.id + 1, "2022-01-19")])
+        v.end = "2099-01-01"
+        v.save()
+        self.assertEqual([x for x, _ in listed()], [v.id, v.id + 1])
+
     def test_an_older_lineup(self):
         # sold until 2026-06-04 without 203 (added then) and with 299 (removed then) (엘리스 10/13)
         c = Card.objects.create(id=299, category="spell", name_ja="299", name_ko="카드299", frame="spell")
