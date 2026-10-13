@@ -256,10 +256,12 @@ def open_pack(request, pack_id):
     user = request.user
     with transaction.atomic():
         tally, _ = PackTally.objects.get_or_create(user=user, pack_id=pack_id)
-        try:
-            gems = change_gems(user, -GEMS_PER_PACK * count, kind="pack_purchase", note=f"{row['name']} {count}팩")
-        except NotEnoughGems as e:
-            return Response({"error": "젬이 부족합니다.", "gems": e.held}, status=400)
+        gems = user.gems
+        if GEMS_PER_PACK:
+            try:
+                gems = change_gems(user, -GEMS_PER_PACK * count, kind="pack_purchase", note=f"{row['name']} {count}팩")
+            except NotEnoughGems as e:
+                return Response({"error": "젬이 부족합니다.", "gems": e.held}, status=400)
         if count == 1:
             packs, owed = [draw_pack(pools, _rng)], tally.owed
         else:

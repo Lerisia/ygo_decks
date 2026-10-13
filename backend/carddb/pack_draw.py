@@ -11,7 +11,7 @@ TENTH = {"UR": 0.2, "SR": 0.8}                                # card 8 of the te
 OWED = {"UR": 1.0}                                            # after ten without a UR
 FINISH = {"high": {"royal": 0.01, "shine": 0.09}, "low": {"royal": 0.0, "shine": 0.1}}
 PACK_SIZE = 8
-GEMS_PER_PACK = 100
+GEMS_PER_PACK = 0   # 100 in the game; free while the beta is for the thrill alone (엘리스 10/13)
 
 
 def rarity_of(odds, pool, x):

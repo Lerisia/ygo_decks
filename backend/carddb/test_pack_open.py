@@ -8,7 +8,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from user.gems import change_gems
-from user.models import User
+from user.models import GemTransaction, User
 
 from . import pack_draw, packs
 from .models import Card, MdPack, MdPackCard, MdPackVersion, MdPrint, PackTally
@@ -104,6 +104,17 @@ class OpenTest(TestCase):
         r = self.client.post(f"/api/carddb/packs/{self.master.id}/open/", {"count": 1}, format="json")
         self.assertIn(r.status_code, (401, 403))
 
+    def test_packs_are_free_for_now(self):
+        # 엘리스 2026-10-13: 0 gems a pack while the beta is for the thrill alone; still signed in only
+        self.client.force_authenticate(self.user)
+        r = self.open(self.master, 10, always("N"))
+        self.assertEqual(r.status_code, 200)
+        r = r.json()
+        self.assertEqual((len(r["packs"]), r["gems"]), (10, 0))
+        self.assertEqual(r["tally"], {"gems": 0, "packs": 10, "ur": 0, "sr": 1, "owed": True})
+        self.assertFalse(GemTransaction.objects.exists())
+
+    @mock.patch.object(packs, "GEMS_PER_PACK", 100)
     def test_not_enough_gems(self):
         self.client.force_authenticate(self.user)
         change_gems(self.user, 50, "admin_grant")
@@ -112,6 +123,7 @@ class OpenTest(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.gems, 50)
 
+    @mock.patch.object(packs, "GEMS_PER_PACK", 100)
     def test_a_pack_costs_gems_and_its_cards_are_not_kept(self):
         # 엘리스 2026-10-13: the beta opens packs for the thrill alone, with no 카드 모음
         self.client.force_authenticate(self.user)
@@ -123,6 +135,7 @@ class OpenTest(TestCase):
         self.assertFalse(any("new" in c for c in cards))
         self.assertEqual(r["tally"], {"gems": 100, "packs": 1, "ur": 0, "sr": 0, "owed": False})
 
+    @mock.patch.object(packs, "GEMS_PER_PACK", 100)
     def test_ten_without_a_ur_owe_one(self):
         self.client.force_authenticate(self.user)
         change_gems(self.user, 2000, "admin_grant")
@@ -138,6 +151,7 @@ class OpenTest(TestCase):
         r = self.open(self.secret, 1, always("SR")).json()
         self.assertEqual([c["print"] for c in r["packs"][0]], [102] * 4 + [202] * 4)
 
+    @mock.patch.object(packs, "GEMS_PER_PACK", 100)
     def test_mine(self):
         r = self.client.get(f"/api/carddb/packs/{self.master.id}/mine/").json()
         self.assertFalse(r["signed_in"])
