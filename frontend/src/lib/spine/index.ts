@@ -65,6 +65,22 @@ export class SpinePlayer {
     return this.renderer.bounds(sk);
   }
 
+  /** Where the figure is at rest (the setup pose, which is the monster as the card's art draws it). */
+  setupBounds(): [number, number, number, number] {
+    const sk = this.skeleton;
+    sk.setupPose();
+    sk.updateWorld();
+    return this.renderer.bounds(sk);
+  }
+
+  /** Draw the figure at rest through the view. */
+  drawSetup(cx: number, cy: number, halfW: number, halfH: number) {
+    const sk = this.skeleton;
+    sk.setupPose();
+    sk.updateWorld();
+    this.renderer.draw(sk, cx, cy, halfW, halfH);
+  }
+
   dispose() {
     this.renderer.dispose();
   }

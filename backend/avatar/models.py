@@ -100,6 +100,7 @@ class CustomIllust(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     # tweet_id is set when this row was created by the Twitter scraper —
     # used for dedup so re-scraping the same date range doesn't duplicate.
+    # "cutin:<print id>" when cutin_illusts made it from a summon cut-in.
     source_tweet_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     class Meta:
