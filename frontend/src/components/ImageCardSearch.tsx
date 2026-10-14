@@ -44,9 +44,9 @@ function scanPicture(file: File, onProgress: (s: Status) => void): Promise<{ car
 /** AI 이미지 검색 in the card search's drop-down (/dev/cards, 참혈 2026-10-14): a picture of one card or a deck list
  *  — chosen, dropped or pasted — goes to the deck scanner (/api/classify-deck/, once every ten seconds), and the
  *  cards it names come back; picking one opens its page. The panel keeps one height throughout. While the picture
- *  goes up and is read, the logo loader says which. Then, from sm, the picture on the left and the cards as rows on
- *  the right; on a phone the picture above and the cards below in one row that scrolls sideways, as card pictures
- *  like the deck builder's search. */
+ *  goes up and is read, the logo loader says which. Then, from sm, a row with the picture and how many cards were
+ *  read, and the cards as rows like the typed suggestions; on a phone the picture above and the cards below in one
+ *  row that scrolls sideways, as card pictures like the deck builder's search. */
 export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (id: number) => void; onClose: () => void }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [preview, setPreview] = useState<string | null>(null);
@@ -55,6 +55,7 @@ export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const busy = status.kind === "uploading" || status.kind === "analyzing";
+  const recognized = found.reduce((n, f) => n + f.count, 0);
 
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -168,50 +169,60 @@ export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (
       )}
 
       {status.kind === "done" && (
-        <div className="flex-1 min-h-0 flex flex-col gap-2 sm:grid sm:grid-cols-[2fr_3fr] sm:gap-3">
-          <div className="flex-1 min-h-0 sm:h-full bg-gray-50 dark:bg-gray-900/40 rounded-md">{picture}</div>
-          <div className="shrink-0 sm:min-h-0 sm:h-full flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* from sm (참혈 2026-10-14, the side-by-side dropped): the picture in a row as tall as a suggestion, how many
+              cards were read beside it, then the cards as rows like the typed suggestions */}
+          <div className="hidden sm:flex shrink-0 h-9 px-3 items-center gap-2.5 text-sm border-b border-gray-100 dark:border-gray-700">
+            {preview && <img src={preview} alt="올린 사진" className="h-7 w-auto max-w-[5.5rem] object-cover rounded" />}
+            <span className="font-semibold">인식된 카드 {recognized}장</span>
+            {unknown > 0 && <span className="text-xs text-gray-500 dark:text-gray-400">· 알아보지 못한 카드 {unknown}장</span>}
+          </div>
+          {found.length ? (
+            <ul className="hidden sm:block flex-1 min-h-0 overflow-y-auto overscroll-contain py-1">
+              {found.map(({ card, count }) => (
+                <li key={card.id}>
+                  <button
+                    type="button"
+                    onClick={() => onPickCard(card.id)}
+                    className="w-full px-3 py-2 border-0 rounded-none bg-transparent flex items-center justify-between gap-3 text-sm text-left hover:bg-blue-50 dark:hover:bg-gray-700"
+                  >
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        {cardTag(card)}
+                      </span>
+                      <span className="break-keep">{card.name}</span>
+                    </span>
+                    {count > 1 && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">×{count}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="hidden sm:flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>
+          )}
+
+          {/* phones, as before: the picture above, the cards below in one row of card pictures that scrolls sideways */}
+          <div className="sm:hidden flex-1 min-h-0 flex flex-col gap-2">
+            <div className="flex-1 min-h-0 bg-gray-50 dark:bg-gray-900/40 rounded-md">{picture}</div>
             {found.length ? (
-              <>
-                {/* phones: card pictures in one row that scrolls sideways */}
-                <ul className="sm:hidden flex gap-1.5 overflow-x-auto overscroll-contain pb-1">
-                  {found.map(({ card, count }) => (
-                    <li key={card.id} className="shrink-0">
-                      <button type="button" onClick={() => onPickCard(card.id)} title={card.name} aria-label={`${card.name} 열기`} className="relative block w-16">
-                        <img src={card.face_thumb_url || card.thumb_url || card.image_url || ""} alt={card.name} loading="lazy" className="w-full aspect-[704/1024] object-contain card-corner" />
-                        {count > 1 && (
-                          <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">×{count}</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {/* wider screens: rows like the typed suggestions */}
-                <ul className="hidden sm:flex flex-col flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                  {found.map(({ card, count }) => (
-                    <li key={card.id}>
-                      <button
-                        type="button"
-                        onClick={() => onPickCard(card.id)}
-                        className="w-full px-2 py-1.5 flex items-center gap-2.5 text-sm text-left rounded-md hover:bg-blue-50 dark:hover:bg-gray-700"
-                      >
-                        <img src={card.face_thumb_url || card.thumb_url || card.image_url || ""} alt="" loading="lazy" className="w-8 aspect-[704/1024] object-contain card-corner shrink-0" />
-                        <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                          {cardTag(card)}
-                        </span>
-                        <span className="min-w-0 flex-1 break-keep">{card.name}</span>
-                        {count > 1 && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">×{count}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <p className="shrink-0 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  찾은 카드 {found.length}종{unknown > 0 && ` · 알아보지 못한 카드 ${unknown}장`}
-                </p>
-              </>
+              <ul className="shrink-0 flex gap-1.5 overflow-x-auto overscroll-contain pb-1">
+                {found.map(({ card, count }) => (
+                  <li key={card.id} className="shrink-0">
+                    <button type="button" onClick={() => onPickCard(card.id)} title={card.name} aria-label={`${card.name} 열기`} className="relative block w-16">
+                      <img src={card.face_thumb_url || card.thumb_url || card.image_url || ""} alt={card.name} loading="lazy" className="w-full aspect-[704/1024] object-contain card-corner" />
+                      {count > 1 && (
+                        <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">×{count}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <p className="sm:h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>
+              <p className="shrink-0 text-sm text-center text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>
             )}
+            <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+              인식된 카드 {recognized}장{unknown > 0 && ` · 알아보지 못한 카드 ${unknown}장`}
+            </p>
           </div>
         </div>
       )}
