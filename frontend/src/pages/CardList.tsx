@@ -160,10 +160,11 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
     navigate({ pathname: basePath, search: filtersToSearch(next) }, { replace: true });
   };
 
-  // The list follows the typing a moment after it stops (names in Korean, Japanese or English).
+  // The list follows the typing a moment after it stops (names in Korean, Japanese or English) — but not in the
+  // /dev/cards trial, where the names are searched on Enter (참혈 2026-10-14).
   useEffect(() => {
     const q = qInput.trim();
-    if (q === filters.q) return;
+    if (unifiedSearch || q === filters.q) return;
     const t = setTimeout(() => update({ q }), 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

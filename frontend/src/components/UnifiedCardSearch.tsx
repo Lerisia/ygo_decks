@@ -6,7 +6,8 @@ import { makeMatcher, nameKeys } from "@/utils/hangul";
 const SUGGESTED = 8;
 
 /** One box for the card book's name search and its 카드군·서포트 pick (/dev/cards, a trial — 참혈 2026-10-14). What is
- *  typed searches the card names as before, the list following the typing; under the box the 카드군 and cards with a
+ *  typed searches the card names when Enter is pressed (the list no longer follows the typing there, 참혈 10/14);
+ *  under the box the 카드군 and cards with a
  *  support list that match the typing drop down (name or 초성, the whole name, then its start, first), and picking
  *  one puts it in the box as a chip, the typing cleared. Enter searches the names, or picks the suggestion marked
  *  with the arrow keys; Backspace in an empty box takes the chip off. */
@@ -81,7 +82,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
             aria-controls={`${id}-list`}
             aria-activedescendant={shown && active >= 0 ? `${id}-${active}` : undefined}
             aria-autocomplete="list"
-            placeholder={chosen ? "카드 이름으로 더 좁히기" : "카드 이름·카드군·서포트 검색 (초성도 돼요)"}
+            placeholder="카드 검색"
             value={query}
             onChange={(e) => {
               onQueryChange(e.target.value);
