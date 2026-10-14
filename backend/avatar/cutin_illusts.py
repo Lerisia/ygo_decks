@@ -20,9 +20,9 @@ from django.core.files.base import ContentFile
 from avatar.models import CustomIllust
 from carddb.models import MdArt, MdPrint
 
-OUT = 2048      # the illustration's side
+OUT = 2048      # the illustration's longer side (a pendulum monster's art is taller than wide)
 ALIGN = 1536    # the render matched against the art
-ART = 1024      # the art, enlarged, for the matching: its features at a scale nearer the render's
+ART = 1024      # the art's longer side, enlarged, for the matching: its features at a scale nearer the render's
 DRAW = 3072     # the first render; a figure the art shows larger is drawn again, up to 4096
 CLEAN = 0.03    # a figure the art covers this little goes into the pool unseen; more, and someone looks first
 KEY = "cutin:{}"   # CustomIllust.source_tweet_id of the illustration made from a print's cut-in
@@ -46,12 +46,19 @@ class Alignment:
 
     def fits(self):
         # a figure on the wrong art gets under 10 inliers at some odd angle; a small dark figure on its own art 50
-        return self.inliers >= 30 and self.error <= 1.0 and abs(self.rotation) <= 1.0 and 0.3 <= self.scale <= 3
+        return self.inliers >= 30 and self.error <= 1.0 and abs(self.rotation) <= 1.0 and 0.3 <= self.scale <= 4
+
+
+def enlarged(art, side):
+    """The art with its longer side `side` px, its shape kept."""
+    h, w = art.shape[:2]
+    k = side / max(h, w)
+    return cv2.resize(art, (round(w * k), round(h * k)), interpolation=cv2.INTER_CUBIC if k < 2.5 else cv2.INTER_LANCZOS4)
 
 
 def align(figure, art):
     """Where the figure (BGRA, ALIGN px square) lies on the art (BGR), from matching features, or None."""
-    big = cv2.resize(art, (ART, ART), interpolation=cv2.INTER_CUBIC)
+    big = enlarged(art, ART)
     sift = cv2.SIFT_create(nfeatures=6000)
     art_points, art_descs = sift.detectAndCompute(cv2.cvtColor(big, cv2.COLOR_BGR2GRAY), None)
     alpha = figure[:, :, 3]
@@ -68,24 +75,25 @@ def align(figure, art):
     if M is None:
         return None
     inliers = inliers.ravel().astype(bool)
-    error = np.linalg.norm((src[inliers] @ M[:, :2].T + M[:, 2]) - dst[inliers], axis=1).mean() * art.shape[0] / ART
+    error = np.linalg.norm((src[inliers] @ M[:, :2].T + M[:, 2]) - dst[inliers], axis=1).mean() * max(art.shape[:2]) / ART
     return Alignment(M, int(inliers.sum()), float(error), float(np.hypot(M[0, 0], M[1, 0])), float(np.degrees(np.arctan2(M[1, 0], M[0, 0]))))
 
 
 def compose(figure, M, art, out=OUT):
-    """The figure (BGRA, any square size) laid on the art by M (ALIGN px -> ART px), `out` px square: the picture
-    (BGR), the share of the figure the art covers with something else, and the share of the picture the figure
-    fills."""
+    """The figure (BGRA, any square size) laid on the art by M (ALIGN px -> ART px), the art's shape with its longer
+    side `out` px: the picture (BGR), the share of the figure the art covers with something else, and the share of
+    the picture the figure fills."""
     k = out / 1024
     T = np.hstack([M[:, :2] * (ALIGN / figure.shape[0]), M[:, 2:]]) * (out / ART)
-    base = cv2.resize(art, (out, out), interpolation=cv2.INTER_LANCZOS4).astype(np.float32)
+    base = enlarged(art, out).astype(np.float32)
+    height, width = base.shape[:2]
     f = figure.astype(np.float32)
     layer = np.dstack([f[:, :, :3] * (f[:, :, 3:4] / 255), f[:, :, 3:4]])   # premultiplied: resampling darkens no edge
     shrink = float(np.hypot(T[0, 0], T[1, 0]))
     if shrink < 1:   # bring it near the output's scale first; warpAffine cannot average pixels away
         layer = cv2.resize(layer, None, fx=shrink, fy=shrink, interpolation=cv2.INTER_AREA)
         T = np.hstack([T[:, :2] / shrink, T[:, 2:]])
-    warped = cv2.warpAffine(layer, T, (out, out), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
+    warped = cv2.warpAffine(layer, T, (width, height), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
     alpha = np.clip(warped[:, :, 3:4] / 255, 0, 1)
     colour = np.clip(warped[:, :, :3], 0, 255)
     whole = base * (1 - alpha) + colour

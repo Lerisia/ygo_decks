@@ -18,12 +18,13 @@ from carddb.models import Card, MdArt, MdPrint
 MEDIA = tempfile.mkdtemp(prefix="cutin-tests-")
 
 
-def drawn_art(seed, size=512):
+def drawn_art(seed, size=512, height=None):
     """A card art stand-in with corners for the matcher to hold on to: coloured shapes on a soft noise ground."""
     rng = np.random.default_rng(seed)
-    img = cv2.resize(rng.integers(60, 200, (16, 16, 3), dtype=np.uint8), (size, size), interpolation=cv2.INTER_CUBIC)
-    for _ in range(60):
-        x, y = (int(v) for v in rng.integers(0, size, 2))
+    height = height or size
+    img = cv2.resize(rng.integers(60, 200, (16, 16, 3), dtype=np.uint8), (size, height), interpolation=cv2.INTER_CUBIC)
+    for _ in range(60 * height // size):
+        x, y = int(rng.integers(0, size)), int(rng.integers(0, height))
         w, h = (int(v) for v in rng.integers(10, 60, 2))
         colour = tuple(int(v) for v in rng.integers(0, 255, 3))
         if rng.random() < 0.5:
@@ -65,6 +66,18 @@ class AlignTest(SimpleTestCase):
         self.assertAlmostEqual(found.scale, 0.5, delta=0.01)
         self.assertAlmostEqual(found.rotation, 0, delta=0.5)
         np.testing.assert_allclose(found.M[:, 2], [128, 128], atol=3)
+
+    def test_a_pendulum_monster_s_taller_art_keeps_its_shape(self):
+        art = drawn_art(1, height=653)
+        found = align(figure_from(art, box=(96, 200, 416, 520)), art)
+        self.assertIsNotNone(found)
+        self.assertTrue(found.fits())
+        # the longer side is 1024 in the matching: 653 -> 1024, so the figure's 4x piece lands at 1024/653/4
+        self.assertAlmostEqual(found.scale, 1024 / 653 / 4, delta=0.01)
+        self.assertAlmostEqual(found.rotation, 0, delta=0.5)
+        picture, covered, cover = compose(figure_from(art, box=(96, 200, 416, 520)), found.M, art, out=1024)
+        self.assertEqual(picture.shape, (1024, 803, 3))
+        self.assertLess(covered, 0.03)
 
     def test_a_figure_from_another_art_does_not_fit(self):
         found = align(figure_from(drawn_art(2)), drawn_art(1))
