@@ -18,6 +18,8 @@ const LEAD: Partial<Record<PackSoundName, number>> = {
   proc_rare: 0.665, proc_rare_02: 0.335,
 };
 const OFF = "pack_sound_off";
+// every sound a step quieter than the game's table (about -2.5 dB): loud for a page (엘리스 2026-10-14)
+const MASTER = 0.75;
 
 let ctx: AudioContext | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -80,7 +82,7 @@ export function playPackSound(name: PackSoundName, volume = 0.8, rate = 1, from?
     const gain = audio.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
-    gain.gain.value = volume;
+    gain.gain.value = volume * MASTER;
     src.connect(gain).connect(audio.destination);
     src.start(0, from ?? LEAD[name] ?? 0);
   });
