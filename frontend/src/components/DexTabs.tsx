@@ -31,7 +31,7 @@ export function useDexCounts() {
 export default function DexTabs() {
   const { pathname } = useLocation();
   const counts = useDexCounts();
-  const onCards = pathname.startsWith("/cards");
+  const onCards = pathname.startsWith("/cards") || pathname.startsWith("/dev/cards");
   const tab = (to: string, active: boolean, label: string, n: number | undefined, unit: string) => (
     <Link
       to={to}

@@ -6,6 +6,8 @@ import ComboBox, { type ComboItem } from "@/components/ComboBox";
 import DexFilterBar from "@/components/DexFilterBar";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
+import UnifiedCardSearch from "@/components/UnifiedCardSearch";
+import { useAdminOnly } from "@/hooks/useAdminOnly";
 import {
   type CardFilters, type CardListItem, type CardOptions,
   filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
@@ -106,11 +108,13 @@ function CardTile({ card }: { card: CardListItem }) {
 }
 
 /** 카드 도감 list: search, filters and sort live in the address (/cards?group=12…), so a 카드군 on a card page links
- *  straight to its cards; App keeps this page alive behind a card page, like the deck list. */
-export default function CardList() {
+ *  straight to its cards; App keeps this page alive behind a card page, like the deck list. At /dev/cards
+ *  (operators only) it tries one box for the name search and the 카드군·서포트 pick (unifiedSearch, 참혈 2026-10-14). */
+export default function CardList({ basePath = "/cards", unifiedSearch = false }: { basePath?: string; unifiedSearch?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const onList = location.pathname === "/cards";
+  const allowed = useAdminOnly(unifiedSearch);
+  const onList = location.pathname === basePath;
   const [filters, setFilters] = useState<CardFilters>(() => withRememberedSort(searchToFilters(location.search), location.search));
   const [qInput, setQInput] = useState(filters.q);
   const [options, setOptions] = useState<CardOptions | null>(null);
@@ -153,7 +157,7 @@ export default function CardList() {
     if (next.group !== filters.group || next.deck !== filters.deck) next.role = "";   // another group or deck starts on its own cards
     if (next.sort !== filters.sort || next.dir !== filters.dir) rememberSort(next);
     setFilters(next);
-    navigate({ pathname: "/cards", search: filtersToSearch(next) }, { replace: true });
+    navigate({ pathname: basePath, search: filtersToSearch(next) }, { replace: true });
   };
 
   // The list follows the typing a moment after it stops (names in Korean, Japanese or English).
@@ -261,12 +265,31 @@ export default function CardList() {
       ban: BANS.map((b) => b.value).filter((x) => v.ban?.includes(x)).join(","),
     });
 
+  if (!allowed) return <div className="min-h-screen" />;
+  const chosenGroup = groupItems.find((it) => it.key === (filters.group ? `g${filters.group}` : filters.card ? `c${filters.card}` : ""));
+
   return (
     <div className="h-auto min-h-screen w-full max-w-5xl mx-auto px-4 pt-6 pb-4 text-center">
       <DexTabs />
       {/* In the book itself the search filters the list as you type (엘리스 2026-10-11); the home page keeps the picker. */}
       {/* Enter (the phone keyboard's 검색 key) searches at once and puts the keyboard away. */}
       {/* 카드군 sit beside the name search, out of the filter panel: they are used often (엘리스 10/12) */}
+      {unifiedSearch ? (
+        <div className="mb-4">
+          <UnifiedCardSearch
+            query={qInput}
+            onQueryChange={setQInput}
+            onSubmit={() => qInput.trim() !== filters.q && update({ q: qInput.trim() })}
+            items={groupItems}
+            chosen={chosenGroup}
+            onPick={(key) => {
+              setQInput("");
+              update({ q: "", ...(key[0] === "g" ? { group: key.slice(1), card: "" } : { card: key.slice(1), group: "" }) });
+            }}
+            onClear={() => update({ group: "", card: "" })}
+          />
+        </div>
+      ) : (
       <div className="mb-4 grid gap-2 sm:grid-cols-[3fr_2fr]">
         <SearchForm onSearch={() => qInput.trim() !== filters.q && update({ q: qInput.trim() })}>
           <Input
@@ -287,6 +310,7 @@ export default function CardList() {
           loading={!options}
         />
       </div>
+      )}
 
       {/* Filters, with the sort and its way at the row's right end, joined as Master Duel shows them */}
       <div className="mb-4">

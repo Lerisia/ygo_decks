@@ -189,6 +189,8 @@ function App() {
             <Route path="/database/:deckId" element={<DeckDetail />} />
             <Route path="/cards" element={null} />
             <Route path="/cards/:cardId" element={<CardDetail />} />
+            {/* the card book trying one search box for names and 카드군 (operators only, 참혈 2026-10-14) */}
+            <Route path="/dev/cards" element={<CardList basePath="/dev/cards" unifiedSearch />} />
             <Route path="/records" element={<RecordGroups />} />
             <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
             {/* 대회 (내부 테스트 중 — 네비게이션 미노출) */}
