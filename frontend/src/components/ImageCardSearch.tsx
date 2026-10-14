@@ -112,20 +112,19 @@ export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (
     },
   };
 
+  // 다른 사진 sits at the right end of the 인식된 카드 row (참혈 2026-10-14)
+  const another = (
+    <button type="button" onClick={choose} className="ml-auto shrink-0 h-7 px-2.5 rounded-md text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700">
+      다른 사진
+    </button>
+  );
   const picture = preview && <img src={preview} alt="올린 사진" className="w-full h-full object-contain rounded-md" />;
 
   return (
     <div className={`${IMAGE_SEARCH_HEIGHT} p-3 flex flex-col gap-2.5`} {...drop}>
       <div className="shrink-0 flex items-center justify-between gap-2">
         <span className="text-sm font-semibold">AI 이미지 검색</span>
-        <span className="flex items-center gap-1">
-          {(status.kind === "done" || status.kind === "error") && (
-            <button type="button" onClick={choose} className="h-7 px-2.5 rounded-md text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700">
-              다른 사진
-            </button>
-          )}
-          <button type="button" onClick={onClose} aria-label="이미지 검색 닫기" className="w-7 h-7 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">✕</button>
-        </span>
+        <button type="button" onClick={onClose} aria-label="이미지 검색 닫기" className="w-7 h-7 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">✕</button>
       </div>
       <input
         ref={fileInput}
@@ -176,6 +175,7 @@ export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (
             {preview && <img src={preview} alt="올린 사진" className="h-7 w-auto max-w-[5.5rem] object-cover rounded" />}
             <span className="font-semibold">인식된 카드 {recognized}장</span>
             {unknown > 0 && <span className="text-xs text-gray-500 dark:text-gray-400">· 알아보지 못한 카드 {unknown}장</span>}
+            {another}
           </div>
           {found.length ? (
             <ul className="hidden sm:block flex-1 min-h-0 overflow-y-auto overscroll-contain py-1">
@@ -220,9 +220,10 @@ export default function ImageCardSearch({ onPickCard, onClose }: { onPickCard: (
             ) : (
               <p className="shrink-0 text-sm text-center text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>
             )}
-            <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-              인식된 카드 {recognized}장{unknown > 0 && ` · 알아보지 못한 카드 ${unknown}장`}
-            </p>
+            <div className="shrink-0 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>인식된 카드 {recognized}장{unknown > 0 && ` · 알아보지 못한 카드 ${unknown}장`}</span>
+              {another}
+            </div>
           </div>
         </div>
       )}
