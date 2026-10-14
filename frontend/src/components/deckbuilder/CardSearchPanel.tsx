@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Input } from "@/components/ui/input";
 import SearchForm from "@/components/SearchForm";
 import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
-import { COPIES_MAX, type DeckDraft, type DeckZone, copiesOf } from "@/lib/deckDrafts";
+import { type DeckDraft, type DeckZone, copiesAllowed, copiesOf } from "@/lib/deckDrafts";
+import { usePressCard } from "@/hooks/usePressCard";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { DeckCardFace } from "./DeckZones";
 
@@ -30,14 +31,17 @@ function TileSkeleton() {
  *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. With the keyboard up it
  *  rides on top of the keyboard, gliding up and down with it, and pressing the box does not scroll the page to it
  *  (참혈 2026-10-14). */
-export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: {
+export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, ready }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   onPick: (card: CardListItem) => void;
+  /** A card held (phone) or right-clicked (computer) is shown. */
+  onShow?: (card: CardListItem) => void;
   notice: string;
   /** false while the deck's own cards are still coming (their names count toward 3). */
   ready: boolean;
 }) {
+  const press = usePressCard();
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<CardListItem[]>([]);
@@ -173,12 +177,13 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
           >
             {items.map((c) => {
               const n = copiesOf(deck, c.name, cards);
-              const out = n >= COPIES_MAX || c.frame === "token";
+              const most = copiesAllowed(c);   // 3, or fewer on today's 금제
+              const out = n >= most || c.frame === "token";
               return (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => ready && onPick(c)}
+                  {...press(() => ready && onPick(c), () => onShow?.(c))}
                   aria-disabled={out || !ready}
                   title={c.name}
                   aria-label={`${c.name} 넣기`}
@@ -188,7 +193,7 @@ export default function CardSearchPanel({ deck, cards, onPick, notice, ready }: 
                     <DeckCardFace card={c} dim={out} />
                     {n > 0 && (
                       <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">
-                        {n}/{COPIES_MAX}
+                        {n}/{most}
                       </span>
                     )}
                   </span>

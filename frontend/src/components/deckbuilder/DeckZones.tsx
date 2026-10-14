@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
+import { usePressCard } from "@/hooks/usePressCard";
 import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, sortedZone } from "@/lib/deckDrafts";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
@@ -31,15 +32,17 @@ export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: 
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, cards, loading, onRemove, reserve }: {
+function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve }: {
   zone: DeckZone;
   ids: number[];
   cards: Map<number, CardListItem>;
   loading: boolean;
   onRemove?: (id: number) => void;
+  onShow?: (card: CardListItem) => void;
   reserve: boolean;
 }) {
   const counts = kindCounts(ids, cards);
+  const press = usePressCard();
   return (
     <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4">
       {/* the zone on the left, how many of each kind on the right (on a phone, the line below) */}
@@ -79,8 +82,8 @@ function Zone({ zone, ids, cards, loading, onRemove, reserve }: {
               <button
                 key={`${id}-${i}`}
                 type="button"
-                onClick={() => onRemove(id)}
-                title={`${card.name} (눌러서 빼기)`}
+                {...press(() => onRemove(id), () => onShow?.(card))}
+                title={`${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
                 aria-label={`${card.name} 1장 빼기`}
                 className="group block"
               >
@@ -106,12 +109,14 @@ function Zone({ zone, ids, cards, loading, onRemove, reserve }: {
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, onRemove }: {
+export default function DeckZones({ deck, cards, order, loading, onRemove, onShow }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
   loading: boolean;
   onRemove?: (zone: DeckZone, id: number) => void;
+  /** Building: a card held (phone) or right-clicked (computer) is shown. */
+  onShow?: (card: CardListItem) => void;
 }) {
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -123,6 +128,7 @@ export default function DeckZones({ deck, cards, order, loading, onRemove }: {
           cards={cards}
           loading={loading}
           onRemove={onRemove && ((id) => onRemove(z, id))}
+          onShow={onShow}
           reserve={!!onRemove}
         />
       ))}

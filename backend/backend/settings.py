@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     'tracker',
     'inquiry',
     'notification',
+    'decklists',
 ]
 
 MIDDLEWARE = [

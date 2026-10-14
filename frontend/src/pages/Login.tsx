@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { login, isAuthenticated } from "../api/accountApi";
 
 const Login = () => {
@@ -7,18 +7,21 @@ const Login = () => {
     const [password, setPassword] = useState("");
     const [message, setMessage] = useState("");
     const navigate = useNavigate();
+    // where to go back to after signing in (a deck a guest was building, 2026-10-14): a path on this site only
+    const next = useSearchParams()[0].get("next");
+    const back = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
     useEffect(() => {
         if (isAuthenticated()) {
             setMessage("이미 로그인되었습니다. 메인 페이지로 이동합니다.");
-            setTimeout(() => navigate("/"), 500);
+            setTimeout(() => navigate(back), 500);
         }
-    }, [navigate]);
+    }, [navigate, back]);
 
     const handleLogin = async () => {
         const result = await login(username, password);
         if (result.access) {
-            navigate("/");
+            navigate(back);
             setTimeout(() => window.location.reload(), 100);
         } else {
             setMessage(

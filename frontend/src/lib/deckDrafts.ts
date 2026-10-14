@@ -1,7 +1,9 @@
-/** 덱 구축 (참혈 2026-10-13, first layout): members' deck lists. The server keeps none yet, so the decks live in this
- *  browser's localStorage, and everything the /decklists pages save or read goes through this file — a deck API takes
- *  its place here alone. The rules of a deck (3 of a name, zone sizes) are here too. No side deck for now. */
+/** 덱 구축 (참혈 2026-10-13, first layout): members' deck lists, kept on the server from 2026-10-14 (api/deckListApi).
+ *  Here: the rules of a deck as Master Duel's editor keeps them (3 of a name, today's 금제, zone sizes, no side deck),
+ *  what a deck is told while it breaks one (deckIssues), a guest's deck kept in the tab while they go to sign in, and
+ *  the decks the first layout kept in this browser, moved to the member's account once. */
 import type { CardListItem } from "@/api/cardDexApi";
+import type { DeckListDoc } from "@/api/deckListApi";
 
 export type DeckZone = "main" | "extra";
 
@@ -18,7 +20,10 @@ export type DeckDraft = {
   extra: number[];
 };
 
+/** Where the first layout kept decks in this browser (before 2026-10-14). */
 const KEY = "deck_drafts_v0";
+/** A guest's deck, kept in this tab while they go to sign in to save it (guests save nothing: 엘리스 2026-10-14). */
+const SESSION_KEY = "deck_draft_tab";
 /** The code of a deck not saved yet (/decklists/new). */
 export const NEW_CODE = "new";
 
@@ -30,7 +35,13 @@ export const COPIES_MAX = 3;
 
 export const blankDeck = (): DeckDraft => ({ code: NEW_CODE, name: "", description: "", createdAt: "", main: [], extra: [] });
 
-function stored(): DeckDraft[] {
+/** A deck the server sent, as the pages hold it. */
+export const fromDoc = (d: DeckListDoc): DeckDraft => ({
+  code: d.code, name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at, main: d.main, extra: d.extra,
+});
+
+/** The decks the first layout kept in this browser, to move to the member's account. */
+export function localDrafts(): DeckDraft[] {
   try {
     const list = JSON.parse(localStorage.getItem(KEY) || "[]");
     return Array.isArray(list) ? list : [];
@@ -39,33 +50,35 @@ function stored(): DeckDraft[] {
   }
 }
 
-/** The saved decks, the newest first. */
-export function listDecks(): DeckDraft[] {
-  return stored().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+/** Lets the browser's decks go once moved, keeping those that could not be (a rule since made stricter). */
+export function clearLocalDrafts(keep: DeckDraft[] = []) {
+  try {
+    if (keep.length) localStorage.setItem(KEY, JSON.stringify(keep));
+    else localStorage.removeItem(KEY);
+  } catch { /* nothing kept */ }
 }
 
-export function getDeck(code: string): DeckDraft | null {
-  return stored().find((d) => d.code === code) ?? null;
+export function clearTabDraft() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* nothing kept */ }
 }
 
-function newCode(taken: Set<string>) {
-  let code;
-  do {
-    code = Array.from({ length: 8 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
-  } while (taken.has(code) || code === NEW_CODE);
-  return code;
+export function keepTabDraft(deck: DeckDraft) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(deck));
+  } catch { /* the deck lasts the page */ }
 }
 
-/** Saves a deck: a new one gets its code and its day here, and every save its last-saved time. Throws when the
- *  browser won't store it (private mode, full storage). */
-export function saveDeck(deck: DeckDraft): DeckDraft {
-  const list = stored();
-  const now = new Date().toISOString();
-  const saved = deck.code === NEW_CODE
-    ? { ...deck, code: newCode(new Set(list.map((d) => d.code))), createdAt: now, updatedAt: now }
-    : { ...deck, updatedAt: now };
-  localStorage.setItem(KEY, JSON.stringify([...list.filter((d) => d.code !== saved.code), saved]));
-  return saved;
+/** The guest's deck kept in this tab, if any: kept until it is saved or given up (signing in reloads the page). */
+export function tabDraft(): DeckDraft | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    const d = raw ? JSON.parse(raw) : null;
+    return d && Array.isArray(d.main) && Array.isArray(d.extra) ? { ...blankDeck(), ...d, code: NEW_CODE } : null;
+  } catch {
+    return null;
+  }
 }
 
 export const deckUpdated = (deck: Pick<DeckDraft, "createdAt" | "updatedAt">) => deck.updatedAt || deck.createdAt;
@@ -115,14 +128,43 @@ export function copiesOf(deck: Pick<DeckDraft, DeckZone>, name: string, cards: M
   return ZONES.reduce((n, z) => n + deck[z].filter((id) => cards.get(id)?.name === name).length, 0);
 }
 
-/** A card picked in the search: into the extra or main deck by its frame. */
+type BanInfo = Pick<CardListItem, "ban">;
+const BAN_LIMIT = { forbidden: 0, limited: 1, semi_limited: 2 } as const;
+const BAN_WORD = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
+
+/** How many of a card a deck may hold today: 3, or fewer on Master Duel's list (금지 0, 제한 1, 준제한 2). */
+export const copiesAllowed = (card: BanInfo) => (card.ban ? BAN_LIMIT[card.ban] : COPIES_MAX);
+
+/** A card picked in the search: into the extra or main deck by its frame, as many as its name and today's 금제
+ *  allow. */
 export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards: Map<number, CardInfo>):
   { deck: D } | { error: string } {
   if (card.frame === "token") return { error: "토큰은 덱에 넣을 수 없습니다." };
-  if (copiesOf(deck, card.name, cards) >= COPIES_MAX) return { error: `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
+  if (card.ban === "forbidden") return { error: "금지 카드는 넣을 수 없습니다." };
+  const most = copiesAllowed(card);
+  if (copiesOf(deck, card.name, cards) >= most) {
+    return { error: card.ban ? `${BAN_WORD[card.ban]} 카드는 ${most}장까지 넣을 수 있습니다.` : `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
+  }
   const zone: DeckZone = isExtraCard(card) ? "extra" : "main";
   if (deck[zone].length >= ZONE_MAX[zone]) return { error: `${ZONE_LABEL[zone]}은 ${ZONE_MAX[zone]}장까지입니다.` };
   return { deck: { ...deck, [zone]: [...deck[zone], card.id] } };
+}
+
+/** What keeps the deck from being played today, as the server says it (decklists/rules.py): too few in the main,
+ *  then each card over today's list, the forbidden first. */
+export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>): string[] {
+  const out: string[] = [];
+  if (deck.main.length < MAIN_MIN) out.push(`메인 덱이 ${MAIN_MIN}장보다 적습니다 (${deck.main.length}/${MAIN_MIN}).`);
+  const n = new Map<number, number>();
+  for (const id of [...deck.main, ...deck.extra]) n.set(id, (n.get(id) ?? 0) + 1);
+  const over = [...n].map(([id, count]) => ({ card: cards.get(id), count }))
+    .filter((x): x is { card: CardListItem; count: number } => !!x.card?.ban && x.count > BAN_LIMIT[x.card.ban])
+    .sort((a, b) => BAN_LIMIT[a.card.ban as keyof typeof BAN_LIMIT] - BAN_LIMIT[b.card.ban as keyof typeof BAN_LIMIT] || a.card.name.localeCompare(b.card.name));
+  for (const { card, count } of over) {
+    const ban = card.ban as keyof typeof BAN_LIMIT;
+    out.push(ban === "forbidden" ? `${card.name}: 금지 카드입니다.` : `${card.name}: ${BAN_WORD[ban]} 카드는 ${BAN_LIMIT[ban]}장까지입니다 (${count}장).`);
+  }
+  return out;
 }
 
 /** Takes one copy of a card out of a zone. */

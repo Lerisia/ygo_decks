@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, deckUpdated, getDeck, kindCounts, listDecks, removeCard, saveDeck, sortedZone,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, deckIssues, deckUpdated, fromDoc, keepTabDraft, kindCounts,
+  localDrafts, removeCard, sortedZone, tabDraft,
 } from "./deckDrafts";
 import { isDeckEditorPath } from "./deckListPaths";
 
@@ -72,54 +73,68 @@ describe("a zone's lines", () => {
   });
 });
 
-describe("keeping decks in this browser", () => {
-  let stored: Record<string, string>;
+describe("today's 금제", () => {
+  const banned = (id: number, name: string, ban: CardListItem["ban"]) => ({ ...card(id, name, "monster", "effect"), ban });
+  const forbidden = banned(20, "금지", "forbidden"), limited = banned(21, "제한", "limited"), semi = banned(22, "준제한", "semi_limited");
+  const cards = new Map([...CARDS, [20, forbidden], [21, limited], [22, semi]]);
+
+  it("keeps a forbidden card out, a limited one to 1 and a semi-limited one to 2", () => {
+    expect(addCard(deck([]), forbidden, cards)).toEqual({ error: "금지 카드는 넣을 수 없습니다." });
+    expect(addCard(deck([]), limited, cards)).toEqual({ deck: deck([21]) });
+    expect(addCard(deck([21]), limited, cards)).toEqual({ error: "제한 카드는 1장까지 넣을 수 있습니다." });
+    expect(addCard(deck([22]), semi, cards)).toEqual({ deck: deck([22, 22]) });
+    expect(addCard(deck([22, 22]), semi, cards)).toHaveProperty("error");
+  });
+
+  it("tells a deck what keeps it from being played, as the server does", () => {
+    expect(deckIssues(deck([20, 21, 21, 1]), cards)).toEqual([
+      "메인 덱이 40장보다 적습니다 (4/40).",
+      "금지: 금지 카드입니다.",
+      "제한: 제한 카드는 1장까지입니다 (2장).",
+    ]);
+    expect(deckIssues(deck(Array.from({ length: 40 }, () => 1)), cards)).toEqual([]);
+  });
+});
+
+describe("decks kept outside the server", () => {
+  let local: Record<string, string>, tab: Record<string, string>;
+  const store = (m: Record<string, string>) => ({
+    getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => (m[k] = v), removeItem: (k: string) => delete m[k],
+  });
 
   beforeEach(() => {
-    stored = {};
-    vi.stubGlobal("localStorage", { getItem: (k: string) => stored[k] ?? null, setItem: (k: string, v: string) => (stored[k] = v) });
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-10-13T12:00:00Z"));
+    local = {};
+    tab = {};
+    vi.stubGlobal("localStorage", store(local));
+    vi.stubGlobal("sessionStorage", store(tab));
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps a guest's deck in the tab until it is saved or given up, through the reload signing in makes", () => {
+    expect(tabDraft()).toBeNull();
+    keepTabDraft({ ...blankDeck(), code: "whatever", name: "손님 덱", main: [1, 3] });
+    expect(tabDraft()).toEqual({ ...blankDeck(), name: "손님 덱", main: [1, 3] });   // always a new deck
+    expect(tabDraft()?.name).toBe("손님 덱");
+    clearTabDraft();
+    expect(tabDraft()).toBeNull();
   });
 
-  it("has no decks to begin with, and stores nothing by looking", () => {
-    expect(listDecks()).toEqual([]);
-    expect(stored).toEqual({});
+  it("hands over the first layout's browser decks, keeping those that could not move", () => {
+    const old = { ...blankDeck(), code: "ab12cd34", name: "예전 덱", createdAt: "2026-10-13T12:00:00.000Z" };
+    local.deck_drafts_v0 = JSON.stringify([old, { ...old, code: "zz" }]);
+    expect(localDrafts().map((d) => d.code)).toEqual(["ab12cd34", "zz"]);
+    clearLocalDrafts([old]);
+    expect(localDrafts()).toEqual([old]);
+    clearLocalDrafts();
+    expect(localDrafts()).toEqual([]);
   });
 
-  it("gives a new deck its code and day on saving, and keeps them when it is saved again", () => {
-    const saved = saveDeck({ ...blankDeck(), name: "새 덱", main: [1] });
-    expect(saved.code).toMatch(/^[0-9a-z]{8}$/);
-    expect(saved.createdAt).toBe("2026-10-13T12:00:00.000Z");
-    expect(saved.updatedAt).toBe("2026-10-13T12:00:00.000Z");
-    expect(getDeck(saved.code)).toEqual(saved);
-    vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));
-    const again = saveDeck({ ...saved, name: "고친 덱" });
-    expect(again).toEqual({ ...saved, name: "고친 덱", updatedAt: "2026-10-14T12:00:00.000Z" });
-    expect(listDecks().map((d) => d.name)).toEqual(["고친 덱"]);
-  });
-
-  it("lists the newest deck first", () => {
-    const first = saveDeck({ ...blankDeck(), name: "먼저" });
-    vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));
-    saveDeck({ ...blankDeck(), name: "나중" });
-    saveDeck(first);
-    expect(listDecks().map((d) => d.name)).toEqual(["나중", "먼저"]);
-  });
-
-  it("reads a deck saved before the last-saved time as last saved when it was made", () => {
+  it("reads the server's deck as the pages hold it", () => {
+    expect(fromDoc({ code: "ab12cd34", name: "덱", description: "", main_count: 1, extra_count: 0, created_at: "a", updated_at: "b", main: [1], extra: [], issues: [] }))
+      .toEqual({ code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1], extra: [] });
     expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z" })).toBe("2026-10-13T12:00:00.000Z");
-    expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z", updatedAt: "2026-10-14T01:00:00.000Z" })).toBe("2026-10-14T01:00:00.000Z");
-  });
-
-  it("finds no deck under an unknown code, nor under new", () => {
-    expect(getDeck("nothing1")).toBeNull();
-    expect(getDeck(NEW_CODE)).toBeNull();
+    expect(blankDeck().code).toBe(NEW_CODE);
   });
 });
 
