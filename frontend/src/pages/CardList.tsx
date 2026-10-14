@@ -11,19 +11,11 @@ import {
   filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
 } from "@/api/cardDexApi";
 import type { DexField, DexValues } from "@/utils/dexFilter";
+import { trackEvent } from "@/api/analyticsApi";
+import { CARD_SORTS } from "@/lib/cardSorts";
 
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
-// Master Duel's sorts, each either way (엘리스 10/12), under its names; 디폴트 순: each monster frame before its pendulum,
-// low levels first, then spells and traps
-const SORTS = [
-  { value: "new", label: "최신 카드순" },
-  { value: "type", label: "디폴트 순" },
-  { value: "name", label: "이름순" },
-  { value: "rarity", label: "레어리티" },
-  { value: "level", label: "레벨 / 랭크 / 링크" },
-  { value: "atk", label: "공격력" },
-  { value: "def", label: "수비력" },
-];
+const SORTS = CARD_SORTS;
 
 const SORT_KEY = "card_list_sort";
 
@@ -148,6 +140,13 @@ export default function CardList() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onList, location.search]);
+
+  // A sort or its way picked by the viewer is counted (참혈 2026-10-14; the dashboard's 카드 도감 정렬).
+  const pickSort = (patch: Pick<CardFilters, "sort" | "dir"> | Pick<CardFilters, "dir">) => {
+    const next = { ...filters, ...patch };
+    trackEvent("card_sort", `${next.sort}:${sortDir(next)}`);
+    update(patch);
+  };
 
   const update = (patch: Partial<CardFilters>) => {
     const next = { ...filters, ...patch };
@@ -305,7 +304,7 @@ export default function CardList() {
                 <select
                   aria-label="정렬"
                   value={filters.sort}
-                  onChange={(e) => update({ sort: e.target.value, dir: "" })}
+                  onChange={(e) => pickSort({ sort: e.target.value, dir: "" })}
                   className="appearance-none max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
                 >
                   {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -314,7 +313,7 @@ export default function CardList() {
               </span>
               <button
                 type="button"
-                onClick={() => update({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
+                onClick={() => pickSort({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
                 aria-label={sortDir(filters) === "asc" ? "오름차순 (누르면 내림차순)" : "내림차순 (누르면 오름차순)"}
                 title={sortDir(filters) === "asc" ? "오름차순" : "내림차순"}
                 className="w-8 sm:w-9 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg rounded-l-none bg-white text-black dark:bg-gray-800 dark:text-white text-base font-bold"

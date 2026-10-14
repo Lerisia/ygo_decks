@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from user.models import User
-from .models import PageView
+from .models import PageView, UiEvent
 
 
 class BeaconTest(TestCase):
@@ -121,3 +121,40 @@ class SummaryTest(TestCase):
         self.assertEqual(self.client.get("/api/analytics/summary/", {"days": 500}).json()["range_days"], 90)
         self.assertEqual(self.client.get("/api/analytics/summary/", {"days": 0}).json()["range_days"], 1)
         self.assertEqual(self.client.get("/api/analytics/summary/", {"days": "abc"}).json()["range_days"], 14)
+
+
+class SortPickTest(TestCase):
+    """카드 도감 정렬 선택 기록 (참혈 2026-10-14): each sort picked is kept, and the dashboard counts them without the team."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = User.objects.create_user(email="s@test.com", username="staffer", password="pass1234", is_staff=True)
+
+    def _pick(self, value, visitor="visitor00001", name="card_sort", client=None):
+        return (client or self.client).post("/api/analytics/event/", {"visitor_id": visitor, "name": name, "value": value}, format="json")
+
+    def test_a_pick_is_kept_and_a_bad_one_refused(self):
+        self.assertEqual(self._pick("atk:desc").status_code, 201)
+        e = UiEvent.objects.get()
+        self.assertEqual((e.name, e.value, e.visitor_id), ("card_sort", "atk:desc", "visitor00001"))
+        self.assertEqual(self._pick("atk:sideways").status_code, 400)
+        self.assertEqual(self._pick("atk:desc", name="anything").status_code, 400)
+        self.assertEqual(self._pick("atk:desc", visitor="x").status_code, 400)
+        self.assertEqual(UiEvent.objects.count(), 1)
+
+    def test_summary_counts_picks_and_people_leaving_the_team_out(self):
+        self._pick("new:desc", "visitor00001")
+        self._pick("new:desc", "visitor00001")
+        self._pick("new:desc", "visitor00002")
+        self._pick("atk:desc", "visitor00002")
+        staff = APIClient()
+        staff.force_authenticate(self.staff)
+        self._pick("rarity:asc", "teamvisitor1", client=staff)
+        # the team's browser signed out still counts as the team: it was seen signed in before
+        PageView.objects.create(visitor_id="teamvisitor2", user=self.staff, path="/cards")
+        self._pick("rarity:asc", "teamvisitor2")
+        sorts = staff.get("/api/analytics/summary/?days=7").json()["card_sorts"]
+        self.assertEqual(sorts, [
+            {"value": "new:desc", "picks": 3, "visitors": 2},
+            {"value": "atk:desc", "picks": 1, "visitors": 1},
+        ])

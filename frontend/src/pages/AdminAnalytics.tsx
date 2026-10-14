@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ColumnChart } from "@/components/charts";
 import { isAdmin } from "@/api/accountApi";
 import { getAnalyticsSummary, type AnalyticsSummary } from "@/api/analyticsApi";
+import { CARD_SORTS } from "@/lib/cardSorts";
+
+/** "atk:desc" → 공격력 ↓ 내림차순, as the card book's sort control names it */
+const sortName = (value: string) => {
+  const [sort, way] = value.split(":");
+  const label = CARD_SORTS.find((s) => s.value === sort)?.label ?? sort;
+  return `${label} ${way === "desc" ? "↓ 내림차순" : "↑ 오름차순"}`;
+};
 
 const fmtDuration = (sec: number) => {
   if (sec < 60) return `${sec}초`;
@@ -126,6 +134,32 @@ export default function AdminAnalytics() {
                         <td className="text-right px-2 py-1.5">{p.views.toLocaleString()}</td>
                         <td className="text-right px-2 py-1.5">{p.visitors.toLocaleString()}</td>
                         <td className="text-right px-2 py-1.5">{fmtDuration(p.dwell_sec)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+            {/* Which sorts people pick in the card book (참혈 2026-10-14) */}
+            <section>
+              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">카드 도감 정렬 선택 (최근 {data.range_days}일, 운영진 제외)</h2>
+              {data.card_sorts.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">아직 데이터가 없습니다.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                      <th className="text-left px-2 pb-1">정렬</th>
+                      <th className="text-right px-2 pb-1 w-[18%]">고른 횟수</th>
+                      <th className="text-right px-2 pb-1 w-[18%]">고른 사람</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.card_sorts.map((r) => (
+                      <tr key={r.value} className="border-b dark:border-gray-700/60">
+                        <td className="px-2 py-1.5">{sortName(r.value)}</td>
+                        <td className="text-right px-2 py-1.5">{r.picks.toLocaleString()}</td>
+                        <td className="text-right px-2 py-1.5">{r.visitors.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>

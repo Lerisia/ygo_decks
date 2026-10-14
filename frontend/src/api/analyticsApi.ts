@@ -41,6 +41,17 @@ export const leavePageView = (id: number, durationMs: number) => {
   } catch { /* ignore */ }
 };
 
+/** Something done on a page that the team counts (참혈 2026-10-14), e.g. trackEvent("card_sort", "atk:desc"). Fire
+ *  and forget. */
+export const trackEvent = (name: string, value: string) => {
+  try {
+    fetch("/api/analytics/event/", {
+      method: "POST", keepalive: true, headers: authHeaders(),
+      body: JSON.stringify({ visitor_id: getVisitorId(), name, value }),
+    }).catch(() => {});
+  } catch { /* ignore */ }
+};
+
 export type DailyRow = { date: string; visitors: number; views: number; dwell_sec: number; avg_dwell_sec: number };
 export type TopPage = { path: string; views: number; visitors: number; dwell_sec: number };
 export type AnalyticsSummary = {
@@ -48,6 +59,8 @@ export type AnalyticsSummary = {
   today: { visitors: number; views: number; dwell_sec: number };
   daily: DailyRow[];
   top_pages: TopPage[];
+  /** Card book sorts picked ("atk:desc"), the team left out. */
+  card_sorts: { value: string; picks: number; visitors: number }[];
 };
 
 export const getAnalyticsSummary = async (days: number): Promise<AnalyticsSummary> => {

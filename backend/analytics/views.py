@@ -8,12 +8,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
-from .models import PageView
+from .models import PageView, UiEvent
 
 VISITOR_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 MAX_PATH = 200
 MAX_DURATION_SEC = 30 * 60
 DEFAULT_DAYS, MAX_DAYS = 14, 90
+# The events a page may report, each with the values it may carry (참혈 2026-10-14: card_sort = a card book sort and
+# its way, picked by the viewer).
+EVENTS = {"card_sort": re.compile(r"^[a-z_]{1,16}:(asc|desc)$")}
 
 
 @api_view(["POST"])
@@ -55,6 +58,35 @@ def pageview_leave(request, pageview_id):
     if not updated:
         return Response({"error": "not found"}, status=404)
     return HttpResponse(status=204)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def ui_event(request):
+    data = request.data
+    visitor = str(data.get("visitor_id") or "")
+    name, value = str(data.get("name") or ""), str(data.get("value") or "")
+    if not VISITOR_RE.match(visitor) or name not in EVENTS or not EVENTS[name].match(value):
+        return Response({"error": "invalid event"}, status=400)
+    UiEvent.objects.create(name=name, value=value, visitor_id=visitor,
+                           user=request.user if request.user.is_authenticated else None)
+    return Response(status=201)
+
+
+def _event_counts(name, since):
+    """How often each value of an event was reported since then and by how many visitors, the team left out: its
+    signed-in users, and any browser ever seen signed in as one of them."""
+    team = set(PageView.objects.filter(user__is_staff=True).values_list("visitor_id", flat=True))
+    team |= set(UiEvent.objects.filter(user__is_staff=True).values_list("visitor_id", flat=True))
+    counts = defaultdict(lambda: {"picks": 0, "visitors": set()})
+    for value, visitor in (UiEvent.objects.filter(name=name, created_at__gte=since)
+                           .exclude(user__is_staff=True).values_list("value", "visitor_id")):
+        if visitor in team:
+            continue
+        counts[value]["picks"] += 1
+        counts[value]["visitors"].add(visitor)
+    rows = [{"value": v, "picks": c["picks"], "visitors": len(c["visitors"])} for v, c in counts.items()]
+    return sorted(rows, key=lambda r: (-r["picks"], -r["visitors"], r["value"]))
 
 
 @api_view(["GET"])
@@ -106,4 +138,5 @@ def summary(request):
         "today": {"visitors": t["visitors"], "views": t["views"], "dwell_sec": t["dwell_sec"]},
         "daily": daily,
         "top_pages": top_pages,
+        "card_sorts": _event_counts("card_sort", start_dt),
     })
