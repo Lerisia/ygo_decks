@@ -194,6 +194,7 @@ def classify_deck_image(request):
 
         results.append({
             'card_name': card_name,
+            'card_id': card_obj.id if card_obj else None,
             'confidence': round(float(match.similarity) * 100, 2),
             'card_image': os.path.join(settings.MEDIA_URL, card_image_path)
         })

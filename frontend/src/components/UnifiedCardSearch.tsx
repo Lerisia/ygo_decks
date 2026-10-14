@@ -1,5 +1,8 @@
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import SearchForm from "./SearchForm";
+import ImageCardSearch from "./ImageCardSearch";
+import { cardTag } from "@/lib/cardTag";
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardListItem } from "@/api/cardDexApi";
 import { makeMatcher, matchRank, nameKeys } from "@/utils/hangul";
@@ -9,12 +12,6 @@ const CARDS_SHOWN = 6;
 const SHOWN = 10;
 // among suggestions that answer the typing as closely, cards come first, then 카드군, then 서포트 (참혈 2026-10-14)
 const KIND_ORDER = { card: 0, group: 1, support: 2 } as const;
-const EXTRA_KINDS = [["fusion", "융합"], ["synchro", "싱크로"], ["xyz", "엑시즈"], ["link", "링크"]] as const;
-
-/** A card's tag in the suggestions (참혈 2026-10-14): 몬스터 / 마법 / 함정, an extra deck monster by its kind. */
-const cardTag = (c: Pick<CardListItem, "category" | "frame">) =>
-  c.category === "spell" ? "마법" : c.category === "trap" ? "함정"
-    : EXTRA_KINDS.find(([frame]) => c.frame.startsWith(frame))?.[1] ?? (c.frame === "token" ? "토큰" : "몬스터");
 
 type Suggestion = {
   key: string; name: string; tag: string; sub?: string; group?: ComboItem; card?: CardListItem;
@@ -27,7 +24,8 @@ type Suggestion = {
  *  name, then its start, first) — picking one puts it in the box as a chip, the typing cleared — then the cards whose
  *  names match, as the card book's search ranks them, each tagged 몬스터 / 마법 / 함정 or its extra deck kind
  *  (참혈 2026-10-14) — picking one opens its page. Enter searches the names, or picks the suggestion marked with the
- *  arrow keys; Backspace in an empty box takes the chip off. */
+ *  arrow keys; Backspace in an empty box takes the chip off. The camera at the box's right end opens the drop-down on
+ *  AI 이미지 검색 instead (ImageCardSearch, 참혈 2026-10-14); typing goes back to the suggestions. */
 export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, items, chosen, onPick, onPickCard, onClear }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -41,6 +39,20 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [imageSearch, setImageSearch] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  // the image search stays open while the box is left (a file picker takes the focus): a press outside it closes it
+  useEffect(() => {
+    if (!imageSearch) return;
+    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setImageSearch(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setImageSearch(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [imageSearch]);
   const [active, setActive] = useState(-1);   // -1: no suggestion marked, Enter searches the names
   const input = useRef<HTMLInputElement>(null);
   const id = useId();
@@ -96,7 +108,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
       .sort((a, b) => a.rank - b.rank || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.order - b.order)
       .slice(0, SHOWN);
   }, [groups, cards, typed]);
-  const shown = open && suggestions.length > 0;
+  const shown = open && !imageSearch && suggestions.length > 0;
 
   const pick = (it: Suggestion) => {
     if (it.group) onPick(it.group.key);
@@ -107,7 +119,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   };
 
   return (
-    <div className="relative text-left">
+    <div ref={root} className="relative text-left">
       <SearchForm
         onSearch={() => {
           if (shown && suggestions[active]) pick(suggestions[active]);
@@ -117,7 +129,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
           }
         }}
       >
-        <div className="flex items-center gap-1.5 h-9 w-full rounded-md border border-input bg-transparent pl-1.5 pr-3 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+        <div className="flex items-center gap-1.5 h-9 w-full rounded-md border border-input bg-transparent pl-1.5 pr-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
           {chosen && (
             <span className="shrink-0 max-w-[55%] inline-flex items-center gap-1 h-7 pl-2 pr-1 rounded-md bg-blue-600 text-white text-xs font-semibold">
               <span className="opacity-80">{chosen.tag === "카드" ? "서포트" : "카드군"}</span>
@@ -144,6 +156,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
             value={query}
             onChange={(e) => {
               onQueryChange(e.target.value);
+              setImageSearch(false);
               setOpen(true);
               setActive(-1);
             }}
@@ -164,8 +177,34 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
             enterKeyHint="search"
             className="min-w-0 flex-1 h-full bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground"
           />
+          <button
+            type="button"
+            onClick={() => {
+              setImageSearch((v) => !v);
+              setOpen(false);
+            }}
+            aria-label="사진으로 카드 찾기"
+            aria-expanded={imageSearch}
+            title="사진으로 카드 찾기"
+            className={`shrink-0 w-8 h-7 grid place-items-center rounded-md transition ${
+              imageSearch ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            <Camera size={18} aria-hidden />
+          </button>
         </div>
       </SearchForm>
+      {imageSearch && (
+        <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+          <ImageCardSearch
+            onPickCard={(id) => {
+              setImageSearch(false);
+              onPickCard(id);
+            }}
+            onClose={() => setImageSearch(false)}
+          />
+        </div>
+      )}
       {shown && (
         <ul
           id={`${id}-list`}

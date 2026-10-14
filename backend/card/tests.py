@@ -496,6 +496,8 @@ class DeckScannerTest(FreshArt, TestCase):
         self.assertEqual(len(identify.call_args[0][0]), 3)   # the whole cut cards, in order
         self.assertEqual([x["card_name"] for x in r.json()["result"]], ["블랙 매지션", "Unknown", "Unknown"])
         self.assertEqual([x["confidence"] for x in r.json()["result"]], [93.0, 90.0, 31.0])
+        # the card's id too, so a card search can open what it found (/dev/cards, 참혈 2026-10-14)
+        self.assertEqual([x["card_id"] for x in r.json()["result"]], [4041, None, None])
         from .models import CardDetection
         self.assertEqual(list(CardDetection.objects.order_by("id").values_list("new_card_id", flat=True)), [4041, None, None])
 
