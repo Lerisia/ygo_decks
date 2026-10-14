@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getDeckNotes, DeckNote } from "@/api/deckApi";
 import { isStaleNote, STALE_YEARS } from "@/utils/noteAge";
 
-const SOURCE_STYLE: Record<string, string> = {
+export const SOURCE_STYLE: Record<string, string> = {
   postype: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   dcinside: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
   notion: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",

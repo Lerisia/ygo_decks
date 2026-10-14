@@ -66,7 +66,7 @@ const MONSTER_KEYS = ["frame", "attribute", "race", "level"];
 const misfit = (key: string, v: DexValues) =>
   MONSTER_KEYS.includes(key) ? ["spell", "trap"].includes(v.category?.[0] ?? "") : key === "st" && v.category?.[0] === "monster";
 
-function TileSkeleton() {
+export function TileSkeleton() {
   return (
     <div>
       <div className="w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700 animate-pulse" />
@@ -77,7 +77,7 @@ function TileSkeleton() {
   );
 }
 
-function CardTile({ card }: { card: CardListItem }) {
+export function CardTile({ card }: { card: CardListItem }) {
   return (
     <Link to={`/cards/${card.id}`} state={{ fromList: true }} className="block text-center group">
       {/* the card's corners are rounded, the rarity badge's are not (특이점 2026-10-12) */}

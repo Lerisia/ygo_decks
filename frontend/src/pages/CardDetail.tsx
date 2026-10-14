@@ -7,6 +7,7 @@ import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/car
 import { type CutinInfo, hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
 import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
 import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
+import { FRAME_COLORS } from "@/lib/cardFrames";
 
 // The finishes' shaders and the summon player arrive when first used, not with the page (2026-10-12)
 const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
@@ -79,11 +80,6 @@ const PANEL_ON_WHITE = "rounded-lg bg-white dark:bg-gray-800";   // a synchro's 
 const PANEL_WIDE = "md:rounded-lg md:bg-gray-200 md:dark:bg-gray-800";   // panels of their own on wider screens only
 const PANEL_WIDE_ON_WHITE = "md:rounded-lg md:bg-white md:dark:bg-gray-800";
 const ROW = "border-b last:border-b-0 border-gray-300 dark:border-gray-600";
-// Master Duel's frame colours, taken from its card frames so that the box matches the card in it
-const FRAME_COLORS: Record<string, string> = {
-  normal: "#c08e3f", effect: "#b8592f", ritual: "#4c75b5", fusion: "#874095", synchro: "#d7d7d5", xyz: "#0b0b0e",
-  link: "#006bb5", spell: "#008a72", trap: "#a91777", token: "#7d6d65",
-};
 const DARK_NAMES = new Set(["normal", "synchro"]);   // frames light enough for dark names
 // the game's icons (mdpipeline/info_icons.py), served from media: the repo is public
 const ICONS = "/media/md_ui/info";

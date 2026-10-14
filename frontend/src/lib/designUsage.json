@@ -1,0 +1,5756 @@
+{
+ "generated": "2026-10-14",
+ "command": "cd frontend && node scripts/design-usage.mjs && DESIGN_MD=write npx vitest run src/lib/designMd.test.ts",
+ "files": 232,
+ "totals": {
+  "colorClasses": 6474,
+  "distinctColors": 110,
+  "hexColors": 160
+ },
+ "families": {
+  "gray": 3469,
+  "blue": 1085,
+  "white": 791,
+  "red": 362,
+  "green": 219,
+  "amber": 189,
+  "yellow": 106,
+  "black": 93,
+  "purple": 51,
+  "orange": 35,
+  "emerald": 26,
+  "sky": 21,
+  "violet": 19,
+  "rose": 6,
+  "fuchsia": 2
+ },
+ "colors": [
+  {
+   "name": "white",
+   "hex": "#ffffff",
+   "total": 791,
+   "light": 711,
+   "dark": 80,
+   "props": {
+    "bg": 429,
+    "text": 343,
+    "ring": 9,
+    "border": 8,
+    "from": 1,
+    "stroke": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 54
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 44
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 35
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 26
+    }
+   ],
+   "fileCount": 112
+  },
+  {
+   "name": "gray-500",
+   "hex": "#6b7280",
+   "total": 588,
+   "light": 563,
+   "dark": 25,
+   "props": {
+    "text": 547,
+    "bg": 35,
+    "border": 4,
+    "fill": 2
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 36
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 28
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 24
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 22
+    }
+   ],
+   "fileCount": 103
+  },
+  {
+   "name": "gray-400",
+   "hex": "#9ca3af",
+   "total": 525,
+   "light": 177,
+   "dark": 348,
+   "props": {
+    "text": 498,
+    "bg": 17,
+    "border": 7,
+    "fill": 2,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "pages/TournamentDetail.tsx",
+     "count": 26
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 20
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 19
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 19
+    }
+   ],
+   "fileCount": 105
+  },
+  {
+   "name": "gray-700",
+   "hex": "#374151",
+   "total": 509,
+   "light": 95,
+   "dark": 414,
+   "props": {
+    "bg": 277,
+    "border": 142,
+    "text": 84,
+    "divide": 5,
+    "fill": 1
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 28
+    },
+    {
+     "file": "components/DeckInfoEditModal.tsx",
+     "count": 16
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 15
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 15
+    }
+   ],
+   "fileCount": 102
+  },
+  {
+   "name": "gray-800",
+   "hex": "#1f2937",
+   "total": 417,
+   "light": 20,
+   "dark": 397,
+   "props": {
+    "bg": 385,
+    "text": 14,
+    "border": 10,
+    "ring": 4,
+    "divide": 1,
+    "from": 1,
+    "stroke": 1,
+    "to": 1
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 23
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 22
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 19
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 18
+    }
+   ],
+   "fileCount": 95
+  },
+  {
+   "name": "gray-600",
+   "hex": "#4b5563",
+   "total": 352,
+   "light": 125,
+   "dark": 227,
+   "props": {
+    "border": 184,
+    "text": 106,
+    "bg": 60,
+    "ring": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 28
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 23
+    },
+    {
+     "file": "pages/CardDetail.tsx",
+     "count": 17
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 15
+    }
+   ],
+   "fileCount": 88
+  },
+  {
+   "name": "blue-600",
+   "hex": "#2563eb",
+   "total": 350,
+   "light": 350,
+   "dark": 0,
+   "props": {
+    "bg": 162,
+    "text": 131,
+    "border": 39,
+    "accent": 17,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 27
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 20
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 18
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 16
+    }
+   ],
+   "fileCount": 97
+  },
+  {
+   "name": "gray-300",
+   "hex": "#d1d5db",
+   "total": 347,
+   "light": 238,
+   "dark": 109,
+   "props": {
+    "border": 185,
+    "text": 109,
+    "bg": 50,
+    "ring": 2,
+    "fill": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 31
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 24
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 20
+    },
+    {
+     "file": "pages/CardDetail.tsx",
+     "count": 17
+    }
+   ],
+   "fileCount": 85
+  },
+  {
+   "name": "gray-200",
+   "hex": "#e5e7eb",
+   "total": 318,
+   "light": 264,
+   "dark": 54,
+   "props": {
+    "bg": 144,
+    "border": 118,
+    "text": 52,
+    "divide": 3,
+    "fill": 1
+   },
+   "files": [
+    {
+     "file": "pages/Info.tsx",
+     "count": 13
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 13
+    },
+    {
+     "file": "pages/CardDetail.tsx",
+     "count": 12
+    },
+    {
+     "file": "pages/CardList.tsx",
+     "count": 12
+    }
+   ],
+   "fileCount": 85
+  },
+  {
+   "name": "gray-100",
+   "hex": "#f3f4f6",
+   "total": 182,
+   "light": 149,
+   "dark": 33,
+   "props": {
+    "bg": 128,
+    "text": 34,
+    "border": 17,
+    "divide": 3
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 12
+    },
+    {
+     "file": "pages/RecordGroupStatistics.tsx",
+     "count": 12
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 10
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 9
+    }
+   ],
+   "fileCount": 61
+  },
+  {
+   "name": "gray-900",
+   "hex": "#111827",
+   "total": 157,
+   "light": 60,
+   "dark": 97,
+   "props": {
+    "bg": 94,
+    "text": 58,
+    "border": 3,
+    "ring": 2
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 10
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 9
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 7
+    },
+    {
+     "file": "pages/SoloDrawingDetail.tsx",
+     "count": 6
+    }
+   ],
+   "fileCount": 58
+  },
+  {
+   "name": "blue-700",
+   "hex": "#1d4ed8",
+   "total": 151,
+   "light": 133,
+   "dark": 18,
+   "props": {
+    "bg": 87,
+    "text": 46,
+    "border": 18
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 13
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 10
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 8
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 7
+    }
+   ],
+   "fileCount": 68
+  },
+  {
+   "name": "blue-400",
+   "hex": "#60a5fa",
+   "total": 133,
+   "light": 20,
+   "dark": 113,
+   "props": {
+    "text": 110,
+    "border": 15,
+    "ring": 7,
+    "bg": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 9
+    },
+    {
+     "file": "pages/AdminBorders.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/IconShop.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 5
+    }
+   ],
+   "fileCount": 65
+  },
+  {
+   "name": "blue-900",
+   "hex": "#1e3a8a",
+   "total": 110,
+   "light": 1,
+   "dark": 109,
+   "props": {
+    "bg": 108,
+    "border": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 15
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 12
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 11
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 9
+    }
+   ],
+   "fileCount": 36
+  },
+  {
+   "name": "blue-500",
+   "hex": "#3b82f6",
+   "total": 107,
+   "light": 102,
+   "dark": 5,
+   "props": {
+    "border": 59,
+    "ring": 31,
+    "bg": 9,
+    "text": 8
+   },
+   "files": [
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 15
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 14
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 8
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 6
+    }
+   ],
+   "fileCount": 47
+  },
+  {
+   "name": "blue-50",
+   "hex": "#eff6ff",
+   "total": 96,
+   "light": 96,
+   "dark": 0,
+   "props": {
+    "bg": 95,
+    "from": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 13
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 10
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 9
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 7
+    }
+   ],
+   "fileCount": 36
+  },
+  {
+   "name": "black",
+   "hex": "#000000",
+   "total": 93,
+   "light": 91,
+   "dark": 2,
+   "props": {
+    "bg": 52,
+    "text": 40,
+    "ring-offset": 1
+   },
+   "files": [
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 8
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 7
+    },
+    {
+     "file": "components/TrackerConfirmModal.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 4
+    }
+   ],
+   "fileCount": 46
+  },
+  {
+   "name": "red-500",
+   "hex": "#ef4444",
+   "total": 88,
+   "light": 87,
+   "dark": 1,
+   "props": {
+    "text": 61,
+    "bg": 23,
+    "border": 3,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "pages/TournamentDetail.tsx",
+     "count": 7
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 4
+    }
+   ],
+   "fileCount": 45
+  },
+  {
+   "name": "gray-50",
+   "hex": "#f9fafb",
+   "total": 74,
+   "light": 74,
+   "dark": 0,
+   "props": {
+    "bg": 73,
+    "to": 1
+   },
+   "files": [
+    {
+     "file": "pages/Mypage.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/AdminEffectTags.tsx",
+     "count": 4
+    }
+   ],
+   "fileCount": 38
+  },
+  {
+   "name": "red-600",
+   "hex": "#dc2626",
+   "total": 73,
+   "light": 73,
+   "dark": 0,
+   "props": {
+    "text": 55,
+    "bg": 18
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 8
+    },
+    {
+     "file": "pages/SoloDrawingDetail.tsx",
+     "count": 7
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 6
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 6
+    }
+   ],
+   "fileCount": 30
+  },
+  {
+   "name": "blue-300",
+   "hex": "#93c5fd",
+   "total": 66,
+   "light": 19,
+   "dark": 47,
+   "props": {
+    "text": 47,
+    "border": 19
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 11
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 7
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 6
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 6
+    }
+   ],
+   "fileCount": 23
+  },
+  {
+   "name": "green-700",
+   "hex": "#15803d",
+   "total": 40,
+   "light": 32,
+   "dark": 8,
+   "props": {
+    "text": 27,
+    "border": 7,
+    "bg": 5,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/AdminEffectTags.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 4
+    }
+   ],
+   "fileCount": 17
+  },
+  {
+   "name": "green-600",
+   "hex": "#16a34a",
+   "total": 38,
+   "light": 34,
+   "dark": 4,
+   "props": {
+    "text": 24,
+    "bg": 10,
+    "border": 4
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/IconShop.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 21
+  },
+  {
+   "name": "red-400",
+   "hex": "#f87171",
+   "total": 35,
+   "light": 1,
+   "dark": 34,
+   "props": {
+    "text": 34,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/deckbuilder/CardSearchPanel.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 21
+  },
+  {
+   "name": "red-900",
+   "hex": "#7f1d1d",
+   "total": 35,
+   "light": 0,
+   "dark": 35,
+   "props": {
+    "bg": 35
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 3
+    }
+   ],
+   "fileCount": 23
+  },
+  {
+   "name": "red-300",
+   "hex": "#fca5a5",
+   "total": 34,
+   "light": 8,
+   "dark": 26,
+   "props": {
+    "text": 26,
+    "border": 8
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 3
+    }
+   ],
+   "fileCount": 21
+  },
+  {
+   "name": "green-400",
+   "hex": "#4ade80",
+   "total": 33,
+   "light": 7,
+   "dark": 26,
+   "props": {
+    "text": 26,
+    "border": 5,
+    "ring": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 6
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 3
+    }
+   ],
+   "fileCount": 17
+  },
+  {
+   "name": "green-300",
+   "hex": "#86efac",
+   "total": 32,
+   "light": 8,
+   "dark": 24,
+   "props": {
+    "text": 24,
+    "border": 7,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/AdminEffectTags.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 3
+    }
+   ],
+   "fileCount": 16
+  },
+  {
+   "name": "blue-100",
+   "hex": "#dbeafe",
+   "total": 28,
+   "light": 28,
+   "dark": 0,
+   "props": {
+    "bg": 22,
+    "border": 6
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 20
+  },
+  {
+   "name": "amber-400",
+   "hex": "#fbbf24",
+   "total": 28,
+   "light": 4,
+   "dark": 24,
+   "props": {
+    "text": 24,
+    "bg": 3,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/tournament/DeckTab.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 16
+  },
+  {
+   "name": "red-700",
+   "hex": "#b91c1c",
+   "total": 28,
+   "light": 27,
+   "dark": 1,
+   "props": {
+    "text": 25,
+    "bg": 2,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 21
+  },
+  {
+   "name": "amber-700",
+   "hex": "#b45309",
+   "total": 27,
+   "light": 19,
+   "dark": 8,
+   "props": {
+    "text": 17,
+    "border": 8,
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/PcTrackerBanner.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/TournamentNoticePopup.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 19
+  },
+  {
+   "name": "amber-300",
+   "hex": "#fcd34d",
+   "total": 27,
+   "light": 11,
+   "dark": 16,
+   "props": {
+    "text": 17,
+    "border": 10
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/PcTrackerBanner.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 15
+  },
+  {
+   "name": "red-50",
+   "hex": "#fef2f2",
+   "total": 27,
+   "light": 27,
+   "dark": 0,
+   "props": {
+    "bg": 27
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 20
+  },
+  {
+   "name": "green-900",
+   "hex": "#14532d",
+   "total": 27,
+   "light": 0,
+   "dark": 27,
+   "props": {
+    "bg": 27
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/AdminEffectTags.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 16
+  },
+  {
+   "name": "yellow-900",
+   "hex": "#713f12",
+   "total": 25,
+   "light": 0,
+   "dark": 25,
+   "props": {
+    "bg": 25
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 6
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/CardQuiz.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 14
+  },
+  {
+   "name": "amber-900",
+   "hex": "#78350f",
+   "total": 24,
+   "light": 3,
+   "dark": 21,
+   "props": {
+    "bg": 21,
+    "text": 3
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/charts/CoinSplit.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckVideosModal.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/NotificationCard.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 16
+  },
+  {
+   "name": "blue-800",
+   "hex": "#1e40af",
+   "total": 24,
+   "light": 4,
+   "dark": 20,
+   "props": {
+    "border": 16,
+    "bg": 6,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/ChangelogEditor.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 17
+  },
+  {
+   "name": "amber-800",
+   "hex": "#92400e",
+   "total": 19,
+   "light": 12,
+   "dark": 7,
+   "props": {
+    "text": 10,
+    "border": 6,
+    "to": 2,
+    "bg": 1
+   },
+   "files": [
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/charts/CoinSplit.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 13
+  },
+  {
+   "name": "blue-200",
+   "hex": "#bfdbfe",
+   "total": 17,
+   "light": 13,
+   "dark": 4,
+   "props": {
+    "border": 11,
+    "text": 4,
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/ChangelogEditor.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/DatabaseTrackerPromo.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 14
+  },
+  {
+   "name": "red-200",
+   "hex": "#fecaca",
+   "total": 16,
+   "light": 15,
+   "dark": 1,
+   "props": {
+    "border": 14,
+    "bg": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 13
+  },
+  {
+   "name": "amber-600",
+   "hex": "#d97706",
+   "total": 15,
+   "light": 15,
+   "dark": 0,
+   "props": {
+    "text": 12,
+    "bg": 3
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/TournamentDetail.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/PcTrackerBanner.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 10
+  },
+  {
+   "name": "red-800",
+   "hex": "#991b1b",
+   "total": 15,
+   "light": 1,
+   "dark": 14,
+   "props": {
+    "border": 14,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminBorders.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 12
+  },
+  {
+   "name": "yellow-700",
+   "hex": "#a16207",
+   "total": 15,
+   "light": 11,
+   "dark": 4,
+   "props": {
+    "text": 11,
+    "border": 4
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 10
+  },
+  {
+   "name": "green-50",
+   "hex": "#f0fdf4",
+   "total": 15,
+   "light": 15,
+   "dark": 0,
+   "props": {
+    "bg": 15
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/AdminEffectTags.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/IconShop.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 9
+  },
+  {
+   "name": "green-500",
+   "hex": "#22c55e",
+   "total": 14,
+   "light": 14,
+   "dark": 0,
+   "props": {
+    "bg": 8,
+    "text": 3,
+    "border": 2,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "pages/CardQuiz.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/DuchMindBrowsePanel.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 9
+  },
+  {
+   "name": "yellow-50",
+   "hex": "#fefce8",
+   "total": 14,
+   "light": 14,
+   "dark": 0,
+   "props": {
+    "bg": 14
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/CardQuiz.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 8
+  },
+  {
+   "name": "amber-100",
+   "hex": "#fef3c7",
+   "total": 13,
+   "light": 11,
+   "dark": 2,
+   "props": {
+    "bg": 11,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "api/cardIconApi.ts",
+     "count": 1
+    },
+    {
+     "file": "components/charts/Bar.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 11
+  },
+  {
+   "name": "amber-50",
+   "hex": "#fffbeb",
+   "total": 12,
+   "light": 12,
+   "dark": 0,
+   "props": {
+    "bg": 12
+   },
+   "files": [
+    {
+     "file": "pages/PcRecorder.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/charts/CoinSplit.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/DeckVideosModal.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 11
+  },
+  {
+   "name": "green-100",
+   "hex": "#dcfce7",
+   "total": 12,
+   "light": 12,
+   "dark": 0,
+   "props": {
+    "bg": 12
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 11
+  },
+  {
+   "name": "yellow-300",
+   "hex": "#fde047",
+   "total": 12,
+   "light": 5,
+   "dark": 7,
+   "props": {
+    "text": 7,
+    "border": 4,
+    "bg": 1
+   },
+   "files": [
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/DuchMindWordPackDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 9
+  },
+  {
+   "name": "purple-700",
+   "hex": "#7e22ce",
+   "total": 11,
+   "light": 10,
+   "dark": 1,
+   "props": {
+    "text": 8,
+    "bg": 2,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 5
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "api/cardIconApi.ts",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 6
+  },
+  {
+   "name": "amber-500",
+   "hex": "#f59e0b",
+   "total": 11,
+   "light": 11,
+   "dark": 0,
+   "props": {
+    "bg": 7,
+    "via": 2,
+    "ring": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "components/DeckHyeolSection.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckVideosModal.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/packs/PackFront.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 10
+  },
+  {
+   "name": "yellow-400",
+   "hex": "#facc15",
+   "total": 11,
+   "light": 7,
+   "dark": 4,
+   "props": {
+    "text": 4,
+    "bg": 3,
+    "border": 2,
+    "ring": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/NotificationCard.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 6
+  },
+  {
+   "name": "yellow-100",
+   "hex": "#fef9c3",
+   "total": 11,
+   "light": 11,
+   "dark": 0,
+   "props": {
+    "bg": 11
+   },
+   "files": [
+    {
+     "file": "pages/SoloTwenty.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/GameResultScreen.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 9
+  },
+  {
+   "name": "purple-900",
+   "hex": "#581c87",
+   "total": 9,
+   "light": 0,
+   "dark": 9,
+   "props": {
+    "bg": 9
+   },
+   "files": [
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 2
+    },
+    {
+     "file": "api/cardIconApi.ts",
+     "count": 1
+    }
+   ],
+   "fileCount": 5
+  },
+  {
+   "name": "purple-300",
+   "hex": "#d8b4fe",
+   "total": 9,
+   "light": 1,
+   "dark": 8,
+   "props": {
+    "text": 8,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "api/cardIconApi.ts",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 5
+  },
+  {
+   "name": "red-100",
+   "hex": "#fee2e2",
+   "total": 9,
+   "light": 9,
+   "dark": 0,
+   "props": {
+    "bg": 9
+   },
+   "files": [
+    {
+     "file": "components/charts/Bar.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/RoomRulesPanel.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 9
+  },
+  {
+   "name": "amber-200",
+   "hex": "#fde68a",
+   "total": 8,
+   "light": 7,
+   "dark": 1,
+   "props": {
+    "border": 4,
+    "from": 2,
+    "bg": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "components/charts/CoinSplit.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckVideosModal.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/NotificationCard.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/packs/PackFront.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 7
+  },
+  {
+   "name": "orange-900",
+   "hex": "#7c2d12",
+   "total": 8,
+   "light": 0,
+   "dark": 8,
+   "props": {
+    "bg": 8
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/GameResultScreen.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "orange-500",
+   "hex": "#f97316",
+   "total": 7,
+   "light": 7,
+   "dark": 0,
+   "props": {
+    "bg": 5,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "sky-700",
+   "hex": "#0369a1",
+   "total": 6,
+   "light": 5,
+   "dark": 1,
+   "props": {
+    "text": 4,
+    "bg": 1,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "emerald-900",
+   "hex": "#064e3b",
+   "total": 6,
+   "light": 0,
+   "dark": 6,
+   "props": {
+    "bg": 6
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "orange-600",
+   "hex": "#ea580c",
+   "total": 6,
+   "light": 6,
+   "dark": 0,
+   "props": {
+    "bg": 4,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "purple-600",
+   "hex": "#9333ea",
+   "total": 6,
+   "light": 6,
+   "dark": 0,
+   "props": {
+    "bg": 4,
+    "border": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/IconShop.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Mypage.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "yellow-200",
+   "hex": "#fef08a",
+   "total": 6,
+   "light": 4,
+   "dark": 2,
+   "props": {
+    "border": 4,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDrawingDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDuchmind.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 5
+  },
+  {
+   "name": "yellow-800",
+   "hex": "#854d0e",
+   "total": 6,
+   "light": 2,
+   "dark": 4,
+   "props": {
+    "border": 4,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDrawingDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDuchmind.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 5
+  },
+  {
+   "name": "purple-100",
+   "hex": "#f3e8ff",
+   "total": 5,
+   "light": 5,
+   "dark": 0,
+   "props": {
+    "bg": 5
+   },
+   "files": [
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 2
+    },
+    {
+     "file": "api/cardIconApi.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "sky-300",
+   "hex": "#7dd3fc",
+   "total": 5,
+   "light": 1,
+   "dark": 4,
+   "props": {
+    "text": 4,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "amber-950",
+   "hex": "#451a03",
+   "total": 5,
+   "light": 3,
+   "dark": 2,
+   "props": {
+    "text": 3,
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/charts/Bar.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/NotificationCard.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 5
+  },
+  {
+   "name": "yellow-500",
+   "hex": "#eab308",
+   "total": 5,
+   "light": 3,
+   "dark": 2,
+   "props": {
+    "bg": 3,
+    "border": 1,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/CardQuiz.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Mypage.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/NotificationCard.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "sky-900",
+   "hex": "#0c4a6e",
+   "total": 4,
+   "light": 0,
+   "dark": 4,
+   "props": {
+    "bg": 4
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "emerald-100",
+   "hex": "#d1fae5",
+   "total": 4,
+   "light": 4,
+   "dark": 0,
+   "props": {
+    "bg": 4
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "emerald-300",
+   "hex": "#6ee7b7",
+   "total": 4,
+   "light": 0,
+   "dark": 4,
+   "props": {
+    "text": 4
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "green-800",
+   "hex": "#166534",
+   "total": 4,
+   "light": 2,
+   "dark": 2,
+   "props": {
+    "border": 2,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminPointsGrant.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "green-200",
+   "hex": "#bbf7d0",
+   "total": 4,
+   "light": 2,
+   "dark": 2,
+   "props": {
+    "border": 2,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/TrackerPendingPanel.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminPointsGrant.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Tracker.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "orange-100",
+   "hex": "#ffedd5",
+   "total": 4,
+   "light": 4,
+   "dark": 0,
+   "props": {
+    "bg": 4
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/GameResultScreen.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 4
+  },
+  {
+   "name": "orange-400",
+   "hex": "#fb923c",
+   "total": 4,
+   "light": 2,
+   "dark": 2,
+   "props": {
+    "ring": 2,
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "orange-50",
+   "hex": "#fff7ed",
+   "total": 4,
+   "light": 4,
+   "dark": 0,
+   "props": {
+    "bg": 4
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "purple-200",
+   "hex": "#e9d5ff",
+   "total": 4,
+   "light": 4,
+   "dark": 0,
+   "props": {
+    "bg": 2,
+    "border": 2
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "violet-900",
+   "hex": "#4c1d95",
+   "total": 3,
+   "light": 0,
+   "dark": 3,
+   "props": {
+    "bg": 3
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "sky-100",
+   "hex": "#e0f2fe",
+   "total": 3,
+   "light": 3,
+   "dark": 0,
+   "props": {
+    "bg": 3
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "emerald-700",
+   "hex": "#047857",
+   "total": 3,
+   "light": 3,
+   "dark": 0,
+   "props": {
+    "text": 3
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "rose-600",
+   "hex": "#e11d48",
+   "total": 3,
+   "light": 3,
+   "dark": 0,
+   "props": {
+    "bg": 3
+   },
+   "files": [
+    {
+     "file": "components/Navbar.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AllMenu.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "rose-700",
+   "hex": "#be123c",
+   "total": 3,
+   "light": 3,
+   "dark": 0,
+   "props": {
+    "bg": 3
+   },
+   "files": [
+    {
+     "file": "components/Navbar.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AllMenu.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "blue-950",
+   "hex": "#172554",
+   "total": 3,
+   "light": 0,
+   "dark": 3,
+   "props": {
+    "bg": 2,
+    "from": 1
+   },
+   "files": [
+    {
+     "file": "pages/CardDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 3
+  },
+  {
+   "name": "emerald-800",
+   "hex": "#065f46",
+   "total": 3,
+   "light": 1,
+   "dark": 2,
+   "props": {
+    "border": 2,
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "violet-600",
+   "hex": "#7c3aed",
+   "total": 3,
+   "light": 3,
+   "dark": 0,
+   "props": {
+    "text": 2,
+    "to": 1
+   },
+   "files": [
+    {
+     "file": "pages/Info.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "violet-400",
+   "hex": "#a78bfa",
+   "total": 3,
+   "light": 1,
+   "dark": 2,
+   "props": {
+    "text": 2,
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/Info.tsx",
+     "count": 3
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "emerald-500",
+   "hex": "#10b981",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 1,
+    "ring": 1
+   },
+   "files": [
+    {
+     "file": "components/DeckHyeolSection.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "violet-100",
+   "hex": "#ede9fe",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "violet-700",
+   "hex": "#6d28d9",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "violet-300",
+   "hex": "#c4b5fd",
+   "total": 2,
+   "light": 0,
+   "dark": 2,
+   "props": {
+    "text": 2
+   },
+   "files": [
+    {
+     "file": "components/DeckNotesSection.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "red-950",
+   "hex": "#450a0a",
+   "total": 2,
+   "light": 0,
+   "dark": 2,
+   "props": {
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/charts/Bar.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "purple-50",
+   "hex": "#faf5ff",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "sky-600",
+   "hex": "#0284c7",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "purple-500",
+   "hex": "#a855f7",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "text": 1,
+    "via": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "purple-800",
+   "hex": "#6b21a8",
+   "total": 2,
+   "light": 0,
+   "dark": 2,
+   "props": {
+    "border": 2
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 2
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "emerald-50",
+   "hex": "#ecfdf5",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 2
+   },
+   "files": [
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "emerald-200",
+   "hex": "#a7f3d0",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "border": 2
+   },
+   "files": [
+    {
+     "file": "pages/Changelog.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "violet-50",
+   "hex": "#f5f3ff",
+   "total": 2,
+   "light": 2,
+   "dark": 0,
+   "props": {
+    "bg": 1,
+    "to": 1
+   },
+   "files": [
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 2
+  },
+  {
+   "name": "orange-300",
+   "hex": "#fdba74",
+   "total": 1,
+   "light": 1,
+   "dark": 0,
+   "props": {
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "orange-700",
+   "hex": "#c2410c",
+   "total": 1,
+   "light": 0,
+   "dark": 1,
+   "props": {
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "fuchsia-600",
+   "hex": "#c026d3",
+   "total": 1,
+   "light": 1,
+   "dark": 0,
+   "props": {
+    "bg": 1
+   },
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "sky-50",
+   "hex": "#f0f9ff",
+   "total": 1,
+   "light": 1,
+   "dark": 0,
+   "props": {
+    "bg": 1
+   },
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "yellow-600",
+   "hex": "#ca8a04",
+   "total": 1,
+   "light": 1,
+   "dark": 0,
+   "props": {
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/CardQuiz.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "violet-500",
+   "hex": "#8b5cf6",
+   "total": 1,
+   "light": 0,
+   "dark": 1,
+   "props": {
+    "border": 1
+   },
+   "files": [
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "purple-400",
+   "hex": "#c084fc",
+   "total": 1,
+   "light": 0,
+   "dark": 1,
+   "props": {
+    "text": 1
+   },
+   "files": [
+    {
+     "file": "pages/Mypage.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "fuchsia-400",
+   "hex": "#e879f9",
+   "total": 1,
+   "light": 1,
+   "dark": 0,
+   "props": {
+    "from": 1
+   },
+   "files": [
+    {
+     "file": "pages/PackDetail.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  },
+  {
+   "name": "violet-950",
+   "hex": "#2e1065",
+   "total": 1,
+   "light": 0,
+   "dark": 1,
+   "props": {
+    "to": 1
+   },
+   "files": [
+    {
+     "file": "pages/RecordGroups.tsx",
+     "count": 1
+    }
+   ],
+   "fileCount": 1
+  }
+ ],
+ "classes": [
+  {
+   "name": "text-gray-500",
+   "count": 547
+  },
+  {
+   "name": "text-gray-400",
+   "count": 498
+  },
+  {
+   "name": "bg-white",
+   "count": 410
+  },
+  {
+   "name": "bg-gray-800",
+   "count": 379
+  },
+  {
+   "name": "text-white",
+   "count": 341
+  },
+  {
+   "name": "bg-gray-700",
+   "count": 264
+  },
+  {
+   "name": "border-gray-300",
+   "count": 185
+  },
+  {
+   "name": "border-gray-600",
+   "count": 183
+  },
+  {
+   "name": "bg-blue-600",
+   "count": 162
+  },
+  {
+   "name": "bg-gray-200",
+   "count": 143
+  },
+  {
+   "name": "border-gray-700",
+   "count": 137
+  },
+  {
+   "name": "text-blue-600",
+   "count": 131
+  },
+  {
+   "name": "bg-gray-100",
+   "count": 128
+  },
+  {
+   "name": "border-gray-200",
+   "count": 116
+  },
+  {
+   "name": "text-blue-400",
+   "count": 110
+  },
+  {
+   "name": "text-gray-300",
+   "count": 109
+  },
+  {
+   "name": "text-gray-600",
+   "count": 106
+  },
+  {
+   "name": "bg-blue-50",
+   "count": 90
+  },
+  {
+   "name": "bg-blue-700",
+   "count": 86
+  },
+  {
+   "name": "bg-gray-900",
+   "count": 84
+  },
+  {
+   "name": "text-gray-700",
+   "count": 84
+  },
+  {
+   "name": "bg-blue-900/20",
+   "count": 74
+  },
+  {
+   "name": "bg-gray-50",
+   "count": 73
+  },
+  {
+   "name": "text-red-500",
+   "count": 61
+  },
+  {
+   "name": "bg-gray-600",
+   "count": 60
+  },
+  {
+   "name": "border-blue-500",
+   "count": 59
+  },
+  {
+   "name": "text-gray-900",
+   "count": 58
+  },
+  {
+   "name": "text-red-600",
+   "count": 55
+  },
+  {
+   "name": "text-gray-200",
+   "count": 52
+  },
+  {
+   "name": "bg-gray-300",
+   "count": 50
+  },
+  {
+   "name": "text-blue-300",
+   "count": 47
+  },
+  {
+   "name": "text-blue-700",
+   "count": 46
+  },
+  {
+   "name": "text-black",
+   "count": 40
+  },
+  {
+   "name": "border-blue-600",
+   "count": 38
+  },
+  {
+   "name": "text-gray-100",
+   "count": 34
+  },
+  {
+   "name": "text-red-400",
+   "count": 34
+  },
+  {
+   "name": "bg-gray-500",
+   "count": 32
+  },
+  {
+   "name": "ring-blue-500",
+   "count": 31
+  },
+  {
+   "name": "bg-red-50",
+   "count": 27
+  },
+  {
+   "name": "text-green-700",
+   "count": 27
+  },
+  {
+   "name": "text-green-400",
+   "count": 26
+  },
+  {
+   "name": "text-red-300",
+   "count": 26
+  },
+  {
+   "name": "text-red-700",
+   "count": 25
+  },
+  {
+   "name": "text-amber-400",
+   "count": 24
+  },
+  {
+   "name": "text-green-300",
+   "count": 24
+  },
+  {
+   "name": "text-green-600",
+   "count": 24
+  },
+  {
+   "name": "bg-red-900/20",
+   "count": 23
+  },
+  {
+   "name": "bg-blue-100",
+   "count": 22
+  },
+  {
+   "name": "bg-red-500",
+   "count": 22
+  },
+  {
+   "name": "bg-black/60",
+   "count": 21
+  },
+  {
+   "name": "border-blue-300",
+   "count": 19
+  },
+  {
+   "name": "bg-red-600",
+   "count": 18
+  },
+  {
+   "name": "border-blue-700",
+   "count": 18
+  },
+  {
+   "name": "accent-blue-600",
+   "count": 17
+  },
+  {
+   "name": "bg-blue-900/30",
+   "count": 17
+  },
+  {
+   "name": "border-gray-100",
+   "count": 17
+  },
+  {
+   "name": "text-amber-700",
+   "count": 17
+  },
+  {
+   "name": "border-blue-400",
+   "count": 15
+  },
+  {
+   "name": "text-amber-300",
+   "count": 15
+  },
+  {
+   "name": "bg-black/50",
+   "count": 14
+  }
+ ],
+ "hex": [
+  {
+   "hex": "#ffffff",
+   "total": 52,
+   "tailwind": "white",
+   "nearest": {
+    "name": "white",
+    "hex": "#ffffff",
+    "delta": 0
+   },
+   "fileCount": 16,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 13
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 7
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 7
+    }
+   ]
+  },
+  {
+   "hex": "#000000",
+   "total": 30,
+   "tailwind": "black",
+   "nearest": {
+    "name": "black",
+    "hex": "#000000",
+    "delta": 0
+   },
+   "fileCount": 9,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 7
+    },
+    {
+     "file": "lib/duchmindCanvas.ts",
+     "count": 6
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 4
+    }
+   ]
+  },
+  {
+   "hex": "#3b82f6",
+   "total": 12,
+   "tailwind": "blue-500",
+   "nearest": {
+    "name": "blue-500",
+    "hex": "#3b82f6",
+    "delta": 0
+   },
+   "fileCount": 6,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 5
+    },
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/ColorWheelPicker.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#ef4444",
+   "total": 10,
+   "tailwind": "red-500",
+   "nearest": {
+    "name": "red-500",
+    "hex": "#ef4444",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 8
+    },
+    {
+     "file": "components/charts/theme.ts",
+     "count": 1
+    },
+    {
+     "file": "lib/deckPower.ts",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#22c55e",
+   "total": 7,
+   "tailwind": "green-500",
+   "nearest": {
+    "name": "green-500",
+    "hex": "#22c55e",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 5
+    },
+    {
+     "file": "lib/deckPower.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminScanLabels.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#f97316",
+   "total": 6,
+   "tailwind": "orange-500",
+   "nearest": {
+    "name": "orange-500",
+    "hex": "#f97316",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 4
+    },
+    {
+     "file": "lib/deckPower.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminScanLabels.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#eab308",
+   "total": 5,
+   "tailwind": "yellow-500",
+   "nearest": {
+    "name": "yellow-500",
+    "hex": "#eab308",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 5
+    }
+   ]
+  },
+  {
+   "hex": "#06b6d4",
+   "total": 4,
+   "tailwind": "cyan-500",
+   "nearest": {
+    "name": "cyan-500",
+    "hex": "#06b6d4",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 3
+    },
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#2563eb",
+   "total": 4,
+   "tailwind": "blue-600",
+   "nearest": {
+    "name": "blue-600",
+    "hex": "#2563eb",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "components/charts/theme.ts",
+     "count": 2
+    },
+    {
+     "file": "components/PLogo.tsx",
+     "count": 1
+    },
+    {
+     "file": "lib/deckPower.ts",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#e5e7eb",
+   "total": 4,
+   "tailwind": "gray-200",
+   "nearest": {
+    "name": "gray-200",
+    "hex": "#e5e7eb",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/charts/theme.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#374151",
+   "total": 4,
+   "tailwind": "gray-700",
+   "nearest": {
+    "name": "gray-700",
+    "hex": "#374151",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 3
+    },
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#f59e0b",
+   "total": 3,
+   "tailwind": "amber-500",
+   "nearest": {
+    "name": "amber-500",
+    "hex": "#f59e0b",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7e22ce",
+   "total": 3,
+   "tailwind": "purple-700",
+   "nearest": {
+    "name": "purple-700",
+    "hex": "#7e22ce",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "lib/deckPower.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ec4899",
+   "total": 3,
+   "tailwind": "pink-500",
+   "nearest": {
+    "name": "pink-500",
+    "hex": "#ec4899",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminScanLabels.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#cfefff",
+   "total": 3,
+   "tailwind": null,
+   "nearest": {
+    "name": "sky-100",
+    "hex": "#e0f2fe",
+    "delta": 5.2
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "lib/packFx.ts",
+     "count": 2
+    },
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ff6ad5",
+   "total": 3,
+   "tailwind": null,
+   "nearest": {
+    "name": "pink-400",
+    "hex": "#f472b6",
+    "delta": 18.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 3
+    }
+   ]
+  },
+  {
+   "hex": "#646cff",
+   "total": 3,
+   "tailwind": null,
+   "nearest": {
+    "name": "indigo-500",
+    "hex": "#6366f1",
+    "delta": 4.6
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "index.css",
+     "count": 3
+    }
+   ]
+  },
+  {
+   "hex": "#d1d5db",
+   "total": 3,
+   "tailwind": "gray-300",
+   "nearest": {
+    "name": "gray-300",
+    "hex": "#d1d5db",
+    "delta": 0
+   },
+   "fileCount": 3,
+   "files": [
+    {
+     "file": "pages/AdminBorders.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#8b5cf6",
+   "total": 3,
+   "tailwind": "violet-500",
+   "nearest": {
+    "name": "violet-500",
+    "hex": "#8b5cf6",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 3
+    }
+   ]
+  },
+  {
+   "hex": "#7a0000",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-800",
+    "hex": "#991b1b",
+    "delta": 10.1
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#ff4400",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "orange-600",
+    "hex": "#ea580c",
+    "delta": 15.1
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#0c4a8a",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "blue-900",
+    "hex": "#1e3a8a",
+    "delta": 15.1
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#065f46",
+   "total": 2,
+   "tailwind": "emerald-800",
+   "nearest": {
+    "name": "emerald-800",
+    "hex": "#065f46",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#10b981",
+   "total": 2,
+   "tailwind": "emerald-500",
+   "nearest": {
+    "name": "emerald-500",
+    "hex": "#10b981",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#3a230a",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-950",
+    "hex": "#422006",
+    "delta": 6.4
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#a16f3d",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-800",
+    "hex": "#854d0e",
+    "delta": 15.6
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#b8860b",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-600",
+    "hex": "#ca8a04",
+    "delta": 7.8
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#fde047",
+   "total": 2,
+   "tailwind": "yellow-300",
+   "nearest": {
+    "name": "yellow-300",
+    "hex": "#fde047",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#1e1b4b",
+   "total": 2,
+   "tailwind": "indigo-950",
+   "nearest": {
+    "name": "indigo-950",
+    "hex": "#1e1b4b",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#6d28d9",
+   "total": 2,
+   "tailwind": "violet-700",
+   "nearest": {
+    "name": "violet-700",
+    "hex": "#6d28d9",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#b8b4c4",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-400",
+    "hex": "#9ca3af",
+    "delta": 8.6
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#d4d0dc",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-300",
+    "hex": "#d1d5db",
+    "delta": 4.4
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#f9a8c8",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "pink-300",
+    "hex": "#f9a8d4",
+    "delta": 6.3
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#fbc3d6",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "pink-200",
+    "hex": "#fbcfe8",
+    "delta": 6.7
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#ff9b9b",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-300",
+    "hex": "#fca5a5",
+    "delta": 6.1
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/Pie.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#f03030",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-600",
+    "hex": "#dc2626",
+    "delta": 6
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/Pie.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#cf1717",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-600",
+    "hex": "#dc2626",
+    "delta": 4.9
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/Pie.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7f0b0b",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-800",
+    "hex": "#991b1b",
+    "delta": 8.3
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/Pie.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#6b7280",
+   "total": 2,
+   "tailwind": "gray-500",
+   "nearest": {
+    "name": "gray-500",
+    "hex": "#6b7280",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/Pie.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#9ca3af",
+   "total": 2,
+   "tailwind": "gray-400",
+   "nearest": {
+    "name": "gray-400",
+    "hex": "#9ca3af",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/charts/theme.ts",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#666666",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-500",
+    "hex": "#6b7280",
+    "delta": 9.8
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#999999",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-400",
+    "hex": "#9ca3af",
+    "delta": 7.9
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#cccccc",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-300",
+    "hex": "#d1d5db",
+    "delta": 4.6
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7c1818",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-900",
+    "hex": "#7f1d1d",
+    "delta": 2.1
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#cc1f1f",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "red-600",
+    "hex": "#dc2626",
+    "delta": 5
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ff7f00",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "orange-500",
+    "hex": "#f97316",
+    "delta": 8
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ffd92e",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-400",
+    "hex": "#facc15",
+    "delta": 5.8
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#16a34a",
+   "total": 2,
+   "tailwind": "green-600",
+   "nearest": {
+    "name": "green-600",
+    "hex": "#16a34a",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#1f7eff",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "blue-500",
+    "hex": "#3b82f6",
+    "delta": 7.8
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#1e3a8a",
+   "total": 2,
+   "tailwind": "blue-900",
+   "nearest": {
+    "name": "blue-900",
+    "hex": "#1e3a8a",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ffb6c1",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "rose-300",
+    "hex": "#fda4af",
+    "delta": 8.4
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7a4a1c",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-900",
+    "hex": "#713f12",
+    "delta": 4.6
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fcd0a1",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "orange-200",
+    "hex": "#fed7aa",
+    "delta": 3.3
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/SoloDraw.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#111827",
+   "total": 2,
+   "tailwind": "gray-900",
+   "nearest": {
+    "name": "gray-900",
+    "hex": "#111827",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/multiplayer/GameResultScreen.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#0617a0",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "violet-800",
+    "hex": "#5b21b6",
+    "delta": 13.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#1c3cf2",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "indigo-600",
+    "hex": "#4f46e5",
+    "delta": 14.2
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#5a3800",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-900",
+    "hex": "#713f12",
+    "delta": 9.3
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#c98f12",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-600",
+    "hex": "#ca8a04",
+    "delta": 3.5
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#ff2fd0",
+   "total": 2,
+   "tailwind": null,
+   "nearest": {
+    "name": "fuchsia-500",
+    "hex": "#d946ef",
+    "delta": 23.7
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#a855f7",
+   "total": 2,
+   "tailwind": "purple-500",
+   "nearest": {
+    "name": "purple-500",
+    "hex": "#a855f7",
+    "delta": 0
+   },
+   "fileCount": 2,
+   "files": [
+    {
+     "file": "components/packs/PackOpening.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AdminScanLabels.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#4b5563",
+   "total": 2,
+   "tailwind": "gray-600",
+   "nearest": {
+    "name": "gray-600",
+    "hex": "#4b5563",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "hex": "#ffaa00",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "amber-500",
+    "hex": "#f59e0b",
+    "delta": 6.3
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#a8dcff",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "blue-200",
+    "hex": "#bfdbfe",
+    "delta": 7.2
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#a7f3d0",
+   "total": 1,
+   "tailwind": "emerald-200",
+   "nearest": {
+    "name": "emerald-200",
+    "hex": "#a7f3d0",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#e8c896",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "orange-200",
+    "hex": "#fed7aa",
+    "delta": 7
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fffbe6",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-50",
+    "hex": "#fefce8",
+    "delta": 0.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#c084fc",
+   "total": 1,
+   "tailwind": "purple-400",
+   "nearest": {
+    "name": "purple-400",
+    "hex": "#c084fc",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#ebe8f0",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "gray-200",
+    "hex": "#e5e7eb",
+    "delta": 2.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fde0e9",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "rose-100",
+    "hex": "#ffe4e6",
+    "delta": 3.8
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#5a3a1a",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-950",
+    "hex": "#422006",
+    "delta": 11.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#3a1f08",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "yellow-950",
+    "hex": "#422006",
+    "delta": 4.8
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fff5e6",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "orange-50",
+    "hex": "#fff7ed",
+    "delta": 2.7
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/AnimatedBorder.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fff7d1",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "amber-100",
+    "hex": "#fef3c7",
+    "delta": 3.6
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#fcd34d",
+   "total": 1,
+   "tailwind": "amber-300",
+   "nearest": {
+    "name": "amber-300",
+    "hex": "#fcd34d",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#b45309",
+   "total": 1,
+   "tailwind": "amber-700",
+   "nearest": {
+    "name": "amber-700",
+    "hex": "#b45309",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7c2d12",
+   "total": 1,
+   "tailwind": "orange-900",
+   "nearest": {
+    "name": "orange-900",
+    "hex": "#7c2d12",
+    "delta": 0
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#7aa7ff",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "blue-400",
+    "hex": "#60a5fa",
+    "delta": 5.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#1f5cff",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "indigo-600",
+    "hex": "#4f46e5",
+    "delta": 11.6
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#0b3fd6",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "indigo-700",
+    "hex": "#4338ca",
+    "delta": 7.4
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "hex": "#0a2a8f",
+   "total": 1,
+   "tailwind": null,
+   "nearest": {
+    "name": "indigo-800",
+    "hex": "#3730a3",
+    "delta": 9.9
+   },
+   "fileCount": 1,
+   "files": [
+    {
+     "file": "components/CoinBadge.tsx",
+     "count": 1
+    }
+   ]
+  }
+ ],
+ "buttons": [
+  {
+   "pair": "bg-blue-600 → hover:bg-blue-700",
+   "family": "blue",
+   "base": "blue-600",
+   "hover": "blue-700",
+   "total": 84,
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 4
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 4
+    },
+    {
+     "file": "components/DexFilterBar.tsx",
+     "count": 3
+    }
+   ]
+  },
+  {
+   "pair": "bg-gray-500 → hover:bg-gray-600",
+   "family": "gray",
+   "base": "gray-500",
+   "hover": "gray-600",
+   "total": 14,
+   "files": [
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 2
+    },
+    {
+     "file": "pages/SkillNames.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/ChangelogEditor.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-red-500 → hover:bg-red-600",
+   "family": "red",
+   "base": "red-500",
+   "hover": "red-600",
+   "total": 8,
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 2
+    },
+    {
+     "file": "components/multiplayer/DuchMindGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "components/multiplayer/QuizGameView.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-green-600 → hover:bg-green-700",
+   "family": "green",
+   "base": "green-600",
+   "hover": "green-700",
+   "total": 4,
+   "files": [
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Multiplayer.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-orange-500 → hover:bg-orange-600",
+   "family": "orange",
+   "base": "orange-500",
+   "hover": "orange-600",
+   "total": 4,
+   "files": [
+    {
+     "file": "components/multiplayer/TwentyGameView.tsx",
+     "count": 4
+    }
+   ]
+  },
+  {
+   "pair": "bg-rose-600 → hover:bg-rose-700",
+   "family": "rose",
+   "base": "rose-600",
+   "hover": "rose-700",
+   "total": 3,
+   "files": [
+    {
+     "file": "components/Navbar.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/AllMenu.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Info.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-gray-700 → hover:bg-gray-600",
+   "family": "gray",
+   "base": "gray-700",
+   "hover": "gray-600",
+   "total": 3,
+   "files": [
+    {
+     "file": "pages/CardList.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Database.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/Mydecks.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-purple-600 → hover:bg-purple-700",
+   "family": "purple",
+   "base": "purple-600",
+   "hover": "purple-700",
+   "total": 2,
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/TierListMaker.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-red-600 → hover:bg-red-700",
+   "family": "red",
+   "base": "red-600",
+   "hover": "red-700",
+   "total": 2,
+   "files": [
+    {
+     "file": "pages/CardDetail.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/RecordGroupDetail.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-blue-500 → hover:bg-blue-600",
+   "family": "blue",
+   "base": "blue-500",
+   "hover": "blue-600",
+   "total": 2,
+   "files": [
+    {
+     "file": "pages/MultiplayerRoom.tsx",
+     "count": 1
+    },
+    {
+     "file": "pages/QuestionPage.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-sky-600 → hover:bg-sky-700",
+   "family": "sky",
+   "base": "sky-600",
+   "hover": "sky-700",
+   "total": 1,
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "pair": "bg-amber-600 → hover:bg-amber-700",
+   "family": "amber",
+   "base": "amber-600",
+   "hover": "amber-700",
+   "total": 1,
+   "files": [
+    {
+     "file": "pages/AdminCardIcons.tsx",
+     "count": 1
+    }
+   ]
+  }
+ ],
+ "darkPairs": [
+  {
+   "light": "bg-white",
+   "dark": "dark:bg-gray-800",
+   "count": 318
+  },
+  {
+   "light": "text-gray-500",
+   "dark": "dark:text-gray-400",
+   "count": 306
+  },
+  {
+   "light": "border-gray-300",
+   "dark": "dark:border-gray-600",
+   "count": 171
+  },
+  {
+   "light": "bg-gray-200",
+   "dark": "dark:bg-gray-700",
+   "count": 120
+  },
+  {
+   "light": "border-gray-200",
+   "dark": "dark:border-gray-700",
+   "count": 107
+  },
+  {
+   "light": "text-blue-600",
+   "dark": "dark:text-blue-400",
+   "count": 97
+  },
+  {
+   "light": "text-gray-600",
+   "dark": "dark:text-gray-300",
+   "count": 61
+  },
+  {
+   "light": "bg-blue-50",
+   "dark": "dark:bg-blue-900/20",
+   "count": 55
+  },
+  {
+   "light": "text-gray-700",
+   "dark": "dark:text-gray-300",
+   "count": 43
+  },
+  {
+   "light": "text-blue-700",
+   "dark": "dark:text-blue-300",
+   "count": 41
+  },
+  {
+   "light": "text-gray-600",
+   "dark": "dark:text-gray-400",
+   "count": 41
+  },
+  {
+   "light": "text-black",
+   "dark": "dark:text-white",
+   "count": 39
+  },
+  {
+   "light": "bg-gray-100",
+   "dark": "dark:bg-gray-700",
+   "count": 38
+  },
+  {
+   "light": "text-gray-700",
+   "dark": "dark:text-gray-200",
+   "count": 33
+  },
+  {
+   "light": "text-red-600",
+   "dark": "dark:text-red-400",
+   "count": 32
+  },
+  {
+   "light": "bg-white",
+   "dark": "dark:bg-gray-700",
+   "count": 31
+  },
+  {
+   "light": "bg-gray-100",
+   "dark": "dark:bg-gray-800",
+   "count": 29
+  },
+  {
+   "light": "bg-gray-50",
+   "dark": "dark:bg-gray-900",
+   "count": 29
+  },
+  {
+   "light": "bg-white",
+   "dark": "dark:bg-gray-900",
+   "count": 26
+  },
+  {
+   "light": "text-green-700",
+   "dark": "dark:text-green-300",
+   "count": 24
+  },
+  {
+   "light": "text-red-700",
+   "dark": "dark:text-red-300",
+   "count": 24
+  },
+  {
+   "light": "text-gray-900",
+   "dark": "dark:text-white",
+   "count": 23
+  },
+  {
+   "light": "text-green-600",
+   "dark": "dark:text-green-400",
+   "count": 23
+  },
+  {
+   "light": "text-gray-900",
+   "dark": "dark:text-gray-100",
+   "count": 22
+  },
+  {
+   "light": "bg-gray-100",
+   "dark": "dark:bg-gray-900",
+   "count": 21
+  },
+  {
+   "light": "bg-red-50",
+   "dark": "dark:bg-red-900/20",
+   "count": 21
+  },
+  {
+   "light": "bg-gray-300",
+   "dark": "dark:bg-gray-700",
+   "count": 18
+  },
+  {
+   "light": "text-gray-400",
+   "dark": "dark:text-gray-500",
+   "count": 18
+  },
+  {
+   "light": "border-blue-300",
+   "dark": "dark:border-blue-700",
+   "count": 16
+  },
+  {
+   "light": "bg-gray-300",
+   "dark": "dark:bg-gray-600",
+   "count": 15
+  },
+  {
+   "light": "bg-gray-50",
+   "dark": "dark:bg-gray-800",
+   "count": 15
+  },
+  {
+   "light": "bg-yellow-50",
+   "dark": "dark:bg-yellow-900/20",
+   "count": 14
+  },
+  {
+   "light": "border-red-200",
+   "dark": "dark:border-red-800",
+   "count": 14
+  },
+  {
+   "light": "text-amber-600",
+   "dark": "dark:text-amber-400",
+   "count": 12
+  },
+  {
+   "light": "text-amber-700",
+   "dark": "dark:text-amber-400",
+   "count": 11
+  },
+  {
+   "light": "text-gray-800",
+   "dark": "dark:text-gray-200",
+   "count": 11
+  },
+  {
+   "light": "border-gray-100",
+   "dark": "dark:border-gray-700",
+   "count": 10
+  },
+  {
+   "light": "bg-blue-100",
+   "dark": "dark:bg-blue-900/40",
+   "count": 9
+  },
+  {
+   "light": "border-blue-200",
+   "dark": "dark:border-blue-800",
+   "count": 9
+  },
+  {
+   "light": "bg-green-100",
+   "dark": "dark:bg-green-900/30",
+   "count": 8
+  },
+  {
+   "light": "bg-yellow-100",
+   "dark": "dark:bg-yellow-900/30",
+   "count": 8
+  },
+  {
+   "light": "text-amber-800",
+   "dark": "dark:text-amber-300",
+   "count": 8
+  },
+  {
+   "light": "text-purple-700",
+   "dark": "dark:text-purple-300",
+   "count": 8
+  },
+  {
+   "light": "bg-blue-100",
+   "dark": "dark:bg-blue-900/30",
+   "count": 7
+  },
+  {
+   "light": "bg-blue-50",
+   "dark": "dark:bg-blue-900/30",
+   "count": 7
+  },
+  {
+   "light": "border-gray-100",
+   "dark": "dark:border-gray-800",
+   "count": 7
+  },
+  {
+   "light": "border-green-300",
+   "dark": "dark:border-green-700",
+   "count": 7
+  },
+  {
+   "light": "text-yellow-700",
+   "dark": "dark:text-yellow-300",
+   "count": 7
+  },
+  {
+   "light": "bg-green-50",
+   "dark": "dark:bg-green-900/20",
+   "count": 6
+  },
+  {
+   "light": "text-amber-700",
+   "dark": "dark:text-amber-300",
+   "count": 6
+  },
+  {
+   "light": "text-blue-600",
+   "dark": "dark:text-blue-300",
+   "count": 6
+  },
+  {
+   "light": "bg-amber-100",
+   "dark": "dark:bg-amber-900/30",
+   "count": 5
+  },
+  {
+   "light": "bg-amber-50",
+   "dark": "dark:bg-amber-900/20",
+   "count": 5
+  },
+  {
+   "light": "bg-purple-100",
+   "dark": "dark:bg-purple-900/30",
+   "count": 5
+  },
+  {
+   "light": "bg-red-100",
+   "dark": "dark:bg-red-900/40",
+   "count": 5
+  },
+  {
+   "light": "border-amber-300",
+   "dark": "dark:border-amber-700",
+   "count": 5
+  },
+  {
+   "light": "border-gray-200",
+   "dark": "dark:border-gray-600",
+   "count": 5
+  },
+  {
+   "light": "text-white",
+   "dark": "dark:text-gray-900",
+   "count": 5
+  },
+  {
+   "light": "bg-amber-100",
+   "dark": "dark:bg-amber-900/40",
+   "count": 4
+  },
+  {
+   "light": "bg-blue-50",
+   "dark": "dark:bg-blue-900/40",
+   "count": 4
+  }
+ ],
+ "cleanup": [
+  {
+   "kind": "button",
+   "title": "파란 버튼의 단계가 섞여 있음",
+   "detail": "bg-blue-600 → hover:bg-blue-700 84 · bg-blue-500 → hover:bg-blue-600 2",
+   "suggest": "주 버튼은 bg-blue-600 hover:bg-blue-700 하나로"
+  },
+  {
+   "kind": "button",
+   "title": "빨간(위험) 버튼의 단계가 섞여 있음",
+   "detail": "bg-red-500 → hover:bg-red-600 8 · bg-red-600 → hover:bg-red-700 2",
+   "suggest": "위험 버튼은 한 쌍으로(많이 쓰는 쪽은 bg-red-500 hover:bg-red-600)"
+  },
+  {
+   "kind": "button",
+   "title": "회색 버튼이 여러 가지",
+   "detail": "bg-gray-500 → hover:bg-gray-600 14 · bg-gray-700 → hover:bg-gray-600 3",
+   "suggest": "보조 버튼은 bg-gray-500 hover:bg-gray-600, 떠 있는 어두운 버튼(맨 위로 등)은 따로 정해 적기"
+  },
+  {
+   "kind": "danger",
+   "title": "위험·패배 빨강이 500과 600으로 나뉨",
+   "detail": "red-500 88(text 61·bg 23) · red-600 73(text 55·bg 18)",
+   "suggest": "글자는 red-500/dark:red-400(승률 규칙), 채운 버튼은 red-600으로 역할을 나눠 적기"
+  },
+  {
+   "kind": "hex",
+   "title": "Tailwind 색과 거의 같은 hex",
+   "detail": "#7c1818≈red-900(ΔE 2.1) · #fffbe6≈yellow-50(ΔE 0.9) · #ebe8f0≈gray-200(ΔE 2.9) · #fff5e6≈orange-50(ΔE 2.7) · #0d0a13≈gray-950(ΔE 2.4) · #ffe14a≈yellow-300(ΔE 0.9) · #ffd21e≈yellow-400(ΔE 2.2) · #f9f9f9≈gray-50(ΔE 0.7) · #dff3ff≈sky-100(ΔE 0.7) · #ffd0e6≈pink-200(ΔE 2) · #dff4ff≈sky-100(ΔE 1.2) · #e8f6ff≈blue-50(ΔE 2.4)",
+   "suggest": "같은 색이면 Tailwind 색 이름(또는 그 hex)으로"
+  },
+  {
+   "kind": "rare",
+   "title": "두 번 이하로만 쓴 Tailwind 색 21가지",
+   "detail": "emerald-500 · violet-100 · violet-700 · violet-300 · red-950 · purple-50 · sky-600 · purple-500 · purple-800 · emerald-50 · emerald-200 · violet-50 · orange-300 · orange-700 · fuchsia-600 · sky-50 · yellow-600 · violet-500 · purple-400 · fuchsia-400 · violet-950",
+   "suggest": "가까운 자주 쓰는 단계로 합칠 수 있는지"
+  }
+ ],
+ "textSizes": {
+  "sm": 753,
+  "xs": 558,
+  "base": 123,
+  "lg": 95,
+  "[10px]": 84,
+  "[11px]": 69,
+  "2xl": 62,
+  "xl": 53,
+  "3xl": 26,
+  "[13px]": 16,
+  "[9px]": 11,
+  "4xl": 7,
+  "5xl": 6,
+  "[15px]": 5,
+  "[17px]": 3,
+  "7xl": 3,
+  "[14px]": 1,
+  "[32px]": 1
+ },
+ "fontWeights": {
+  "semibold": 577,
+  "bold": 250,
+  "medium": 59,
+  "normal": 31,
+  "extrabold": 18,
+  "black": 1
+ },
+ "rounded": {
+  "lg": 535,
+  "DEFAULT": 300,
+  "xl": 161,
+  "full": 149,
+  "md": 27,
+  "2xl": 13,
+  "none": 3,
+  "[15px]": 2,
+  "[1px]": 1
+ },
+ "shadows": {
+  "shadow": 102,
+  "shadow-lg": 32,
+  "drop-shadow": 12,
+  "shadow-xl": 12,
+  "shadow-sm": 10,
+  "shadow-md": 7,
+  "shadow-2xl": 4,
+  "shadow-[0_0_14px_rgba(232,121,249,.6)]": 1,
+  "shadow-[0_1px_2px_rgba(0,0,0,0.03)]": 1,
+  "shadow-none": 1
+ },
+ "maxWidths": {
+  "2xl": 31,
+  "md": 17,
+  "lg": 16,
+  "sm": 16,
+  "3xl": 12,
+  "4xl": 11,
+  "5xl": 8,
+  "full": 8,
+  "xs": 7,
+  "none": 6,
+  "6xl": 5,
+  "7xl": 4,
+  "[44px]": 2,
+  "[55%]": 2,
+  "[1920px]": 1,
+  "[40%]": 1,
+  "[45%]": 1,
+  "[7.5rem]": 1,
+  "[8rem]": 1,
+  "[92vw]": 1
+ },
+ "spacing": {
+  "gap-2": 310,
+  "py-2": 285,
+  "px-3": 261,
+  "px-2": 237,
+  "px-4": 209,
+  "py-1": 160,
+  "mb-2": 150,
+  "py-1.5": 141,
+  "gap-1": 131,
+  "mb-1": 130,
+  "mb-3": 125,
+  "gap-3": 118,
+  "mt-1": 105,
+  "p-4": 93,
+  "py-3": 93,
+  "gap-1.5": 91,
+  "mb-4": 88,
+  "mt-2": 88,
+  "p-2": 83,
+  "py-0.5": 73,
+  "p-3": 67,
+  "px-1.5": 59,
+  "mt-4": 58,
+  "py-6": 58,
+  "mt-0.5": 53,
+  "mt-3": 40,
+  "space-y-2": 34,
+  "gap-4": 32,
+  "p-5": 32,
+  "mb-6": 31,
+  "mt-6": 30,
+  "px-2.5": 29,
+  "py-2.5": 23,
+  "pb-1": 22,
+  "pt-6": 22,
+  "px-0": 21,
+  "px-1": 21,
+  "mb-5": 20,
+  "space-y-1": 18,
+  "p-0": 17
+ },
+ "breakpoints": {
+  "sm": 430,
+  "md": 318,
+  "lg": 242,
+  "min-[…]": 5
+ },
+ "counters": {
+  "break-keep": 57,
+  "animate-pulse": 62,
+  "card-corner": 21,
+  "tabular-nums": 78,
+  "truncate": 101,
+  "line-clamp": 13
+ },
+ "palette": {
+  "white": "#ffffff",
+  "black": "#000000",
+  "slate-50": "#f8fafc",
+  "slate-100": "#f1f5f9",
+  "slate-200": "#e2e8f0",
+  "slate-300": "#cbd5e1",
+  "slate-400": "#94a3b8",
+  "slate-500": "#64748b",
+  "slate-600": "#475569",
+  "slate-700": "#334155",
+  "slate-800": "#1e293b",
+  "slate-900": "#0f172a",
+  "slate-950": "#020617",
+  "gray-50": "#f9fafb",
+  "gray-100": "#f3f4f6",
+  "gray-200": "#e5e7eb",
+  "gray-300": "#d1d5db",
+  "gray-400": "#9ca3af",
+  "gray-500": "#6b7280",
+  "gray-600": "#4b5563",
+  "gray-700": "#374151",
+  "gray-800": "#1f2937",
+  "gray-900": "#111827",
+  "gray-950": "#030712",
+  "zinc-50": "#fafafa",
+  "zinc-100": "#f4f4f5",
+  "zinc-200": "#e4e4e7",
+  "zinc-300": "#d4d4d8",
+  "zinc-400": "#a1a1aa",
+  "zinc-500": "#71717a",
+  "zinc-600": "#52525b",
+  "zinc-700": "#3f3f46",
+  "zinc-800": "#27272a",
+  "zinc-900": "#18181b",
+  "zinc-950": "#09090b",
+  "neutral-50": "#fafafa",
+  "neutral-100": "#f5f5f5",
+  "neutral-200": "#e5e5e5",
+  "neutral-300": "#d4d4d4",
+  "neutral-400": "#a3a3a3",
+  "neutral-500": "#737373",
+  "neutral-600": "#525252",
+  "neutral-700": "#404040",
+  "neutral-800": "#262626",
+  "neutral-900": "#171717",
+  "neutral-950": "#0a0a0a",
+  "stone-50": "#fafaf9",
+  "stone-100": "#f5f5f4",
+  "stone-200": "#e7e5e4",
+  "stone-300": "#d6d3d1",
+  "stone-400": "#a8a29e",
+  "stone-500": "#78716c",
+  "stone-600": "#57534e",
+  "stone-700": "#44403c",
+  "stone-800": "#292524",
+  "stone-900": "#1c1917",
+  "stone-950": "#0c0a09",
+  "red-50": "#fef2f2",
+  "red-100": "#fee2e2",
+  "red-200": "#fecaca",
+  "red-300": "#fca5a5",
+  "red-400": "#f87171",
+  "red-500": "#ef4444",
+  "red-600": "#dc2626",
+  "red-700": "#b91c1c",
+  "red-800": "#991b1b",
+  "red-900": "#7f1d1d",
+  "red-950": "#450a0a",
+  "orange-50": "#fff7ed",
+  "orange-100": "#ffedd5",
+  "orange-200": "#fed7aa",
+  "orange-300": "#fdba74",
+  "orange-400": "#fb923c",
+  "orange-500": "#f97316",
+  "orange-600": "#ea580c",
+  "orange-700": "#c2410c",
+  "orange-800": "#9a3412",
+  "orange-900": "#7c2d12",
+  "orange-950": "#431407",
+  "amber-50": "#fffbeb",
+  "amber-100": "#fef3c7",
+  "amber-200": "#fde68a",
+  "amber-300": "#fcd34d",
+  "amber-400": "#fbbf24",
+  "amber-500": "#f59e0b",
+  "amber-600": "#d97706",
+  "amber-700": "#b45309",
+  "amber-800": "#92400e",
+  "amber-900": "#78350f",
+  "amber-950": "#451a03",
+  "yellow-50": "#fefce8",
+  "yellow-100": "#fef9c3",
+  "yellow-200": "#fef08a",
+  "yellow-300": "#fde047",
+  "yellow-400": "#facc15",
+  "yellow-500": "#eab308",
+  "yellow-600": "#ca8a04",
+  "yellow-700": "#a16207",
+  "yellow-800": "#854d0e",
+  "yellow-900": "#713f12",
+  "yellow-950": "#422006",
+  "lime-50": "#f7fee7",
+  "lime-100": "#ecfccb",
+  "lime-200": "#d9f99d",
+  "lime-300": "#bef264",
+  "lime-400": "#a3e635",
+  "lime-500": "#84cc16",
+  "lime-600": "#65a30d",
+  "lime-700": "#4d7c0f",
+  "lime-800": "#3f6212",
+  "lime-900": "#365314",
+  "lime-950": "#1a2e05",
+  "green-50": "#f0fdf4",
+  "green-100": "#dcfce7",
+  "green-200": "#bbf7d0",
+  "green-300": "#86efac",
+  "green-400": "#4ade80",
+  "green-500": "#22c55e",
+  "green-600": "#16a34a",
+  "green-700": "#15803d",
+  "green-800": "#166534",
+  "green-900": "#14532d",
+  "green-950": "#052e16",
+  "emerald-50": "#ecfdf5",
+  "emerald-100": "#d1fae5",
+  "emerald-200": "#a7f3d0",
+  "emerald-300": "#6ee7b7",
+  "emerald-400": "#34d399",
+  "emerald-500": "#10b981",
+  "emerald-600": "#059669",
+  "emerald-700": "#047857",
+  "emerald-800": "#065f46",
+  "emerald-900": "#064e3b",
+  "emerald-950": "#022c22",
+  "teal-50": "#f0fdfa",
+  "teal-100": "#ccfbf1",
+  "teal-200": "#99f6e4",
+  "teal-300": "#5eead4",
+  "teal-400": "#2dd4bf",
+  "teal-500": "#14b8a6",
+  "teal-600": "#0d9488",
+  "teal-700": "#0f766e",
+  "teal-800": "#115e59",
+  "teal-900": "#134e4a",
+  "teal-950": "#042f2e",
+  "cyan-50": "#ecfeff",
+  "cyan-100": "#cffafe",
+  "cyan-200": "#a5f3fc",
+  "cyan-300": "#67e8f9",
+  "cyan-400": "#22d3ee",
+  "cyan-500": "#06b6d4",
+  "cyan-600": "#0891b2",
+  "cyan-700": "#0e7490",
+  "cyan-800": "#155e75",
+  "cyan-900": "#164e63",
+  "cyan-950": "#083344",
+  "sky-50": "#f0f9ff",
+  "sky-100": "#e0f2fe",
+  "sky-200": "#bae6fd",
+  "sky-300": "#7dd3fc",
+  "sky-400": "#38bdf8",
+  "sky-500": "#0ea5e9",
+  "sky-600": "#0284c7",
+  "sky-700": "#0369a1",
+  "sky-800": "#075985",
+  "sky-900": "#0c4a6e",
+  "sky-950": "#082f49",
+  "blue-50": "#eff6ff",
+  "blue-100": "#dbeafe",
+  "blue-200": "#bfdbfe",
+  "blue-300": "#93c5fd",
+  "blue-400": "#60a5fa",
+  "blue-500": "#3b82f6",
+  "blue-600": "#2563eb",
+  "blue-700": "#1d4ed8",
+  "blue-800": "#1e40af",
+  "blue-900": "#1e3a8a",
+  "blue-950": "#172554",
+  "indigo-50": "#eef2ff",
+  "indigo-100": "#e0e7ff",
+  "indigo-200": "#c7d2fe",
+  "indigo-300": "#a5b4fc",
+  "indigo-400": "#818cf8",
+  "indigo-500": "#6366f1",
+  "indigo-600": "#4f46e5",
+  "indigo-700": "#4338ca",
+  "indigo-800": "#3730a3",
+  "indigo-900": "#312e81",
+  "indigo-950": "#1e1b4b",
+  "violet-50": "#f5f3ff",
+  "violet-100": "#ede9fe",
+  "violet-200": "#ddd6fe",
+  "violet-300": "#c4b5fd",
+  "violet-400": "#a78bfa",
+  "violet-500": "#8b5cf6",
+  "violet-600": "#7c3aed",
+  "violet-700": "#6d28d9",
+  "violet-800": "#5b21b6",
+  "violet-900": "#4c1d95",
+  "violet-950": "#2e1065",
+  "purple-50": "#faf5ff",
+  "purple-100": "#f3e8ff",
+  "purple-200": "#e9d5ff",
+  "purple-300": "#d8b4fe",
+  "purple-400": "#c084fc",
+  "purple-500": "#a855f7",
+  "purple-600": "#9333ea",
+  "purple-700": "#7e22ce",
+  "purple-800": "#6b21a8",
+  "purple-900": "#581c87",
+  "purple-950": "#3b0764",
+  "fuchsia-50": "#fdf4ff",
+  "fuchsia-100": "#fae8ff",
+  "fuchsia-200": "#f5d0fe",
+  "fuchsia-300": "#f0abfc",
+  "fuchsia-400": "#e879f9",
+  "fuchsia-500": "#d946ef",
+  "fuchsia-600": "#c026d3",
+  "fuchsia-700": "#a21caf",
+  "fuchsia-800": "#86198f",
+  "fuchsia-900": "#701a75",
+  "fuchsia-950": "#4a044e",
+  "pink-50": "#fdf2f8",
+  "pink-100": "#fce7f3",
+  "pink-200": "#fbcfe8",
+  "pink-300": "#f9a8d4",
+  "pink-400": "#f472b6",
+  "pink-500": "#ec4899",
+  "pink-600": "#db2777",
+  "pink-700": "#be185d",
+  "pink-800": "#9d174d",
+  "pink-900": "#831843",
+  "pink-950": "#500724",
+  "rose-50": "#fff1f2",
+  "rose-100": "#ffe4e6",
+  "rose-200": "#fecdd3",
+  "rose-300": "#fda4af",
+  "rose-400": "#fb7185",
+  "rose-500": "#f43f5e",
+  "rose-600": "#e11d48",
+  "rose-700": "#be123c",
+  "rose-800": "#9f1239",
+  "rose-900": "#881337",
+  "rose-950": "#4c0519"
+ }
+}
