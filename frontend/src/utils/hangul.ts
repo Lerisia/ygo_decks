@@ -72,6 +72,18 @@ export const nameKeys = (name: string): NameKeys => {
   return { jamo: toJamo(s), initials: getInitials(s) };
 };
 
+/** How closely a name answers a query, for ordering what makeMatcher kept: 0 the whole name, 1 its start, 2 anywhere
+ *  (bare consonants are held against the name's initials). */
+export const matchRank = (query: string): ((keys: NameKeys) => 0 | 1 | 2) => {
+  const q = squash(query);
+  if (isInitialsOnly(q)) {
+    const initials = expandCompoundJamo(q);
+    return (k) => (k.initials === initials ? 0 : k.initials.startsWith(initials) ? 1 : 2);
+  }
+  const jamo = toJamo(q);
+  return (k) => (k.jamo === jamo ? 0 : k.jamo.startsWith(jamo) ? 1 : 2);
+};
+
 /** One query's test over many names (the 카드군 dropdown, 엘리스 2026-10-12): bare consonants match the names'
  *  initials from the start, anything else matches as jamo, so the list holds steady while a syllable is being
  *  composed instead of emptying at "블ㄹ" and filling again at "블랙". */

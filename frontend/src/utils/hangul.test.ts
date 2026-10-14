@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import cases from "./deckSearchCases.json";
-import { expandCompoundJamo, getInitials, isInitialsOnly, makeMatcher, matchesDeckQuery, matchesInitials, nameKeys, toJamo } from "./hangul";
+import { expandCompoundJamo, getInitials, isInitialsOnly, makeMatcher, matchRank, matchesDeckQuery, matchesInitials, nameKeys, toJamo } from "./hangul";
 
 describe("expandCompoundJamo", () => {
   it("expands compound jamo into component consonants", () => {
@@ -95,5 +95,20 @@ describe("makeMatcher (the dropdown's search, 엘리스 10/12)", () => {
   });
   it("matches everything on an empty query", () => {
     expect(found(" ")).toHaveLength(4);
+  });
+});
+
+describe("matchRank", () => {
+  it("puts the whole name first, then its start, then anywhere, spaces ignored", () => {
+    const rank = matchRank("블랙 매지션");
+    expect(rank(nameKeys("블랙매지션"))).toBe(0);
+    expect(rank(nameKeys("블랙 매지션 걸"))).toBe(1);
+    expect(rank(nameKeys("용기사 블랙 매지션"))).toBe(2);
+  });
+
+  it("holds bare consonants against the initials", () => {
+    const rank = matchRank("ㅂㄹㅁㅈㅅ");
+    expect(rank(nameKeys("블랙 매지션"))).toBe(0);
+    expect(rank(nameKeys("블랙 매지션 걸"))).toBe(1);
   });
 });

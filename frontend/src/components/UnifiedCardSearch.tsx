@@ -2,10 +2,13 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "r
 import SearchForm from "./SearchForm";
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardListItem } from "@/api/cardDexApi";
-import { makeMatcher, nameKeys } from "@/utils/hangul";
+import { makeMatcher, matchRank, nameKeys } from "@/utils/hangul";
 
-const GROUPS_SHOWN = 5;
+const GROUPS_SHOWN = 6;
 const CARDS_SHOWN = 6;
+const SHOWN = 10;
+// among suggestions that answer the typing as closely, cards come first, then 카드군, then 서포트 (참혈 2026-10-14)
+const KIND_ORDER = { card: 0, group: 1, support: 2 } as const;
 const EXTRA_KINDS = [["fusion", "융합"], ["synchro", "싱크로"], ["xyz", "엑시즈"], ["link", "링크"]] as const;
 
 /** A card's tag in the suggestions (참혈 2026-10-14): 몬스터 / 마법 / 함정, an extra deck monster by its kind. */
@@ -13,7 +16,10 @@ const cardTag = (c: Pick<CardListItem, "category" | "frame">) =>
   c.category === "spell" ? "마법" : c.category === "trap" ? "함정"
     : EXTRA_KINDS.find(([frame]) => c.frame.startsWith(frame))?.[1] ?? (c.frame === "token" ? "토큰" : "몬스터");
 
-type Suggestion = { key: string; name: string; tag: string; sub?: string; group?: ComboItem; card?: CardListItem };
+type Suggestion = {
+  key: string; name: string; tag: string; sub?: string; group?: ComboItem; card?: CardListItem;
+  rank: number; kind: keyof typeof KIND_ORDER; order: number;
+};
 
 /** One box for the card book's name search and its 카드군·서포트 pick (/dev/cards, a trial — 참혈 2026-10-14). What is
  *  typed searches the card names when Enter is pressed (the list no longer follows the typing there, 참혈 10/14).
@@ -41,16 +47,14 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   const keyed = useMemo(() => items.map((it) => ({ it, k: nameKeys(it.name) })), [items]);
   const typed = useDeferredValue(query.trim());
   const groups = useMemo(() => {
-    const q = nameKeys(typed).jamo;
-    if (!q) return [];
+    if (!nameKeys(typed).jamo) return [];
     const match = makeMatcher(typed);
-    const rank = (k: { jamo: string }) => (k.jamo === q ? 0 : k.jamo.startsWith(q) ? 1 : 2);
+    const rank = matchRank(typed);
     return keyed
       .filter(({ k }) => match(k))
-      .map((x, i) => [rank(x.k), i, x.it] as const)
-      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
-      .slice(0, GROUPS_SHOWN)
-      .map((x) => x[2]);
+      .map((x, i) => ({ it: x.it, rank: rank(x.k), order: i }))
+      .sort((a, b) => a.rank - b.rank || a.order - b.order)
+      .slice(0, GROUPS_SHOWN);
   }, [keyed, typed]);
 
   // the cards come from the server's name search a moment after the typing stops
@@ -72,10 +76,26 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
     };
   }, [typed]);
 
-  const suggestions: Suggestion[] = useMemo(() => [
-    ...groups.map((g) => ({ key: g.key, name: g.name, tag: g.tag === "카드" ? "서포트" : "카드군", sub: g.sub, group: g })),
-    ...(typed ? cards : []).map((c) => ({ key: `card${c.id}`, name: c.name, tag: cardTag(c), card: c })),
-  ], [groups, cards, typed]);
+  // one list, the closest answers first whatever they are (참혈 2026-10-14); a card found by its Japanese or English
+  // name counts as answering anywhere
+  const suggestions: Suggestion[] = useMemo(() => {
+    const rank = matchRank(typed);
+    return [
+      ...groups.map(({ it, rank, order }) => {
+        const support = it.tag === "카드";
+        return {
+          key: it.key, name: it.name, tag: support ? "서포트" : "카드군", group: it, rank, order,
+          kind: support ? "support" as const : "group" as const,
+          sub: support ? it.sub?.replace(/^서포트\s*/, "") : it.sub,   // the tag already says 서포트: the count alone
+        };
+      }),
+      ...(typed ? cards : []).map((c, i) => ({
+        key: `card${c.id}`, name: c.name, tag: cardTag(c), card: c, rank: rank(nameKeys(c.name)), kind: "card" as const, order: i,
+      })),
+    ]
+      .sort((a, b) => a.rank - b.rank || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.order - b.order)
+      .slice(0, SHOWN);
+  }, [groups, cards, typed]);
   const shown = open && suggestions.length > 0;
 
   const pick = (it: Suggestion) => {
