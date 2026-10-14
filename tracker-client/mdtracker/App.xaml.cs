@@ -8,9 +8,9 @@ namespace MdTracker;
 public partial class App : System.Windows.Application
 {
 #if TEST_BUILD
-    public const string Version = "1.0.2-test";
+    public const string Version = "1.0.3-test";
 #else
-    public const string Version = "1.0.2";
+    public const string Version = "1.0.3";
 #endif
     internal static Tracker Tracker = null!;
     internal static MainWindow? MainWin;
@@ -159,6 +159,17 @@ public partial class App : System.Windows.Application
                 rateSheets.DropDownItems.Add(it);
             }
             menu.Items.Add(rateSheets);
+            var cupSheets = new WinForms.ToolStripMenuItem("듀얼리스트 컵 시트");
+            var sameCup = new WinForms.ToolStripMenuItem("랭크전과 같은 시트") { Checked = Tracker.Store.Config.CupGroupId == null };
+            sameCup.Click += (_, _) => { Tracker.Store.Config.CupGroupId = null; Tracker.Store.Config.CupGroupName = null; Tracker.Store.SaveConfig(); MainWin?.Refresh(); };
+            cupSheets.DropDownItems.Add(sameCup);
+            foreach (var g in _trayGroups)
+            {
+                var it = new WinForms.ToolStripMenuItem(g.Name) { Checked = g.Id == Tracker.Store.Config.CupGroupId };
+                it.Click += (_, _) => { Tracker.Store.Config.CupGroupId = g.Id; Tracker.Store.Config.CupGroupName = g.Name; Tracker.Store.SaveConfig(); MainWin?.Refresh(); };
+                cupSheets.DropDownItems.Add(it);
+            }
+            menu.Items.Add(cupSheets);
             if (DateTime.Now - _trayGroupsAt > TimeSpan.FromSeconds(60))
                 new Thread(() => { try { _trayGroups = Tracker.Api.Groups(); _trayGroupsAt = DateTime.Now; } catch { } }) { IsBackground = true }.Start();
 

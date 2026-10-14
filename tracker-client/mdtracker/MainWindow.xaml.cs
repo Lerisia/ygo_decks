@@ -78,9 +78,12 @@ public partial class MainWindow : Window
         AccountText.Text = loggedIn ? $"로그인됨: {T.Store.Config.Email}" : "";
         bool noSheet = loggedIn && T.Store.Config.RecordGroupId == null;
         NoSheetWarn.Visibility = noSheet ? Visibility.Visible : Visibility.Collapsed;
+        var c = T.Store.Config;
         SetupMsg.Text = noSheet ? "시트를 만들면 다음 게임부터 기록됩니다."
-                      : T.Store.Config.RateGroupId != null ? $"랭크전은 '{T.Store.Config.RecordGroupName}', 레이팅전은 '{T.Store.Config.RateGroupName}' 시트에 기록됩니다."
-                                : $"게임은 '{T.Store.Config.RecordGroupName}' 시트에 기록됩니다.";
+                      : c.RateGroupId == null && c.CupGroupId == null ? $"게임은 '{c.RecordGroupName}' 시트에 기록됩니다."
+                      : $"랭크전은 '{c.RecordGroupName}'"
+                        + (c.RateGroupId != null ? $", 레이팅전은 '{c.RateGroupName}'" : "")
+                        + (c.CupGroupId != null ? $", 듀얼리스트 컵은 '{c.CupGroupName}'" : "") + " 시트에 기록됩니다.";
         SetupMsg.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
         _settingAutoStart = true;
         AutoStartBox.IsChecked = T.Store.Config.StartWithWindows;
@@ -206,6 +209,7 @@ public partial class MainWindow : Window
             OppDeck = m.SavedOppDeckName ?? (m.Status == "saved" ? "모름" : DeckName(m.SuggestedOppDeckId) ?? "모름"),
             Rank = m.GameMode == 19
                 ? (m.RatingAfter is double r ? $"레이팅 {r:0.##}" : "레이팅")
+                : m.GameMode == 12 ? "듀얼리스트 컵"
                 : $"{OverlayWindow.RankLabel(m.RankCode)}{(m.Wins is int w ? $" · {w}승" : "")}",
         }).ToList();
     }
@@ -281,7 +285,7 @@ public partial class MainWindow : Window
     private void Logout_Click(object sender, RoutedEventArgs e)
     {
         T.Store.Config.Token = null; T.Store.SaveConfig();
-        GroupBox.ItemsSource = null; RateGroupBox.ItemsSource = null;
+        GroupBox.ItemsSource = null; RateGroupBox.ItemsSource = null; CupGroupBox.ItemsSource = null;
         RefreshPanels();
     }
 
@@ -311,6 +315,14 @@ public partial class MainWindow : Window
             var curRate = groups.FirstOrDefault(g => g.Id == T.Store.Config.RateGroupId);
             RateGroupBox.SelectedItem = curRate ?? SameAsRank;
             if (curRate == null && T.Store.Config.RateGroupId != null) { T.Store.Config.RateGroupId = null; T.Store.Config.RateGroupName = null; T.Store.SaveConfig(); }
+            // Duelist Cup duels the same way
+            var cup = new List<RecordGroup> { SameAsRank };
+            cup.AddRange(groups);
+            CupGroupBox.ItemsSource = cup;
+            CupGroupBox.DisplayMemberPath = "Name";
+            var curCup = groups.FirstOrDefault(g => g.Id == T.Store.Config.CupGroupId);
+            CupGroupBox.SelectedItem = curCup ?? SameAsRank;
+            if (curCup == null && T.Store.Config.CupGroupId != null) { T.Store.Config.CupGroupId = null; T.Store.Config.CupGroupName = null; T.Store.SaveConfig(); }
             if (groups.Count == 0 && NewGroupBox.Text.Length == 0) NewGroupBox.Text = $"{DateTime.Now:yyyy-MM} 시즌";
             RefreshPanels();
         }
@@ -335,6 +347,14 @@ public partial class MainWindow : Window
         if (_loadingGroups || RateGroupBox.SelectedItem is not RecordGroup g) return;
         bool own = !ReferenceEquals(g, SameAsRank);
         T.Store.Config.RateGroupId = own ? g.Id : null; T.Store.Config.RateGroupName = own ? g.Name : null; T.Store.SaveConfig();
+        RefreshPanels();
+    }
+
+    private void CupGroupBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingGroups || CupGroupBox.SelectedItem is not RecordGroup g) return;
+        bool own = !ReferenceEquals(g, SameAsRank);
+        T.Store.Config.CupGroupId = own ? g.Id : null; T.Store.Config.CupGroupName = own ? g.Name : null; T.Store.SaveConfig();
         RefreshPanels();
     }
 

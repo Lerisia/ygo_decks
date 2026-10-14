@@ -261,6 +261,19 @@ class TrackerGameArchiveTest(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(TrackerGame.objects.get(user=self.user, did=self.capture["did"]).match_id, res.json()["match_id"])
 
+    def test_a_duelist_cup_game_keeps_its_result(self):
+        # 1.0.3 (엘리스 2026-10-14): a cup duel's result as the game holds it, to find its points in; no ladder rank
+        from .models import TrackerGame
+        result = {"resultInfo": {"result": 1, "dc": {"point": 1234}}}
+        self.client.post("/api/tracker/games/", {**self.capture, "game_mode": 12, "rank_code": "", "duel_result": result}, format="json")
+        g = TrackerGame.objects.get(did=self.capture["did"])
+        self.assertEqual((g.game_mode, g.duel_result, g.rank_code), (12, result, ""))
+        # a later upload without it leaves it, and anything but an object is not kept
+        self.client.post("/api/tracker/games/", {**self.capture, "game_mode": 12}, format="json")
+        self.client.post("/api/tracker/games/", {**self.capture, "game_mode": 12, "duel_result": "x"}, format="json")
+        g.refresh_from_db()
+        self.assertEqual(g.duel_result, result)
+
     def test_requires_did(self):
         self.assertEqual(self.client.post("/api/tracker/games/", {"result": "win"}, format="json").status_code, 400)
 

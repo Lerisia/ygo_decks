@@ -20,9 +20,14 @@ public sealed class Config
     /// Sheet for rated duels; null = the same sheet as ranked duels (RecordGroupId).
     public int? RateGroupId { get; set; }
     public string? RateGroupName { get; set; }
+    /// Sheet for Duelist Cup duels (1.0.3); null = the same sheet as ranked duels.
+    public int? CupGroupId { get; set; }
+    public string? CupGroupName { get; set; }
     /// The sheet a game of this mode is saved to.
     public (int? Id, string? Name) GroupFor(int gameMode) =>
-        gameMode == 19 && RateGroupId != null ? (RateGroupId, RateGroupName) : (RecordGroupId, RecordGroupName);
+        gameMode == 19 && RateGroupId != null ? (RateGroupId, RateGroupName)
+        : gameMode == 12 && CupGroupId != null ? (CupGroupId, CupGroupName)
+        : (RecordGroupId, RecordGroupName);
     /// Master Duel deck id → site deck id, remembered after the first save.
     public Dictionary<string, int> DeckMap { get; set; } = new();
     /// Seconds the overlay waits before saving with the suggested values.

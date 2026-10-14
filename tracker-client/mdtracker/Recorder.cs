@@ -10,7 +10,7 @@ internal sealed class Recorder
     private readonly Game _g;
     private readonly Action<PendingMatch> _onMatch;
     private readonly Func<string, bool> _alreadyKnown;
-    public static readonly HashSet<int> RecordedModes = new() { 3, 19 }; // Rank, Rate
+    public static readonly HashSet<int> RecordedModes = new() { 3, 12, 19 }; // Rank, Duelist Cup (1.0.3), Rate
     public Action<PendingMatch, LiveTick>? OnLive;
     public Action? OnLiveEnd;
     public Action<PendingMatch>? OnResearch;   // test build: every finished duel, any mode
@@ -424,7 +424,8 @@ internal sealed class Recorder
                 m.RatingAfter = GetDouble(rate, "new_rate");
             }
         }
-        m.RankCode = RankCode(m.RankBefore, m.TierBefore);
+        // a Duelist Cup duel has no ladder rank: the profile's rank is the player's ladder one, not this duel's
+        m.RankCode = m.GameMode == 12 ? null : RankCode(m.RankBefore, m.TierBefore);
         if (m.GameMode == 3 && ReadLadder() is { } seen)
         {
             if (m.RankAfter == null) { m.RankAfter = seen.rank; m.TierAfter = seen.tier; }   // rankChange, when present, has the last word

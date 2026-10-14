@@ -189,7 +189,7 @@ public sealed class Api
 
     public (int id, int points) AddMatch(int groupId, PendingMatch m, int deckId, int? oppDeckId, string? notes)
     {
-        bool rate = m.GameMode == 19;
+        bool rate = m.GameMode == 19, cup = m.GameMode == 12;
         var o = new JsonObject
         {
             ["deck"] = deckId == SiteDeck.Other.Id ? null : deckId,
@@ -197,10 +197,10 @@ public sealed class Api
             ["first_or_second"] = m.First ? "first" : "second",
             ["result"] = m.Result == "lose" ? "lose" : "win",
             ["coin_toss_result"] = m.CoinWin ? "win" : "lose",
-            ["rank"] = rate ? null : m.RankCode,
-            ["wins"] = rate ? null : m.Wins,
-            ["score"] = rate && m.RatingAfter is double r ? (int)Math.Round(r) : null,
-            ["score_type"] = rate ? "rating" : null,
+            ["rank"] = rate || cup ? null : m.RankCode,
+            ["wins"] = rate || cup ? null : m.Wins,
+            ["score"] = rate && m.RatingAfter is double r ? (int)Math.Round(r) : null,   // a cup's points: read on the site from its result once known
+            ["score_type"] = rate ? "rating" : cup ? "duelist_cup" : null,
             ["notes"] = string.IsNullOrWhiteSpace(notes) ? null : notes,
             ["tracker_did"] = m.Did,
         };
@@ -232,6 +232,12 @@ public sealed class Api
             ["paused"] = m.Paused,
             ["list_log"] = new JsonArray(m.ListLog.Select(x => (JsonNode)x).ToArray()),
         };
+        // a Duelist Cup duel's result as the game holds it: where its points and stage are is read from these on the
+        // site (1.0.3, no test build at hand during the cup)
+        if (m.GameMode == 12 && m.RawDuelResult is { Length: > 0 and < 200_000 } raw)
+        {
+            try { o["duel_result"] = JsonNode.Parse(raw); } catch { }
+        }
         var (status, text) = Send(Req(HttpMethod.Post, "/api/tracker/games/", o.ToJsonString()));
         if (status == 401) throw new UnauthorizedAccessException();
         if (status is not (200 or 201)) throw new Exception($"games {status}");

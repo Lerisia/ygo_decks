@@ -153,6 +153,10 @@ def upsert_game(user, data, legacy_turn=False):
         "started_at": _dt(data.get("started_at")),
         "ended_at": _dt(data.get("ended_at")),
     }
+    # a Duelist Cup duel's result as the game holds it (1.0.3): kept to find its points and stage in; an upload
+    # without it leaves the one kept
+    if isinstance(data.get("duel_result"), dict):
+        fields["duel_result"] = data["duel_result"]
     obj, created = TrackerGame.objects.update_or_create(user=user, did=did, defaults=fields)
     # Keep what the server suggested when the duel ended, so a record saved with another deck reads as a correction.
     # Only the first suggestion counts — a later re-upload must not rewrite what the person was shown.

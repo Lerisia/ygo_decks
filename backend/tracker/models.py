@@ -71,6 +71,8 @@ class TrackerGame(models.Model):
     my_cards = models.JSONField(default=list, help_text="main+extra card ids as listed by the game")
     opp_cards = models.JSONField(default=list, help_text="[{id, pos, face}] every opponent card the engine revealed")
     turn_times = models.JSONField(null=True, blank=True, help_text="[{turn, me, sec}] wall-clock seconds per turn")
+    duel_result = models.JSONField(null=True, blank=True,
+                                   help_text="듀얼리스트 컵 판의 결과 원본 ($.DuelResult, 1.0.3) — 컵 포인트·단계를 찾는 자료")
     hidden = models.BooleanField(default=False, help_text="captured while the person had recording paused: kept for research, left out of their own stats")
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
