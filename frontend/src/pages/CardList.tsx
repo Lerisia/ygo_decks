@@ -14,7 +14,7 @@ import {
 } from "@/api/cardDexApi";
 import type { DexField, DexValues } from "@/utils/dexFilter";
 import { trackEvent } from "@/api/analyticsApi";
-import { CARD_SORTS } from "@/lib/cardSorts";
+import { CARD_SORTS, DEV_CARD_SORTS } from "@/lib/cardSorts";
 
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
 const SORTS = CARD_SORTS;
@@ -22,12 +22,12 @@ const SORTS = CARD_SORTS;
 const SORT_KEY = "card_list_sort";
 
 /** The viewer's last sort and its way, kept in this browser (엘리스 10/12); an address that names one wins. */
-function withRememberedSort(f: CardFilters, search: string): CardFilters {
+function withRememberedSort(f: CardFilters, search: string, sorts = SORTS): CardFilters {
   const qs = new URLSearchParams(search);
   if (qs.has("sort") || qs.has("dir")) return f;
   try {
     const saved = JSON.parse(localStorage.getItem(SORT_KEY) || "null");
-    if (SORTS.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) {
+    if (sorts.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) {
       return { ...f, sort: saved.sort, dir: saved.dir };
     }
   } catch {
@@ -115,7 +115,8 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
   const navigate = useNavigate();
   const allowed = useAdminOnly(unifiedSearch);
   const onList = location.pathname === basePath;
-  const [filters, setFilters] = useState<CardFilters>(() => withRememberedSort(searchToFilters(location.search), location.search));
+  const sorts = unifiedSearch ? DEV_CARD_SORTS : SORTS;
+  const [filters, setFilters] = useState<CardFilters>(() => withRememberedSort(searchToFilters(location.search), location.search, sorts));
   const [qInput, setQInput] = useState(filters.q);
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [items, setItems] = useState<CardListItem[]>([]);
@@ -137,7 +138,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
   // The address is the source of truth while the list is on screen (a 카드군 chip links here with ?group=).
   useEffect(() => {
     if (!onList) return;
-    const next = withRememberedSort(searchToFilters(location.search), location.search);
+    const next = withRememberedSort(searchToFilters(location.search), location.search, sorts);
     if (filtersToSearch(next) !== key) {
       setFilters(next);
       setQInput(next.q);
@@ -333,7 +334,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
                   onChange={(e) => pickSort({ sort: e.target.value, dir: "" })}
                   className="appearance-none max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
                 >
-                  {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {sorts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden />
               </span>

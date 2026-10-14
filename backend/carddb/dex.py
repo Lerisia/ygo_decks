@@ -82,9 +82,11 @@ SORTS = {
     "level": (lambda r: r.number, False),
     "atk": (lambda r: r.atk, False),
     "def": (lambda r: r.def_, False),
+    # 추천순 (/dev/cards, 참혈 2026-10-14): ordered by _popular_order, as the counts behind it change
+    "popular": (None, True),
 }
 BAN_FILTERS = {"forbidden", "limited", "semi_limited", "unlimited"}
-HIGH_FIRST = {"new"}   # the way a sort goes when none is asked: the newest first, the rest low to high
+HIGH_FIRST = {"new", "popular"}   # the way a sort goes when none is asked: the newest first, the rest low to high
 
 _index = {"key": None, "at": 0.0, "type": [], "orders": {}, "face_thumbs": set(), "thumbs": set()}
 INDEX_MAX_AGE = 600   # seconds; also rebuilt then, for edits the fingerprint can't see (a bare QuerySet.update)
@@ -188,8 +190,41 @@ def _card_index():
     return _index
 
 
+POPULAR_MAX_AGE = 300   # seconds between counts of card page views
+_views = {"at": 0.0, "counts": {}, "order": None}
+
+
+def _card_views():
+    """How many people opened each card's page (analytics page views of /cards/<id>, once a visitor), the team left
+    out: its signed-in users and any browser seen signed in as one of them. Counted again every five minutes."""
+    from analytics.models import PageView
+    now = time.time()
+    if now - _views["at"] > POPULAR_MAX_AGE:
+        team = set(PageView.objects.filter(user__is_staff=True).values_list("visitor_id", flat=True))
+        people = defaultdict(set)
+        for path, visitor in (PageView.objects.filter(path__startswith="/cards/").exclude(user__is_staff=True)
+                              .values_list("path", "visitor_id")):
+            tail = path[len("/cards/"):].strip("/")
+            if tail.isdigit() and visitor not in team:
+                people[int(tail)].add(visitor)
+        _views.update(at=now, counts={cid: len(v) for cid, v in people.items()}, order=None)
+    return _views["counts"]
+
+
+def _popular_order(index):
+    """추천순: the cards more people opened first, then the newest, then by name."""
+    views = _card_views()
+    if _views["order"] is None or _views["order"][0] is not index["type"]:
+        rows = sorted(index["type"], key=lambda r: (-views.get(r.id, 0), r.released is None, -(r.released or 0), r.name, r.id))
+        _views["order"] = (index["type"], rows)
+    return _views["order"][1]
+
+
 def _ordered(index, sort, high_first):
-    """Every card in a sort, either way; made once per index."""
+    """Every card in a sort, either way; made once per index (추천순 once per count of views)."""
+    if sort == "popular":
+        rows = _popular_order(index)
+        return rows if high_first else rows[::-1]
     if (sort, high_first) not in index["orders"]:
         value, whole = SORTS[sort]
         have = [r for r in index["type"] if value(r) is not None]

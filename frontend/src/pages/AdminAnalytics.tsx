@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { ColumnChart } from "@/components/charts";
 import { isAdmin } from "@/api/accountApi";
 import { getAnalyticsSummary, type AnalyticsSummary } from "@/api/analyticsApi";
-import { CARD_SORTS } from "@/lib/cardSorts";
+import { CARD_SORTS, DEV_CARD_SORTS } from "@/lib/cardSorts";
 
 /** "atk:desc" → 공격력 ↓ 내림차순, as the card book's sort control names it */
 const sortName = (value: string) => {
   const [sort, way] = value.split(":");
-  const label = CARD_SORTS.find((s) => s.value === sort)?.label ?? sort;
+  const label = (CARD_SORTS.find((s) => s.value === sort) ?? DEV_CARD_SORTS.find((s) => s.value === sort))?.label ?? sort;
   return `${label} ${way === "desc" ? "↓ 내림차순" : "↑ 오름차순"}`;
 };
 

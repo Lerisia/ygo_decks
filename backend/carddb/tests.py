@@ -889,6 +889,25 @@ class CardDexApiTest(TestCase):
                   atk=None, def_value=None, spell_trap_subtype="normal")
         self.assertEqual(self.ids(sort="type"), [1, 2, 9, 3, 5, 12, 6, 4, 11, 10])
 
+    def test_recommended_order(self):
+        # 추천순 (/dev/cards, 참혈 2026-10-14): cards whose pages more people opened first (once a person, the team left
+        # out), then the newest, then by name; a query still puts the closest names first
+        from analytics.models import PageView
+        from user.models import User
+        from . import dex
+        dex._views["at"] = 0
+        self.addCleanup(dex._views.update, at=0)
+        self.card(9, "가나다", ocg_date=date(1999, 2, 4))   # out the same day as 블랙 매지션
+        staff = User.objects.create_user(email="s@test.com", username="staffer", password="pass1234", is_staff=True)
+        for visitor in ("visitor001", "visitor002", "visitor003", "visitor001"):
+            PageView.objects.create(visitor_id=visitor, path="/cards/2")
+        for visitor in ("visitor001", "visitor002"):
+            PageView.objects.create(visitor_id=visitor, path="/cards/3")
+        for _ in range(5):
+            PageView.objects.create(visitor_id="teamvisitor", user=staff, path="/cards/4")
+        self.assertEqual(self.ids(sort="popular"), [2, 3, 4, 6, 5, 9, 1])
+        self.assertEqual(self.ids(sort="popular", q="블랙 매지션"), [1, 3, 4])
+
     def test_master_duel_sorts_either_way(self):
         # every sort of Master Duel's card list, low to high or high to low (엘리스 10/12): equal cards keep the
         # 디폴트 순, cards without the value (a spell's level, a link's DEF) come last
