@@ -1303,7 +1303,7 @@ class CardDexApiTest(TestCase):
                          ([{"kind": "card", "id": 6, "name": "링크 몬스터", "mutual": True}], 2))
 
 
-class CardFaceTest(TestCase):
+class CardFaceCase(TestCase):
     """Korean card faces drawn from Master Duel's pictures (stand-ins here) with free fonts (마루 부리, Noto)."""
 
     def setUp(self):
@@ -1346,6 +1346,8 @@ class CardFaceTest(TestCase):
         MdPrint.objects.create(md_id=7, card=self.card)
         MdArt.objects.create(md_print_id=7, version="common", image="cards/art/common/7.webp")
 
+
+class CardFaceTest(CardFaceCase):
     def test_letters_the_name_font_lacks(self):
         """마루 부리 has no Greek, Cyrillic or Japanese-only kanji: those letters come from the next free font that has
         them (엘리스 10/11: PSY프레임로드 Ω showed a box), and only the faces with such names are drawn again."""
@@ -1471,8 +1473,94 @@ class CardFaceTest(TestCase):
         self.assertEqual(draw_face(self.card).getpixel((10, 500))[:3], (200, 120, 60))   # the usual print keeps its frame
 
     def test_pendulum_scale_is_drawn_with_the_text_boxes_empty(self):
-        from .face import PEND_SCALE_X, draw_face
+        from .face import LAYOUT, draw_face
         self.card.frame, self.card.types, self.card.pendulum_scale = "effect_pendulum", ["pendulum", "effect"], 7
-        x = PEND_SCALE_X[0]
+        x = LAYOUT["pendulum_scale"]["x"][0]
         box = draw_face(self.card).crop((x - 15, 715, x + 15, 755)).convert("L")
         self.assertLess(min(box.getdata()), 60)   # dark digit strokes on the light frame
+
+    def test_letters_can_be_left_off(self):
+        """The layout page sets the letters in the browser over a face drawn without them (참혈 2026-10-14)."""
+        from .face import LAYOUT, draw_face
+        for box in (LAYOUT["name"]["box"], (62, 769, 644, 960)):   # the name; the type line and ATK/DEF
+            self.assertGreater(len(set(draw_face(self.card).crop(box).getdata())), 1)
+            self.assertEqual(len(set(draw_face(self.card, with_text=True, letters=False).crop(box).getdata())), 1)
+        stars = (60, 124, 646, 172)
+        self.assertEqual(draw_face(self.card, letters=False).crop(stars).tobytes(), draw_face(self.card).crop(stars).tobytes())
+
+
+class FaceLayoutApiTest(CardFaceCase):
+    """/dev/cardlayout's operator API: the layout, a print's letters, its face without letters, the free fonts."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+        from django.test import override_settings
+        from rest_framework.test import APIClient
+        ctx = override_settings(BASE_DIR=tempfile.mkdtemp())
+        ctx.enable()
+        self.addCleanup(ctx.disable)
+        cache.clear()
+        User = get_user_model()
+        self.staff = APIClient()
+        self.staff.force_authenticate(User.objects.create_user(email="s@test.com", username="s", password="x", is_staff=True))
+        self.user = APIClient()
+        self.user.force_authenticate(User.objects.create_user(email="u@test.com", username="u", password="x"))
+
+    def test_operators_only(self):
+        from rest_framework.test import APIClient
+        for url in ("/api/carddb/face-layout/", "/api/carddb/face-layout/7/", "/api/carddb/face-layout/7/bare/",
+                    "/api/carddb/face-layout/assets/MaruBuri-Bold.otf"):
+            self.assertEqual(self.user.get(url).status_code, 403, url)
+            self.assertIn(APIClient().get(url).status_code, (401, 403), url)
+
+    def test_layout_is_what_faces_are_drawn_with(self):
+        from unittest.mock import patch
+        from . import face, face_layout
+        with patch.object(face_layout, "SAMPLES", [("싱크로", 7), ("없는 카드", 999)]):
+            body = self.staff.get("/api/carddb/face-layout/").json()
+        self.assertEqual(body["layout"], face.LAYOUT)
+        self.assertEqual(body["samples"], [{"label": "싱크로", "id": 7, "name": "스타더스트 드래곤"}])
+        maru = next(f for f in body["fonts"] if f["file"] == "MaruBuri-Bold.otf")
+        self.assertEqual((maru["weight"], maru["upm"], maru["ascender"], maru["descender"]), (700, 1000, 965, -380))
+        noto = next(f for f in body["fonts"] if f["file"] == "NotoSansKR.ttf")
+        self.assertEqual(noto["instances"]["Medium"], 500)
+        self.assertIn("。", body["no_line_start"])
+
+    def test_letters_of_a_print(self):
+        from .models import CardText
+        CardText.objects.create(card=self.card, lang="ko", materials="튜너 + 튜너 이외의 몬스터 1장 이상",
+                                effect="①: 효과.\n●첫째")
+        body = self.staff.get("/api/carddb/face-layout/7/").json()
+        self.assertEqual((body["name"], body["frame"], body["type_line"], body["stats"], body["spell_trap"]),
+                         ("스타더스트 드래곤", "synchro", "【드래곤족／싱크로／튜너／효과】", [["DEF/", "2000"], ["ATK/", "2500"]], None))
+        self.assertEqual(body["effect"], "튜너 + 튜너 이외의 몬스터 1장 이상\n①: 효과.\n●첫째")
+        self.assertEqual((body["overframe"], body["pendulum_scale"], body["face_url"]), (False, None, None))
+        self.assertEqual(body["prints"], [{"id": 7, "alt": False, "overframe": False}])
+        self.card.category, self.card.frame, self.card.spell_trap_subtype = "spell", "spell", "quick_play"
+        self.card.save()
+        body = self.staff.get("/api/carddb/face-layout/7/").json()
+        self.assertEqual((body["spell_trap"], body["stats"]), ({"label": "【마법 카드", "icon": "GUI_T_Icon1_Icon05.png"}, None))
+        self.assertEqual(self.staff.get("/api/carddb/face-layout/999/").status_code, 404)
+
+    def test_bare_face_is_drawn_without_saving_anything(self):
+        import os
+        from PIL import Image
+        before = sorted(os.walk(self.media))
+        res = self.staff.get("/api/carddb/face-layout/7/bare/")
+        self.assertEqual((res.status_code, res["Content-Type"]), (200, "image/png"))
+        img = Image.open(io.BytesIO(res.content))
+        self.assertEqual((img.size, img.mode), ((704, 1024), "RGBA"))
+        self.assertEqual(sorted(os.walk(self.media)), before)
+
+    def test_assets_are_the_free_fonts_and_kind_icons(self):
+        res = self.staff.get("/api/carddb/face-layout/assets/MaruBuri-Bold.otf")
+        self.assertEqual((res.status_code, res["Content-Type"]), (200, "font/otf"))
+        res.close()
+        res = self.staff.get("/api/carddb/face-layout/assets/GUI_T_Icon1_Icon05.png")
+        self.assertEqual((res.status_code, res["Content-Type"]), (200, "image/png"))
+        res.close()
+        for name in ("card_frame00.png", "missing.ttf", "..%2Fdb.sqlite3"):
+            self.assertEqual(self.staff.get(f"/api/carddb/face-layout/assets/{name}").status_code, 404, name)

@@ -19,6 +19,10 @@ from PIL import Image, ImageDraw, ImageFont
 from .display import art_name, art_path
 
 W, H = 704, 1024
+# Where and how every letter is set (name, type lines, ATK/DEF, scales, card text): one file, which the layout page
+# /dev/cardlayout starts from (참혈 2026-10-14)
+with open(os.path.join(os.path.dirname(__file__), "face_layout.json")) as _f:
+    LAYOUT = json.load(_f)
 FACE_VERSION = 5          # raise after any change to how faces are drawn: every face is drawn again
 FACE_DIR = "cards/face"
 SIGNATURES = "cards/face/_signatures.json"
@@ -32,7 +36,6 @@ FRAMES = {
     "synchro": "10", "xyz": "12", "normal_pendulum": "13", "effect_pendulum": "14", "xyz_pendulum": "15",
     "synchro_pendulum": "16", "fusion_pendulum": "17", "link": "18", "ritual_pendulum": "19",
 }
-WHITE_NAME = {"spell", "trap", "xyz", "xyz_pendulum", "link"}
 ATTR_ICON = {"light": "01", "dark": "02", "water": "03", "fire": "04", "earth": "05", "wind": "06", "divine": "07",
              "spell": "08", "trap": "09"}
 KIND_ICON = {"counter": "01", "field": "02", "equip": "03", "continuous": "04", "quick_play": "05", "ritual": "06"}
@@ -50,9 +53,7 @@ TYPE_WORDS = {"fusion": "융합", "ritual": "의식", "synchro": "싱크로", "x
               "link": "링크", "special_summon": "특수 소환", "flip": "리버스", "gemini": "듀얼", "spirit": "스피릿",
               "toon": "툰", "union": "유니온", "tuner": "튜너", "effect": "효과"}
 
-NAME_BOX = (58, 46, 590, 114)          # name plate, leaving the attribute icon its corner
 ATTR_BOX = (596, 47, 662, 113)
-STAR_ROW = (60, 123, 646, 171)        # the spell / trap line
 # Stars as Master Duel lays them, where its Royal / Shine shaders emboss them: 12 to a row (13 a little wider), a
 # level's from the right, a rank's from the left
 STAR_SPANS = {12: (0.085 * W, 0.915 * W), 13: (0.051 * W, 0.9491 * W)}
@@ -60,12 +61,6 @@ STAR_PITCH = 0.83 * W / 12
 STAR_TOP, STAR_SIZE = 124, 48
 ART = (89, 191, 616, 719)
 PEND_ART = (50, 186, 654, 956)          # the art runs behind both (slightly see-through) pendulum boxes
-TEXT = (62, 769, 644, 956)              # inside the lower box
-TYPE_LINE_H = 32
-STAT_RULE_Y = 922                      # the rule over ATK/DEF
-STAT_BASELINE_Y = 952
-PEND_TEXT = (108, 648, 598, 756)
-PEND_SCALE_X = (74, 630)
 LINK_SLOTS = {"top": ("U", 352, 171), "bottom": ("D", 352, 737), "left": ("L", 68, 455), "right": ("R", 636, 455),
               "top_left": ("UL", 92, 192), "top_right": ("UR", 612, 192),
               "bottom_left": ("DL", 92, 715), "bottom_right": ("DR", 612, 715)}
@@ -90,14 +85,14 @@ def _font(name, size, variation=None):
     return f
 
 
-def title(size, weight="Bold"):
-    """마루 부리 for names and type lines."""
-    return _font(f"MaruBuri-{weight}.otf", size)
+def font_of(spec, size):
+    """A layout font ({"file", "variation"}) at a size."""
+    return _font(spec["file"], size, spec["variation"])
 
 
-# what 마루 부리 lacks (Greek and Cyrillic letters, the kanji of Japanese-only names) comes from the first of these free
-# fonts that has it (엘리스 2026-10-11: "PSY프레임로드 Ω" showed a box)
-FALLBACKS = (("NotoSerifKR.ttf", "Bold"), ("NotoSerifJP.ttf", "Bold"), ("DejaVuSerif-Bold.ttf", None))
+def title(size):
+    """The name font."""
+    return font_of(LAYOUT["name"]["font"], size)
 
 
 @lru_cache(maxsize=16)
@@ -107,8 +102,10 @@ def _letters(path):
 
 
 def text_runs(text, font):
-    """The text cut where its letters change font: [(text, font)], the given font wherever it has the letter."""
-    fonts = [font] + [_font(n, font.size, w) for n, w in FALLBACKS if os.path.exists(_asset(n))]
+    """The text cut where its letters change font: [(text, font)], the given font wherever it has the letter. What
+    마루 부리 lacks (Greek and Cyrillic letters, the kanji of Japanese-only names) comes from the first of the name's
+    free fallback fonts that has it (엘리스 2026-10-11: "PSY프레임로드 Ω" showed a box)."""
+    fonts = [font] + [font_of(f, font.size) for f in LAYOUT["name"]["fallbacks"] if os.path.exists(_asset(f["file"]))]
     runs = []
     for ch in text:
         f = next((f for f in fonts if ord(ch) in _letters(f.path)), font)
@@ -122,18 +119,6 @@ def text_runs(text, font):
 def needs_fallback(name):
     """Whether a card name has letters the name font lacks."""
     return any(ord(ch) not in _letters(title(48).path) for ch in name)
-
-
-def sans(size, weight="Medium"):
-    return _font("NotoSansKR.ttf", size, weight)
-
-
-def serif(size, weight="Regular"):
-    return _font("NotoSerifKR.ttf", size, weight)
-
-
-def stat_font(size):
-    return title(size)
 
 
 def type_line(card):
@@ -155,18 +140,18 @@ def is_overframe(art):
     return art.height >= 1.5 * art.width
 
 
-def _squeezed_text(text, font, fill, max_w, height):
+def _squeezed_text(text, font, fill, max_w, height, pad):
     """One line of text, squeezed sideways when it is wider than max_w (long card names); letters the font lacks in
     the fallback fonts, on the same baseline."""
     runs = text_runs(text, font)
     w = max(1, round(sum(f.getlength(t) for t, f in runs)))
-    layer = Image.new("RGBA", (w + 4, height), (0, 0, 0, 0))
+    layer = Image.new("RGBA", (w + 2 * pad, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     if len(runs) == 1 and runs[0][1] is font:
-        draw.text((2, height / 2), text, font=font, fill=fill, anchor="lm")
+        draw.text((pad, height / 2), text, font=font, fill=fill, anchor="lm")
     else:
         ascent, descent = font.getmetrics()
-        x, baseline = 2, height / 2 + (ascent - descent) / 2   # where "lm" puts the name font's baseline
+        x, baseline = pad, height / 2 + (ascent - descent) / 2   # where "lm" puts the name font's baseline
         for t, f in runs:
             draw.text((x, baseline), t, font=f, fill=fill, anchor="ls")
             x += f.getlength(t)
@@ -203,7 +188,7 @@ def card_paragraphs(text):
     return text.replace("\0", "\n")
 
 
-def fit(text, box_w, box_h, font_for, sizes=range(30, 11, -1), spacing=1.25):
+def fit(text, box_w, box_h, font_for, sizes, spacing):
     """The largest size whose wrapped text fits the box: (font, lines, line height)."""
     for size in sizes:
         font = font_for(size)
@@ -215,9 +200,9 @@ def fit(text, box_w, box_h, font_for, sizes=range(30, 11, -1), spacing=1.25):
     return font, wrap(text, font, box_w), round(sizes[-1] * spacing)
 
 
-def _draw_lines(draw, lines, font, x, y, lh, fill=(0, 0, 0, 255)):
+def _draw_lines(draw, lines, font, x, y, lh, fill, anchor):
     for i, line in enumerate(lines):
-        draw.text((x, y + i * lh), line, font=font, fill=fill)
+        draw.text((x, y + i * lh), line, font=font, fill=fill, anchor=anchor)
 
 
 def _stars(face, card):
@@ -236,41 +221,50 @@ def _stat_value(v):
     return "" if v is None else "?" if v < 0 else str(v)
 
 
-def _stats(draw, card, link, right, bottom):   # bottom = the baseline
+def stat_pieces(card, link):
+    """The last line's pieces from the right: (label, number), the number None for LINK-n."""
+    first = ("LINK-" + str(card.link_rating or 0), None) if link else ("DEF/", _stat_value(card.def_value))
+    return [first, ("ATK/", _stat_value(card.atk))]
+
+
+def _stats(draw, card, link):
     """ATK/ … DEF/ … (or LINK-n) right-aligned on the last line, each number right-aligned in a four-digit slot."""
-    font = stat_font(28)
-    slot = font.getlength("0000")
-    pieces = []
-    if link:
-        pieces.append(("LINK-" + str(card.link_rating or 0), None))
-    else:
-        pieces.append(("DEF/", _stat_value(card.def_value)))
-    pieces.append(("ATK/", _stat_value(card.atk)))
-    x = right
-    for label, value in pieces:
+    lay = LAYOUT["stats"]
+    font, fill, anchor = font_of(lay["font"], lay["size"]), tuple(lay["color"]), lay["anchor"]
+    slot = font.getlength(lay["slot"])
+    x, bottom = lay["right"], lay["baseline"]
+    for label, value in stat_pieces(card, link):
         if value is not None:
-            draw.text((x, bottom), value, font=font, fill=(0, 0, 0, 255), anchor="rs")
-            x -= slot + 4
-        draw.text((x, bottom), label, font=font, fill=(0, 0, 0, 255), anchor="rs")
-        x -= font.getlength(label) + 26
+            draw.text((x, bottom), value, font=font, fill=fill, anchor=anchor)
+            x -= slot + lay["number_gap"]
+        draw.text((x, bottom), label, font=font, fill=fill, anchor=anchor)
+        x -= font.getlength(label) + lay["label_gap"]
+
+
+def spell_trap_label(card):
+    """【마법 카드 / 【함정 카드 and the file of its kind's icon (None for a normal one); 】 closes the line."""
+    icon_name = KIND_ICON.get(card.spell_trap_subtype)
+    return ("【마법 카드" if card.category == "spell" else "【함정 카드",
+            f"GUI_T_Icon1_Icon{icon_name}.png" if icon_name else None)
 
 
 def _spell_trap_line(face, draw, card):
-    label = "【마법 카드" if card.category == "spell" else "【함정 카드"
-    icon_name = KIND_ICON.get(card.spell_trap_subtype)
-    font = title(38)
-    x0, y0, x1, y1 = STAR_ROW
-    icon = _image(f"GUI_T_Icon1_Icon{icon_name}.png").resize((40, 40), Image.LANCZOS) if icon_name else None
+    lay = LAYOUT["spell_trap_line"]
+    label, icon_file = spell_trap_label(card)
+    font, fill, anchor = font_of(lay["font"], lay["size"]), tuple(lay["color"]), lay["anchor"]
+    x0, y0, x1, y1 = lay["box"]
+    size = lay["icon_size"]
+    icon = _image(icon_file).resize((size, size), Image.LANCZOS) if icon_file else None
     tail_w = font.getlength("】")
-    width = font.getlength(label) + (44 if icon else 0) + tail_w
+    width = font.getlength(label) + (lay["icon_advance"] if icon else 0) + tail_w
     x = x1 - width
     yc = (y0 + y1) / 2
-    draw.text((x, yc), label, font=font, fill=(0, 0, 0, 255), anchor="lm")
+    draw.text((x, yc), label, font=font, fill=fill, anchor=anchor)
     x += font.getlength(label)
     if icon:
-        face.alpha_composite(icon, (round(x + 2), round(yc - 20)))
-        x += 44
-    draw.text((x, yc), "】", font=font, fill=(0, 0, 0, 255), anchor="lm")
+        face.alpha_composite(icon, (round(x + lay["icon_dx"]), round(yc - size / 2)))
+        x += lay["icon_advance"]
+    draw.text((x, yc), "】", font=font, fill=fill, anchor=anchor)
 
 
 def _link_markers(face, markers):
@@ -283,18 +277,41 @@ def _link_markers(face, markers):
         face.alpha_composite(sprite, (round(cx - sprite.width / 2), round(cy - sprite.height / 2)))
 
 
-def draw_face(card, texts=None, with_text=False, art_id=None):
+def frame_key(card):
+    """The frame a card is drawn in (a monster with none known as an effect monster)."""
+    return card.frame if card.frame in FRAMES else ("spell" if card.category == "spell" else
+                                                    "trap" if card.category == "trap" else "effect")
+
+
+def card_text_parts(card, texts):
+    """A face's two card texts from its CardText: (the pendulum box's, the lower box's, whether the lower one is a
+    normal monster's, set in the serif)."""
+    normal_monster = card.category == "monster" and "normal" in card.types
+    body = card_paragraphs(texts.flavor if normal_monster and texts.flavor else texts.effect)
+    if texts.materials:
+        body = card_paragraphs(texts.materials) + "\n" + body
+    return card_paragraphs(texts.pendulum_effect) if texts.pendulum_effect else "", body, normal_monster
+
+
+def _text_box(draw, text, lay, box, font_key):
+    x0, y0, x1, y1 = box
+    font, lines, lh = fit(text, x1 - x0, y1 - y0, lambda s: font_of(lay[font_key], s),
+                          range(lay["max_size"], lay["min_size"] - 1, -1), lay["line_spacing"])
+    _draw_lines(draw, lines, font, x0, y0, lh, tuple(lay["color"]), lay["anchor"])
+
+
+def draw_face(card, texts=None, with_text=False, art_id=None, letters=True):
     """The card face as a 704×1024 RGBA image, with the art of Master Duel print art_id (the card's own by default,
     another id for an alternate art). The effect boxes stay empty (at the size the card book shows a face, card text
     can't be read, and the page prints it in full below, 엘리스 10/11); with_text=True fills them from texts, the
-    card's Korean CardText (fetched when not given)."""
-    if not with_text:
+    card's Korean CardText (fetched when not given). letters=False leaves every letter off (frame, art, icons, stars
+    and markers only), for the layout page to set them in the browser."""
+    if not with_text or not letters:
         texts = False
     elif texts is None:
         texts = card.texts.filter(lang="ko").first()
-    frame_key = card.frame if card.frame in FRAMES else ("spell" if card.category == "spell" else
-                                                          "trap" if card.category == "trap" else "effect")
-    pendulum = frame_key.endswith("_pendulum")
+    frame = frame_key(card)
+    pendulum = frame.endswith("_pendulum")
     path = art_path(art_id or card.id)
     art = Image.open(path).convert("RGBA") if path and os.path.exists(path) else None
     overframe = art is not None and is_overframe(art)
@@ -309,53 +326,53 @@ def draw_face(card, texts=None, with_text=False, art_id=None):
             else:
                 art = _cover(art, x1 - x0, y1 - y0)
             face.alpha_composite(art, (x0, y0))
-        face.alpha_composite(_image(f"card_frame{FRAMES[frame_key]}.png"))
+        face.alpha_composite(_image(f"card_frame{FRAMES[frame]}.png"))
     draw = ImageDraw.Draw(face)
 
     # name and attribute; over a 오버프레임 art the name is white on a soft shadow so it reads on any picture
-    x0, y0, x1, y1 = NAME_BOX
-    if overframe:
-        shadow = _squeezed_text(card.name_ko or card.name_ja, title(48), (0, 0, 0, 200), x1 - x0, y1 - y0)
-        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2), (2, 2)):
-            face.alpha_composite(shadow, (x0 + dx, y0 + dy))
-    name_fill = (255, 255, 255, 255) if overframe or frame_key in WHITE_NAME else (0, 0, 0, 255)
-    name = _squeezed_text(card.name_ko or card.name_ja, title(48), name_fill, x1 - x0, y1 - y0)
-    face.alpha_composite(name, (x0, y0))
+    if letters:
+        lay = LAYOUT["name"]
+        x0, y0, x1, y1 = lay["box"]
+        name, font = card.name_ko or card.name_ja, font_of(lay["font"], lay["size"])
+        if overframe:
+            shadow = _squeezed_text(name, font, tuple(lay["shadow_color"]), x1 - x0, y1 - y0, lay["pad"])
+            for dx, dy in lay["shadow_offsets"]:
+                face.alpha_composite(shadow, (x0 + dx, y0 + dy))
+        light = overframe or frame in lay["light_frames"]
+        face.alpha_composite(_squeezed_text(name, font, tuple(lay["light_color" if light else "color"]),
+                                            x1 - x0, y1 - y0, lay["pad"]), (x0, y0))
     attr = ATTR_ICON.get(card.category if card.category in ("spell", "trap") else card.attribute)
     if attr:
         ax0, ay0, ax1, ay1 = ATTR_BOX
         face.alpha_composite(_image(f"GUI_T_Icon1_Attr{attr}.png").resize((ax1 - ax0, ay1 - ay0), Image.LANCZOS), (ax0, ay0))
 
-    tx0, ty0, tx1, ty1 = TEXT
     if card.category == "monster":
-        if frame_key == "link":
+        if frame == "link":
             _link_markers(face, card.link_markers or [])
         else:
             _stars(face, card)
-        draw.text((tx0, ty0), type_line(card), font=title(26), fill=(0, 0, 0, 255))
-        body_top, body_bottom = ty0 + TYPE_LINE_H, STAT_RULE_Y - 2
-        draw.line([(tx0, STAT_RULE_Y), (tx1, STAT_RULE_Y)], fill=(0, 0, 0, 255), width=2)
-        _stats(draw, card, frame_key == "link", tx1, STAT_BASELINE_Y)
-    else:
+        if letters:
+            lay = LAYOUT["type_line"]
+            draw.text((lay["x"], lay["y"]), type_line(card), font=font_of(lay["font"], lay["size"]),
+                      fill=tuple(lay["color"]), anchor=lay["anchor"])
+            rule = LAYOUT["stats"]["rule"]
+            draw.line([(rule["x0"], rule["y"]), (rule["x1"], rule["y"])], fill=tuple(rule["color"]), width=rule["width"])
+            _stats(draw, card, frame == "link")
+    elif letters:
         _spell_trap_line(face, draw, card)
-        body_top, body_bottom = ty0 + 2, ty1
-    if pendulum and card.pendulum_scale is not None:
-        for x in PEND_SCALE_X:
-            draw.text((x, 735), str(card.pendulum_scale), font=stat_font(42), fill=(0, 0, 0, 255), anchor="mm")
+    if letters and pendulum and card.pendulum_scale is not None:
+        lay = LAYOUT["pendulum_scale"]
+        for x in lay["x"]:
+            draw.text((x, lay["y"]), str(card.pendulum_scale), font=font_of(lay["font"], lay["size"]),
+                      fill=tuple(lay["color"]), anchor=lay["anchor"])
 
     if texts:
-        if pendulum and texts.pendulum_effect:
-            pend = card_paragraphs(texts.pendulum_effect)
-            px0, py0, px1, py1 = PEND_TEXT
-            font, lines, lh = fit(pend, px1 - px0, py1 - py0, lambda s: sans(s), sizes=range(24, 9, -1))
-            _draw_lines(draw, lines, font, px0, py0, lh)
-        normal_monster = card.category == "monster" and "normal" in card.types
-        body = card_paragraphs(texts.flavor if normal_monster and texts.flavor else texts.effect)
-        if texts.materials:
-            body = card_paragraphs(texts.materials) + "\n" + body
-        font_for = (lambda s: serif(s)) if normal_monster else (lambda s: sans(s))
-        font, lines, lh = fit(body, tx1 - tx0, body_bottom - body_top - 4, font_for)
-        _draw_lines(draw, lines, font, tx0, body_top, lh)
+        pend, body, normal_monster = card_text_parts(card, texts)
+        if pendulum and pend:
+            _text_box(draw, pend, LAYOUT["pendulum_effect"], LAYOUT["pendulum_effect"]["box"], "font")
+        lay = LAYOUT["effect"]
+        _text_box(draw, body, lay, lay["box"] if card.category == "monster" else lay["spell_trap_box"],
+                  "normal_font" if normal_monster else "font")
     return face
 
 
@@ -389,8 +406,10 @@ def write_signatures(sigs):
 def draw_name_mask(card):
     """The card name alone, white on black over the card's top sixth: Master Duel's Shine and Royal shaders paint the
     name from it (Royal in gold, Shine in white) instead of taking it from the face (엘리스 10/11)."""
-    x0, y0, x1, y1 = NAME_BOX
-    layer = _squeezed_text(card.name_ko or card.name_ja, title(48), (255, 255, 255, 255), x1 - x0, y1 - y0)
+    lay = LAYOUT["name"]
+    x0, y0, x1, y1 = lay["box"]
+    layer = _squeezed_text(card.name_ko or card.name_ja, font_of(lay["font"], lay["size"]), (255, 255, 255, 255),
+                           x1 - x0, y1 - y0, lay["pad"])
     mask = Image.new("L", (W, H), 0)
     mask.paste(255, (x0, y0), layer.getchannel("A"))
     return mask.resize(NAME_MASK_SIZE, Image.LANCZOS, box=(0, 0, W, H / 6))

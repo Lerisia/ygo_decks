@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import dex, packs, views
+from . import dex, face_layout, packs, views
 
 urlpatterns = [
     path("dex-counts/", dex.dex_counts),
@@ -14,6 +14,10 @@ urlpatterns = [
     path("packs/<int:pack_id>/", packs.pack),
     path("packs/<int:pack_id>/open/", packs.open_pack),
     path("packs/<int:pack_id>/mine/", packs.pack_mine),
+    path("face-layout/", face_layout.layout),
+    path("face-layout/assets/<str:name>", face_layout.asset),
+    path("face-layout/<int:md_id>/", face_layout.letters),
+    path("face-layout/<int:md_id>/bare/", face_layout.bare),
     path("card-groups/", views.card_groups),
     path("card-groups/<int:group_id>/", views.card_group),
     path("card-groups/<int:group_id>/members/", views.card_group_member),

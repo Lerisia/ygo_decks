@@ -1,0 +1,77 @@
+{
+  "name": {
+    "box": [58, 46, 590, 114],
+    "anchor": "lm",
+    "font": {"file": "MaruBuri-Bold.otf", "variation": null},
+    "size": 48,
+    "pad": 2,
+    "color": [0, 0, 0, 255],
+    "light_color": [255, 255, 255, 255],
+    "light_frames": ["spell", "trap", "xyz", "xyz_pendulum", "link"],
+    "shadow_color": [0, 0, 0, 200],
+    "shadow_offsets": [[-2, 0], [2, 0], [0, -2], [0, 2], [2, 2]],
+    "fallbacks": [
+      {"file": "NotoSerifKR.ttf", "variation": "Bold"},
+      {"file": "NotoSerifJP.ttf", "variation": "Bold"},
+      {"file": "DejaVuSerif-Bold.ttf", "variation": null}
+    ]
+  },
+  "spell_trap_line": {
+    "box": [60, 123, 646, 171],
+    "anchor": "lm",
+    "font": {"file": "MaruBuri-Bold.otf", "variation": null},
+    "size": 38,
+    "color": [0, 0, 0, 255],
+    "icon_size": 40,
+    "icon_dx": 2,
+    "icon_advance": 44
+  },
+  "type_line": {
+    "x": 62,
+    "y": 769,
+    "anchor": "la",
+    "font": {"file": "MaruBuri-Bold.otf", "variation": null},
+    "size": 26,
+    "color": [0, 0, 0, 255]
+  },
+  "stats": {
+    "right": 644,
+    "baseline": 952,
+    "anchor": "rs",
+    "font": {"file": "MaruBuri-Bold.otf", "variation": null},
+    "size": 28,
+    "color": [0, 0, 0, 255],
+    "slot": "0000",
+    "number_gap": 4,
+    "label_gap": 26,
+    "rule": {"x0": 62, "x1": 644, "y": 922, "width": 2, "color": [0, 0, 0, 255]}
+  },
+  "pendulum_scale": {
+    "x": [74, 630],
+    "y": 735,
+    "anchor": "mm",
+    "font": {"file": "MaruBuri-Bold.otf", "variation": null},
+    "size": 42,
+    "color": [0, 0, 0, 255]
+  },
+  "effect": {
+    "box": [62, 801, 644, 916],
+    "spell_trap_box": [62, 771, 644, 952],
+    "anchor": "la",
+    "font": {"file": "NotoSansKR.ttf", "variation": "Medium"},
+    "normal_font": {"file": "NotoSerifKR.ttf", "variation": "Regular"},
+    "max_size": 30,
+    "min_size": 12,
+    "line_spacing": 1.25,
+    "color": [0, 0, 0, 255]
+  },
+  "pendulum_effect": {
+    "box": [108, 648, 598, 756],
+    "anchor": "la",
+    "font": {"file": "NotoSansKR.ttf", "variation": "Medium"},
+    "max_size": 24,
+    "min_size": 10,
+    "line_spacing": 1.25,
+    "color": [0, 0, 0, 255]
+  }
+}
