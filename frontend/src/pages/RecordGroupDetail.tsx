@@ -868,7 +868,7 @@ const RecordGroupDetailPage = () => {
           />
         </div>
       </div>
-      {canWrite && <PcTrackerBanner dismissible />}
+      {canWrite && <PcTrackerBanner dismissible className="mb-4" />}
       {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}

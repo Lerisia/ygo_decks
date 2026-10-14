@@ -43,10 +43,10 @@ const RecordGroups = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [metaStats, setMetaStats] = useState<MetaDeckStat[]>([]);
-  // /records?meta=1 (linked from notices) opens the meta stats and scrolls to them (특이점 2026-10-10).
+  // The meta stats start open (참혈 2026-10-14); /records?meta=1 (linked from notices) also scrolls to them (특이점 2026-10-10).
   const [searchParams] = useSearchParams();
   const metaLinked = searchParams.get("meta") === "1";
-  const [showMetaStats, setShowMetaStats] = useState(metaLinked);
+  const [showMetaStats, setShowMetaStats] = useState(true);
   const metaRef = useRef<HTMLDivElement>(null);
   const metaScrolled = useRef(false);
   const [showMoreMeta, setShowMoreMeta] = useState(false);
