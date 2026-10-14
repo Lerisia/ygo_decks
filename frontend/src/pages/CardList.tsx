@@ -334,7 +334,8 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
                   onChange={(e) => pickSort({ sort: e.target.value, dir: "" })}
                   className="appearance-none max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
                 >
-                  {sorts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {/* 조회순 reads 정확도순 while a query is on: the closest names come first then (참혈 2026-10-14) */}
+                  {sorts.map((s) => <option key={s.value} value={s.value}>{s.value === "popular" && filters.q ? "정확도순" : s.label}</option>)}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden />
               </span>

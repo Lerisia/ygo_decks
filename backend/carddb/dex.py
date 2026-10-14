@@ -1,5 +1,6 @@
 """카드 도감: the public card list (search, filters, sort, 60 a page) and card documents — Master Duel cards with art."""
 import json
+from datetime import timedelta
 import os
 import time
 import unicodedata
@@ -82,7 +83,7 @@ SORTS = {
     "level": (lambda r: r.number, False),
     "atk": (lambda r: r.atk, False),
     "def": (lambda r: r.def_, False),
-    # 추천순 (/dev/cards, 참혈 2026-10-14): ordered by _popular_order, as the counts behind it change
+    # 조회순 (/dev/cards, 참혈 2026-10-14): ordered by _popular_order, as the counts behind it change
     "popular": (None, True),
 }
 BAN_FILTERS = {"forbidden", "limited", "semi_limited", "unlimited"}
@@ -191,28 +192,34 @@ def _card_index():
 
 
 POPULAR_MAX_AGE = 300   # seconds between counts of card page views
+REVIEW_GAP = timedelta(minutes=5)   # a person's view of a card counts again only this long after the last counted
 _views = {"at": 0.0, "counts": {}, "order": None}
 
 
 def _card_views():
-    """How many people opened each card's page (analytics page views of /cards/<id>, once a visitor), the team left
-    out: its signed-in users and any browser seen signed in as one of them. Counted again every five minutes."""
+    """How often each card's page was viewed (analytics page views of /cards/<id>), a person's views of a card
+    counting again only five minutes after the last one counted (참혈 2026-10-14), the team left out: its signed-in
+    users and any browser seen signed in as one of them. Counted again every five minutes."""
     from analytics.models import PageView
     now = time.time()
     if now - _views["at"] > POPULAR_MAX_AGE:
         team = set(PageView.objects.filter(user__is_staff=True).values_list("visitor_id", flat=True))
-        people = defaultdict(set)
-        for path, visitor in (PageView.objects.filter(path__startswith="/cards/").exclude(user__is_staff=True)
-                              .values_list("path", "visitor_id")):
+        counts, last = Counter(), {}
+        for path, visitor, at in (PageView.objects.filter(path__startswith="/cards/").exclude(user__is_staff=True)
+                                  .order_by("created_at").values_list("path", "visitor_id", "created_at")):
             tail = path[len("/cards/"):].strip("/")
-            if tail.isdigit() and visitor not in team:
-                people[int(tail)].add(visitor)
-        _views.update(at=now, counts={cid: len(v) for cid, v in people.items()}, order=None)
+            if not tail.isdigit() or visitor in team:
+                continue
+            key = (int(tail), visitor)
+            if key not in last or at - last[key] >= REVIEW_GAP:
+                counts[key[0]] += 1
+                last[key] = at
+        _views.update(at=now, counts=dict(counts), order=None)
     return _views["counts"]
 
 
 def _popular_order(index):
-    """추천순: the cards more people opened first, then the newest, then by name."""
+    """조회순: the most viewed cards first, then the newest, then by name."""
     views = _card_views()
     if _views["order"] is None or _views["order"][0] is not index["type"]:
         rows = sorted(index["type"], key=lambda r: (-views.get(r.id, 0), r.released is None, -(r.released or 0), r.name, r.id))

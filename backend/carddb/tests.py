@@ -890,8 +890,9 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.ids(sort="type"), [1, 2, 9, 3, 5, 12, 6, 4, 11, 10])
 
     def test_recommended_order(self):
-        # 추천순 (/dev/cards, 참혈 2026-10-14): cards whose pages more people opened first (once a person, the team left
-        # out), then the newest, then by name; a query still puts the closest names first
+        # 조회순 (/dev/cards, 참혈 2026-10-14): the most viewed cards first — a person's views of a card count again only
+        # five minutes after the last one counted, the team left out — then the newest, then by name; a query still
+        # puts the closest names first
         from analytics.models import PageView
         from user.models import User
         from . import dex
@@ -905,7 +906,13 @@ class CardDexApiTest(TestCase):
             PageView.objects.create(visitor_id=visitor, path="/cards/3")
         for _ in range(5):
             PageView.objects.create(visitor_id="teamvisitor", user=staff, path="/cards/4")
-        self.assertEqual(self.ids(sort="popular"), [2, 3, 4, 6, 5, 9, 1])
+        from datetime import timedelta
+        from django.utils import timezone
+        start = timezone.now() - timedelta(hours=1)
+        for minutes in (0, 2, 6, 12, 20):   # 0 counts, 2 is too soon, then 6, 12 (6 after 6) and 20: four views
+            v = PageView.objects.create(visitor_id="visitor009", path="/cards/6")
+            PageView.objects.filter(id=v.id).update(created_at=start + timedelta(minutes=minutes))
+        self.assertEqual(self.ids(sort="popular"), [6, 2, 3, 4, 5, 9, 1])
         self.assertEqual(self.ids(sort="popular", q="블랙 매지션"), [1, 3, 4])
 
     def test_master_duel_sorts_either_way(self):

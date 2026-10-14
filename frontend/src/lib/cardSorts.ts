@@ -10,9 +10,9 @@ export const CARD_SORTS = [
   { value: "def", label: "수비력" },
 ];
 
-/** /dev/cards tries 추천순 — the cards whose pages more people opened first, then the newest, then by name; a query
- *  still puts the closest names first — and calls 디폴트 순 유형순 (참혈 2026-10-14). */
+/** /dev/cards tries 조회순 — the most viewed cards first, then the newest, then by name; with a query it reads
+ *  정확도순, the closest names first — and calls 디폴트 순 유형순 (참혈 2026-10-14). */
 export const DEV_CARD_SORTS = [
-  { value: "popular", label: "추천순" },
+  { value: "popular", label: "조회순" },
   ...CARD_SORTS.map((s) => (s.value === "type" ? { ...s, label: "유형순" } : s)),
 ];
