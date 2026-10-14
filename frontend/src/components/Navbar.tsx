@@ -6,7 +6,7 @@ import { NOTIFICATIONS_UPDATED, getUnreadNotificationCount } from "@/api/notific
 import Avatar from "@/components/Avatar";
 import PLogo from "@/components/PLogo";
 import { ALL_MENU_PATH, CONTACT_PATH, DONATE_URL, MENU_GROUPS, groupOf, itemHref } from "@/lib/siteMenu";
-import logo from "/images/logo_big.webp";
+import logo from "/images/logo_wide.webp";   // 참혈 2026-10-14, at 4x; a new name so no browser keeps the old one
 import { startInquiryAlerts, stopInquiryAlerts, useInquiryAlerts } from "@/lib/inquiryAlerts";
 
 // 공지, 문의 and 후원 sit at the top right of every page (redesign 2026-10; this order 특이점 2026-10-07).

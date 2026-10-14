@@ -59,6 +59,8 @@ class SeoTest(TestCase):
         self.assertEqual(r.status_code, 404)
         self.assertIn("<title>YGO Decks - 유희왕 마스터 듀얼 종합 정보</title>", r.content.decode())
         self.assertIn("카드 도감 - 마스터 듀얼", self.client.get("/cards").content.decode())
+        # a list has no picture of its own: the site's link preview (참혈 2026-10-14)
+        self.assertIn('<meta property="og:image" content="https://ygodecks.com/og-image.png">', self.client.get("/cards").content.decode())
         self.assertIn("덱 도감 - 마스터 듀얼", self.client.get("/database/").content.decode())
 
     def test_deck_page_and_sitemap(self):

@@ -58,8 +58,9 @@ def page(path, title, description, image=None, body="", status=200, kind="websit
             f'<meta property="og:type" content="{kind}">', f'<meta property="og:title" content="{e(title)}">',
             f'<meta property="og:description" content="{e(description)}">', f'<meta property="og:url" content="{SITE}{path}">',
             '<meta property="og:locale" content="ko_KR">']
-    if image:
-        head += [f'<meta property="og:image" content="{e(image)}">', '<meta name="twitter:card" content="summary_large_image">']
+    # a page without a picture of its own (a list) shows the site's preview (참혈 2026-10-14)
+    head += [f'<meta property="og:image" content="{e(image or SITE + "/og-image.png")}">',
+             '<meta name="twitter:card" content="summary_large_image">']
     doc = _built_page()
     # the page's own head in place of the site's (its title, description, canonical address and preview tags)
     doc = re.sub(r'\s*<(?:meta (?:name="description"|property="og:[^"]*"|name="twitter:[^"]*")|link rel="canonical")[^>]*>', "", doc)

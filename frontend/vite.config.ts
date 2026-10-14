@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["logo.png", "pwa-192.png", "pwa-512.png", "pwa-maskable-192.png", "pwa-maskable-512.png"],
+      includeAssets: ["favicon.ico", "favicon-96.png", "apple-touch-icon.png", "pwa-192.png", "pwa-512.png", "pwa-maskable-192.png", "pwa-maskable-512.png"],
       manifest: {
         name: "YGO Decks",
         short_name: "YGO Decks",
