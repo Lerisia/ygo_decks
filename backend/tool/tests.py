@@ -1259,3 +1259,37 @@ class DuelistCupSheetTest(TestCase):
         self.assertEqual(m.record_group.name, self.cup_name)
         self.assertEqual(hand.record_group_id, self.ranked.id)
         self.assertEqual(json.load(open(backup)), [{"match": m.id, "from_group": self.ranked.id}])
+
+
+class DevIconChoicesTest(TestCase):
+    """/dev/icons (참혈 2026-10-15): operators save the icon picked for each emoji; the bot reads it from SiteConfig."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = User.objects.create_user(email="d@d.com", username="design", password="pass1234", is_staff=True)
+        self.url = "/api/dev/icon-choices/"
+
+    def test_operators_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 401)
+        member = User.objects.create_user(email="m@m.com", username="member", password="pass1234")
+        self.client.force_authenticate(member)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.put(self.url, {"choices": {}}, format="json").status_code, 403)
+
+    def test_save_and_read_back(self):
+        import json
+        self.client.force_authenticate(self.staff)
+        self.assertEqual(self.client.get(self.url).json(), {})
+        body = {"choices": {"📢 공지": {"lib": "remix-fill", "name": "megaphone"}, "🎮 놀이터 탭": {"lib": "fa", "name": "gamepad"}},
+                "custom": {"⚔️ 대결": "sword"}}
+        saved = self.client.put(self.url, body, format="json").json()
+        self.assertEqual((saved["choices"], saved["custom"], saved["saved_by"]), (body["choices"], body["custom"], "design"))
+        self.assertEqual(self.client.get(self.url).json()["choices"]["📢 공지"], {"lib": "remix-fill", "name": "megaphone"})
+        self.assertEqual(json.loads(SiteConfig.get("dev_icon_choices"))["custom"], {"⚔️ 대결": "sword"})
+
+    def test_bad_input_is_refused(self):
+        self.client.force_authenticate(self.staff)
+        for body in ({"choices": []}, {"choices": {"📢 공지": {"lib": "emoji", "name": "x"}}},
+                     {"choices": {"📢 공지": {"lib": "fa", "name": "<svg>"}}}, {"choices": {}, "custom": {"x": "Bad Name"}}):
+            self.assertEqual(self.client.put(self.url, body, format="json").status_code, 400, body)
+        self.assertIsNone(SiteConfig.get("dev_icon_choices"))
