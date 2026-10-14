@@ -112,7 +112,7 @@ export default function DeckTab({ tournamentId, myEntrant, myUserId, isHost, ent
         <div className="mb-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <p className="text-sm font-semibold mb-1">덱 스크린샷 제출</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            마스터듀얼 덱 화면 스크린샷을 올리면 카드가 자동으로 인식됩니다. 잘못 인식되거나 빠진 카드는 아래에서 직접 검색해 넣어 주세요.
+            마스터 듀얼 덱 화면 스크린샷을 올리면 카드가 자동으로 인식됩니다. 잘못 인식되거나 빠진 카드는 아래에서 직접 검색해 넣어 주세요.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <label className={`${blueBtn} cursor-pointer`}>

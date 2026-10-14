@@ -4,7 +4,8 @@ import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { getPackShowcase, type PackShowcase } from "@/api/packApi";
-import { CONTACT_PATH, DONATE_URL, RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
+import { CONTACT_PATH, DONATE_URL } from "@/lib/siteMenu";
+import RecorderDownload from "@/components/RecorderDownload";
 import DeckPickerModal from "@/components/DeckPickerModal";
 import CardPickerModal from "@/components/CardPickerModal";
 import { useDexCounts } from "@/components/DexTabs";
@@ -210,8 +211,8 @@ function Info() {
         </section>
 
         {/* Pillar 2: the recorder */}
-        {/* Windows-only, so phones skip the download pitch (특이점 2026-10-08). */}
-        <section aria-labelledby="home-rec" className="hidden sm:flex rounded-2xl p-5 md:p-6 flex-col gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+        {/* Shown everywhere for the pitch, the download on Windows only (참혈 2026-10-15; phones skipped it from 특이점 10/08). */}
+        <section aria-labelledby="home-rec" className="flex rounded-2xl p-5 md:p-6 flex-col gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
           <span className="text-xs font-bold tracking-wide text-amber-700 dark:text-amber-400">YGO Decks 레코더 · PC</span>
           <h2 id="home-rec" className="text-xl md:text-2xl font-extrabold tracking-tight">게임만 하세요. 전적은 저절로 쌓입니다</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 min-h-[20px]">
@@ -227,13 +228,7 @@ function Info() {
             <li>듀얼 중에 그 덱 상대 내 전적을 보여 줌</li>
           </ul>
           <div className="mt-auto pt-1 flex items-center gap-3">
-            <a
-              href={RECORDER_DOWNLOAD_URL}
-              download
-              className="block flex-1 text-center py-3 rounded-lg font-extrabold bg-amber-400 hover:bg-amber-500 text-amber-950 transition"
-            >
-              Windows용 내려받기
-            </a>
+            <RecorderDownload className="flex-1" />
             <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
               무료{rec ? ` · ${rec.version}` : ""}
               <Link to="/recorder" className="ml-2 underline">자세히</Link>

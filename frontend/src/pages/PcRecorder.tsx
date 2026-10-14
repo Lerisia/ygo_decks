@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { isAuthenticated } from "@/api/accountApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { getTrackerClientStatus, type TrackerClientStatus } from "@/api/trackerPendingApi";
-import { RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
+import RecorderDownload from "@/components/RecorderDownload";
 
 /** /recorder on the web: what the PC recorder does, how to set it up, and the download. */
 export default function PcRecorder() {
@@ -47,16 +47,9 @@ export default function PcRecorder() {
       )}
 
       <section className="rounded-2xl p-5 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 flex flex-col gap-3">
-        <a
-          href={RECORDER_DOWNLOAD_URL}
-          download
-          className="hidden sm:block text-center py-3 rounded-lg font-extrabold bg-amber-400 hover:bg-amber-500 text-amber-950 transition"
-        >
-          Windows용 내려받기{stats ? ` (${stats.version})` : ""}
-        </a>
-        <p className="sm:hidden text-sm font-semibold">
-          Windows PC용 프로그램입니다. PC에서 ygodecks.com/recorder 를 열어 내려받아 주세요.
-        </p>
+        {/* the download on Windows only (참혈 2026-10-15) */}
+        <RecorderDownload note="Windows PC용 프로그램입니다. PC에서 ygodecks.com/recorder 를 열어 다운로드해 주세요." />
+        {/* how many points: here, the cards elsewhere just say there are some (참혈 2026-10-15) */}
         <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
           레코더로 기록한 듀얼마다 승리 <b>5P</b>, 패배 <b>1P</b>를 드립니다.
         </p>
@@ -65,7 +58,7 @@ export default function PcRecorder() {
       <section aria-labelledby="rec-does" className="flex flex-col gap-2">
         <h2 id="rec-does" className="text-lg font-bold">하는 일</h2>
         <ul className="list-disc pl-5 flex flex-col gap-1.5 text-gray-700 dark:text-gray-300">
-          <li>랭크·레이팅 듀얼이 끝나면 결과, 코인, 선후공, 랭크, 덱을 전적 시트에 자동으로 저장합니다.</li>
+          <li>랭크·레이팅·듀얼리스트 컵 듀얼이 끝나면 결과, 코인, 선후공, 덱 등을 전적 시트에 자동으로 저장합니다.</li>
           <li>상대가 보여 준 카드로 상대 덱을 판독해 채워 둡니다. 틀리면 저장 전에 고칠 수 있습니다.</li>
           <li>듀얼 중에는 그 상대 덱을 만났을 때의 내 전적을 보여 줍니다.</li>
         </ul>
@@ -81,12 +74,12 @@ export default function PcRecorder() {
           <li>ygodecks.com 계정으로 로그인하고 <b>기록할 시트</b>를 고릅니다. 창을 닫아도 트레이에서 계속 돌아갑니다.</li>
           <li>마스터 듀얼은 <b>창 모드</b>나 <b>테두리 없는 창 모드</b>로 두세요. 전체 화면이면 확인 창이 게임 위에 보이지 않습니다.</li>
           <li>듀얼이 끝나면 게임 위에 확인 창이 뜹니다. 내 덱과 상대 덱이 채워져 있으니 맞으면 그대로, 틀리면 고쳐서 <b>저장</b>하세요. 10초 동안 두면 자동으로 저장됩니다.</li>
-          <li>잘못 기록된 판은 <Link to="/records" className="text-blue-600 dark:text-blue-400 underline">전적 시트</Link>에서 언제든 고칠 수 있습니다.</li>
+          <li>잘못 기록된 듀얼은 <Link to="/records" className="text-blue-600 dark:text-blue-400 underline">전적 시트</Link>에서 언제든 고칠 수 있습니다.</li>
         </ol>
       </section>
 
       <p className="text-sm text-gray-500 dark:text-gray-400">
-        레코더는 게임 메모리를 읽기만 하고 게임 파일이나 동작은 바꾸지 않습니다. 랭크·레이팅이 아닌 듀얼은 기록하지 않습니다.
+        레코더는 게임 메모리를 읽기만 하고 게임 파일이나 동작은 바꾸지 않습니다. 랭크·레이팅·듀얼리스트 컵이 아닌 듀얼은 기록하지 않습니다.
       </p>
     </div>
   );

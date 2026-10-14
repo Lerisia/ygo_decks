@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { RECORDER_DOWNLOAD_URL } from "@/lib/siteMenu";
+import { isWindows } from "@/lib/platform";
 
-const DOWNLOAD_URL = "/media/recorder/YGODecksRecorder.exe";
 const DISMISS_KEY = "database_tracker_promo_dismissed";
 
 const readDismissed = () => {
@@ -15,9 +17,9 @@ const readDismissed = () => {
 // Deliberately API-free: /database is open to logged-out visitors, and the
 // client-status endpoint (used by PcTrackerBanner) requires authentication.
 // Phones get nothing: the recorder is Windows-only (특이점 2026-10-08).
+// Worded as the record pages' recorder card, the download on Windows only, the rest on /recorder (참혈 2026-10-15).
 export default function DatabaseTrackerPromo() {
   const [hidden, setHidden] = useState(readDismissed);
-  const [howtoOpen, setHowtoOpen] = useState(false);
 
   if (hidden) return null;
 
@@ -31,63 +33,43 @@ export default function DatabaseTrackerPromo() {
   };
 
   return (
-    <>
-      {/* Desktop: full card with the download button */}
-      <div className="hidden sm:block mb-4 max-w-2xl w-full mx-auto text-left border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="font-semibold">
-              PC 마스터듀얼 레코더{" "}
-              <span className="text-xs font-normal text-blue-600 dark:text-blue-300">정식 출시</span>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              랭크·레이팅 게임이 끝날 때마다 결과·코인·선후공·랭크·덱을 자동으로 기록합니다. Windows 전용.
-            </div>
-            <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">
-              레코더로 '승리'를 기록할 때마다 <b>5P</b>, 패배도 <b>1P</b>를 드립니다!!
-            </div>
+    <div className="hidden sm:block mb-4 max-w-2xl w-full mx-auto text-left border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold">
+            YGO Decks 레코더 <span className="text-xs font-normal text-blue-600 dark:text-blue-300">무료</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setHowtoOpen((v) => !v)}
-              className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              {howtoOpen ? "사용법 접기" : "사용법"}
-            </button>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            랭크·레이팅·듀얼리스트 컵 듀얼이 끝나면 전적 시트에 자동으로 저장합니다.
+          </div>
+          <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mt-0.5">전적을 기록할 때마다 포인트를 드립니다!</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/recorder"
+            className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            자세히
+          </Link>
+          {isWindows() && (
             <a
-              href={DOWNLOAD_URL}
+              href={RECORDER_DOWNLOAD_URL}
+              download
               className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition"
             >
               다운로드
             </a>
-            <button
-              type="button"
-              aria-label="닫기"
-              onClick={dismiss}
-              className="px-2 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              ✕
-            </button>
-          </div>
+          )}
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={dismiss}
+            className="px-2 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            ✕
+          </button>
         </div>
-
-        {howtoOpen && (
-          <ol className="mt-3 text-sm text-gray-700 dark:text-gray-200 list-decimal pl-5 space-y-1">
-            <li>
-              <b>YGODecksRecorder.exe</b>를 받아 실행합니다. Windows가 "확인되지 않은 앱"이라고 막으면{" "}
-              <b>추가 정보 → 실행</b>을 누르세요 (아직 코드 서명이 없어서 뜨는 안내입니다).
-            </li>
-            <li>ygodecks.com 계정으로 로그인하고 <b>기록할 시트</b>를 고릅니다. 창을 닫아도 트레이에서 계속 돌아갑니다.</li>
-            <li>마스터듀얼은 <b>창모드 또는 테두리 없는 창모드</b>로 두세요. 전체화면이면 확인 창이 게임 위에 보이지 않습니다.</li>
-            <li>
-              게임이 끝나면 게임 위에 확인 창이 뜹니다. 내 덱·상대 덱이 자동으로 채워지니 맞으면 그대로, 틀리면 고쳐서{" "}
-              <b>저장</b>. 10초 동안 두면 자동 저장됩니다.
-            </li>
-            <li>게임 메모리를 읽기만 할 뿐 게임 파일이나 동작을 바꾸지 않습니다. 랭크·레이팅 외의 모드는 기록하지 않습니다.</li>
-          </ol>
-        )}
       </div>
-    </>
+    </div>
   );
 }
