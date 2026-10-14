@@ -65,6 +65,16 @@ export class SummonFx {
     this.renderer.dispose();
   }
 
+  /** Make ready unseen and wait for the GPU: every system's shader compiled now rather than as the system first shows
+   *  (5 to 8 an attribute, as the cut-in starts), its targets made and pictures sent up by drawing the opening moments
+   *  (엘리스 10/14: "첫 실행시 버벅거리고"). Back to the start after. */
+  warm(cx: number, cy: number, halfW: number, halfH: number) {
+    this.renderer.prepare(this.systems);
+    for (const t of [0, 0.15, 0.3]) this.draw(t, cx, cy, halfW, halfH);
+    this.renderer.finish();
+    this.restart();
+  }
+
   /** Back to the start. */
   restart() {
     this.time = 0;

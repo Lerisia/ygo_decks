@@ -185,6 +185,19 @@ export class FxRenderer {
                                  pixel: { cb: {}, t: {} }, blend: null as never }).pr;
   }
 
+  /** Compile every system's shaders now. */
+  prepare(systems: System[]) {
+    for (const s of systems) {
+      if (s.shader) this.program(s.shader);
+      if (s.trail) this.program(s.trail.shader);
+    }
+  }
+
+  /** Wait until the GPU has done all it was asked. */
+  finish() {
+    this.gl.finish();
+  }
+
   /** Delete what this renderer made (not the context: a canvas's context is shared by whoever asks it). */
   dispose() {
     const gl = this.gl;

@@ -95,6 +95,11 @@ export class SpineRenderer {
     this.textures.set(page, t);
   }
 
+  /** Wait until the GPU has done all it was asked. */
+  finish() {
+    this.gl.finish();
+  }
+
   /** Draw the skeleton through a view centred on (cx, cy) showing halfW / halfH skeleton units each way. */
   draw(sk: Skeleton, cx: number, cy: number, halfW: number, halfH: number) {
     const gl = this.gl;

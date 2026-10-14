@@ -1,6 +1,8 @@
 /** The pack opening's sounds, the game's own (md_ui/packopen/sound). Played through Web Audio, opened within the first
  *  tap, so the ones that follow a tap by a moment (the tear, the cards coming out) still play on a phone. The viewer
  *  can turn them off; that is remembered. */
+import { openAudio } from "@/lib/webAudio";
+
 const BASE = "/media/md_ui/packopen/sound/";
 const NAMES = ["01_op", "02_packout", "02_packout_1pack", "03_cut", "04_cardin", "05_cardout", "card_move_01", "card_move_02", "card_move_03", "card_move_04",
                "card_sr", "card_ur", "card_shake", "hope", "upgrad_01", "upgrad_01_ur", "kaminari_01", "kaminari_02", "kaminari_03", "proc_rare",
@@ -55,30 +57,15 @@ function load(name: string) {
   return buffers.get(name)!;
 }
 
-/** Call within a tap: opens the sound and fetches the sounds. A phone that left the page (another app, the screen
- *  locked) hands it back "interrupted" or "suspended", so any state but running is resumed here, within the tap, with
- *  a silent sound played in it as an iPhone wants (엘리스 10/13: "소리가 아예 안 나요"). */
+/** Call within a tap: opens the sound (the site's one context, lib/webAudio) and fetches the sounds. */
 export function unlockPackSound() {
   if (!soundOn()) return;
-  try {
-    // an iPhone keeps a page's Web Audio quiet in silent mode unless the page asks to play as media does — as the
-    // 소환 연출's sounds (an Audio element) already play (엘리스 10/13: "소리 왜 안 나지")
-    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (session && session.type !== "playback") session.type = "playback";
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!ctx || ctx.state === "closed") {
-      ctx = new Ctx();
-      buffers.clear();
-    }
-    if (ctx.state !== "running") ctx.resume().catch(() => {});
-    const blank = ctx.createBufferSource();
-    blank.buffer = ctx.createBuffer(1, 1, 22050);
-    blank.connect(ctx.destination);
-    blank.start();
-    NAMES.forEach(load);
-  } catch {
-    ctx = null;
+  const opened = openAudio();
+  if (opened !== ctx) {
+    ctx = opened;
+    buffers.clear();
   }
+  if (ctx) NAMES.forEach(load);
 }
 
 /** volume as the game's sound table sets it; rate shifts the pitch (the game varies a card's move a little each time).

@@ -1,19 +1,42 @@
-export type CutinSound = { audio: HTMLAudioElement; ready: Promise<void> };
+import { openAudio } from "@/lib/webAudio";
 
-/** The attribute's sound, started muted within the tap (browsers let sound start only from one) and stopped again;
- *  `ready` once that is done, so that the cut-in can play it from the start without the stop cutting it off. */
+/** A summon's attribute sound: `ready` once it is fetched and decoded, `play` starts it at once (엘리스 2026-10-14: the
+ *  cut-in waits for it and starts it with its first frame, through Web Audio as the pack opening does — the Audio
+ *  element it had, started muted in the tap and stopped again, could be stopped after the real start when the file
+ *  came late, and an iPhone could refuse a start made after the tap). */
+export type CutinSound = { ready: Promise<void>; play: () => void };
+
+const decoded = new Map<string, Promise<AudioBuffer | null>>();
+
+/** Call within the tap. */
 export function primeCutinSound(attribute: string): CutinSound | null {
   if (!attribute) return null;
-  const audio = new Audio(`/media/md_ui/cutin/sound/${attribute}.wav`);
-  audio.muted = true;
-  const ready = audio
-    .play()
-    .then(() => {
-      audio.pause();
-      audio.currentTime = 0;
-    }, () => {})
-    .finally(() => {
-      audio.muted = false;
-    });
-  return { audio, ready };
+  const audio = openAudio();
+  if (!audio) return null;
+  const key = attribute;
+  if (!decoded.has(key)) {
+    // a file that failed to come (a deploy restarting the site, a dropped connection) is asked for again next time
+    decoded.set(key, fetch(`/media/md_ui/cutin/sound/${attribute}.wav`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((b) => audio.decodeAudioData(b))
+      .catch(() => {
+        decoded.delete(key);
+        return null;
+      }));
+  }
+  let buffer: AudioBuffer | null = null;
+  const ready = decoded.get(key)!.then((b) => {
+    buffer = b;
+  });
+  return {
+    ready,
+    play() {
+      if (!buffer) return;
+      if (audio.state !== "running") audio.resume().catch(() => {});
+      const src = audio.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audio.destination);
+      src.start();
+    },
+  };
 }

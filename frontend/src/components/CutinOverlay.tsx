@@ -68,6 +68,8 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
 
   useEffect(() => {
     const canvas = keptCanvas("cutin"), bgCanvas = keptCanvas("bg");
+    // both unseen until all is ready: the warm-up draws on them
+    canvas.style.visibility = "hidden";
     bgCanvas.style.visibility = "hidden";
     hostRef.current!.append(bgCanvas, canvas);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -86,9 +88,10 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
       ? keep("bg", `${attribute}@${BG_VERSION}`, () => SummonFx.load(bgCanvas, `${BG_BASE}/${attribute}`, BG_VERSION, { vignette: false }),
              (fx) => fx.dispose()).catch(() => null)
       : Promise.resolve(null);
-    Promise.all([cutinLoad, bgLoad])
-      // the sound is let loose first (at most a moment's wait), so that all start together
-      .then((loaded) => Promise.race([sound?.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => loaded))
+    // the sound too, fetched and decoded, so that it starts with the first frame (a file that never comes lets the
+    // summon play without it)
+    const soundLoad = sound ? Promise.race([sound.ready, new Promise((r) => setTimeout(r, 8000))]) : null;
+    Promise.all([cutinLoad, bgLoad, soundLoad])
       .then(([p, loadedFx]) => {
         if (!alive) return;
         let fx = loadedFx;
@@ -126,15 +129,33 @@ export default function CutinOverlay({ id, info, attribute, sound, alt, onClose 
         // units) is the camera's 5 units up and down from the origin
         const [vx, vy, vh] = info.view ?? [cx, cy, halfH];
         const k = CAMERA_SIZE / vh;
-        p.restart();
-        fx?.restart();
+        // the first play's heavy work (shaders compiled, pictures sent to the GPU, the bloom's targets made) done
+        // here, behind the loading line, rather than in the first frames (엘리스 10/14: "첫 실행부터 매끄러운 편이")
+        p.warm(anim, cx, cy, halfW, halfH);
+        try {
+          fx?.warm((cx - vx) * k, (cy - vy) * k, halfW * k, halfH * k);
+        } catch {
+          fx = null;
+        }
         setState("playing");
+        canvas.style.visibility = "";
         if (fx) bgCanvas.style.visibility = "";
-        sound?.audio.play().catch(() => {});
-        let start = -1, last = 0;
+        // the opening moment shown still for two frames, while the page takes the change in (the canvases' first
+        // showing can hold a frame back a quarter of a second): then the clock and the sound start together
+        fx?.draw(0, (cx - vx) * k, (cy - vy) * k, halfW * k, halfH * k);
+        p.draw(anim, 0, 0, cx, cy, halfW, halfH);
+        let settle = 2, start = -1, last = 0;
         const frame = (now: number) => {
           if (!alive) return;
-          if (start < 0) start = last = now;
+          if (settle > 0) {
+            settle--;
+            raf = requestAnimationFrame(frame);
+            return;
+          }
+          if (start < 0) {
+            start = last = now;
+            sound?.play();
+          }
           const t = (now - start) / 1000;
           if (fx) {
             try {

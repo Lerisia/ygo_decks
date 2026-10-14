@@ -48,6 +48,15 @@ export class SpinePlayer {
     this.renderer.draw(sk, cx, cy, halfW, halfH);
   }
 
+  /** Draw a few moments of the animation, unseen, and wait for the GPU: every picture goes up and the shader is made
+   *  before the play starts, so its first frames do not stall (엘리스 10/14: "첫 실행시 버벅거리고"). Back to the start
+   *  after. */
+  warm(anim: Animation, cx: number, cy: number, halfW: number, halfH: number) {
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) this.draw(anim, anim.duration * f, 0, cx, cy, halfW, halfH);
+    this.renderer.finish();
+    this.restart();
+  }
+
   /** Where the animation's figure is at `time` (posed without drawing): minX, minY, maxX, maxY. */
   bounds(anim: Animation, time: number): [number, number, number, number] {
     const sk = this.skeleton;
