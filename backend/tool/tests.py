@@ -1072,7 +1072,8 @@ class SheetSummaryTest(TestCase):
         return self.client.get(f"/api/record-groups/{self.group.id}/statistics/", params).json()["summary"]
 
     def test_recent_streak_last_day_and_coin(self):
-        now = _tz.now()
+        # noon the day before, so yesterday's 26 games never run past midnight into the last day
+        now = _tz.localtime().replace(hour=12, minute=0, second=0, microsecond=0) - _td(days=1)
         yesterday = now - _td(days=1)
         self._m(yesterday, result="lose", coin_toss_result="lose", first_or_second="second")
         for i in range(25):
