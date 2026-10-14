@@ -287,6 +287,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
               setQInput("");
               update({ q: "", ...(key[0] === "g" ? { group: key.slice(1), card: "" } : { card: key.slice(1), group: "" }) });
             }}
+            onPickCard={(id) => navigate(`/cards/${id}`, { state: { fromList: true } })}
             onClear={() => update({ group: "", card: "" })}
           />
         </div>
