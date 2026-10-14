@@ -32,7 +32,10 @@ class Command(BaseCommand):
                 if str(md_id) in rows and not options["redo"]:
                     continue
                 entry = entries[str(md_id)]
-                row = make(md_id, lambda size: renderer.render(md_id, entry["v"], size), out)
+                try:
+                    row = make(md_id, lambda size: renderer.render(md_id, entry["v"], size), out)
+                except Exception as e:   # noqa: BLE001 — one print's trouble must not end the night's run
+                    row = {"md_id": md_id, "name": "", "verdict": "error", "error": f"{type(e).__name__}: {e}"[:300]}
                 if options["save"] and row["verdict"] == "clean":
                     obj, _ = save_illust(MdPrint.objects.select_related("card").get(md_id=md_id), Path(row["file"]).read_bytes(), options["replace"])
                     row["illust"] = obj.id

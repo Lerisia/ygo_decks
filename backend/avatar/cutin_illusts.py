@@ -45,7 +45,8 @@ class Alignment:
     rotation: float   # degrees
 
     def fits(self):
-        return self.inliers >= 80 and self.error <= 1.0 and abs(self.rotation) <= 1.0
+        # a figure on the wrong art gets under 10 inliers at some odd angle; a small dark figure on its own art 50
+        return self.inliers >= 30 and self.error <= 1.0 and abs(self.rotation) <= 1.0 and 0.3 <= self.scale <= 3
 
 
 def align(figure, art):
@@ -212,12 +213,20 @@ class PoseRenderer:
             route.fulfill(status=404)
 
     def _draw(self, page, md_id, version, size):
-        for _ in range(3):
-            png = page.evaluate(f"renderCutinPose('/media/md_ui/cutin/{md_id}', {version}, {size}).then((r) => r.png)")
+        failure = None
+        for attempt in range(3):
+            if attempt:   # a fresh page: a decode the browser refused, or an empty drawing, after many cut-ins
+                page.goto(f"{self.ORIGIN}/index.html")
+            try:
+                png = page.evaluate(f"renderCutinPose('/media/md_ui/cutin/{md_id}', {version}, {size}).then((r) => r.png)")
+            except Exception as e:   # noqa: BLE001
+                failure = e
+                continue
             image = cv2.imdecode(np.frombuffer(base64.b64decode(png.split(",", 1)[1]), np.uint8), cv2.IMREAD_UNCHANGED)
             if image is not None and image.shape[2] == 4 and image[:, :, 3].any():
                 return image
-        raise RuntimeError(f"cut-in {md_id} drew nothing at {size} px")
+            failure = RuntimeError(f"cut-in {md_id} drew nothing at {size} px")
+        raise failure
 
     def render(self, md_id, version, size):
         """The print's cut-in at rest, fitted on a transparent `size` px square: BGRA."""
