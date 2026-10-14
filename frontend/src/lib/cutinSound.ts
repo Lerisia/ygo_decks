@@ -7,6 +7,8 @@ import { openAudio } from "@/lib/webAudio";
 export type CutinSound = { ready: Promise<void>; play: () => void };
 
 const decoded = new Map<string, Promise<AudioBuffer | null>>();
+// half its level (about -6 dB): a tap on a card's page does not expect a sound at full blast (엘리스 2026-10-14)
+const VOLUME = 0.5;
 
 /** Call within the tap. */
 export function primeCutinSound(attribute: string): CutinSound | null {
@@ -34,8 +36,10 @@ export function primeCutinSound(attribute: string): CutinSound | null {
       if (!buffer) return;
       if (audio.state !== "running") audio.resume().catch(() => {});
       const src = audio.createBufferSource();
+      const gain = audio.createGain();
       src.buffer = buffer;
-      src.connect(audio.destination);
+      gain.gain.value = VOLUME;
+      src.connect(gain).connect(audio.destination);
       src.start();
     },
   };
