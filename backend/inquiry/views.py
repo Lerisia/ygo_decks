@@ -70,8 +70,11 @@ def posts(request):
         board = request.GET.get("board")
         if board not in BOARDS:
             return _error("게시판을 골라 주세요.")
+        # newest first, said outright: counting the answers groups the rows, and Django then drops Meta.ordering
+        # (특이점 2026-10-14: the boards listed the oldest first)
         qs = (InquiryPost.objects.filter(board=board, is_deleted=False).select_related("author")
-              .annotate(n_comments=Count("comments", filter=Q(comments__is_deleted=False))))
+              .annotate(n_comments=Count("comments", filter=Q(comments__is_deleted=False)))
+              .order_by("-created_at", "-id"))
         if request.GET.get("mine") == "1" and request.user.is_authenticated:
             qs = qs.filter(author=request.user)
         total = qs.count()

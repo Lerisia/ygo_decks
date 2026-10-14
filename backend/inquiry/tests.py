@@ -50,6 +50,17 @@ class InquiryBoardTest(TestCase):
         self.assertEqual(staff_rows["unanswered"], 1)
         self.assertEqual(self._as(None).get("/api/inquiry/?board=deck").json()["total"], 0)
 
+    def test_list_shows_the_newest_post_first(self):
+        # 특이점 2026-10-14: counting each post's answers had dropped the model's newest-first order
+        from datetime import timedelta
+        from django.utils import timezone
+        old = self._write(title="먼저 쓴 글").json()["id"]
+        new = self._write(title="나중에 쓴 글").json()["id"]
+        InquiryPost.objects.filter(id=old).update(created_at=timezone.now() - timedelta(days=1))
+        InquiryComment.objects.create(post_id=old, author=self.staff, body="답변")
+        rows = self._as(self.staff).get("/api/inquiry/?board=site").json()["results"]
+        self.assertEqual([r["id"] for r in rows], [new, old])
+
     def test_private_post_opens_only_for_its_author_and_staff(self):
         pid = self._write().json()["id"]
         locked = self._as(self.other).get(f"/api/inquiry/{pid}/")
