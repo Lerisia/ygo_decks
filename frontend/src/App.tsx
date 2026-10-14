@@ -38,6 +38,7 @@ const Noresults = lazyChunk(() => import("./pages/Noresults"));
 const DatabasePage = lazyChunk(() => import("./pages/Database"));
 const DeckDetail = lazyChunk(() => import("./pages/DeckDetail"));
 const CardList = lazyChunk(() => import("./pages/CardList"));
+const DevLoader = lazyChunk(() => import("./pages/DevLoader"));
 const CardDetail = lazyChunk(() => import("./pages/CardDetail"));
 const RecordGroups = lazyChunk(() => import("./pages/RecordGroups"));
 const RecordGroupDetail = lazyChunk(() => import("./pages/RecordGroupDetail"));
@@ -191,6 +192,8 @@ function App() {
             <Route path="/cards/:cardId" element={<CardDetail />} />
             {/* the card book trying one search box for names and 카드군 (operators only, 참혈 2026-10-14) */}
             <Route path="/dev/cards" element={<CardList basePath="/dev/cards" unifiedSearch />} />
+            {/* the logo shuffle loader, tuned here first (operators only, 참혈 2026-10-14) */}
+            <Route path="/dev/loader" element={<DevLoader />} />
             <Route path="/records" element={<RecordGroups />} />
             <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
             {/* 대회 (내부 테스트 중 — 네비게이션 미노출) */}
