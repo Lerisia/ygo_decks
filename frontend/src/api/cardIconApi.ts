@@ -152,44 +152,6 @@ export const bulkUploadCustomIllusts = async (files: File[]): Promise<BulkUpload
   return body as BulkUploadResult;
 };
 
-export const getTwitterCredentials = () =>
-  request<{
-    configured: boolean;
-    updated_at?: string;
-    note?: string;
-    auth_token_tail?: string;
-    ct0_tail?: string;
-  }>("/card-icons/custom-illusts/twitter-credentials/");
-
-export const setTwitterCredentials = (auth_token: string, ct0: string, note: string = "") =>
-  request<{ ok: boolean }>("/card-icons/custom-illusts/twitter-credentials/", {
-    method: "POST",
-    body: JSON.stringify({ auth_token, ct0, note }),
-  });
-
-export interface ScrapeResult {
-  query: string;
-  tweets_seen: number;
-  imported: CustomIllustResult[];
-  imported_count: number;
-  skipped: { tweet: string; reason: string }[];
-  skipped_count: number;
-  duplicates: number;
-  errors: number;
-}
-
-export const scrapeTwitterRange = (since: string, until: string, username = "YuGiOh_OCG_INFO") =>
-  request<ScrapeResult>("/card-icons/custom-illusts/scrape-twitter/", {
-    method: "POST",
-    body: JSON.stringify({ since, until, username }),
-  });
-
-export const importTweetIllusts = (tweet_url: string, name: string) =>
-  request<{ created: CustomIllustResult[] }>("/card-icons/custom-illusts/import-tweet/", {
-    method: "POST",
-    body: JSON.stringify({ tweet_url, name }),
-  });
-
 export const listIcons = () =>
   request<{ icons: CardIcon[] }>("/card-icons/");
 

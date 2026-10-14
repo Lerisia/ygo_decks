@@ -5,18 +5,8 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from carddb.models import Card, has_art
-from .models import CardIcon, Border, UserBorderUnlock, UserIconUnlock, CustomIllust, TwitterCredentials
+from .models import CardIcon, Border, UserBorderUnlock, UserIconUnlock, CustomIllust
 from .serializers import CardIconSerializer, BorderSerializer
-
-
-def _korean_name_for(jp_name):
-    """Korean name of the card a tweet names in Japanese (full/half-width ignored), else the Japanese name."""
-    import unicodedata
-    key = unicodedata.normalize("NFKC", jp_name)
-    for ja, ko in Card.objects.exclude(name_ko="").values_list("name_ja", "name_ko").iterator():
-        if unicodedata.normalize("NFKC", ja) == key:
-            return ko
-    return jp_name
 
 
 def _resolve_default_icon():
@@ -747,195 +737,11 @@ def upload_custom_illust(request):
     )
 
 
-@api_view(["GET", "POST"])
-@permission_classes([IsAdminUser])
-def twitter_credentials(request):
-    """GET → returns whether creds are configured + last-updated timestamp
-    (does NOT echo the cookies). POST → upserts new auth_token + ct0."""
-    if request.method == "GET":
-        cred = TwitterCredentials.objects.order_by("-updated_at").first()
-        if not cred:
-            return Response({"configured": False})
-        return Response({
-            "configured": True,
-            "updated_at": cred.updated_at.isoformat(),
-            "note": cred.note,
-            # Last 4 chars only, so the admin can sanity-check without
-            # exposing the full token in any DB dump or screenshot.
-            "auth_token_tail": "…" + cred.auth_token[-4:] if cred.auth_token else "",
-            "ct0_tail": "…" + cred.ct0[-4:] if cred.ct0 else "",
-        })
-    auth_token = (request.data.get("auth_token") or "").strip()
-    ct0 = (request.data.get("ct0") or "").strip()
-    note = (request.data.get("note") or "").strip()
-    if not auth_token or not ct0:
-        return Response({"error": "auth_token + ct0 둘 다 필요합니다."}, status=400)
-    # Replace existing — only one set of creds is used at a time.
-    TwitterCredentials.objects.all().delete()
-    TwitterCredentials.objects.create(auth_token=auth_token, ct0=ct0, note=note)
-    return Response({"ok": True})
-
-
-@api_view(["POST"])
-@permission_classes([IsAdminUser])
-def scrape_twitter_range(request):
-    """Search OCG official tweets in a date range using stored cookies,
-    download images that pass the SAMPLE filter, save as CustomIllust.
-
-    Body: { since: 'YYYY-MM-DD', until: 'YYYY-MM-DD',
-            username: 'YuGiOh_OCG_INFO' (optional, default OCG official) }"""
-    import time
-    from datetime import datetime
-    import requests
-    from PIL import Image
-    from io import BytesIO
-    from django.core.files.base import ContentFile
-
-    cred = TwitterCredentials.objects.order_by("-updated_at").first()
-    if not cred:
-        return Response({"error": "Twitter 쿠키가 설정되지 않았습니다."}, status=400)
-
-    since = (request.data.get("since") or "").strip()
-    until = (request.data.get("until") or "").strip()
-    username = (request.data.get("username") or "YuGiOh_OCG_INFO").strip()
-    try:
-        d_since = datetime.strptime(since, "%Y-%m-%d")
-        d_until = datetime.strptime(until, "%Y-%m-%d")
-    except ValueError:
-        return Response({"error": "since/until은 YYYY-MM-DD 형식이어야 합니다."}, status=400)
-    if (d_until - d_since).days > 90:
-        return Response({"error": "한 번에 90일 이내로 요청해주세요."}, status=400)
-
-    # Use tweety-ns for the actual scrape — it tracks Twitter's GraphQL
-    # query-id changes internally so we don't need to hardcode.
-    try:
-        from tweety import TwitterAsync as _Async  # noqa: F401
-    except Exception:
-        pass
-    from tweety import Twitter
-
-    app = Twitter("ocg_scraper_session")
-    try:
-        # tweety can authenticate via cookies (no full account login).
-        app.load_auth_token(cred.auth_token)
-        # ct0 is auto-derived but we set it just in case.
-        try:
-            app.session.cookies.set("ct0", cred.ct0)
-        except Exception:
-            pass
-    except Exception as e:
-        return Response({"error": f"Twitter 인증 실패: {e}"}, status=502)
-
-    raw_query = f"from:{username} since:{since} until:{until} filter:images"
-
-    # tweety paginates ~20 tweets per page. 12 pages covers a busy
-    # 90-day range (~240 tweets) without blowing past Twitter's
-    # rate limit for a single search session.
-    try:
-        search = app.search(raw_query, filter_=None, pages=12)
-    except Exception as e:
-        return Response({"error": f"검색 실패: {e}"}, status=502)
-
-    MIN_DIM = 1000
-
-    def is_sample(w, h):
-        # Square-only: single-card SAMPLE reveal posts come at ~1080×1080.
-        # Pack-reveal composites (1596×1200) are excluded because they
-        # cram pack art + card together and the SAMPLE region isn't a
-        # clean avatar source.
-        if w < MIN_DIM or h < MIN_DIM:
-            return False
-        a = w / h if h else 0
-        return 0.95 <= a <= 1.05
-
-    imported, skipped, duplicates, errors = [], [], 0, 0
-
-    seen_ids = 0
-    for tweet in search:
-        seen_ids += 1
-        if seen_ids > 1:
-            time.sleep(1.0)  # be nice
-        tweet_id = str(getattr(tweet, "id", "") or "")
-        if not tweet_id:
-            continue
-        if CustomIllust.objects.filter(source_tweet_id=tweet_id).exists():
-            duplicates += 1
-            continue
-        media_list = getattr(tweet, "media", None) or []
-        for idx, m in enumerate(media_list):
-            url = getattr(m, "media_url_https", None) or getattr(m, "url", None)
-            if not url:
-                continue
-            # Twitter sometimes preserves PNG when the original upload
-            # was PNG (especially older single-card SAMPLE reveals). Try
-            # PNG first, fall back to JPEG. Either way name=orig gets
-            # the largest variant.
-            base_url = url.split("?")[0]
-            png_url = base_url.rsplit(".", 1)[0] + ".png?name=orig"
-            jpg_url = base_url + "?name=orig"
-            r = None
-            for attempt in (png_url, jpg_url):
-                try:
-                    rr = requests.get(attempt, timeout=20)
-                    if rr.status_code == 200 and rr.content:
-                        r = rr
-                        used_url = attempt
-                        break
-                except Exception:
-                    continue
-            if r is None:
-                errors += 1
-                skipped.append({"tweet": tweet_id, "reason": "download failed"})
-                continue
-            try:
-                with Image.open(BytesIO(r.content)) as im:
-                    w, h = im.size
-            except Exception as e:
-                errors += 1
-                skipped.append({"tweet": tweet_id, "reason": f"unreadable: {e}"})
-                continue
-            if not is_sample(w, h):
-                skipped.append({"tweet": tweet_id, "reason": f"size {w}x{h}"})
-                continue
-            # Use the actual URL we successfully fetched to derive ext.
-            ext = "png" if used_url.split("?")[0].endswith(".png") else "jpg"
-            filename = f"tweet_{tweet_id}_{idx}.{ext}"
-            # Build a human-friendly name from tweet text. OCG_INFO posts
-            # the card name in the body, often inside 「」 brackets — try
-            # to extract the first quoted name; map to our Korean name via
-            # Card.name_ja so the admin sees recognizable Hangul instead
-            # of raw kanji. Falls back to the JP name if no DB match.
-            tweet_text = (getattr(tweet, "text", "") or "").strip()
-            import re as _re
-            m_quote = _re.search(r"[「『]([^」』]+)[」』]", tweet_text)
-            if m_quote:
-                base = _korean_name_for(m_quote.group(1).strip())
-            else:
-                cleaned = _re.sub(r"https?://\S+", "", tweet_text)
-                cleaned = _re.sub(r"#\S+", "", cleaned).strip()
-                base = cleaned.split("\n")[0][:60] if cleaned else f"트윗 {tweet_id}"
-            name = base + (f" #{idx + 1}" if len(media_list) > 1 else "")
-            obj = CustomIllust(name=name[:100], source_tweet_id=tweet_id)
-            obj.image.save(filename, ContentFile(r.content), save=True)
-            imported.append({"id": obj.id, "name": obj.name, "image_url": obj.image.url})
-
-    return Response({
-        "query": raw_query,
-        "tweets_seen": seen_ids,
-        "imported": imported,
-        "imported_count": len(imported),
-        "skipped": skipped,
-        "skipped_count": len(skipped),
-        "duplicates": duplicates,
-        "errors": errors,
-    })
-
-
 @api_view(["POST"])
 @permission_classes([IsAdminUser])
 def bulk_upload_custom_illusts(request):
     """Multi-file upload with size/aspect filtering. Reuses the same
-    `is_likely_sample` rules as import_twitter_dump so the filter is
+    `is_likely_sample` rules as the import_twitter_dump command so the filter is
     consistent across CLI and admin UI. multipart: images[] (multiple)."""
     from PIL import Image
     files = request.FILES.getlist("images")
@@ -945,7 +751,7 @@ def bulk_upload_custom_illusts(request):
     MIN_DIM = 1000
 
     def is_sample(w, h):
-        # Square-only — see scrape_twitter_range for rationale.
+        # Square-only: SAMPLE card images are square; banners and composites are not.
         if w < MIN_DIM or h < MIN_DIM:
             return False, f"too small ({w}x{h})"
         a = w / h if h else 0
@@ -984,95 +790,6 @@ def bulk_upload_custom_illusts(request):
         "skipped_count": len(skipped),
         "duplicates": duplicates,
     }, status=201 if imported else 200)
-
-
-@api_view(["POST"])
-@permission_classes([IsAdminUser])
-def import_tweet_illusts(request):
-    """Pull every photo from a tweet URL and create one CustomIllust per
-    image. Uses fxtwitter (community Twitter mirror) so we don't need
-    auth/API keys; falls back gracefully if the tweet is photo-less.
-    Body: { tweet_url, name (optional prefix, ' #N' suffix added when
-    the tweet has multiple photos) }."""
-    import re
-    import requests
-    from urllib.parse import urlparse
-    from django.core.files.base import ContentFile
-
-    tweet_url = (request.data.get("tweet_url") or "").strip()
-    name_prefix = (request.data.get("name") or "").strip()
-    m = re.search(r"/status(?:es)?/(\d+)", tweet_url)
-    if not m:
-        return Response({"error": "트윗 URL에서 ID를 추출할 수 없습니다."}, status=400)
-    tweet_id = m.group(1)
-
-    api_url = f"https://api.fxtwitter.com/i/status/{tweet_id}"
-    try:
-        r = requests.get(api_url, timeout=15, headers={"User-Agent": "ygodecks-importer/1.0"})
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        return Response({"error": f"트윗 가져오기 실패: {e}"}, status=502)
-
-    if data.get("code") != 200 or not data.get("tweet"):
-        return Response({"error": "트윗을 찾을 수 없습니다 (비공개/삭제됨)."}, status=404)
-
-    photos = ((data.get("tweet") or {}).get("media") or {}).get("photos") or []
-    if not photos:
-        return Response({"error": "트윗에 이미지가 없습니다."}, status=400)
-
-    # Try to surface a Korean card name from tweet text (single-tweet path
-    # often comes with a name_prefix already, but auto-match still wins).
-    tweet_text = (data.get("tweet") or {}).get("text") or ""
-    auto_name = name_prefix
-    if not auto_name:
-        m_quote = re.search(r"[「『]([^」』]+)[」』]", tweet_text)
-        if m_quote:
-            auto_name = _korean_name_for(m_quote.group(1).strip())
-
-    created = []
-    for i, p in enumerate(photos):
-        img_url = p.get("url")
-        if not img_url:
-            continue
-        # Try PNG (some older tweets preserve PNG) before falling back
-        # to whatever fxtwitter returned. Same trick as the bulk scraper.
-        base = img_url.split("?")[0]
-        png_url = base.rsplit(".", 1)[0] + ".png?name=orig"
-        candidates = [png_url, img_url]
-        img_r = None
-        used_url = None
-        for u in candidates:
-            try:
-                rr = requests.get(u, timeout=20, headers={"User-Agent": "ygodecks-importer/1.0"})
-                if rr.status_code == 200 and rr.content:
-                    img_r = rr
-                    used_url = u
-                    break
-            except Exception:
-                continue
-        if img_r is None:
-            continue
-        ext = "png" if used_url.split("?")[0].endswith(".png") else "jpg"
-        filename = f"tweet_{tweet_id}_{i}.{ext}"
-        if auto_name and len(photos) > 1:
-            name = f"{auto_name} #{i + 1}"
-        elif auto_name:
-            name = auto_name
-        elif len(photos) > 1:
-            name = f"트윗 {tweet_id} #{i + 1}"
-        else:
-            name = f"트윗 {tweet_id}"
-        obj = CustomIllust(name=name[:100], source_tweet_id=tweet_id)
-        obj.image.save(filename, ContentFile(img_r.content), save=True)
-        created.append({
-            "id": obj.id, "name": obj.name,
-            "image_url": obj.image.url if obj.image else None,
-        })
-
-    if not created:
-        return Response({"error": "이미지 다운로드에 모두 실패했습니다."}, status=502)
-    return Response({"created": created}, status=201)
 
 
 @api_view(["DELETE"])

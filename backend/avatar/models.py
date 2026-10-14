@@ -110,22 +110,6 @@ class CustomIllust(models.Model):
         return self.name
 
 
-class TwitterCredentials(models.Model):
-    """Singleton row holding the admin's Twitter session cookies for the
-    on-demand SAMPLE scraper. Only the latest row is read; older rows
-    can be deleted safely. Not user-facing — admin-only via /manage."""
-    auth_token = models.CharField(max_length=200, help_text="Twitter cookie: auth_token")
-    ct0 = models.CharField(max_length=200, help_text="Twitter cookie: ct0 (CSRF)")
-    note = models.CharField(max_length=200, blank=True, default="")
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["-updated_at"]
-
-    def __str__(self):
-        return f"twitter creds (updated {self.updated_at:%Y-%m-%d %H:%M})"
-
-
 class CardIcon(models.Model):
     """A circular crop of a card illustration, usable as a user avatar.
 
