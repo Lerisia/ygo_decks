@@ -133,6 +133,11 @@ def add_match_to_record_group(request, record_group_id):
         if existing:
             return Response({"match_id": existing, "points_added": 0, "duplicate": True}, status=status.HTTP_201_CREATED)
 
+    # a cup game the recorder aims at a sheet with other games goes to the person's cup sheet (특이점 2026-10-14)
+    if data.get("score_type") == "duelist_cup" and (data.get("tracker_did") or data.get("tracker_pending_id")):
+        from .cup import sheet_for_recorder_cup_game
+        record_group = sheet_for_recorder_cup_game(user, record_group)
+
     opponent_deck = data.get("opponent_deck")
     if opponent_deck == "null" or opponent_deck == "" or opponent_deck is None:
         opponent_deck = None
@@ -176,7 +181,8 @@ def add_match_to_record_group(request, record_group_id):
         from tracker.services import link_game
         points_added = link_game(user, data.get("tracker_did"), match)
 
-    return Response({"match_id": match.id, "points_added": points_added}, status=status.HTTP_201_CREATED)
+    return Response({"match_id": match.id, "points_added": points_added, "record_group_id": match.record_group_id},
+                    status=status.HTTP_201_CREATED)
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])

@@ -1205,3 +1205,55 @@ class MetaStatsWindowTest(TestCase):
         data = self.stats()
         self.assertEqual(data["total_matches"], 1)
         self.assertEqual(_dt.fromisoformat(data["since"]), reset)
+
+
+class DuelistCupSheetTest(TestCase):
+    """특이점 2026-10-14: a recorder cup game aimed at a sheet with other games goes to the person's cup sheet."""
+
+    def setUp(self):
+        from django.utils import timezone
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="cup@test.com", username="cupper", password="pass1234")
+        self.client.force_authenticate(self.user)
+        self.ranked = RecordGroup.objects.create(user=self.user, name="랭크")
+        self.deck, self.opp = _create_deck(name="내덱"), _create_deck(name="상대")
+        _create_match(self.ranked, self.deck, self.opp, rank="diamond3")
+        self.cup_name = f"듀얼리스트 컵 {timezone.localtime():%Y.%m}"
+
+    def save(self, group, **extra):
+        body = {"deck": self.deck.id, "opponent_deck": self.opp.id, "first_or_second": "first", "result": "win",
+                "coin_toss_result": "win", "score_type": "duelist_cup", **extra}
+        return self.client.post(f"/api/record-groups/{group.id}/add-match/", body, format="json")
+
+    def test_recorder_cup_games_leave_the_ranked_sheet(self):
+        r = self.save(self.ranked, tracker_did="d1")
+        self.assertEqual(r.status_code, 201, r.content)
+        cup = RecordGroup.objects.get(user=self.user, name=self.cup_name)
+        self.assertEqual(r.json()["record_group_id"], cup.id)
+        self.save(self.ranked, tracker_did="d2")
+        self.assertEqual(RecordGroup.objects.filter(user=self.user, name=self.cup_name).count(), 1)
+        self.assertEqual(MatchRecord.objects.filter(record_group=cup).count(), 2)
+        self.assertEqual(MatchRecord.objects.filter(record_group=self.ranked).count(), 1)
+
+    def test_a_sheet_picked_for_the_cup_and_hand_entries_stay(self):
+        picked = RecordGroup.objects.create(user=self.user, name="내 컵 시트")
+        self.assertEqual(self.save(picked, tracker_did="d3").json()["record_group_id"], picked.id)
+        self.assertEqual(self.save(self.ranked).json()["record_group_id"], self.ranked.id)   # typed on the site
+        self.assertFalse(RecordGroup.objects.filter(name=self.cup_name).exists())
+
+    def test_command_moves_what_landed_before(self):
+        import json, tempfile, os
+        from django.core.management import call_command
+        from tracker.models import TrackerGame
+        m = _create_match(self.ranked, self.deck, self.opp, score_type="duelist_cup")
+        TrackerGame.objects.create(user=self.user, did="old", game_mode=12, match=m)
+        hand = _create_match(self.ranked, self.deck, self.opp, score_type="duelist_cup")   # not the recorder's
+        backup = os.path.join(tempfile.mkdtemp(), "moves.json")
+        call_command("move_cup_games", stdout=open(os.devnull, "w"))
+        m.refresh_from_db()
+        self.assertEqual(m.record_group_id, self.ranked.id)   # a dry run moves nothing
+        call_command("move_cup_games", "--apply", f"--backup={backup}", stdout=open(os.devnull, "w"))
+        m.refresh_from_db(); hand.refresh_from_db()
+        self.assertEqual(m.record_group.name, self.cup_name)
+        self.assertEqual(hand.record_group_id, self.ranked.id)
+        self.assertEqual(json.load(open(backup)), [{"match": m.id, "from_group": self.ranked.id}])
