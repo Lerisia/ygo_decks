@@ -7,7 +7,7 @@ async function renderCutinPose(base: string, version: number, size: number): Pro
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const player = await SpinePlayer.load(canvas, base, version);
+  const player = await SpinePlayer.load(canvas, base, version, { bitmaps: true });
   try {
     const [x0, y0, x1, y1] = player.setupBounds();
     const half = (Math.max(x1 - x0, y1 - y0) / 2) * 1.04;

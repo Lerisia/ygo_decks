@@ -9,8 +9,10 @@ export class SpinePlayer {
   private constructor(private renderer: SpineRenderer, readonly skeleton: Skeleton) {}
 
   /** The cut-in under `base` (skeleton.json, atlas.txt and its pages) on the canvas; `version` goes on every address,
-   *  so that pictures made again reach browsers that keep the old ones. */
-  static async load(canvas: HTMLCanvasElement, base: string, version = 0): Promise<SpinePlayer> {
+   *  so that pictures made again reach browsers that keep the old ones. With `bitmaps`, each page is decoded outside
+   *  the browser's image cache and let go once it is on the GPU: five 4096² pages decoded through <img> fill the
+   *  browser's decoded-image budget and the fifth refuses (2026-10-15, five cut-ins have that many). */
+  static async load(canvas: HTMLCanvasElement, base: string, version = 0, { bitmaps = false } = {}): Promise<SpinePlayer> {
     const q = version ? `?v=${version}` : "";
     const [json, atlasText] = await Promise.all([
       fetch(`${base}/skeleton.json${q}`).then((r) => r.json()),
@@ -20,11 +22,20 @@ export class SpinePlayer {
     const renderer = new SpineRenderer(canvas, atlas.regions);
     // one page at a time: several 4096² pages decoded at once can run a browser out of memory
     for (const page of atlas.pages) {
-      const im = new Image();
-      im.crossOrigin = "anonymous";
-      im.src = `${base}/${page.name}${q}`;
-      await im.decode();
-      renderer.addPage(page, im);
+      const url = `${base}/${page.name}${q}`;
+      if (bitmaps) {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`${page.name}: ${r.status}`);
+        const bitmap = await createImageBitmap(await r.blob(), { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+        renderer.addPage(page, bitmap);
+        bitmap.close();
+      } else {
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.src = url;
+        await im.decode();
+        renderer.addPage(page, im);
+      }
     }
     return new SpinePlayer(renderer, new Skeleton(readSkeleton(json)));
   }
