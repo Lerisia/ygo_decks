@@ -103,7 +103,7 @@ function Popover({ field, chosen, onPick, anchor, root, box }: {
  *  row, a + that unfolds the rest (필터링 항목, then 그 외 toggles), the page's own control at the row's right end.
  *  A chip in use carries a ✕ that clears it; a multi item's values are a chip each. On a wide screen every pick
  *  applies at once; below sm the row opens a modal whose picks wait for 적용. Chips that don't fit fold into "그 외 n종". */
-export default function DexFilterBar({ fields, extra, values, onChange, isDisabled, right, active = true }: {
+export default function DexFilterBar({ fields, extra, values, onChange, isDisabled, right, active = true, modalOnPlus = false }: {
   /** The chips, the primary (base) one first. */
   fields: DexField[];
   /** 그 외: several toggles in one group. */
@@ -116,6 +116,8 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   right?: ReactNode;
   /** False while the page is kept hidden behind a document: everything folds. */
   active?: boolean;
+  /** On a phone only + opens the modal; a chip opens its own choices, applied at 확인 (/dev/cards, 참혈 2026-10-14). */
+  modalOnPlus?: boolean;
 }) {
   const narrow = useNarrow();
   const [open, setOpen] = useState(false);
@@ -156,7 +158,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     fold();
   };
   const openChip = (f: DexField, id: string) => {
-    if (narrow && !modal) return unfold();
+    if (narrow && !modal && !modalOnPlus) return unfold();
     if (off(f) && !vals(f.key).length) return;
     if (popup?.anchor === id) return setPopup(null);
     setPending(vals(f.key));
@@ -210,14 +212,15 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     return () => document.removeEventListener("keydown", onKey);
   }, [popup, modal]);
 
+  const phoneChoices = narrow && !!popup;
   useEffect(() => {
-    if (!modal) return;
+    if (!modal && !phoneChoices) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [modal]);
+  }, [modal, phoneChoices]);
 
   // How many top chips fit, from a hidden copy of the row: every chip, "그 외 n종", +.
   const measure = useCallback(() => {
@@ -356,6 +359,41 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     </>
   );
 
+  // a phone's choices for one chip: over the modal, or on their own when only + opens it (modalOnPlus)
+  const choices = popupField && narrow && (
+    <div
+      className="fixed inset-0 z-[56] bg-black/40 flex items-center justify-center p-4"
+      onClick={(e) => {
+        e.stopPropagation();
+        setPopup(null);
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={popupField.label}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm max-h-[80svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 p-4 text-left shadow-xl"
+      >
+        <p className="font-semibold">{popupField.label}</p>
+        {popupField.multi && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">여러 개 선택 가능</p>}
+        <div className="mt-3 min-h-0 overflow-y-auto overscroll-contain">
+          <OptionList field={popupField} chosen={pending} onPick={(value) => pickPending(popupField, value)} />
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            set(popupField.key, pending);
+            setPopup(null);
+          }}
+          className={`mt-4 w-full ${APPLY_BTN}`}
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div ref={rootRef} className="relative text-left">
       {/* data-dex-row: what a .dex-compact wrapper draws smaller (the chip row and its unfolded items, not the menus) */}
@@ -363,7 +401,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         {/* on a phone the whole row opens the modal, but a ✕ clears its chip at once */}
         <div
           ref={areaRef}
-          onClick={narrow ? unfold : undefined}
+          onClick={narrow && !modalOnPlus ? unfold : undefined}
           className={`flex-1 min-w-0 flex items-center gap-1 sm:gap-1.5 ${wide ? "flex-wrap" : ""}`}
         >
           {top.slice(0, shownCount).map((c) => topChip(c, narrow ? "phone" : "row"))}
@@ -408,6 +446,8 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         />
       )}
 
+      {!modal && choices}
+
       {modal && (
         <div className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4" onClick={fold}>
           <div
@@ -427,39 +467,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
               <button type="button" onClick={apply} className={APPLY_BTN}>적용</button>
             </div>
           </div>
-          {popupField && (
-            <div
-              className="fixed inset-0 z-[56] bg-black/40 flex items-center justify-center p-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPopup(null);
-              }}
-            >
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={popupField.label}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-sm max-h-[80svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 p-4 text-left shadow-xl"
-              >
-                <p className="font-semibold">{popupField.label}</p>
-                {popupField.multi && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">여러 개 선택 가능</p>}
-                <div className="mt-3 min-h-0 overflow-y-auto overscroll-contain">
-                  <OptionList field={popupField} chosen={pending} onPick={(value) => pickPending(popupField, value)} />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    set(popupField.key, pending);
-                    setPopup(null);
-                  }}
-                  className={`mt-4 w-full ${APPLY_BTN}`}
-                >
-                  확인
-                </button>
-              </div>
-            </div>
-          )}
+          {choices}
         </div>
       )}
     </div>
