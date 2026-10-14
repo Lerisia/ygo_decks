@@ -31,6 +31,7 @@ const CLOSE_BTN = "h-9 px-4 rounded-lg bg-gray-500 text-white font-semibold hove
 const APPLY_BTN = "h-9 px-4 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition";
 const HEADING = "h-7 flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200";
 const PLUS = `${CHIP_BOX} justify-center w-8 sm:w-9 ${LOOKS.base}`;
+const PANEL = "mt-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3";
 
 /** Where a chip is drawn: the top row (a phone's opens the modal), the modal, or the hidden copy that measures the row. */
 type Where = "row" | "phone" | "modal" | "measure";
@@ -103,7 +104,7 @@ function Popover({ field, chosen, onPick, anchor, root, box }: {
  *  row, a + that unfolds the rest (필터링 항목, then 그 외 toggles), the page's own control at the row's right end.
  *  A chip in use carries a ✕ that clears it; a multi item's values are a chip each. On a wide screen every pick
  *  applies at once; below sm the row opens a modal whose picks wait for 적용. Chips that don't fit fold into "그 외 n종". */
-export default function DexFilterBar({ fields, extra, values, onChange, isDisabled, right, active = true, modalOnPlus = false }: {
+export default function DexFilterBar({ fields, extra, values, onChange, isDisabled, right, active = true, trial = false }: {
   /** The chips, the primary (base) one first. */
   fields: DexField[];
   /** 그 외: several toggles in one group. */
@@ -116,8 +117,10 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   right?: ReactNode;
   /** False while the page is kept hidden behind a document: everything folds. */
   active?: boolean;
-  /** On a phone only + opens the modal; a chip opens its own choices, applied at 확인 (/dev/cards, 참혈 2026-10-14). */
-  modalOnPlus?: boolean;
+  /** /dev/cards' trial (참혈 2026-10-14): one thing open at a time. On a wide screen a chip's choices open in the area
+   *  under the row, where + unfolds the items, in place of the drop-down; on a phone only + opens the modal, a chip opens
+   *  its own choices, and a chip picked in the modal turns the modal into its choices, whose 확인 applies everything. */
+  trial?: boolean;
 }) {
   const narrow = useNarrow();
   const [open, setOpen] = useState(false);
@@ -136,10 +139,12 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   const off = (f: DexField) => !!isDisabled?.(f.key, shown);
   const top = topChips(fields, extra, shown);
   const listFields = fields.filter((f) => f.multi || (!f.primary && !vals(f.key).length));
-  const wide = open && !narrow;   // unfolded on a wide screen: the top row shows every chip, wrapping
+  const popupField = popup ? [...fields, ...(extra ? [extra] : [])].find((f) => f.key === popup.key) : undefined;
+  const unfolded = open && !narrow;   // the items under the row
+  const below = trial && !narrow ? popupField : undefined;   // or a chip's choices there
+  const wide = unfolded || !!below;   // either way the top row shows every chip, wrapping
   const shownCount = wide ? top.length : Math.min(fit, top.length);
   const hidden = top.length - shownCount;
-  const popupField = popup ? [...fields, ...(extra ? [extra] : [])].find((f) => f.key === popup.key) : undefined;
 
   const commit = (v: DexValues) => (modal ? setDraft(v) : onChange(v));
   const set = (key: string, next: string[]) => commit(normalizeValues(fields, { ...shown, [key]: next }, isDisabled));
@@ -158,9 +163,10 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     fold();
   };
   const openChip = (f: DexField, id: string) => {
-    if (narrow && !modal && !modalOnPlus) return unfold();
+    if (narrow && !modal && !trial) return unfold();
     if (off(f) && !vals(f.key).length) return;
     if (popup?.anchor === id) return setPopup(null);
+    if (trial && unfolded) setOpen(false);
     setPending(vals(f.key));
     setPopup({ key: f.key, anchor: id });
   };
@@ -174,6 +180,15 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   };
   const pickPending = (f: DexField, value: string | null) =>
     setPending((p) => (value === null ? [] : f.multi ? toggleValue(p, value, true) : [value]));
+  const confirmPending = (f: DexField) => {
+    // the modal turned into one chip's choices: what was picked in it applies with them
+    if (trial && modal) {
+      onChange(normalizeValues(fields, { ...shown, [f.key]: pending }, isDisabled));
+      return fold();
+    }
+    set(f.key, pending);
+    setPopup(null);
+  };
 
   // Across sm the modal and the unfolded rows turn into each other: narrowing starts the modal on what is applied,
   // widening applies the modal's picks, as the rows apply every pick.
@@ -191,7 +206,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   }, [active]);
 
   useEffect(() => {
-    if (!popup || narrow) return;
+    if (!popup || narrow || trial) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Element;
       if (popBox.current?.contains(t) || t.closest?.("[data-chip]")?.getAttribute("data-chip") === popup.anchor) return;
@@ -199,7 +214,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
-  }, [popup, narrow]);
+  }, [popup, narrow, trial]);
 
   useEffect(() => {
     if (!popup && !modal) return;
@@ -359,8 +374,27 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
     </>
   );
 
-  // a phone's choices for one chip: over the modal, or on their own when only + opens it (modalOnPlus)
-  const choices = popupField && narrow && (
+  // a phone's choices for one chip
+  const choiceBox = popupField && narrow && (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={popupField.label}
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-sm max-h-[80svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 p-4 text-left shadow-xl"
+    >
+      <p className="font-semibold">{popupField.label}</p>
+      {popupField.multi && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">여러 개 선택 가능</p>}
+      <div className="mt-3 min-h-0 overflow-y-auto overscroll-contain">
+        <OptionList field={popupField} chosen={pending} onPick={(value) => pickPending(popupField, value)} />
+      </div>
+      <button type="button" onClick={() => confirmPending(popupField)} className={`mt-4 w-full ${APPLY_BTN}`}>
+        확인
+      </button>
+    </div>
+  );
+  // over the modal, or on their own (a chip on the row, trial)
+  const choices = choiceBox && (
     <div
       className="fixed inset-0 z-[56] bg-black/40 flex items-center justify-center p-4"
       onClick={(e) => {
@@ -368,29 +402,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         setPopup(null);
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={popupField.label}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm max-h-[80svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 p-4 text-left shadow-xl"
-      >
-        <p className="font-semibold">{popupField.label}</p>
-        {popupField.multi && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">여러 개 선택 가능</p>}
-        <div className="mt-3 min-h-0 overflow-y-auto overscroll-contain">
-          <OptionList field={popupField} chosen={pending} onPick={(value) => pickPending(popupField, value)} />
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            set(popupField.key, pending);
-            setPopup(null);
-          }}
-          className={`mt-4 w-full ${APPLY_BTN}`}
-        >
-          확인
-        </button>
-      </div>
+      {choiceBox}
     </div>
   );
 
@@ -401,7 +413,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         {/* on a phone the whole row opens the modal, but a ✕ clears its chip at once */}
         <div
           ref={areaRef}
-          onClick={narrow && !modalOnPlus ? unfold : undefined}
+          onClick={narrow && !trial ? unfold : undefined}
           className={`flex-1 min-w-0 flex items-center gap-1 sm:gap-1.5 ${wide ? "flex-wrap" : ""}`}
         >
           {top.slice(0, shownCount).map((c) => topChip(c, narrow ? "phone" : "row"))}
@@ -412,15 +424,15 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (wide) fold();
+              if (unfolded) fold();
               else unfold();
             }}
             aria-expanded={open}
-            aria-label={narrow ? "필터 열기" : wide ? "필터 항목 접기" : "필터 항목 더 보기"}
-            title={narrow ? "필터 열기" : wide ? "필터 항목 접기" : "필터 항목 더 보기"}
+            aria-label={narrow ? "필터 열기" : unfolded ? "필터 항목 접기" : "필터 항목 더 보기"}
+            title={narrow ? "필터 열기" : unfolded ? "필터 항목 접기" : "필터 항목 더 보기"}
             className={PLUS}
           >
-            {wide ? <ChevronUp className="w-5 h-5" aria-hidden /> : <Plus className="w-5 h-5" aria-hidden />}
+            {unfolded ? <ChevronUp className="w-5 h-5" aria-hidden /> : <Plus className="w-5 h-5" aria-hidden />}
           </button>
         </div>
         {right && <div className="shrink-0 flex items-center h-9">{right}</div>}
@@ -433,9 +445,20 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         </div>
       </div>
 
-      {wide && <div data-dex-row className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3">{sections}</div>}
+      {unfolded && <div data-dex-row className={PANEL}>{sections}</div>}
+      {below && (
+        <div data-dex-row className={PANEL}>
+          <div className={HEADING}>
+            {below.label}
+            {below.multi && <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">여러 개 선택 가능</span>}
+          </div>
+          <div className="mt-1">
+            <OptionList field={below} chosen={vals(below.key)} onPick={(value) => pick(below, value)} />
+          </div>
+        </div>
+      )}
 
-      {popup && popupField && !narrow && (
+      {popup && popupField && !narrow && !trial && (
         <Popover
           field={popupField}
           chosen={vals(popupField.key)}
@@ -450,24 +473,26 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
 
       {modal && (
         <div className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4" onClick={fold}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="필터"
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm max-h-[85svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 text-left shadow-xl"
-          >
-            <div className="px-4 pt-4 pb-2 font-semibold">필터</div>
-            <div className="px-4 pb-3 min-h-0 overflow-y-auto overscroll-contain">
-              <div className="flex flex-wrap gap-1.5">{top.map((c) => topChip(c, "modal"))}</div>
-              <div className="mt-3">{sections}</div>
+          {trial && choiceBox ? choiceBox : (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="필터"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm max-h-[85svh] flex flex-col rounded-xl bg-white dark:bg-gray-800 text-left shadow-xl"
+            >
+              <div className="px-4 pt-4 pb-2 font-semibold">필터</div>
+              <div className="px-4 pb-3 min-h-0 overflow-y-auto overscroll-contain">
+                <div className="flex flex-wrap gap-1.5">{top.map((c) => topChip(c, "modal"))}</div>
+                <div className="mt-3">{sections}</div>
+              </div>
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                <button type="button" onClick={fold} className={CLOSE_BTN}>닫기</button>
+                <button type="button" onClick={apply} className={APPLY_BTN}>적용</button>
+              </div>
             </div>
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-              <button type="button" onClick={fold} className={CLOSE_BTN}>닫기</button>
-              <button type="button" onClick={apply} className={APPLY_BTN}>적용</button>
-            </div>
-          </div>
-          {choices}
+          )}
+          {!trial && choices}
         </div>
       )}
     </div>

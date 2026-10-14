@@ -293,7 +293,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
               setQInput(text);
               update({ q: text });
             }}
-            filterBar={<DexFilterBar fields={barFields} extra={barExtra} values={barValues} onChange={applyBar} isDisabled={misfit} active={onList} modalOnPlus />}
+            filterBar={<DexFilterBar fields={barFields} extra={barExtra} values={barValues} onChange={applyBar} isDisabled={misfit} active={onList} trial />}
             onClear={() => update({ group: "", card: "" })}
           />
         </div>
@@ -329,7 +329,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
           onChange={applyBar}
           isDisabled={misfit}
           active={onList}
-          modalOnPlus={unifiedSearch}
+          trial={unifiedSearch}
           right={
             <div className="flex items-stretch h-9">
               {/* its own caret, a little in from the edge (참혈 2026-10-12) */}
