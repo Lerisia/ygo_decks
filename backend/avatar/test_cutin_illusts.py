@@ -209,3 +209,38 @@ class IllustTest(TestCase):
         with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
             call_command("cutin_illusts", out=str(out), save=True, verbosity=0)
         self.assertEqual(CustomIllust.objects.count(), 1)
+
+    def test_a_covered_one_waits_for_a_look_and_goes_in_on_accept_without_a_new_drawing(self):
+        art = drawn_art(3)
+        figure = figure_from(art)
+        art[150:330, 150:330] = (255, 255, 255)   # a splash over much of the monster
+        self.with_art(4007, art)
+        Path(MEDIA, "md_ui/cutin").mkdir(parents=True, exist_ok=True)
+        Path(MEDIA, "md_ui/cutin/index.json").write_text(json.dumps({"4007": {"anim": "animation", "v": 3}}))
+        out = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out, True)
+        drawn = []
+
+        class FakeRenderer:
+            def __init__(self, work):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def render(self, md_id, version, size):
+                drawn.append(md_id)
+                return cv2.resize(figure, (size, size), interpolation=cv2.INTER_CUBIC)
+
+        with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
+            call_command("cutin_illusts", out=str(out), save=True, verbosity=0)
+            report = json.loads((out / "report.json").read_text())
+            self.assertEqual(report["4007"]["verdict"], "check")
+            self.assertFalse(CustomIllust.objects.exists())
+            call_command("cutin_illusts", out=str(out), save=True, accept=True, verbosity=0)
+        self.assertEqual(drawn, [4007])   # the accepted picture is the one already made
+        illust = CustomIllust.objects.get(source_tweet_id="cutin:4007")
+        self.assertEqual(json.loads((out / "report.json").read_text())["4007"]["illust"], illust.id)
