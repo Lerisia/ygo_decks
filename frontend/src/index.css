@@ -366,3 +366,12 @@ button:focus-visible {
 .deck-zone-reserve {
   min-height: calc(var(--rows) * (100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) * 1024 / 704 + (var(--rows) - 1) * var(--gap));
 }
+
+/* The card book's filter chips a size smaller (/dev/cards' search drop-down, 참혈 2026-10-14): the chip row and its
+   unfolded items only (data-dex-row in DexFilterBar); their menus and the phone modal keep their size. */
+.dex-compact [data-dex-row] .h-9 { height: 1.75rem; }
+.dex-compact [data-dex-row] .h-8 { height: 1.625rem; }
+.dex-compact [data-dex-row] .h-7 { height: 1.5rem; }
+.dex-compact [data-dex-row] .text-sm { font-size: 0.75rem; line-height: 1rem; }
+.dex-compact [data-dex-row] button[aria-label^="필터"] { width: 1.75rem; }
+.dex-compact [data-dex-row] svg.w-5 { width: 1rem; height: 1rem; }

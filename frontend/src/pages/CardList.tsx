@@ -289,6 +289,11 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
               update({ q: "", ...(key[0] === "g" ? { group: key.slice(1), card: "" } : { card: key.slice(1), group: "" }) });
             }}
             onPickCard={(id) => navigate(`/cards/${id}`, { state: { fromList: true } })}
+            onSearchText={(text) => {
+              setQInput(text);
+              update({ q: text });
+            }}
+            filterBar={<DexFilterBar fields={barFields} extra={barExtra} values={barValues} onChange={applyBar} isDisabled={misfit} active={onList} />}
             onClear={() => update({ group: "", card: "" })}
           />
         </div>

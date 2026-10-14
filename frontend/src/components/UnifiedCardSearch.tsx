@@ -1,8 +1,9 @@
-import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Camera } from "lucide-react";
 import SearchForm from "./SearchForm";
 import ImageCardSearch from "./ImageCardSearch";
 import { cardTag } from "@/lib/cardTag";
+import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rememberSearch } from "@/lib/recentCardSearches";
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardListItem } from "@/api/cardDexApi";
 import { makeMatcher, matchRank, nameKeys } from "@/utils/hangul";
@@ -26,7 +27,7 @@ type Suggestion = {
  *  (참혈 2026-10-14) — picking one opens its page. Enter searches the names, or picks the suggestion marked with the
  *  arrow keys; Backspace in an empty box takes the chip off. The camera at the box's right end opens the drop-down on
  *  AI 이미지 검색 instead (ImageCardSearch, 참혈 2026-10-14); typing goes back to the suggestions. */
-export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, items, chosen, onPick, onPickCard, onClear }: {
+export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, items, chosen, onPick, onPickCard, onClear, filterBar, onSearchText }: {
   query: string;
   onQueryChange: (q: string) => void;
   /** search the names at once (Enter) */
@@ -37,6 +38,10 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   /** a card picked from the suggestions */
   onPickCard: (id: number) => void;
   onClear: () => void;
+  /** the card book's filter chips, drawn a size smaller at the top of the drop-down (참혈 2026-10-14) */
+  filterBar?: ReactNode;
+  /** a recent search picked again: its words put back in the box and searched */
+  onSearchText?: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imageSearch, setImageSearch] = useState(false);
@@ -108,24 +113,59 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
       .sort((a, b) => a.rank - b.rank || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.order - b.order)
       .slice(0, SHOWN);
   }, [groups, cards, typed]);
-  const shown = open && !imageSearch && suggestions.length > 0;
+  // with the box empty, the recent searches in place of the suggestions (참혈 2026-10-14)
+  const [recent, setRecent] = useState<RecentSearch[]>(loadRecent);
+  const showingRecent = !query.trim();
+  const rows: { key: string; name: string; tag: string; sub?: string; go: () => void; forget?: () => void }[] = showingRecent
+    ? recent.map((r) => ({
+        key: recentId(r),
+        name: r.kind === "q" ? r.text : r.name,
+        tag: r.kind === "q" ? "검색" : r.tag,
+        go: () => (r.kind === "q" ? onSearchText?.(r.text) : r.kind === "group" ? onPick(r.key) : onPickCard(r.id)),
+        forget: () => setRecent(forgetSearch(recentId(r))),
+      }))
+    : suggestions.map((it) => ({ key: it.key, name: it.name, tag: it.tag, sub: it.sub, go: () => pickSuggestion(it) }));
+  // the drop-down opens with the box: the chips always, then the suggestions or the recent searches
+  const shown = open && !imageSearch;
 
-  const pick = (it: Suggestion) => {
-    if (it.group) onPick(it.group.key);
-    else if (it.card) onPickCard(it.card.id);
+  const close = () => {
     setOpen(false);
     setActive(-1);
     input.current?.blur();
   };
+  const pickSuggestion = (it: Suggestion) => {
+    if (it.group) {
+      setRecent(rememberSearch({ kind: "group", key: it.group.key, name: it.name, tag: it.tag }));
+      onPick(it.group.key);
+    } else if (it.card) {
+      setRecent(rememberSearch({ kind: "card", id: it.card.id, name: it.name, tag: it.tag }));
+      onPickCard(it.card.id);
+    }
+  };
+  const go = (i: number) => {
+    const row = rows[i];
+    if (!row) return;
+    row.go();
+    close();
+  };
+  // a press anywhere outside closes it (the chips' own menus sit inside, so the box may lose the focus to them)
+  useEffect(() => {
+    if (!shown) return;
+    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [shown]);
 
   return (
     <div ref={root} className="relative text-left">
       <SearchForm
         onSearch={() => {
-          if (shown && suggestions[active]) pick(suggestions[active]);
+          if (shown && rows[active]) go(active);
           else {
+            const q = query.trim();
+            if (q) setRecent(rememberSearch({ kind: "q", text: q }));
             onSubmit();
-            setOpen(false);
+            close();
           }
         }}
       >
@@ -150,7 +190,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
             aria-label="카드 검색"
             aria-expanded={shown}
             aria-controls={`${id}-list`}
-            aria-activedescendant={shown && active >= 0 ? `${id}-${active}` : undefined}
+            aria-activedescendant={shown && active >= 0 && rows[active] ? `${id}-${active}` : undefined}
             aria-autocomplete="list"
             placeholder="카드 검색"
             value={query}
@@ -161,15 +201,15 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
               setActive(-1);
             }}
             onFocus={() => setOpen(true)}
-            onBlur={() => setOpen(false)}
+            onClick={() => setOpen(true)}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                if (!suggestions.length) return;
+                if (!rows.length) return;
                 e.preventDefault();
                 setOpen(true);
-                setActive(Math.max(-1, Math.min(suggestions.length - 1, active + (e.key === "ArrowDown" ? 1 : -1))));
+                setActive(Math.max(-1, Math.min(rows.length - 1, active + (e.key === "ArrowDown" ? 1 : -1))));
               } else if (e.key === "Escape") {
-                setOpen(false);
+                close();
               } else if (e.key === "Backspace" && !query && chosen) {
                 onClear();
               }
@@ -206,37 +246,64 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
         </div>
       )}
       {shown && (
-        <ul
-          id={`${id}-list`}
-          role="listbox"
-          aria-label="검색 추천"
-          // a press on the list must not blur the box before the pick lands
-          onMouseDown={(e) => e.preventDefault()}
+        <div
+          // a press inside must not take the focus from the box before it lands (the chips' menus keep theirs)
+          onMouseDown={(e) => e.target instanceof HTMLElement && !e.target.closest("input, select, textarea") && e.preventDefault()}
           className="absolute z-30 left-0 right-0 mt-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1"
         >
-          <li className="px-3 pt-1 pb-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-            Enter: 카드 이름으로 검색 · 카드군·서포트는 고르면 거르기, 카드는 문서 열기
-          </li>
-          {suggestions.map((it, i) => (
-            <li
-              key={it.key}
-              id={`${id}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              onClick={() => pick(it)}
-              onMouseEnter={() => setActive(i)}
-              className={`px-3 py-2 flex items-center justify-between gap-3 text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
-            >
-              <span className="flex items-center gap-1.5 min-w-0">
-                <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {it.tag}
-                </span>
-                <span className="break-keep">{it.name}</span>
-              </span>
-              {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
-            </li>
-          ))}
-        </ul>
+          {/* the filter chips where the Enter hint was, a size smaller, working as on the page (참혈 2026-10-14) */}
+          {filterBar && <div className="dex-compact px-2 pt-1 pb-1.5 border-b border-gray-100 dark:border-gray-700">{filterBar}</div>}
+          {showingRecent && (
+            <div className="px-3 pt-1.5 pb-0.5 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+              <span>최근 검색</span>
+              {recent.length > 0 && (
+                <button type="button" onClick={() => setRecent(clearRecent())} className="h-5 px-1 rounded hover:text-gray-800 dark:hover:text-gray-200">
+                  기록 지우기
+                </button>
+              )}
+            </div>
+          )}
+          {rows.length ? (
+            <ul id={`${id}-list`} role="listbox" aria-label={showingRecent ? "최근 검색" : "검색 추천"}>
+              {rows.map((it, i) => (
+                <li
+                  key={it.key}
+                  id={`${id}-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  onClick={() => go(i)}
+                  onMouseEnter={() => setActive(i)}
+                  className={`px-3 py-2 flex items-center justify-between gap-3 text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
+                >
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                      {it.tag}
+                    </span>
+                    <span className="break-keep">{it.name}</span>
+                  </span>
+                  {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
+                  {it.forget && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        it.forget?.();
+                      }}
+                      aria-label={`${it.name} 기록 지우기`}
+                      className="shrink-0 w-6 h-6 -mr-1 rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+              {showingRecent ? "최근 검색 기록이 없습니다." : "맞는 추천이 없습니다. Enter로 카드 이름을 검색합니다."}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

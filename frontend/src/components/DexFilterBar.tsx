@@ -358,7 +358,8 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
 
   return (
     <div ref={rootRef} className="relative text-left">
-      <div className="relative flex items-start gap-1.5 sm:gap-2">
+      {/* data-dex-row: what a .dex-compact wrapper draws smaller (the chip row and its unfolded items, not the menus) */}
+      <div data-dex-row className="relative flex items-start gap-1.5 sm:gap-2">
         {/* on a phone the whole row opens the modal, but a ✕ clears its chip at once */}
         <div
           ref={areaRef}
@@ -394,7 +395,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         </div>
       </div>
 
-      {wide && <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3">{sections}</div>}
+      {wide && <div data-dex-row className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3">{sections}</div>}
 
       {popup && popupField && !narrow && (
         <Popover
