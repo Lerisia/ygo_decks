@@ -1237,6 +1237,7 @@ class DuelistCupSheetTest(TestCase):
 
     def test_a_sheet_picked_for_the_cup_and_hand_entries_stay(self):
         picked = RecordGroup.objects.create(user=self.user, name="내 컵 시트")
+        _create_match(picked, self.deck, self.opp)   # a game typed without a kind: still a cup sheet
         self.assertEqual(self.save(picked, tracker_did="d3").json()["record_group_id"], picked.id)
         self.assertEqual(self.save(self.ranked).json()["record_group_id"], self.ranked.id)   # typed on the site
         self.assertFalse(RecordGroup.objects.filter(name=self.cup_name).exists())
