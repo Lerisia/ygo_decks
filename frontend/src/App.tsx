@@ -40,6 +40,7 @@ const DeckDetail = lazyChunk(() => import("./pages/DeckDetail"));
 const CardList = lazyChunk(() => import("./pages/CardList"));
 const DevLoader = lazyChunk(() => import("./pages/DevLoader"));
 const DevPalette = lazyChunk(() => import("./pages/DevPalette"));
+const DevIcons = lazyChunk(() => import("./pages/DevIcons"));
 const CardDetail = lazyChunk(() => import("./pages/CardDetail"));
 const RecordGroups = lazyChunk(() => import("./pages/RecordGroups"));
 const RecordGroupDetail = lazyChunk(() => import("./pages/RecordGroupDetail"));
@@ -197,6 +198,7 @@ function App() {
             <Route path="/dev/loader" element={<DevLoader />} />
             {/* the site's design in one page: colours, type, components, how often each is used (operators only, 참혈 2026-10-14) */}
             <Route path="/dev/palette" element={<DevPalette />} />
+            <Route path="/dev/icons" element={<DevIcons />} />
             <Route path="/records" element={<RecordGroups />} />
             <Route path="/record-groups/statistics" element={<RecordGroupStatistics />} />
             {/* 대회 (내부 테스트 중 — 네비게이션 미노출) */}
