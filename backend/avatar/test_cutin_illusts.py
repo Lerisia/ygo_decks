@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 
-from avatar.cutin_illusts import ALIGN, align, compose, illust_name, make, save_illust
+from avatar.cutin_illusts import ALIGN, LOOKS, align, compose, illust_name, make, save_illust
 from avatar.models import CustomIllust
 from carddb.models import Card, MdArt, MdPrint
 
@@ -75,7 +75,7 @@ class AlignTest(SimpleTestCase):
         # the longer side is 1024 in the matching: 653 -> 1024, so the figure's 4x piece lands at 1024/653/4
         self.assertAlmostEqual(found.scale, 1024 / 653 / 4, delta=0.01)
         self.assertAlmostEqual(found.rotation, 0, delta=0.5)
-        picture, covered, cover = compose(figure_from(art, box=(96, 200, 416, 520)), found.M, art, out=1024)
+        picture, covered, cover, _ = compose(figure_from(art, box=(96, 200, 416, 520)), found.M, art, out=1024)
         self.assertEqual(picture.shape, (1024, 803, 3))
         self.assertLess(covered, 0.03)
 
@@ -92,7 +92,7 @@ class ComposeTest(SimpleTestCase):
         figure[:, :, :3] = np.clip(figure[:, :, :3].astype(int) + 8, 0, 255)   # the sharp figure, told apart by a shade
         art[200:300, 200:300] = (255, 255, 255)                                # a splash the art paints over the monster
         M = np.float32([[0.5, 0, 128], [0, 0.5, 128]])
-        img, covered, cover = compose(figure, M, art, out=1024)
+        img, covered, cover, _ = compose(figure, M, art, out=1024)
         self.assertEqual(img.shape, (1024, 1024, 3))
         np.testing.assert_allclose(img[310, 310], (58, 68, 78), atol=2)        # the figure, where the art agrees
         np.testing.assert_allclose(img[500, 500], (255, 255, 255), atol=2)     # the splash, kept
@@ -144,7 +144,7 @@ class IllustTest(TestCase):
         self.with_art(4007, art)
         sizes = []
 
-        def render(size):
+        def render(size, look=None):
             sizes.append(size)
             return figure_from(art, size)
 
@@ -153,8 +153,30 @@ class IllustTest(TestCase):
         row = make(4007, render, out)
         self.assertEqual((row["verdict"], row["name"]), ("clean", "푸른 눈의 백룡 (고화질)"))
         self.assertLess(row["covered"], 0.03)
-        self.assertEqual(sizes, [3072])   # the figure is drawn larger than it will be shown: no second, larger render
+        self.assertEqual(sizes, [3072] * 6)   # drawn large enough the first time; then once in each look
+        self.assertEqual(row["looks"]["None"], 1.0)
         self.assertEqual(cv2.imread(str(out / "4007.webp")).shape, (2048, 2048, 3))
+
+    def test_the_look_nearest_the_art_is_worn(self):
+        art = drawn_art(3)
+        self.with_art(4007, art)
+        shut = art.copy()
+        shut[150:180, 150:260] = (40, 40, 40)   # the eyes, shut in the rest pose
+        looks = []
+
+        def render(size, look=None):
+            looks.append(look)
+            return figure_from(shut if look in (None, LOOKS[1]) else art, size)
+
+        out = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out, True)
+        row = make(4007, render, out)
+        self.assertEqual(looks, list(LOOKS))
+        self.assertGreater(row["looks"][str(LOOKS[2])], 0)   # the open eyes come from the first open-eyed look
+        self.assertGreater(row["looks"]["None"], 0.9)        # the rest pose everywhere else
+        picture = cv2.imread(str(out / "4007.webp"))
+        # the eyes come from the open-eyed look, not the art's stand-in for them
+        np.testing.assert_allclose(picture[660, 820], art[165, 205], atol=6)
 
     def test_the_ocg_art_stands_in_when_there_is_no_shared_one(self):
         art = drawn_art(3)
@@ -162,18 +184,18 @@ class IllustTest(TestCase):
         self.with_art(4007, drawn_art(5), "tcg")
         out = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, out, True)
-        self.assertEqual(make(4007, lambda size: figure_from(art, size), out)["verdict"], "clean")
+        self.assertEqual(make(4007, lambda size, look=None: figure_from(art, size), out)["verdict"], "clean")
 
     def test_a_cut_in_that_does_not_lie_on_the_art_is_left_out(self):
         self.with_art(4007, drawn_art(3))
         out = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, out, True)
-        row = make(4007, lambda size: figure_from(drawn_art(4), size), out)
+        row = make(4007, lambda size, look=None: figure_from(drawn_art(4), size), out)
         self.assertEqual(row["verdict"], "unaligned")
         self.assertFalse((out / "4007.webp").exists())
 
     def test_a_print_without_art_is_left_out(self):
-        self.assertEqual(make(4007, lambda size: None, Path(MEDIA))["verdict"], "no_art")
+        self.assertEqual(make(4007, lambda size, look=None: None, Path(MEDIA))["verdict"], "no_art")
 
     def test_the_command_reports_and_saves_the_clean_ones(self):
         art = drawn_art(3)
@@ -193,8 +215,8 @@ class IllustTest(TestCase):
             def __exit__(self, *a):
                 pass
 
-            def render(self, md_id, version, size):
-                self.calls.append((md_id, version, size))
+            def render(self, md_id, version, size, look=None):
+                self.calls.append((md_id, version, size, look))
                 return figure_from(art, size)
 
         with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
@@ -231,7 +253,7 @@ class IllustTest(TestCase):
             def __exit__(self, *a):
                 pass
 
-            def render(self, md_id, version, size):
+            def render(self, md_id, version, size, look=None):
                 drawn.append(md_id)
                 return cv2.resize(figure, (size, size), interpolation=cv2.INTER_CUBIC)
 
@@ -241,6 +263,6 @@ class IllustTest(TestCase):
             self.assertEqual(report["4007"]["verdict"], "check")
             self.assertFalse(CustomIllust.objects.exists())
             call_command("cutin_illusts", out=str(out), save=True, accept=True, verbosity=0)
-        self.assertEqual(drawn, [4007])   # the accepted picture is the one already made
+        self.assertEqual(drawn, [4007] * 6)   # the accepted picture is the one already made: no new drawing
         illust = CustomIllust.objects.get(source_tweet_id="cutin:4007")
         self.assertEqual(json.loads((out / "report.json").read_text())["4007"]["illust"], illust.id)

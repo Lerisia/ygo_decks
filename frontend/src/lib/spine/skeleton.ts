@@ -975,10 +975,47 @@ export class Skeleton {
     for (const item of this.cache) item.update();
   }
 
+  /** The setup pose with only what the animation shows, hides or recolours at `time` (slot attachments, colours,
+   *  draw order): the figure as the card's art has it, with the face the animation gives it — many cut-ins keep
+   *  the eyes shut in the setup pose and open them as they play (2026-10-15). */
+  applyLook(anim: Animation, time: number) {
+    this.setupPose();
+    for (const tl of anim.timelines) this.applyLookTimeline(tl, time);
+  }
+
+  /** Apply a timeline that changes what a slot shows rather than where it is; false if it is not one of those. */
+  private applyLookTimeline(tl: Animation["timelines"][number], time: number): boolean {
+    switch (tl.kind) {
+      case "rgba": case "alpha": case "rgba2": {
+        const slot = this.slots[tl.slot], k = tl.keys;
+        if (time < k.frames[0]) return true;
+        if (tl.kind === "alpha") slot.color[3] = sample(k, time, 0);
+        else {
+          for (let c = 0; c < 4; c++) slot.color[c] = sample(k, time, c);
+          if (tl.kind === "rgba2") slot.dark = [sample(k, time, 4), sample(k, time, 5), sample(k, time, 6), 1];
+        }
+        return true;
+      }
+      case "attachment": {
+        const i = stepIndex(tl.times, time);
+        if (i >= 0) this.slots[tl.slot].setAttachment(tl.names[i]);
+        return true;
+      }
+      case "drawOrder": {
+        const i = stepIndex(tl.times, time);
+        const order = i >= 0 ? tl.orders[i] : null;
+        if (order) this.drawOrder = order.map((s) => this.slots[s]);
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Pose the skeleton at `time` seconds of the animation, from the setup pose. */
   apply(anim: Animation, time: number) {
     this.setupPose();
     for (const tl of anim.timelines) {
+      if (this.applyLookTimeline(tl, time)) continue;
       switch (tl.kind) {
         case "rotate": case "translate": case "translatex": case "translatey": case "scale": case "scalex":
         case "scaley": case "shear": case "shearx": case "sheary": {
@@ -1003,27 +1040,6 @@ export class Skeleton {
         case "inherit": {
           const i = stepIndex(tl.times, time);
           if (i >= 0) this.bones[tl.bone].inherit = tl.values[i];
-          break;
-        }
-        case "rgba": case "alpha": case "rgba2": {
-          const slot = this.slots[tl.slot], k = tl.keys;
-          if (time < k.frames[0]) break;
-          if (tl.kind === "alpha") slot.color[3] = sample(k, time, 0);
-          else {
-            for (let c = 0; c < 4; c++) slot.color[c] = sample(k, time, c);
-            if (tl.kind === "rgba2") slot.dark = [sample(k, time, 4), sample(k, time, 5), sample(k, time, 6), 1];
-          }
-          break;
-        }
-        case "attachment": {
-          const i = stepIndex(tl.times, time);
-          if (i >= 0) this.slots[tl.slot].setAttachment(tl.names[i]);
-          break;
-        }
-        case "drawOrder": {
-          const i = stepIndex(tl.times, time);
-          const order = i >= 0 ? tl.orders[i] : null;
-          if (order) this.drawOrder = order.map((s) => this.slots[s]);
           break;
         }
         case "ik": {

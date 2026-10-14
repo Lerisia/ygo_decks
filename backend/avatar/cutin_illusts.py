@@ -79,13 +79,10 @@ def align(figure, art):
     return Alignment(M, int(inliers.sum()), float(error), float(np.hypot(M[0, 0], M[1, 0])), float(np.degrees(np.arctan2(M[1, 0], M[0, 0]))))
 
 
-def compose(figure, M, art, out=OUT):
-    """The figure (BGRA, any square size) laid on the art by M (ALIGN px -> ART px), the art's shape with its longer
-    side `out` px: the picture (BGR), the share of the figure the art covers with something else, and the share of
-    the picture the figure fills."""
-    k = out / 1024
+def _laid(figure, M, base, out):
+    """The figure (BGRA, any square size) warped onto the art's enlarged copy `base` by M (ALIGN px -> ART px):
+    premultiplied colour and alpha, float, the base's shape."""
     T = np.hstack([M[:, :2] * (ALIGN / figure.shape[0]), M[:, 2:]]) * (out / ART)
-    base = enlarged(art, out).astype(np.float32)
     height, width = base.shape[:2]
     f = figure.astype(np.float32)
     layer = np.dstack([f[:, :, :3] * (f[:, :, 3:4] / 255), f[:, :, 3:4]])   # premultiplied: resampling darkens no edge
@@ -94,18 +91,58 @@ def compose(figure, M, art, out=OUT):
         layer = cv2.resize(layer, None, fx=shrink, fy=shrink, interpolation=cv2.INTER_AREA)
         T = np.hstack([T[:, :2] / shrink, T[:, 2:]])
     warped = cv2.warpAffine(layer, T, (width, height), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
-    alpha = np.clip(warped[:, :, 3:4] / 255, 0, 1)
-    colour = np.clip(warped[:, :, :3], 0, 255)
+    return np.clip(warped[:, :, :3], 0, 255), np.clip(warped[:, :, 3:4] / 255, 0, 1)
+
+
+def _blur(image, k):
+    return cv2.GaussianBlur(image, (0, 0), 4 * k)
+
+
+def _finished(base, colour, alpha, out):
+    """The laid figure over the art where the two agree, and the figures of merit."""
+    k = out / 1024
     whole = base * (1 - alpha) + colour
-    blur = lambda im: cv2.GaussianBlur(im, (0, 0), 4 * k)
-    differs = np.abs(blur(whole) - blur(base)).mean(axis=2)
+    differs = np.abs(_blur(whole, k) - _blur(base, k)).mean(axis=2)
     solid = alpha[:, :, 0] > 0.95
     covered = float((solid & (differs > 40)).sum() / max(solid.sum(), 1))
+    gap = float(differs[solid].mean()) if solid.any() else 255.0
     agree = (differs < 30).astype(np.float32)
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
-    return picture.clip(0, 255).astype(np.uint8), covered, float((alpha > 0.5).mean())
+    return picture.clip(0, 255).astype(np.uint8), covered, float((alpha > 0.5).mean()), gap
+
+
+def compose(figure, M, art, out=OUT):
+    """The figure (BGRA, any square size) laid on the art by M (ALIGN px -> ART px), the art's shape with its longer
+    side `out` px: the picture (BGR), the share of the figure the art covers with something else, the share of the
+    picture the figure fills, and how far the figure is from the art on average where it is solid (the gap: a
+    figure wearing the wrong face scores higher)."""
+    base = enlarged(art, out).astype(np.float32)
+    return _finished(base, *_laid(figure, M, base, out), out)
+
+
+def compose_looks(figures, M, art, out=OUT):
+    """Several renders of the same pose in different looks (eyes shut or open, a slot faded in or not), laid on the
+    art together: each pixel comes from the look nearest the art there, so the open eyes win the eyes and the rest
+    pose wins where a later look adds something the art has not. Returns what `compose` does, then each look's
+    share of the solid figure."""
+    k = out / 1024
+    base = enlarged(art, out).astype(np.float32)
+    laid = [_laid(f, M, base, out) for f in figures]
+    far = []
+    for colour, alpha in laid:
+        differs = np.abs(_blur(base * (1 - alpha) + colour, k) - _blur(base, k)).mean(axis=2)
+        far.append(np.where(alpha[:, :, 0] > 0.95, differs, np.inf))   # only where the look shows something solid
+    far = np.stack(far)
+    choice = np.where(np.isfinite(far).any(axis=0), far.argmin(axis=0), 0)
+    weights = [cv2.GaussianBlur((choice == i).astype(np.float32), (0, 0), 3 * k)[:, :, None] for i in range(len(laid))]
+    total = np.maximum(sum(weights), 1e-6)
+    colour = sum(w * c for w, (c, _) in zip(weights, laid)) / total
+    alpha = sum(w * a for w, (_, a) in zip(weights, laid)) / total
+    solid = alpha[:, :, 0] > 0.95
+    shares = [round(float(((choice == i) & solid).sum() / max(solid.sum(), 1)), 3) for i in range(len(laid))]
+    return (*_finished(base, colour, alpha, out), shares)
 
 
 def art_file(md_id):
@@ -138,9 +175,16 @@ def save_illust(print_, data, replace=False):
     return obj, created
 
 
+# moments of the animation whose look (eyes open, slots faded in) the rest pose is tried with, besides its own;
+# the very start and end are left out, where most cut-ins are faded away
+LOOKS = (None, 0.15, 0.35, 0.55, 0.75, 0.95)
+
+
 def make(md_id, render, out_dir):
-    """One print's illustration, `render(size)` drawing its cut-in at rest on a transparent square of that size
-    (BGRA). The row says what came of it; one that fits has its picture at out_dir/<md_id>.webp."""
+    """One print's illustration, `render(size, look)` drawing its cut-in at rest on a transparent square of that
+    size (BGRA), wearing the animation's look at `look` (0..1) or its own (None). The look nearest the art wins:
+    the rest pose often has the eyes shut, and the art the open ones (엘리스 10/15: "얼굴이 흐릿해요"). The row says
+    what came of it; one that fits has its picture at out_dir/<md_id>.webp."""
     print_ = MdPrint.objects.select_related("card").filter(md_id=md_id).first()
     row = {"md_id": md_id, "name": illust_name(print_) if print_ else ""}
     if print_ is None:
@@ -149,7 +193,7 @@ def make(md_id, render, out_dir):
     if path is None:
         return row | {"verdict": "no_art"}
     art = cv2.imread(str(path))
-    figure = render(DRAW)
+    figure = render(DRAW, None)
     found = align(cv2.resize(figure, (ALIGN, ALIGN), interpolation=cv2.INTER_AREA), art)
     if found is not None:
         row |= {"inliers": found.inliers, "error": round(found.error, 2), "scale": round(found.scale, 4), "rotation": round(found.rotation, 2)}
@@ -157,12 +201,13 @@ def make(md_id, render, out_dir):
         return row | {"verdict": "unaligned"}
     # about one drawn pixel per shown pixel: a figure the art shows larger than the first render is drawn again
     want = int(min(4096, max(OUT, round(DRAW * found.scale / 256) * 256)))
-    if want > DRAW:
-        figure = render(want)
-    picture, covered, cover = compose(figure, found.M, art)
+    size = max(want, DRAW)
+    figures = [figure if look is None and size == DRAW else render(size, look) for look in LOOKS]
+    picture, covered, cover, gap, shares = compose_looks(figures, found.M, art)
     file = Path(out_dir, f"{md_id}.webp")
     cv2.imwrite(str(file), picture, [cv2.IMWRITE_WEBP_QUALITY, 92])
-    return row | {"verdict": "clean" if covered <= CLEAN else "check", "covered": round(covered, 4), "cover": round(cover, 3), "file": str(file)}
+    return row | {"verdict": "clean" if covered <= CLEAN else "check", "covered": round(covered, 4), "cover": round(cover, 3),
+                  "looks": dict(zip(map(str, LOOKS), shares)), "gap": round(gap, 2), "file": str(file)}
 
 
 class PoseRenderer:
@@ -220,23 +265,26 @@ class PoseRenderer:
         else:
             route.fulfill(status=404)
 
-    def _draw(self, page, md_id, version, size):
+    def _draw(self, page, md_id, version, size, look):
         failure = None
+        arg = json.dumps({"anim": look[0], "t": look[1]}) if look else "undefined"
         for attempt in range(3):
             if attempt:   # a fresh page: a decode the browser refused, or an empty drawing, after many cut-ins
                 page.goto(f"{self.ORIGIN}/index.html")
             try:
-                png = page.evaluate(f"renderCutinPose('/media/md_ui/cutin/{md_id}', {version}, {size}).then((r) => r.png)")
+                png = page.evaluate(f"renderCutinPose('/media/md_ui/cutin/{md_id}', {version}, {size}, {arg}).then((r) => r.png)")
             except Exception as e:   # noqa: BLE001
                 failure = e
                 continue
             image = cv2.imdecode(np.frombuffer(base64.b64decode(png.split(",", 1)[1]), np.uint8), cv2.IMREAD_UNCHANGED)
-            if image is not None and image.shape[2] == 4 and image[:, :, 3].any():
+            # a look may well show nothing (the figure faded out at that moment); the rest pose never does
+            if image is not None and image.shape[2] == 4 and (look or image[:, :, 3].any()):
                 return image
             failure = RuntimeError(f"cut-in {md_id} drew nothing at {size} px")
         raise failure
 
-    def render(self, md_id, version, size):
-        """The print's cut-in at rest, fitted on a transparent `size` px square: BGRA."""
-        self.requests.put((md_id, version, size))
+    def render(self, md_id, version, size, look=None):
+        """The print's cut-in at rest, fitted on a transparent `size` px square: BGRA. `look` = (animation name,
+        0..1) dresses it in what that moment of the animation shows."""
+        self.requests.put((md_id, version, size, look))
         return self._reply()

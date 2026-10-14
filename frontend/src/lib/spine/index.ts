@@ -84,10 +84,12 @@ export class SpinePlayer {
     return this.renderer.bounds(sk);
   }
 
-  /** Draw the figure at rest through the view. */
-  drawSetup(cx: number, cy: number, halfW: number, halfH: number) {
+  /** Draw the figure at rest through the view; with `look`, wearing what the animation shows at that time (the eyes
+   *  open, say) while standing as at rest. */
+  drawSetup(cx: number, cy: number, halfW: number, halfH: number, look?: { anim: Animation; time: number }) {
     const sk = this.skeleton;
-    sk.setupPose();
+    if (look) sk.applyLook(look.anim, look.time);
+    else sk.setupPose();
     sk.updateWorld();
     this.renderer.draw(sk, cx, cy, halfW, halfH);
   }

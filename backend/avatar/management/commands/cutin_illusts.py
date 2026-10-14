@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 if made:
                     entry = entries[str(md_id)]
                     try:
-                        row = make(md_id, lambda size: renderer.render(md_id, entry["v"], size), out)
+                        row = make(md_id, lambda size, look=None: renderer.render(md_id, entry["v"], size, None if look is None else (entry["anim"], look)), out)
                     except Exception as e:   # noqa: BLE001 — one print's trouble must not end the night's run
                         row = {"md_id": md_id, "name": "", "verdict": "error", "error": f"{type(e).__name__}: {e}"[:300]}
                 saved = options["save"] and row["verdict"] in wanted and ("illust" not in row or options["replace"])
@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 rows[str(md_id)] = row
                 report.write_text(json.dumps(rows, ensure_ascii=False, indent=1))
                 if options["verbosity"]:
-                    detail = " ".join(f"{k}={row[k]}" for k in ("inliers", "error", "scale", "covered") if k in row)
+                    detail = " ".join(f"{k}={row[k]}" for k in ("inliers", "error", "scale", "covered", "look", "gap") if k in row)
                     self.stdout.write(f"{md_id} {row['name']}: {row['verdict']}{' saved' if saved else ''} {detail}")
         if options["verbosity"]:
             counts = Counter(r["verdict"] for r in rows.values())
