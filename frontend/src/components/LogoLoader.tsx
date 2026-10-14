@@ -18,7 +18,8 @@ const ovalAt = (t: 0 | 1) =>
 const pct = (ms: number, total: number) => `${((ms / total) * 100).toFixed(3)}%`;
 
 /** The keyframes of one loop: `shuffles` shuffles, each the cards fanning out to the second frame and coming back
- *  together (the one behind passing in front on the way back), then a rest. */
+ *  together, the left one going in front as they start to close (참혈 2026-10-14: it always opens behind), then a
+ *  rest. */
 function loopCss(name: string, shuffleMs: number, pauseMs: number, shuffles: number, swap: boolean) {
   const total = shuffles * shuffleMs + pauseMs;
   const card = (side: -1 | 1) => {
@@ -38,17 +39,16 @@ function loopCss(name: string, shuffleMs: number, pauseMs: number, shuffles: num
     oval.push(`${pct(b + 0.92 * shuffleMs, total)} { transform: ${ovalAt(0)}; }`);
   }
   oval.push(`100% { transform: ${ovalAt(0)}; }`);
-  // the left card's top copy: shown while the left card is in front. The right one starts in front (the second
-  // frame), and they change places halfway back each time; while stacked it makes no difference which is on top.
+  // the left card's top copy: shown while the left card is in front. Each shuffle opens with the right one in front
+  // (the second frame) and the left one comes in front as they start to close; it goes back behind once they are
+  // stacked, where it makes no difference which is on top.
   const front = [`0% { opacity: 0; }`];
-  let on = 0;
   for (let i = 0; i < shuffles && swap; i++) {
-    const at = i * shuffleMs + 0.7 * shuffleMs;
-    front.push(`${pct(at - 0.5, total)} { opacity: ${on}; }`);
-    on = 1 - on;
-    front.push(`${pct(at, total)} { opacity: ${on}; }`);
+    const b = i * shuffleMs;
+    front.push(`${pct(b + 0.48 * shuffleMs, total)} { opacity: 1; }`);
+    front.push(`${pct(b + 0.96 * shuffleMs, total)} { opacity: 0; }`);
   }
-  front.push(`100% { opacity: ${on}; }`);
+  front.push(`100% { opacity: 0; }`);
   const ease = "cubic-bezier(0.65, 0, 0.35, 1)";
   return `
 @keyframes ${name}-l { ${card(-1)} }
@@ -79,7 +79,7 @@ function Card({ className }: { className: string }) {
  *  shuffles, a rest, again. Black lines on white, turned over like the menu logo on dark screens; still for those
  *  who ask for less motion. */
 export default function LogoLoader({
-  size = 64, shuffleMs = 900, pauseMs = 700, shuffles = 3, swap = true, label = "불러오는 중", className = "",
+  size = 64, shuffleMs = 600, pauseMs = 700, shuffles = 3, swap = true, label = "불러오는 중", className = "",
 }: {
   /** width in px; the height follows the logo's shape */
   size?: number;

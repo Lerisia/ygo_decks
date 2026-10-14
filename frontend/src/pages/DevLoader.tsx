@@ -18,7 +18,7 @@ function Slider({ label, value, min, max, step, unit, onChange }: {
 export default function DevLoader() {
   const admin = useAdminOnly();
   const [size, setSize] = useState(160);
-  const [shuffleMs, setShuffleMs] = useState(900);
+  const [shuffleMs, setShuffleMs] = useState(600);
   const [pauseMs, setPauseMs] = useState(700);
   const [shuffles, setShuffles] = useState(3);
   const [swap, setSwap] = useState(true);
@@ -31,16 +31,16 @@ export default function DevLoader() {
     <div className="min-h-screen w-full max-w-4xl mx-auto px-4 py-6">
       <h1 className="text-xl font-bold">로딩 스피너 시험</h1>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 break-keep">
-        카드가 갈라져 섞이고 돌아올 때 앞뒤가 바뀝니다. {shuffles}번 섞은 뒤 잠깐 쉽니다. 움직임 줄이기를 켠 기기에서는 멈춘 채 깜빡입니다.
+        카드가 갈라질 때는 왼쪽이 아래, 닫히기 시작하면 왼쪽이 위로 올라옵니다. {shuffles}번 섞은 뒤 잠깐 쉽니다. 움직임 줄이기를 켠 기기에서는 멈춘 채 깜빡입니다.
       </p>
       <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-2.5">
         <Slider label="크기" value={size} min={24} max={320} step={4} unit="px" onChange={setSize} />
-        <Slider label="한 번 섞는 시간" value={shuffleMs} min={400} max={2000} step={50} unit="ms" onChange={setShuffleMs} />
+        <Slider label="한 번 섞는 시간" value={shuffleMs} min={300} max={2000} step={50} unit="ms" onChange={setShuffleMs} />
         <Slider label="쉬는 시간" value={pauseMs} min={0} max={3000} step={100} unit="ms" onChange={setPauseMs} />
         <Slider label="섞는 횟수" value={shuffles} min={1} max={5} step={1} unit="번" onChange={setShuffles} />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={swap} onChange={(e) => setSwap(e.target.checked)} />
-          돌아올 때 앞뒤 바꾸기
+          닫힐 때 앞뒤 바꾸기
         </label>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
