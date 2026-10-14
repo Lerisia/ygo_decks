@@ -9,10 +9,10 @@ export class SpinePlayer {
   private constructor(private renderer: SpineRenderer, readonly skeleton: Skeleton) {}
 
   /** The cut-in under `base` (skeleton.json, atlas.txt and its pages) on the canvas; `version` goes on every address,
-   *  so that pictures made again reach browsers that keep the old ones. With `bitmaps`, each page is decoded outside
-   *  the browser's image cache and let go once it is on the GPU: five 4096² pages decoded through <img> fill the
-   *  browser's decoded-image budget and the fifth refuses (2026-10-15, five cut-ins have that many). */
-  static async load(canvas: HTMLCanvasElement, base: string, version = 0, { bitmaps = false } = {}): Promise<SpinePlayer> {
+   *  so that pictures made again reach browsers that keep the old ones. Each page is decoded outside the browser's
+   *  image cache and let go once it is on the GPU (where the browser can): five 4096² pages decoded through <img>
+   *  fill the browser's decoded-image budget and the fifth refuses, so five cut-ins never played (2026-10-15). */
+  static async load(canvas: HTMLCanvasElement, base: string, version = 0, { bitmaps = typeof createImageBitmap === "function" } = {}): Promise<SpinePlayer> {
     const q = version ? `?v=${version}` : "";
     const [json, atlasText] = await Promise.all([
       fetch(`${base}/skeleton.json${q}`).then((r) => r.json()),
