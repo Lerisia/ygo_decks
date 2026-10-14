@@ -419,6 +419,26 @@ def cards(request):
     })
 
 
+# the filter chips' keys: what narrows the cards without naming a 카드군, card or deck
+CHIP_FILTERS = ("category", "frame", "attribute", "race", "level", "st", "has", "ban")
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def filtered_counts(request):
+    """How many cards pass the filter chips in each 카드군 and in each card's support list, for the unified search's
+    suggestions to follow the chips (/dev/cards, 참혈 2026-10-14). Only those with a card left are listed."""
+    keep = _keep({k: v for k, v in request.query_params.items() if k in CHIP_FILTERS})
+    rows = _card_index()["type"]
+    lists = Counter(t for r in rows for t in r.as_cards)
+    groups, cards = Counter(), Counter()
+    for r in rows:
+        if keep(r):
+            groups.update(r.groups)
+            cards.update(t for t in r.as_cards if lists[t] > 1)
+    return Response({"groups": groups, "cards": cards})
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def dex_counts(request):

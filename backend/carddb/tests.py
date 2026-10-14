@@ -1211,6 +1211,23 @@ class CardDexApiTest(TestCase):
         self.assertEqual(self.client.get("/api/carddb/cards/22/").json()["supports"], [])
         self.assertEqual([t["id"] for t in self.client.get("/api/carddb/cards/23/").json()["supports"]], [20])
 
+    def test_counts_under_the_filter_chips(self):
+        # the unified search's 카드군·서포트 suggestions follow the chips (참혈 2026-10-14): how many cards of each pass them
+        from .models import CardGroup, CardGroupMember, CardSupport
+        g = CardGroup.objects.create(text="ブラック・マジシャン", reading="ブラック・マジシャン", name_ko="블랙 매지션")
+        for c in (self.dm, self.girl, self.quick):
+            CardGroupMember.objects.create(group=g, card=c, how="name")
+        CardSupport.objects.create(card=self.scale, target=self.bewd, how="card")
+        CardSupport.objects.create(card=self.quick, target=self.bewd, how="card")
+
+        def counts(**params):
+            return self.client.get("/api/carddb/cards/counts/", params).json()
+
+        self.assertEqual(counts(), {"groups": {str(g.id): 3}, "cards": {"2": 3}})
+        self.assertEqual(counts(category="spell"), {"groups": {str(g.id): 1}, "cards": {"2": 1}})
+        self.assertEqual(counts(category="monster", attribute="light"), {"groups": {}, "cards": {"2": 1}})
+        self.assertEqual(counts(level="7", group=g.id, q="없는 이름"), {"groups": {str(g.id): 1}, "cards": {}})   # chips only
+
     def test_a_deck_built_on_a_card_alone_is_one_list(self):
         # no 카드군 to split into 테마 카드 and 서포트 (빛의 황금궤, 엘리스 10/12): the card, the cards bearing its name
         # and the cards naming it, in one list, as the card's own support list shows them

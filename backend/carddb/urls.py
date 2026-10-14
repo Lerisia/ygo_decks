@@ -6,6 +6,7 @@ urlpatterns = [
     path("dex-counts/", dex.dex_counts),
     path("cards/", dex.cards),
     path("cards/options/", dex.card_options),
+    path("cards/counts/", dex.filtered_counts),
     path("cards/<int:card_id>/", dex.card),
     path("packs/", packs.packs),
     path("packs/search/", packs.pack_search),

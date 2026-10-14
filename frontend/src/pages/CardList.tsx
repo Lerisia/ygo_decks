@@ -293,6 +293,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
               setQInput(text);
               update({ q: text });
             }}
+            filters={filters}
             filterBar={<DexFilterBar fields={barFields} extra={barExtra} values={barValues} onChange={applyBar} isDisabled={misfit} active={onList} trial />}
             onClear={() => update({ group: "", card: "" })}
           />

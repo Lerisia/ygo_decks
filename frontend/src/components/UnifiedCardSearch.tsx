@@ -5,7 +5,7 @@ import ImageCardSearch from "./ImageCardSearch";
 import { cardTag } from "@/lib/cardTag";
 import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rememberSearch } from "@/lib/recentCardSearches";
 import type { ComboItem } from "./ComboBox";
-import { EMPTY_FILTERS, listCards, type CardListItem } from "@/api/cardDexApi";
+import { CHIP_FILTERS, EMPTY_FILTERS, getFilteredCounts, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
 import { makeMatcher, matchRank, nameKeys } from "@/utils/hangul";
 
 const GROUPS_SHOWN = 6;
@@ -26,8 +26,10 @@ type Suggestion = {
  *  names match, as the card book's search ranks them, each tagged 몬스터 / 마법 / 함정 or its extra deck kind
  *  (참혈 2026-10-14) — picking one opens its page. Enter searches the names, or picks the suggestion marked with the
  *  arrow keys; Backspace in an empty box takes the chip off. The camera at the box's right end opens the drop-down on
- *  AI 이미지 검색 instead (ImageCardSearch, 참혈 2026-10-14); typing goes back to the suggestions. */
-export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, items, chosen, onPick, onPickCard, onClear, filterBar, onSearchText }: {
+ *  AI 이미지 검색 instead (ImageCardSearch, 참혈 2026-10-14); typing goes back to the suggestions. The filter chips
+ *  narrow the suggestions too: the cards are searched under them, and a 카드군 or support list shows only with cards
+ *  left, counted under them (참혈 2026-10-14). */
+export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, items, chosen, onPick, onPickCard, onClear, filterBar, filters, onSearchText }: {
   query: string;
   onQueryChange: (q: string) => void;
   /** search the names at once (Enter) */
@@ -40,6 +42,8 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   onClear: () => void;
   /** the card book's filter chips, drawn a size smaller at the top of the drop-down (참혈 2026-10-14) */
   filterBar?: ReactNode;
+  /** what the chips have set, to narrow the suggestions */
+  filters?: CardFilters;
   /** a recent search picked again: its words put back in the box and searched */
   onSearchText?: (text: string) => void;
 }) {
@@ -63,18 +67,37 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   const id = useId();
   const keyed = useMemo(() => items.map((it) => ({ it, k: nameKeys(it.name) })), [items]);
   const typed = useDeferredValue(query.trim());
+  // the chips in use, as the server reads them ("" with none)
+  const chips = new URLSearchParams(CHIP_FILTERS.flatMap((k) => (filters?.[k] ? [[k, filters[k]]] : []))).toString();
+  const [counts, setCounts] = useState<{ chips: string; groups: Record<string, number>; cards: Record<string, number> } | null>(null);
+  useEffect(() => {
+    if (!chips) return;
+    const ctrl = new AbortController();
+    getFilteredCounts(chips, ctrl.signal).then((r) => setCounts({ chips, ...r })).catch(() => {});
+    return () => ctrl.abort();
+  }, [chips]);
+  // under chips, each 카드군 and support list with its cards left (none: left out, and none at all until they come)
+  const narrowed = useMemo(() => {
+    if (!chips) return keyed;
+    if (counts?.chips !== chips) return [];
+    return keyed.flatMap(({ it, k }) => {
+      const support = it.tag === "카드";
+      const n = (support ? counts.cards : counts.groups)[it.key.slice(1)] ?? 0;
+      return n ? [{ it: { ...it, sub: `${support ? "서포트 " : ""}${n.toLocaleString()}장` }, k }] : [];
+    });
+  }, [keyed, chips, counts]);
   const groups = useMemo(() => {
     if (!nameKeys(typed).jamo) return [];
     const match = makeMatcher(typed);
     const rank = matchRank(typed);
-    return keyed
+    return narrowed
       .filter(({ k }) => match(k))
       .map((x, i) => ({ it: x.it, rank: rank(x.k), order: i }))
       .sort((a, b) => a.rank - b.rank || a.order - b.order)
       .slice(0, GROUPS_SHOWN);
-  }, [keyed, typed]);
+  }, [narrowed, typed]);
 
-  // the cards come from the server's name search a moment after the typing stops
+  // the cards come from the server's name search under the chips, a moment after the typing stops
   const [cards, setCards] = useState<CardListItem[]>([]);
   useEffect(() => {
     if (!typed) {
@@ -83,7 +106,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
     }
     const ctrl = new AbortController();
     const t = setTimeout(() => {
-      listCards({ ...EMPTY_FILTERS, q: typed }, 1, ctrl.signal)
+      listCards({ ...EMPTY_FILTERS, ...Object.fromEntries(new URLSearchParams(chips)), q: typed }, 1, ctrl.signal)
         .then((r) => setCards(r.results.slice(0, CARDS_SHOWN)))
         .catch(() => {});
     }, 150);
@@ -91,7 +114,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [typed]);
+  }, [typed, chips]);
 
   // one list, the closest answers first whatever they are (참혈 2026-10-14); a card found by its Japanese or English
   // name counts as answering anywhere

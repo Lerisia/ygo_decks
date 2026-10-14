@@ -174,6 +174,14 @@ export const listCards = (f: CardFilters, page: number, signal?: AbortSignal) =>
 export const getCardsByIds = (ids: number[], signal?: AbortSignal) =>
   getJson<CardListResponse>(`/?ids=${[...new Set(ids)].join(",")}`, signal).then((r) => r.results);
 
+/** The filter chips' keys: what narrows the cards without naming a 카드군, card or deck. */
+export const CHIP_FILTERS = ["category", "frame", "attribute", "race", "level", "st", "has", "ban"] as const;
+
+/** How many cards pass the filter chips in each 카드군 and each card's support list (by id; those with none left
+ *  are missing), for the unified search's suggestions (/dev/cards, 참혈 2026-10-14). */
+export const getFilteredCounts = (qs: string, signal?: AbortSignal) =>
+  getJson<{ groups: Record<string, number>; cards: Record<string, number> }>(`/counts/?${qs}`, signal);
+
 let optionsPromise: Promise<CardOptions> | null = null;
 export const getCardOptions = () => {
   optionsPromise ??= getJson<CardOptions>("/options/").catch((e) => {
