@@ -6,8 +6,11 @@ const STROKE = 60;
 const TRIANGLE = "151.8,413.5 1895.2,413.5 1023.5,1754.6";
 const CARD = { x: 738, y: 413.5, w: 566, h: 883, cx: 1021, cy: 855 };
 const OVAL = { cx: 1021, cy: 837, rx: 110, ry: 191 };
-const SPREAD = { dx: 389, cy: 771, turn: 43, squash: 0.895, ovalX: 1.18, ovalY: 1.155 };
-const VIEW = { x: 60, y: 200, w: 1928, h: 1650 };
+// Fanned out the cards stand apart (참혈 2026-10-14: no overlap at the widest): a card turned 43° reaches 517 units
+// right of its middle with its stroke, so the middles sit 545 from the centre line, 28 to spare. The view is widened
+// to hold them.
+const SPREAD = { dx: 545, cy: 771, turn: 43, squash: 0.895, ovalX: 1.18, ovalY: 1.155 };
+const VIEW = { x: -70, y: 200, w: 2180, h: 1650 };
 
 const cardAt = (side: -1 | 1, t: 0 | 1) =>
   `translate(${CARD.cx + side * SPREAD.dx * t}px, ${CARD.cy + (SPREAD.cy - CARD.cy) * t}px) rotate(${side * SPREAD.turn * t}deg) ` +
