@@ -127,14 +127,15 @@ def _toned(base, colour, alpha, k):
 def _finished(base, colour, alpha, out):
     """The laid figure, toned like the art, over the art where the two agree, and the figures of merit."""
     k = out / 1024
-    colour, drawn = _toned(base, colour, alpha, k)
+    colour, _ = _toned(base, colour, alpha, k)
     whole = base * (1 - alpha) + colour
     differs = np.abs(_blur(whole, k) - _blur(base, k)).mean(axis=2)
     solid = alpha[:, :, 0] > 0.95
     covered = float((solid & (differs > 40)).sum() / max(solid.sum(), 1))
     gap = float(differs[solid].mean()) if solid.any() else 255.0
-    # where the art and the figure draw the same thing, haze textures and thin bolts over it do not keep the figure out
-    agree = (differs < np.where(drawn > 0.5, 60, 30)).astype(np.float32)
+    # a part the rest pose holds elsewhere than the art (라이징 리벨리온 팔콘's lower body) must stay the art's: the
+    # bar is the same where the drawing matches, since the toning has already closed the colour gap there
+    agree = (differs < 30).astype(np.float32)
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
