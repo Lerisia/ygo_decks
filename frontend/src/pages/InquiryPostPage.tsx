@@ -117,7 +117,7 @@ export default function InquiryPostPage() {
           >
             {post.answered ? "✓ 답변 완료" : "답변 대기"}
           </span>
-          {post.author_name && <span className="text-amber-700 dark:text-amber-400">작성자 {post.author_name} (운영진에게만 보임)</span>}
+          {post.author_name && <span className="text-amber-700 dark:text-amber-400">작성자 {post.author_name} (운영자에게만 보임)</span>}
           {post.notify_email != null && <span>{post.notify_email ? "✉️ 답변 메일 알림 켬" : "메일 알림 끔"}</span>}
           {(post.mine || staff) && post.can_view && (
             <button type="button" onClick={removePost} className="ml-auto text-red-500 hover:underline bg-transparent p-0 border-0">
@@ -131,7 +131,7 @@ export default function InquiryPostPage() {
         <div className="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-10 text-center">
           <div className="text-3xl" aria-hidden="true">🔒</div>
           <p className="mt-2 font-semibold">비공개 글입니다</p>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">글쓴이와 운영진만 내용을 볼 수 있어요.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">글쓴이와 운영자만 내용을 볼 수 있어요.</p>
           {!isAuthenticated() && (
             <Link to="/login" className="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400">내가 쓴 글이라면 로그인해 주세요 →</Link>
           )}
@@ -141,13 +141,13 @@ export default function InquiryPostPage() {
           <div className="mt-5 whitespace-pre-wrap break-words leading-relaxed">{post.body}</div>
 
           <section className="mt-8">
-            <h2 className="text-base font-bold">운영진 답변 {post.comments?.length ? <span className="text-blue-600 dark:text-blue-400">{post.comments.length}</span> : null}</h2>
+            <h2 className="text-base font-bold">운영자 답변 {post.comments?.length ? <span className="text-blue-600 dark:text-blue-400">{post.comments.length}</span> : null}</h2>
             {post.comments && post.comments.length > 0 ? (
               <ul className="mt-3 flex flex-col gap-3">
                 {post.comments.map((c) => (
                   <li key={c.id} className="rounded-xl border border-blue-100 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 p-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="font-semibold text-blue-700 dark:text-blue-300">운영진</span>
+                      <span className="font-semibold text-blue-700 dark:text-blue-300">운영자</span>
                       <span>{formatInquiryDate(c.created_at)}</span>
                       {staff && (
                         <button type="button" onClick={() => removeAnswer(c.id)} className="ml-auto text-red-500 hover:underline bg-transparent p-0 border-0">
@@ -160,7 +160,7 @@ export default function InquiryPostPage() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">아직 답변이 없습니다. 운영진이 확인하는 대로 답변을 달아 드릴게요.</p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">아직 답변이 없습니다. 운영자가 확인하는 대로 답변을 달아 드릴게요.</p>
             )}
 
             {staff && (
@@ -170,7 +170,7 @@ export default function InquiryPostPage() {
                   onChange={(e) => setAnswer(e.target.value)}
                   maxLength={3000}
                   rows={4}
-                  placeholder="답변 쓰기 (운영진만 보이는 칸, 답변은 '운영진'으로 표시됩니다)"
+                  placeholder="답변 쓰기 (운영자만 보이는 칸, 답변은 '운영자'로 표시됩니다)"
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="flex items-center justify-between gap-2">

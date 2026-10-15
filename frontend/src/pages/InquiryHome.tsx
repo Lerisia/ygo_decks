@@ -10,7 +10,7 @@ export default function InquiryHome() {
       {/* Board pages take about 88% of the site's width on PC (특이점 2026-10-07: max-w-2xl looked too narrow). */}
       <h1 className="text-2xl md:text-3xl font-bold">문의하기</h1>
       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        제보와 문의는 게시판에 남겨 주세요. 운영진이 확인하고 답변을 달아 드립니다.
+        제보와 문의는 게시판에 남겨 주세요. 운영자가 확인하고 답변을 달아 드립니다.
       </p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -31,8 +31,8 @@ export default function InquiryHome() {
 
       <ul className="mt-6 text-sm text-gray-500 dark:text-gray-400 list-disc pl-5 space-y-1">
         <li>글쓴이는 모두 <b className="text-gray-700 dark:text-gray-300">익명</b>으로 표시됩니다.</li>
-        <li>모든 글은 비공개(🔒)로 올라가, 글쓴이와 운영진만 제목과 내용을 볼 수 있습니다. 목록에는 '문의사항'으로 표시됩니다.</li>
-        <li>답변은 운영진만 달 수 있습니다. 원하면 답변이 달릴 때 메일로 알려 드립니다.</li>
+        <li>모든 글은 비공개(🔒)로 올라가, 글쓴이와 운영자만 제목과 내용을 볼 수 있습니다. 목록에는 '문의사항'으로 표시됩니다.</li>
+        <li>답변은 운영자만 달 수 있습니다. 원하면 답변이 달릴 때 메일로 알려 드립니다.</li>
       </ul>
     </div>
   );

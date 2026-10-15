@@ -124,7 +124,7 @@ def post_detail(request, pk):
 
     staff = _is_staff(request.user)
     if not (staff or (request.user.is_authenticated and post.author_id == request.user.id)):
-        return _error("글쓴이나 운영진만 지울 수 있습니다.", 403)
+        return _error("글쓴이나 운영자만 지울 수 있습니다.", 403)
     post.is_deleted = True
     post.save(update_fields=["is_deleted"])
     if staff and post.author_id != request.user.id:
@@ -141,7 +141,7 @@ def _notify_author(post):
     url = f"https://ygodecks.com/inquiry/post/{post.id}"
     send_mail(
         subject="[YGO Decks] 문의하신 글에 답변이 등록되었습니다",
-        message=(f"회원님이 문의한 내용에 관리자의 답변이 등록되었습니다.\n\n"
+        message=(f"회원님이 문의한 내용에 운영자의 답변이 등록되었습니다.\n\n"
                  f"문의 제목: {post.title}\n아래 링크에서 답변을 확인하실 수 있습니다.\n{url}\n\n"
                  f"이 메일은 문의를 쓸 때 '답변 알림 메일 받기'를 선택하셔서 보내드렸습니다."),
         from_email=settings.DEFAULT_FROM_EMAIL,
@@ -155,7 +155,7 @@ def _notify_author(post):
 @permission_classes([AllowAny])
 def add_comment(request, pk):
     if not _is_staff(request.user):
-        return _error("댓글은 운영진만 달 수 있습니다.", 403 if request.user.is_authenticated else 401)
+        return _error("댓글은 운영자만 달 수 있습니다.", 403 if request.user.is_authenticated else 401)
     post = InquiryPost.objects.filter(pk=pk, is_deleted=False).select_related("author").first()
     if not post:
         return _error("글을 찾을 수 없습니다.", 404)
@@ -173,7 +173,7 @@ def add_comment(request, pk):
 @permission_classes([AllowAny])
 def delete_comment(request, pk):
     if not _is_staff(request.user):
-        return _error("운영진만 지울 수 있습니다.", 403 if request.user.is_authenticated else 401)
+        return _error("운영자만 지울 수 있습니다.", 403 if request.user.is_authenticated else 401)
     comment = InquiryComment.objects.filter(pk=pk, is_deleted=False).select_related("post").first()
     if not comment:
         return _error("답변을 찾을 수 없습니다.", 404)
@@ -191,7 +191,7 @@ def delete_comment(request, pk):
 def alerts(request):
     """Staff only: what the site's 문의 badge and new-inquiry popup show (특이점 2026-10-07)."""
     if not _is_staff(request.user):
-        return _error("운영진만 볼 수 있습니다.", 403 if request.user.is_authenticated else 401)
+        return _error("운영자만 볼 수 있습니다.", 403 if request.user.is_authenticated else 401)
     waiting = InquiryPost.objects.filter(is_deleted=False, answered_at__isnull=True)
     latest = InquiryPost.objects.filter(is_deleted=False).order_by("-id").first()
     return Response({

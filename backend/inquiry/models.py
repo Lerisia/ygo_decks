@@ -28,7 +28,7 @@ class InquiryPost(models.Model):
 
 
 class InquiryComment(models.Model):
-    """A staff answer under an inquiry post; shown as 운영진."""
+    """A staff answer under an inquiry post; shown as 운영자 (특이점 2026-10-15: one person answers, so not 운영진)."""
 
     post = models.ForeignKey(InquiryPost, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="inquiry_comments")

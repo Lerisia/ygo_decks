@@ -117,7 +117,7 @@ class InquiryBoardTest(TestCase):
         self._as(self.staff).post(f"/api/inquiry/{loud}/comments/", {"body": "고쳤습니다"}, format="json")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["a@test.com"])
-        self.assertIn("관리자의 답변이 등록되었습니다", mail.outbox[0].body)
+        self.assertIn("운영자의 답변이 등록되었습니다", mail.outbox[0].body)
         self.assertIn(f"/inquiry/post/{loud}", mail.outbox[0].body)
 
     def test_author_or_staff_can_delete_and_deleted_posts_disappear(self):
