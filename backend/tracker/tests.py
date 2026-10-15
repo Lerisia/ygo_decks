@@ -906,6 +906,33 @@ class TrackerDeckPriorityTest(TestCase):
         cands, _ = infer_decks([201, 201])
         self.assertEqual([c["name"] for c in cands], ["십이수"])
 
+    def test_a_card_both_decks_use_does_not_bring_the_priority(self):
+        # 감옥신 vs 엘펜노츠 (특이점 2026-10-15): 엘펜노츠 goes first only when a card of its own shows; 쥬노르도, used
+        # by both, alone with 감옥신's cards is 감옥신 — here 현람 stands for 엘펜노츠, 십이수 for 감옥신
+        from carddb.models import CardGroup, CardGroupMember
+        both = old_style_card(card_id="c204", konami_id="204", name="card204", archetype="Zoodiac")
+        CardGroupMember.objects.create(group=CardGroup.objects.get(text="Radiant Typhoon"), card=both, how="name")
+        cands, _ = infer_decks([201, 201, 204])
+        self.assertEqual(cands[0]["name"], "십이수")
+        cands, _ = infer_decks([201, 204, 202])   # a 현람 card of its own: the priority holds
+        self.assertEqual(cands[0]["name"], "현람")
+
+    def test_a_beaten_loser_neither_demotes_nor_dilutes_its_winner(self):
+        # 엘펜노츠 is an engine, 감옥신 a plain deck (특이점 2026-10-15): 감옥신's cards in a mix must not push 엘펜노츠
+        # under a third deck seen in passing, nor make the mix too unsure to record
+        from tracker.inference import infer_opponent
+        from tracker.models import TrackerCardDeckStat
+        self.rad.is_engine = True
+        self.rad.save(update_fields=["is_engine"])
+        passing = _create_deck("령수")
+        link_group(deck=passing, name="Spiritual Beast")
+        old_style_card(card_id="c203", konami_id="203", name="card203", archetype="Spiritual Beast")
+        TrackerCardDeckStat.objects.create(konami_id=203, deck=self.zoo, games=10)   # seldom in its own deck
+        cands, _ = infer_decks([202, 201, 201, 203])
+        self.assertEqual(cands[0]["name"], "현람")
+        cands, unsure, _ = infer_opponent([202, 201, 201, 201])
+        self.assertEqual((cands[0]["name"], cands[0]["share"], unsure), ("현람", 1.0, []))
+
     def test_priority_only_applies_to_the_listed_pair(self):
         other = _create_deck("령수")
         link_group(deck=other, name="Spiritual Beast")

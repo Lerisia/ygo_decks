@@ -153,8 +153,22 @@ def infer_decks(card_ids, limit=3):
             has_main[deck_id] = has_main[deck_id] or main
     names = {d: decks[d].name for d in scores}
     engines = {d: decks[d].is_engine for d in scores}
-    best_plain = max((s for d, s in scores.items() if not engines[d] and specific[d] >= SPECIFIC_MIN), default=0.0)
-    beaten = {p.loser_id for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores)}
+    # a priority puts its winner first only when a card of the winner's own shows, one not also voting for the loser:
+    # a card both decks use says nothing of a mix (감옥신 vs 엘펜노츠, 특이점 2026-10-15)
+    wins = defaultdict(set)   # winner → the losers it beats in this duel
+    for p in DeckInferencePriority.objects.filter(winner_id__in=scores, loser_id__in=scores):
+        if any(p.winner_id in m and p.loser_id not in m for m in links.values()):
+            wins[p.winner_id].add(p.loser_id)
+    beaten = set().union(*wins.values())
+    # a beaten loser is part of its winner's deck: it neither demotes the winner as a plain deck would an engine, nor
+    # takes the winner's share — its cards count toward it (특이점 2026-10-15)
+    best_plain = max((s for d, s in scores.items() if not engines[d] and d not in beaten and specific[d] >= SPECIFIC_MIN), default=0.0)
+    covered = dict(scores)
+    for kid, m in links.items():
+        vote = counts[kid] * weights[kid]
+        for winner, losers in wins.items():
+            if winner not in m:
+                covered[winner] += vote * max((m[l] for l in losers if l in m), default=0.0)
 
     def demoted(deck_id, score):
         return engines[deck_id] and names[deck_id] not in ENGINE_ALWAYS_TOP and best_plain >= ENGINE_DEMOTE_MIN_RATIO * score
@@ -162,7 +176,7 @@ def infer_decks(card_ids, limit=3):
     ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, demoted(*kv), -kv[1], names[kv[0]]))[:limit]
     if not ranked:
         return learned_decks(resolved, limit), unknown
-    return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(s / total, 3), "is_engine": engines[d],
+    return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(min(1.0, covered[d] / total), 3), "is_engine": engines[d],
              "extra_only": not has_main[d]} for d, s in ranked], unknown
 
 
