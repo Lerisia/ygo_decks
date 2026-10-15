@@ -38,9 +38,24 @@ export const isFinished = ({ answered, hidden, total, candidateCount }:
 export const STRENGTH_TIERS = ["최상위", "상위", "중상위", "중하위", "하위", "최하위"];
 const LAST_TIER = STRENGTH_TIERS.length - 1;
 
-/** Answer value for the chosen tiers; the whole bar is the same as 상관 없음. */
-export const strengthRangeValue = (lo: number, hi: number): string | null =>
-  lo === 0 && hi === LAST_TIER ? null : `${lo}-${hi}`;
+// What each deck power tier means, shown under the bar for the tier under the cursor or the one just chosen
+// (특이점 2026-10-11).
+export const STRENGTH_NOTES = [
+  "현재 기준으로 마스터 듀얼에서 맹활약중인, 가장 강력한 최상위 티어 덱",
+  "티어 덱만큼은 아니지만, 분명한 강점이 존재해 티어 게임에서 고를 가치가 있는 덱",
+  "티어 게임에서는 다소 사용하기 힘들지만, 강점이 뚜렷하고 준수한 성능을 보여주는 덱",
+  "체급이 다소 부족하지만, 무난하고 자신만의 개성이 존재하는 덱",
+  "덱 파워가 약하여 개인적인 애정이 없다면 플레이하기 어려운 덱",
+  "사용에 도전 정신이 필요할 정도로 매우 약한 덱",
+];
+
+// Difficulty on a bar too (특이점 2026-10-15): 0=쉬움 … 2=어려움, two neighbouring ones may be chosen together.
+export const DIFFICULTY_TIERS = ["쉬움", "보통", "어려움"];
+
+/** Answer value for the chosen tiers of a bar with `last` the rightmost; the whole bar is the same as 상관 없음. */
+export const rangeValue = (lo: number, hi: number, last: number): string | null =>
+  lo === 0 && hi === last ? null : `${lo}-${hi}`;
+export const strengthRangeValue = (lo: number, hi: number): string | null => rangeValue(lo, hi, LAST_TIER);
 
 export const countInRange = (counts: number[], lo: number, hi: number): number =>
   counts.slice(lo, hi + 1).reduce((sum, n) => sum + n, 0);

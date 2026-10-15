@@ -5,6 +5,7 @@ import {
   hiddenOptionalCount,
   isFinished,
   strengthRangeValue,
+  rangeValue,
   countInRange,
   pickHandle,
   moveHandle,
@@ -73,6 +74,15 @@ describe("isFinished", () => {
   });
   it("does not finish on zero candidates (caller routes to no-results)", () => {
     expect(isFinished({ answered: 0, hidden: 0, total: 7, candidateCount: 0 })).toBe(false);
+  });
+});
+
+describe("difficulty bar (특이점 2026-10-15)", () => {
+  it("encodes 쉬움 … 어려움 the same way, two neighbours together", () => {
+    expect(rangeValue(0, 1, 2)).toBe("0-1");
+    expect(rangeValue(1, 1, 2)).toBe("1-1");
+    expect(rangeValue(0, 2, 2)).toBeNull();
+    expect(buildAnswerKey([{ key: "s", value: "0-1" }, { key: "d", value: rangeValue(1, 2, 2) }])).toBe("d=1-2|s=0-1");
   });
 });
 

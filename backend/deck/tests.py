@@ -30,6 +30,12 @@ class ParseAnswerKeyTest(TestCase):
         self.assertEqual(parse_answer_key("strength=1-3|difficulty=2"), {"strength_range": [1, 3], "difficulty": 2})
         self.assertEqual(parse_answer_key("strength=4-4"), {"strength_range": [4, 4]})
 
+    def test_difficulty_range(self):
+        # 특이점 2026-10-15: 난이도도 막대 — 0=쉬움 … 2=어려움, 이웃한 두 단계도 고를 수 있음
+        self.assertEqual(parse_answer_key("difficulty=0-1|strength=1-3"), {"difficulty_range": [0, 1], "strength_range": [1, 3]})
+        with self.assertRaises(ValueError):
+            parse_answer_key("difficulty=1-3")
+
     def test_empty_pairs_ignored(self):
         result = parse_answer_key("strength=1||difficulty=2")
         self.assertEqual(result["strength"], 1)
@@ -311,6 +317,22 @@ class RecommendStepTest(TestCase):
     def test_strength_tier_counts_for_the_bar(self):
         self.assertEqual(self.step()["available"]["s_tiers"], [1, 1, 0, 1, 0, 0])
         self.assertEqual(self.step("t=0")["available"]["s_tiers"], [1, 1, 0, 0, 0, 0])
+
+    def test_difficulty_range(self):
+        # 특이점 2026-10-15: D1 쉬움, D2 보통, D3 어려움
+        self.assertEqual(self.step("d=0-1")["candidate_count"], 2)
+        self.assertEqual(self.step("d=1-2")["candidate_count"], 2)
+        self.assertEqual(self.step("d=2-2")["candidate_count"], 1)
+        self.assertEqual(self.step("d=0-2|s=0-1")["candidate_count"], 2)
+        self.assertEqual(self.step("d=1")["candidate_count"], 1)   # a single value as before
+
+    def test_difficulty_counts_for_the_bar(self):
+        self.assertEqual(self.step()["available"]["d_tiers"], [1, 1, 1])
+        self.assertEqual(self.step("t=0")["available"]["d_tiers"], [1, 1, 0])
+
+    def test_bad_difficulty_range_returns_400(self):
+        for key in ("d=2-1", "d=0-3", "d=a-b"):
+            self.assertEqual(self.client.get(self.STEP_URL, {"key": key}).status_code, 400, key)
 
     def test_bad_strength_range_returns_400(self):
         for key in ("s=3-1", "s=0-6", "s=-1-2", "s=1-", "s=a-b"):

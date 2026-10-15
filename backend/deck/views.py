@@ -14,15 +14,19 @@ from rest_framework.response import Response
 from .permissions import CanEditDeckBook
 from user.models import User
 
-def parse_tier_range(raw):
-    """Deck power bar (특이점 2026-10-11): "lo-hi" tiers, 0=최상위 … 5=최하위, lo<=hi (equal = one tier)."""
+def parse_tier_range(raw, last=5):
+    """A bar's "lo-hi" tiers, lo<=hi (equal = one tier): deck power 0=최상위 … 5=최하위 (특이점 2026-10-11),
+    difficulty 0=쉬움 … 2=어려움 (last=2, 특이점 2026-10-15)."""
     parts = raw.split("-")
     if len(parts) != 2:
         raise ValueError(raw)
     lo, hi = int(parts[0]), int(parts[1])
-    if not 0 <= lo <= hi <= 5:
+    if not 0 <= lo <= hi <= last:
         raise ValueError(raw)
     return [lo, hi]
+
+
+DIFFICULTY_LAST = 2
 
 
 def parse_answer_key(answer_key):
@@ -39,6 +43,8 @@ def parse_answer_key(answer_key):
                 criteria[key] = value.split(",")
             elif key == "strength" and "-" in value:
                 criteria["strength_range"] = parse_tier_range(value)
+            elif key == "difficulty" and "-" in value:
+                criteria["difficulty_range"] = parse_tier_range(value, DIFFICULTY_LAST)
             else:
                 criteria[key] = int(value)
     
@@ -69,6 +75,9 @@ def parse_short_answer_key(answer_key):
         if field == "strength" and "-" in raw.lstrip("-"):
             criteria["strength_range"] = parse_tier_range(raw)
             continue
+        if field == "difficulty" and "-" in raw.lstrip("-"):
+            criteria["difficulty_range"] = parse_tier_range(raw, DIFFICULTY_LAST)
+            continue
         value = int(raw)  # ValueError propagates
         if field in M2M_FIELDS:
             criteria.setdefault(field, []).append(value)
@@ -87,6 +96,9 @@ def filter_decks(criteria, user=None):
         query &= Q(deck_type=criteria["deck_type"])
     if criteria.get("difficulty") is not None:
         query &= Q(difficulty=criteria["difficulty"])
+    if criteria.get("difficulty_range") is not None:
+        lo, hi = criteria["difficulty_range"]
+        query &= Q(difficulty__gte=lo, difficulty__lte=hi)
     if criteria.get("strength") is not None:
         # Survey sends a band index (0-4). Each band covers 1-2 adjacent tiers.
         # Unknown band -> empty tuple -> __in matches nothing.
@@ -123,15 +135,20 @@ def available_options(decks):
         return sorted({v for v in Deck.objects.filter(id__in=ids).values_list(f"{field}__id", flat=True) if v is not None})
 
     tier_counts = [0] * 6
+    difficulty_counts = [0] * (DIFFICULTY_LAST + 1)
     for r in rows:
         if r["strength"] is not None and 0 <= r["strength"] <= 5:
             tier_counts[r["strength"]] += 1
+        if r["difficulty"] is not None and 0 <= r["difficulty"] <= DIFFICULTY_LAST:
+            difficulty_counts[r["difficulty"]] += 1
 
     return {
         "s": sorted(bands),
         # how many candidates sit at each tier, for the deck power bar
         "s_tiers": tier_counts,
         "d": sorted({r["difficulty"] for r in rows}),
+        # and at each difficulty, for its bar (특이점 2026-10-15)
+        "d_tiers": difficulty_counts,
         "t": sorted({r["deck_type"] for r in rows}),
         "a": sorted({r["art_style"] for r in rows}),
         "sm": m2m("summoning_methods"),

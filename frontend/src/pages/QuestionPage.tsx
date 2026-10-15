@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import QuestionItem from "../components/QuestionItem";
-import StrengthRangePicker from "../components/StrengthRangePicker";
+import TierRangePicker from "../components/TierRangePicker";
 import { fetchQuestions, fetchRecommendStep } from "../api/questionApi";
 import {
-  buildAnswerKey, visibleOptions, hiddenOptionalCount, isFinished, strengthRangeValue,
+  buildAnswerKey, visibleOptions, hiddenOptionalCount, isFinished, rangeValue,
+  DIFFICULTY_TIERS, STRENGTH_NOTES, STRENGTH_TIERS,
   type Question, type Answer, type Available,
 } from "../utils/recommendFlow";
 
 type Step = { key: string; candidateCount: number; available: Available };
 
-// Deck power is asked on a bar with two points (특이점 2026-10-11). The earlier five fixed choices
-// (최상위~상위 … 하위~최하위) are kept: set this to "choices" to bring them back; the server still takes both answers.
+// Deck power is asked on a bar with two points (특이점 2026-10-11), and difficulty too (특이점 2026-10-15). The earlier
+// fixed choices are kept: set this to "choices" to bring them back; the server still takes both answers.
 const STRENGTH_PICKER: "bar" | "choices" = "bar";
 
 // Moving between questions fades the current one out, swaps, then fades the next in (특이점 2026-10-11),
@@ -155,11 +156,33 @@ function QuestionPage() {
       const q = requiredQuestions[currentIndex];
       if (q.key === "s" && STRENGTH_PICKER === "bar") {
         return (
-          <StrengthRangePicker
+          <TierRangePicker
             key={q.key}
             question={q.question}
+            hint="두 점을 움직여 원하는 덱 파워의 범위를 정하세요. 왼쪽일수록 강한 덱이고, 두 점을 겹치면 그 단계만 고릅니다."
+            tiers={STRENGTH_TIERS}
+            notes={STRENGTH_NOTES}
+            noteSuffix="권"
+            ends={["가장 강한 쪽", "가장 약한 쪽"]}
+            newcomerFrom={3}
             tierCounts={available?.s_tiers ?? null}
-            onConfirm={(lo, hi) => handleAnswer(q.key, strengthRangeValue(lo, hi))}
+            onConfirm={(lo, hi) => handleAnswer(q.key, rangeValue(lo, hi, STRENGTH_TIERS.length - 1))}
+          />
+        );
+      }
+      if (q.key === "d" && STRENGTH_PICKER === "bar") {
+        // each difficulty told as its choice used to read (the server's question)
+        const notes = DIFFICULTY_TIERS.map((_, i) => q.options.find((o) => o.value === i)?.label ?? "");
+        return (
+          <TierRangePicker
+            key={q.key}
+            question={q.question}
+            hint="두 점을 움직여 원하는 난이도의 범위를 정하세요. 왼쪽일수록 쉬운 덱이고, 두 점을 겹치면 그 단계만 고릅니다."
+            tiers={DIFFICULTY_TIERS}
+            notes={notes}
+            ends={["가장 쉬운 쪽", "가장 어려운 쪽"]}
+            tierCounts={available?.d_tiers ?? null}
+            onConfirm={(lo, hi) => handleAnswer(q.key, rangeValue(lo, hi, DIFFICULTY_TIERS.length - 1))}
           />
         );
       }
