@@ -1,12 +1,16 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Camera } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import DexFilterBar from "@/components/DexFilterBar";
+import { ScanInfoRow, ScanState } from "@/components/ImageCardSearch";
 import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardListItem, type CardOptions } from "@/api/cardDexApi";
 import { BAR_EXTRA, barFields, barFilters, barValues, groupItems, misfit } from "@/lib/cardFilterBar";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
 import { type DeckDraft, type DeckZone, copiesAllowed, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { useImageScan } from "@/hooks/useImageScan";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DeckCardFace } from "./DeckZones";
 
 // Below lg the results are one row that scrolls sideways (a card 64px wide on a phone, 72px on a tablet, the row a
@@ -35,7 +39,10 @@ function TileSkeleton() {
  *  rounded see-through card, the box at its bottom and the results one row above it, the row folded away until
  *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. With the keyboard up it
  *  rides on top of the keyboard, gliding up and down with it, and pressing the box does not scroll the page to it
- *  (참혈 2026-10-14). */
+ *  (참혈 2026-10-14). The camera at the box's right end turns it to AI 이미지 검색, as in /dev/cards (참혈 2026-10-16):
+ *  the chips and the 카드군·서포트 make way for one row with the picture, how many cards were read and 다른 사진, and
+ *  the cards read take the cards' place, going into the deck as the searched ones do; typing goes back. The picture
+ *  and its cards stay while the search goes back and forth. */
 export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, ready }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
@@ -62,6 +69,9 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
   const results = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLInputElement>(null);
   const keyboard = useKeyboardInset(box);
+  const [imaging, setImaging] = useState(false);
+  const scan = useImageScan(imaging);
+  const wide = useMediaQuery("(min-width: 1024px)");
 
   // A tap on the box lets the browser scroll the page to it, which below lg throws the deck far down. The tap is
   // taken over and the box focused without that scroll; a swipe that starts on the box stays a swipe. The page still
@@ -149,6 +159,38 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
       .finally(() => id === request.current && setLoading(false));
   };
 
+  // a card found: pressed it goes in, held or right-clicked it is shown; n/most once the deck holds it, and how many
+  // the picture held (times)
+  const tile = (c: CardListItem, times?: number) => {
+    const n = copiesOf(deck, c.name, cards);
+    const most = copiesAllowed(c);   // 3, or fewer on today's 금제
+    const out = n >= most || c.frame === "token";
+    return (
+      <button
+        key={c.id}
+        type="button"
+        {...press(() => ready && onPick(c), () => onShow?.(c))}
+        aria-disabled={out || !ready}
+        title={c.name}
+        aria-label={`${c.name} 넣기`}
+        className={`group block text-center ${TILE} ${out ? "cursor-not-allowed" : ""}`}
+      >
+        <span className="relative block">
+          <DeckCardFace card={c} dim={out} />
+          {times !== undefined && times > 1 && (
+            <span className="absolute top-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-blue-600/90 text-white tabular-nums">×{times}</span>
+          )}
+          {n > 0 && (
+            <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">
+              {n}/{most}
+            </span>
+          )}
+        </span>
+        <span className="hidden lg:block mt-0.5 h-8 text-[11px] leading-4 line-clamp-2 break-keep">{c.name}</span>
+      </button>
+    );
+  };
+
   // the parts are in their desktop order; below lg, order-* stacks them up from the box: the chips, the 카드군·서포트,
   // the cards, and on top the line saying why a card didn't go in
   return (
@@ -178,21 +220,42 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
             <input
               ref={box}
               aria-label="카드 검색"
-              placeholder={chosenItem ? "카드 이름" : "카드 이름 검색 (한국어·일본어·영어·초성)"}
+              placeholder="카드 검색"
               value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
+              onChange={(e) => {
+                setQInput(e.target.value);
+                setImaging(false);
+              }}
               onKeyDown={(e) => e.key === "Backspace" && !qInput && chosen && setChosen("")}
               enterKeyHint="search"
               className="min-w-0 flex-1 h-full bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground"
             />
+            <button
+              type="button"
+              onClick={() => {
+                setImaging((v) => !v);
+                box.current?.blur();
+              }}
+              aria-label="사진으로 카드 찾기"
+              aria-expanded={imaging}
+              title="사진으로 카드 찾기"
+              className={`shrink-0 w-8 h-7 p-0 border-0 grid place-items-center rounded-md transition ${
+                imaging ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              <Camera size={18} aria-hidden />
+            </button>
           </div>
         </SearchForm>
       </div>
       {/* the card book's filter chips a size smaller; a chip opens its choices under the row (a popup on a phone) */}
-      <div className="order-4 dex-compact lg:order-none lg:mt-2">
+      <div className={`order-4 dex-compact lg:order-none lg:mt-2 ${imaging ? "hidden" : ""}`}>
         <DexFilterBar fields={barFields(options)} extra={BAR_EXTRA} values={barValues(bar)} onChange={(v) => setBar(barFilters(v))} isDisabled={misfit} trial />
       </div>
-      {suggestions.length > 0 && (
+      {imaging && scan.status.kind === "done" && (
+        <ScanInfoRow scan={scan} compact={wide} className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
+      )}
+      {!imaging && suggestions.length > 0 && (
         <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:order-none lg:mt-2 lg:flex-wrap lg:overflow-visible">
           {suggestions.map(({ it }) => {
             const support = it.tag === "카드";
@@ -212,17 +275,32 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
         </div>
       )}
       <p
-        className={`order-1 h-5 px-0.5 text-xs truncate lg:order-none lg:mt-1 lg:px-0 ${notice || error ? "" : "hidden lg:block"}`}
+        className={`order-1 h-5 px-0.5 text-xs truncate lg:order-none lg:mt-1 lg:px-0 ${notice || (error && !imaging) ? "" : "hidden lg:block"}`}
         aria-live="polite"
       >
         {notice ? (
           <span className="text-red-600 dark:text-red-400">{notice}</span>
-        ) : error ? (
+        ) : imaging ? null : error ? (
           <span className="text-red-600 dark:text-red-400">{error}</span>
         ) : (
           total !== null && <span className="text-gray-500 dark:text-gray-400 tabular-nums">카드 {total.toLocaleString()}장</span>
         )}
       </p>
+      {imaging ? (
+        <div className={`order-2 ${ROW} flex flex-col lg:order-none lg:mt-1 lg:flex-1 lg:min-h-0`} {...scan.drop}>
+          <input {...scan.fileInput} />
+          <ScanState scan={scan} small={!wide} className="flex-1 min-h-0" />
+          {scan.status.kind === "done" && (
+            scan.found.length ? (
+              <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden overscroll-contain lg:overflow-x-hidden lg:overflow-y-auto">
+                <div className="flex gap-1.5 w-max lg:w-auto lg:grid lg:grid-cols-3 lg:gap-2">{scan.found.map(({ card, count }) => tile(card, count))}</div>
+              </div>
+            ) : (
+              <p className="flex-1 m-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>
+            )
+          )}
+        </div>
+      ) : (
       <div
         ref={results}
         className={`order-2 ${noMatch ? "h-8" : ROW} overflow-x-auto overflow-y-hidden overscroll-contain lg:order-none lg:mt-1 lg:flex-1 lg:min-h-0 lg:h-auto lg:overflow-x-hidden lg:overflow-y-auto ${
@@ -237,32 +315,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
               loading && page === 1 && found.length ? "opacity-50" : ""
             }`}
           >
-            {found.map((c) => {
-              const n = copiesOf(deck, c.name, cards);
-              const most = copiesAllowed(c);   // 3, or fewer on today's 금제
-              const out = n >= most || c.frame === "token";
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  {...press(() => ready && onPick(c), () => onShow?.(c))}
-                  aria-disabled={out || !ready}
-                  title={c.name}
-                  aria-label={`${c.name} 넣기`}
-                  className={`group block text-center ${TILE} ${out ? "cursor-not-allowed" : ""}`}
-                >
-                  <span className="relative block">
-                    <DeckCardFace card={c} dim={out} />
-                    {n > 0 && (
-                      <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">
-                        {n}/{most}
-                      </span>
-                    )}
-                  </span>
-                  <span className="hidden lg:block mt-0.5 h-8 text-[11px] leading-4 line-clamp-2 break-keep">{c.name}</span>
-                </button>
-              );
-            })}
+            {found.map((c) => tile(c))}
             {loading && (page > 1 || !found.length) && Array.from({ length: 12 }, (_, i) => <TileSkeleton key={`s${i}`} />)}
             {hasMore && (
               <button
@@ -277,6 +330,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
           </div>
         )}
       </div>
+      )}
     </aside>
   );
 }

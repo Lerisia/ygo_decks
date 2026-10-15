@@ -11,6 +11,7 @@ from carddb.display import display_name
 from carddb.models import Banlist, Card
 
 MAIN_MIN, MAIN_MAX, EXTRA_MAX, COPIES_MAX = 40, 60, 15, 3
+COVERS_MAX = 3
 EXTRA_FRAMES = ("fusion", "synchro", "xyz", "link")
 LIMIT = {"forbidden": 0, "limited": 1, "semi_limited": 2}
 LIMIT_WORD = {"limited": "제한", "semi_limited": "준제한"}
@@ -46,6 +47,18 @@ def check(main, extra):
         if n > COPIES_MAX:
             raise DeckError(f"{name}: 같은 이름의 카드는 {COPIES_MAX}장까지 넣을 수 있습니다.")
     return cards
+
+
+def check_covers(covers, main, extra):
+    """The deck's 대표 카드 (참혈 2026-10-16): up to 3 of its own cards, each once, or DeckError."""
+    if not isinstance(covers, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in covers):
+        raise DeckError("대표 카드가 올바르지 않습니다.")
+    if len(covers) > COVERS_MAX:
+        raise DeckError(f"대표 카드는 {COVERS_MAX}장까지입니다.")
+    if len(set(covers)) < len(covers):
+        raise DeckError("같은 카드를 대표 카드로 두 번 고를 수 없습니다.")
+    if not set(covers) <= set(main) | set(extra):
+        raise DeckError("대표 카드는 덱에 든 카드에서 고릅니다.")
 
 
 def issues(main, extra):

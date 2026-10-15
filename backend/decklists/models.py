@@ -22,6 +22,8 @@ class DeckList(models.Model):
     description = models.TextField(blank=True, default="")
     main = models.JSONField(default=list)
     extra = models.JSONField(default=list)
+    # up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16)
+    cover_cards = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

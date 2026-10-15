@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, deckIssues, deckUpdated, fromDoc, keepTabDraft, kindCounts,
-  localDrafts, removeCard, sortedZone, tabDraft,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, coverIds, deckIssues, deckUpdated, fromDoc, keepTabDraft, kindCounts,
+  localDrafts, overLimit, removeCard, setCover, sortedZone, tabDraft,
 } from "./deckDrafts";
 import { isDeckEditorPath } from "./deckListPaths";
 
@@ -94,6 +94,30 @@ describe("today's 금제", () => {
     ]);
     expect(deckIssues(deck(Array.from({ length: 40 }, () => 1)), cards)).toEqual([]);
   });
+
+  it("finds a zone's cards over today's list, for the warning by its title", () => {
+    expect(overLimit([21, 1, 21, 20], cards).map((o) => [o.card.id, o.count])).toEqual([[20, 1], [21, 2]]);
+    expect(overLimit([21, 22, 22], cards)).toEqual([]);
+  });
+});
+
+describe("대표 카드", () => {
+  it("fills the slot pressed, a card already in another slot trading places with it", () => {
+    const d = deck([1, 3, 4], [5]);
+    const one = setCover(d, 0, 3);
+    expect(one.covers).toEqual([3, null, null]);
+    expect(setCover(one, 2, 5).covers).toEqual([3, null, 5]);
+    expect(setCover(setCover(one, 2, 5), 2, 3).covers).toEqual([5, null, 3]);
+    expect(setCover(setCover(one, 1, 4), 0, null).covers).toEqual([null, 4, null]);
+  });
+
+  it("lets a card go when its last copy leaves the deck, and saves them without the gaps", () => {
+    const d = { ...deck([1, 1, 3], [5]), covers: [1, 3, 5] };
+    expect(removeCard(d, "main", 1).covers).toEqual([1, 3, 5]);
+    expect(removeCard(removeCard(d, "main", 1), "main", 1).covers).toEqual([null, 3, 5]);
+    expect(coverIds({ ...d, covers: [null, 3, 5] })).toEqual([3, 5]);
+    expect(coverIds({ ...d, extra: [], covers: [5, 1] })).toEqual([1]);
+  });
 });
 
 describe("decks kept outside the server", () => {
@@ -131,8 +155,9 @@ describe("decks kept outside the server", () => {
   });
 
   it("reads the server's deck as the pages hold it", () => {
-    expect(fromDoc({ code: "ab12cd34", name: "덱", description: "", main_count: 1, extra_count: 0, created_at: "a", updated_at: "b", main: [1], extra: [], issues: [] }))
-      .toEqual({ code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1], extra: [] });
+    expect(fromDoc({
+      code: "ab12cd34", name: "덱", description: "", main_count: 1, extra_count: 0, cover_cards: [1], created_at: "a", updated_at: "b", main: [1], extra: [], issues: [],
+    })).toEqual({ code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1], extra: [], covers: [1] });
     expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z" })).toBe("2026-10-13T12:00:00.000Z");
     expect(blankDeck().code).toBe(NEW_CODE);
   });

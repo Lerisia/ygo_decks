@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import DeckList
-from .rules import DeckError, check, issues
+from .rules import DeckError, check, check_covers, issues
 
 DECKS_MAX = 300   # a member's deck lists, at most
 ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
@@ -14,15 +14,16 @@ ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
 
 def _row(d):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
-            "extra_count": len(d.extra), "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
+            "extra_count": len(d.extra), "cover_cards": d.cover_cards, "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
 
 
 def _full(d):
     return {**_row(d), "main": d.main, "extra": d.extra, "issues": issues(d.main, d.extra)}
 
 
-def _fields(data):
-    """The name, description and cards sent, checked; DeckError on a rule broken."""
+def _fields(data, covers=()):
+    """The name, description, cards and 대표 카드 sent, checked; DeckError on a rule broken. A body without
+    cover_cards (a page from before them) keeps the deck's own (covers), those still in it."""
     name = " ".join(str(data.get("name") or "").split())
     if not name:
         raise DeckError("덱 이름을 적어 주세요.")
@@ -33,7 +34,12 @@ def _fields(data):
         raise DeckError("덱 설명은 500자까지입니다.")
     main, extra = data.get("main", []), data.get("extra", [])
     check(main, extra)
-    return {"name": name, "description": description, "main": main, "extra": extra}
+    if "cover_cards" in data:
+        covers = data["cover_cards"]
+    else:
+        covers = [i for i in covers if i in set(main) | set(extra)]
+    check_covers(covers, main, extra)
+    return {"name": name, "description": description, "main": main, "extra": extra, "cover_cards": covers}
 
 
 @api_view(["GET", "POST"])
@@ -67,7 +73,7 @@ def deck_list(request, code):
         return Response(status=status.HTTP_204_NO_CONTENT)
     if request.method == "PUT":
         try:
-            fields = _fields(request.data)
+            fields = _fields(request.data, d.cover_cards)
         except DeckError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         for k, v in fields.items():

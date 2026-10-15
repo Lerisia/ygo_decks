@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
-import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, sortedZone } from "@/lib/deckDrafts";
+import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, overLimit, sortedZone } from "@/lib/deckDrafts";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
 // deck two on phones and tablets and three from lg, the extra deck one (deck-zone-reserve in index.css).
 const RESERVE: Record<DeckZone, string> = { main: "[--rows:2] lg:[--rows:3]", extra: "[--rows:1]" };
 const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
+// what a zone lacks or holds too many of, by its title, in yellow (참혈 2026-10-16)
+const WARN = "text-xs font-semibold text-amber-600 dark:text-amber-400";
 
 /** A card's picture as the card book draws it, its 금제 in the corner. */
 export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: boolean }) {
@@ -32,7 +34,7 @@ export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: 
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve }: {
+function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, marks }: {
   zone: DeckZone;
   ids: number[];
   cards: Map<number, CardListItem>;
@@ -40,19 +42,23 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve }: {
   onRemove?: (id: number) => void;
   onShow?: (card: CardListItem) => void;
   reserve: boolean;
+  picking?: boolean;
+  marks?: Map<number, number>;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
+  // while it is built, cards over today's 금제 (one saved before it) are told by the title and ringed in the zone
+  const over = onRemove ? overLimit(ids, cards) : [];
+  const overIds = new Set(over.map((o) => o.card.id));
   return (
-    <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4">
+    <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
       {/* the zone on the left, how many of each kind on the right (on a phone, the line below) */}
       <header className="mb-2 sm:flex sm:items-baseline sm:justify-between sm:gap-3">
         <h2 className="m-0 h-6 flex items-baseline gap-2 shrink-0 whitespace-nowrap text-base">
           <span className="font-bold">{ZONE_LABEL[zone]}</span>
           <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{ids.length}장</span>
-          {zone === "main" && ids.length < MAIN_MIN && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">{MAIN_MIN}장 이상 필요</span>
-          )}
+          {zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
+          {over.length > 0 && <span className={WARN} title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
         </h2>
         <p className="min-h-5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums break-keep sm:text-right">
           {loading && ids.length ? (
@@ -78,16 +84,23 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve }: {
             if (!card) {
               return <span key={`${id}-${i}`} className={`${TILE_BLANK} ${loading ? "animate-pulse" : ""}`} />;
             }
+            const mark = marks?.get(id);
             return onRemove ? (
               <button
                 key={`${id}-${i}`}
                 type="button"
                 {...press(() => onRemove(id), () => onShow?.(card))}
-                title={`${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
-                aria-label={`${card.name} 1장 빼기`}
-                className="group block"
+                title={picking ? `${card.name} (눌러서 대표 카드로)` : `${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
+                aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
+                className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
                 <DeckCardFace card={card} />
+                {overIds.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
+                {mark !== undefined && (
+                  <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
+                    {mark}
+                  </span>
+                )}
               </button>
             ) : (
               <Link key={`${id}-${i}`} to={`/cards/${id}`} title={card.name} className="group block">
@@ -109,7 +122,7 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve }: {
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, onRemove, onShow }: {
+export default function DeckZones({ deck, cards, order, loading, onRemove, onShow, picking, marks }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
@@ -117,6 +130,9 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
   onRemove?: (zone: DeckZone, id: number) => void;
   /** Building: a card held (phone) or right-clicked (computer) is shown. */
   onShow?: (card: CardListItem) => void;
+  /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: the slot of each. */
+  picking?: boolean;
+  marks?: Map<number, number>;
 }) {
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -130,6 +146,8 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
           onRemove={onRemove && ((id) => onRemove(z, id))}
           onShow={onShow}
           reserve={!!onRemove}
+          picking={picking}
+          marks={marks}
         />
       ))}
     </div>

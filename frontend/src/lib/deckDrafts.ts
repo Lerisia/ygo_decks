@@ -18,6 +18,8 @@ export type DeckDraft = {
   /** Card ids, an id once per copy. */
   main: number[];
   extra: number[];
+  /** The 대표 카드 by slot (참혈 2026-10-16): a slot left empty is null; saved without the gaps (coverIds). */
+  covers: (number | null)[];
 };
 
 /** Where the first layout kept decks in this browser (before 2026-10-14). */
@@ -32,12 +34,14 @@ export const ZONE_LABEL: Record<DeckZone, string> = { main: "메인 덱", extra:
 export const ZONE_MAX: Record<DeckZone, number> = { main: 60, extra: 15 };
 export const MAIN_MIN = 40;
 export const COPIES_MAX = 3;
+export const COVERS_MAX = 3;
 
-export const blankDeck = (): DeckDraft => ({ code: NEW_CODE, name: "", description: "", createdAt: "", main: [], extra: [] });
+export const blankDeck = (): DeckDraft => ({ code: NEW_CODE, name: "", description: "", createdAt: "", main: [], extra: [], covers: [] });
 
 /** A deck the server sent, as the pages hold it. */
 export const fromDoc = (d: DeckListDoc): DeckDraft => ({
   code: d.code, name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at, main: d.main, extra: d.extra,
+  covers: d.cover_cards ?? [],
 });
 
 /** The decks the first layout kept in this browser, to move to the member's account. */
@@ -150,25 +154,46 @@ export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards:
   return { deck: { ...deck, [zone]: [...deck[zone], card.id] } };
 }
 
+/** The cards held more often than today's list allows (a 금제 since saving), the forbidden first, each with its line. */
+export function overLimit(ids: number[], cards: Map<number, CardListItem>) {
+  const n = new Map<number, number>();
+  for (const id of ids) n.set(id, (n.get(id) ?? 0) + 1);
+  return [...n].map(([id, count]) => ({ card: cards.get(id), count }))
+    .filter((x): x is { card: CardListItem; count: number } => !!x.card?.ban && x.count > BAN_LIMIT[x.card.ban])
+    .sort((a, b) => BAN_LIMIT[a.card.ban as keyof typeof BAN_LIMIT] - BAN_LIMIT[b.card.ban as keyof typeof BAN_LIMIT] || a.card.name.localeCompare(b.card.name))
+    .map(({ card, count }) => {
+      const ban = card.ban as keyof typeof BAN_LIMIT;
+      const line = ban === "forbidden" ? `${card.name}: 금지 카드입니다.` : `${card.name}: ${BAN_WORD[ban]} 카드는 ${BAN_LIMIT[ban]}장까지입니다 (${count}장).`;
+      return { card, count, line };
+    });
+}
+
 /** What keeps the deck from being played today, as the server says it (decklists/rules.py): too few in the main,
  *  then each card over today's list, the forbidden first. */
 export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>): string[] {
   const out: string[] = [];
   if (deck.main.length < MAIN_MIN) out.push(`메인 덱이 ${MAIN_MIN}장보다 적습니다 (${deck.main.length}/${MAIN_MIN}).`);
-  const n = new Map<number, number>();
-  for (const id of [...deck.main, ...deck.extra]) n.set(id, (n.get(id) ?? 0) + 1);
-  const over = [...n].map(([id, count]) => ({ card: cards.get(id), count }))
-    .filter((x): x is { card: CardListItem; count: number } => !!x.card?.ban && x.count > BAN_LIMIT[x.card.ban])
-    .sort((a, b) => BAN_LIMIT[a.card.ban as keyof typeof BAN_LIMIT] - BAN_LIMIT[b.card.ban as keyof typeof BAN_LIMIT] || a.card.name.localeCompare(b.card.name));
-  for (const { card, count } of over) {
-    const ban = card.ban as keyof typeof BAN_LIMIT;
-    out.push(ban === "forbidden" ? `${card.name}: 금지 카드입니다.` : `${card.name}: ${BAN_WORD[ban]} 카드는 ${BAN_LIMIT[ban]}장까지입니다 (${count}장).`);
-  }
-  return out;
+  return [...out, ...overLimit([...deck.main, ...deck.extra], cards).map((o) => o.line)];
 }
 
-/** Takes one copy of a card out of a zone. */
+/** Takes one copy of a card out of a zone; with its last copy gone it is no longer a 대표 카드 either. */
 export function removeCard<D extends DeckDraft>(deck: D, zone: DeckZone, id: number): D {
   const at = deck[zone].indexOf(id);
-  return at < 0 ? deck : { ...deck, [zone]: deck[zone].filter((_, i) => i !== at) };
+  if (at < 0) return deck;
+  const left = deck[zone].filter((_, i) => i !== at);
+  return { ...deck, [zone]: left, covers: left.includes(id) ? deck.covers : deck.covers.map((c) => (c === id ? null : c)) };
 }
+
+/** Puts a card in a 대표 카드 slot (null empties it); a card already in another slot trades places with what the slot
+ *  held, so no card stands there twice. */
+export function setCover<D extends DeckDraft>(deck: D, slot: number, id: number | null): D {
+  const covers = Array.from({ length: COVERS_MAX }, (_, i) => deck.covers[i] ?? null);
+  const was = id === null ? -1 : covers.indexOf(id);
+  if (was >= 0) covers[was] = covers[slot];
+  covers[slot] = id;
+  return { ...deck, covers };
+}
+
+/** The 대표 카드 as saved: in slot order without the empty ones, only cards still in the deck. */
+export const coverIds = (deck: Pick<DeckDraft, DeckZone | "covers">) =>
+  deck.covers.filter((c): c is number => c !== null && (deck.main.includes(c) || deck.extra.includes(c)));

@@ -1,11 +1,13 @@
 /** A member's deck lists on the server (덱 구축, 엘리스 2026-10-14: kept on the server, theirs alone for now). */
 export type DeckListRow = {
   code: string; name: string; description: string; main_count: number; extra_count: number;
+  /** Up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16). */
+  cover_cards: number[];
   created_at: string; updated_at: string;
 };
 /** A deck in full: its cards by card book id, an id once per copy, and what keeps it from being played today. */
 export type DeckListDoc = DeckListRow & { main: number[]; extra: number[]; issues: string[] };
-export type DeckListBody = { name: string; description: string; main: number[]; extra: number[] };
+export type DeckListBody = { name: string; description: string; main: number[]; extra: number[]; cover_cards?: number[] };
 
 const auth = (): Record<string, string> => {
   const token = localStorage.getItem("access_token");

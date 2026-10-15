@@ -97,3 +97,27 @@ class DeckListApiTest(TestCase):
             "강욕한 항아리: 금지 카드입니다.",
             "제한 카드: 제한 카드는 1장까지입니다 (2장).",
         ])
+
+    def test_cover_cards(self):
+        """Up to 3 of the deck's own cards stand for it, in the order picked (대표 카드, 참혈 2026-10-16)."""
+        r = self.c.post("/api/decklists/", self.body(cover_cards=[3, 1]), format="json")
+        self.assertEqual(r.status_code, 201)
+        code = r.json()["code"]
+        self.assertEqual(self.c.get(f"/api/decklists/{code}/").json()["cover_cards"], [3, 1])
+        self.assertEqual(self.c.get("/api/decklists/").json()["decks"][0]["cover_cards"], [3, 1])
+        bad = {
+            "4 of them": [1, 2, 3, 5],
+            "one twice": [1, 1],
+            "not in the deck": [5],
+            "not a card id": ["1"],
+            "not a list": 1,
+        }
+        for why, covers in bad.items():
+            r = self.c.put(f"/api/decklists/{code}/", self.body(cover_cards=covers), format="json")
+            self.assertEqual(r.status_code, 400, why)
+            self.assertTrue(r.json().get("error"), why)
+        self.assertEqual(DeckList.objects.get(code=code).cover_cards, [3, 1])
+        # a page from before them sends none: the deck keeps those still in it
+        r = self.c.put(f"/api/decklists/{code}/", self.body(extra=[]), format="json")
+        self.assertEqual((r.status_code, r.json()["cover_cards"]), (200, [1]))
+        self.assertEqual(self.c.post("/api/decklists/", self.body(), format="json").json()["cover_cards"], [])
