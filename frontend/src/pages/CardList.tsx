@@ -12,7 +12,10 @@ import {
   type CardFilters, type CardListItem, type CardOptions,
   filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
 } from "@/api/cardDexApi";
-import type { DexField, DexValues } from "@/utils/dexFilter";
+import type { DexValues } from "@/utils/dexFilter";
+import {
+  BAR_EXTRA, barFields as cardBarFields, barFilters as cardBarFilters, barValues as cardBarValues, groupItems as cardGroupItems, misfit,
+} from "@/lib/cardFilterBar";
 import { trackEvent } from "@/api/analyticsApi";
 import { CARD_SORTS, DEV_CARD_SORTS } from "@/lib/cardSorts";
 
@@ -46,26 +49,6 @@ function rememberSort(f: CardFilters) {
 
 const hasFilter = (f: CardFilters) =>
   !!(f.category || f.frame || f.attribute || f.race || f.level || f.st || f.group || f.card || f.deck || f.has || f.ban);
-// cards with another art, a monster cut-in, or both: chosen together they narrow to cards with both (엘리스 2026-10-11)
-const HAS = [
-  { value: "alt", label: "다른 일러스트" },
-  { value: "cutin", label: "소환 연출" },
-  // an alternate print whose art covers the whole card (특이점 2026-10-12)
-  { value: "overframe", label: "오버프레임" },
-];
-// the filter bar's chips (참혈 2026-10-12); a monster's items don't fit 마법·함정, nor 마법·함정 a monster
-const BAR_KEYS = ["category", "frame", "attribute", "race", "level", "st"] as const;
-// today's Master Duel 금제, the same as the icon in each card's corner; several at once (엘리스 10/12)
-const BANS = [
-  { value: "forbidden", label: "금지" },
-  { value: "limited", label: "제한" },
-  { value: "semi_limited", label: "준제한" },
-  { value: "unlimited", label: "무제한" },
-];
-const MONSTER_KEYS = ["frame", "attribute", "race", "level"];
-const misfit = (key: string, v: DexValues) =>
-  MONSTER_KEYS.includes(key) ? ["spell", "trap"].includes(v.category?.[0] ?? "") : key === "st" && v.category?.[0] === "monster";
-
 export function TileSkeleton() {
   return (
     <div>
@@ -233,39 +216,11 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
 
   const groupName = options?.groups.find((g) => String(g.id) === filters.group)?.name;
   // 카드군, and once a name is typed the cards with a support list (엘리스 10/12: a card's 서포트 searched here too)
-  const groupItems: ComboItem[] = useMemo(
-    () => [
-      ...(options?.groups ?? []).map((g) => ({ key: `g${g.id}`, name: g.name, sub: `${g.count.toLocaleString()}장`, tag: "카드군" })),
-      ...(options?.support_cards ?? []).map((c) => ({
-        key: `c${c.id}`, name: c.name, sub: `서포트 ${c.count.toLocaleString()}장`, tag: "카드", searchOnly: true,
-      })),
-    ],
-    [options],
-  );
-  const barFields: DexField[] = [
-    { key: "category", label: "종류", primary: true, options: options?.categories ?? [] },
-    { key: "frame", label: "몬스터", options: options?.frames ?? [] },
-    { key: "attribute", label: "속성", options: options?.attributes ?? [] },
-    { key: "race", label: "종족", options: options?.races ?? [] },
-    {
-      key: "level", label: "레벨·랭크·링크", format: (l) => `레벨·랭크·링크 ${l}`,
-      options: (options?.levels ?? []).map((n) => ({ value: String(n), label: String(n) })),
-    },
-    { key: "st", label: "마법·함정", options: options?.spell_trap_kinds ?? [] },
-    { key: "ban", label: "금제", multi: true, options: BANS },
-  ];
-  const barExtra: DexField = { key: "has", label: "그 외", multi: true, options: HAS };
-  const barValues: DexValues = {
-    ...Object.fromEntries(BAR_KEYS.map((k) => [k, filters[k] ? [filters[k]] : []])),
-    has: filters.has.split(",").filter(Boolean),
-    ban: filters.ban.split(",").filter(Boolean),
-  };
-  const applyBar = (v: DexValues) =>
-    update({
-      ...Object.fromEntries(BAR_KEYS.map((k) => [k, v[k]?.[0] ?? ""])),
-      has: HAS.map((h) => h.value).filter((x) => v.has?.includes(x)).join(","),
-      ban: BANS.map((b) => b.value).filter((x) => v.ban?.includes(x)).join(","),
-    });
+  const groupItems: ComboItem[] = useMemo(() => cardGroupItems(options), [options]);
+  const barFields = cardBarFields(options);
+  const barExtra = BAR_EXTRA;
+  const barValues = cardBarValues(filters);
+  const applyBar = (v: DexValues) => update(cardBarFilters(v));
 
   if (!allowed) return <div className="min-h-screen" />;
   const chosenGroup = groupItems.find((it) => it.key === (filters.group ? `g${filters.group}` : filters.card ? `c${filters.card}` : ""));

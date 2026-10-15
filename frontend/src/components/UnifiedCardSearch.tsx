@@ -5,8 +5,9 @@ import ImageCardSearch from "./ImageCardSearch";
 import { cardTag } from "@/lib/cardTag";
 import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rememberSearch } from "@/lib/recentCardSearches";
 import type { ComboItem } from "./ComboBox";
-import { CHIP_FILTERS, EMPTY_FILTERS, getFilteredCounts, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
-import { makeMatcher, matchRank, nameKeys } from "@/utils/hangul";
+import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
+import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
+import { matchRank, nameKeys } from "@/utils/hangul";
 
 const GROUPS_SHOWN = 6;
 const CARDS_SHOWN = 6;
@@ -50,10 +51,13 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   const [open, setOpen] = useState(false);
   const [imageSearch, setImageSearch] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  // the box and its drop-down, and the filter chips' popups, which DexFilterBar puts at the page's end
+  const inside = (t: EventTarget | null) =>
+    !!root.current?.contains(t as Node) || !!(t instanceof Element && t.closest("[data-dex-overlay]"));
   // the image search stays open while the box is left (a file picker takes the focus): a press outside it closes it
   useEffect(() => {
     if (!imageSearch) return;
-    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setImageSearch(false);
+    const away = (e: MouseEvent) => !inside(e.target) && setImageSearch(false);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setImageSearch(false);
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc);
@@ -65,37 +69,9 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   const [active, setActive] = useState(-1);   // -1: no suggestion marked, Enter searches the names
   const input = useRef<HTMLInputElement>(null);
   const id = useId();
-  const keyed = useMemo(() => items.map((it) => ({ it, k: nameKeys(it.name) })), [items]);
   const typed = useDeferredValue(query.trim());
-  // the chips in use, as the server reads them ("" with none)
-  const chips = new URLSearchParams(CHIP_FILTERS.flatMap((k) => (filters?.[k] ? [[k, filters[k]]] : []))).toString();
-  const [counts, setCounts] = useState<{ chips: string; groups: Record<string, number>; cards: Record<string, number> } | null>(null);
-  useEffect(() => {
-    if (!chips) return;
-    const ctrl = new AbortController();
-    getFilteredCounts(chips, ctrl.signal).then((r) => setCounts({ chips, ...r })).catch(() => {});
-    return () => ctrl.abort();
-  }, [chips]);
-  // under chips, each 카드군 and support list with its cards left (none: left out, and none at all until they come)
-  const narrowed = useMemo(() => {
-    if (!chips) return keyed;
-    if (counts?.chips !== chips) return [];
-    return keyed.flatMap(({ it, k }) => {
-      const support = it.tag === "카드";
-      const n = (support ? counts.cards : counts.groups)[it.key.slice(1)] ?? 0;
-      return n ? [{ it: { ...it, sub: `${support ? "서포트 " : ""}${n.toLocaleString()}장` }, k }] : [];
-    });
-  }, [keyed, chips, counts]);
-  const groups = useMemo(() => {
-    if (!nameKeys(typed).jamo) return [];
-    const match = makeMatcher(typed);
-    const rank = matchRank(typed);
-    return narrowed
-      .filter(({ k }) => match(k))
-      .map((x, i) => ({ it: x.it, rank: rank(x.k), order: i }))
-      .sort((a, b) => a.rank - b.rank || a.order - b.order)
-      .slice(0, GROUPS_SHOWN);
-  }, [narrowed, typed]);
+  const chips = chipQuery(filters);
+  const groups = useGroupSuggestions(items, typed, chips, GROUPS_SHOWN);
 
   // the cards come from the server's name search under the chips, a moment after the typing stops
   const [cards, setCards] = useState<CardListItem[]>([]);
@@ -174,7 +150,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   // a press anywhere outside closes it (the chips' own menus sit inside, so the box may lose the focus to them)
   useEffect(() => {
     if (!shown) return;
-    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const away = (e: MouseEvent) => !inside(e.target) && setOpen(false);
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, [shown]);

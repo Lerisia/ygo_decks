@@ -15,4 +15,5 @@ export const isDeckEditorPath = (path: string) =>
 /** The room kept at the foot of those pages below lg, in place of the tab bar's: the floating search at its tallest
  *  and a little air, so the last cards and the footer scroll out from behind it and the deck never moves when the
  *  search grows or shrinks. */
-export const DECK_EDITOR_ROOM = "lg:hidden h-[calc(13rem+env(safe-area-inset-bottom))] sm:h-[calc(14rem+env(safe-area-inset-bottom))]";
+// the cards row, the 카드군·서포트 row and the filter chips over the box (참혈 2026-10-15)
+export const DECK_EDITOR_ROOM = "lg:hidden h-[calc(17rem+env(safe-area-inset-bottom))] sm:h-[calc(18rem+env(safe-area-inset-bottom))]";

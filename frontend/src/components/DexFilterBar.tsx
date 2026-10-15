@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Plus, RotateCw, X } from "lucide-react";
 import {
   type DexField, type DexValues, type TopChip,
@@ -396,6 +397,7 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
   // over the modal, or on their own (a chip on the row, trial)
   const choices = choiceBox && (
     <div
+      data-dex-overlay
       className="fixed inset-0 z-[56] bg-black/40 flex items-center justify-center p-4"
       onClick={(e) => {
         e.stopPropagation();
@@ -469,10 +471,13 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
         />
       )}
 
-      {!modal && choices}
+      {/* The overlays go to the page's end: a bar inside a box with a backdrop blur or its own layer (the deck
+          builder's floating search, a drop-down) would hold a fixed overlay inside that box. Whatever holds the bar
+          and closes on a press outside it leaves [data-dex-overlay] alone. */}
+      {!modal && choices && createPortal(choices, document.body)}
 
-      {modal && (
-        <div className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4" onClick={fold}>
+      {modal && createPortal(
+        <div data-dex-overlay className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4" onClick={fold}>
           {trial && choiceBox ? choiceBox : (
             <div
               role="dialog"
@@ -493,7 +498,8 @@ export default function DexFilterBar({ fields, extra, values, onChange, isDisabl
             </div>
           )}
           {!trial && choices}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
