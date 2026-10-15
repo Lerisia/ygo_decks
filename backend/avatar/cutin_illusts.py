@@ -45,8 +45,9 @@ class Alignment:
     rotation: float   # degrees
 
     def fits(self):
-        # a figure on the wrong art gets under 10 inliers at some odd angle; a small dark figure on its own art 50
-        return self.inliers >= 30 and self.error <= 1.0 and abs(self.rotation) <= 1.0 and 0.3 <= self.scale <= 4
+        # a figure on the wrong art gets under 10 inliers at some odd angle; a small dark figure on its own art 50;
+        # a true fit's error is 0.2–0.6 px, 1.1 on a busy art (RANSAC's draw), never near 2
+        return self.inliers >= 30 and self.error <= 1.5 and abs(self.rotation) <= 1.0 and 0.3 <= self.scale <= 4
 
 
 def enlarged(art, side):
