@@ -20,7 +20,7 @@ function Slot({ at, id, cards, active }: { at: number; id: number | null; cards:
     return (
       <span className={`flex border-2 border-dashed bg-gray-50 dark:bg-gray-800 ${active ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} w-full h-full card-corner ${ring}`}>
         <span className={`absolute flex text-gray-400 dark:text-gray-500 font-semibold ${NUMBER_AT[at]}`}>
-          {at === 0 ? <span className="text-[11px] leading-tight text-center break-keep px-1">대표<br />카드</span> : <span className="text-xs">{at + 1}</span>}
+          {at === 0 ? <span className="text-[11px] lg:text-[13px] leading-tight text-center break-keep px-1">대표<br />카드</span> : <span className="text-xs lg:text-sm">{at + 1}</span>}
         </span>
       </span>
     );
@@ -35,7 +35,8 @@ function Slot({ at, id, cards, active }: { at: number; id: number | null; cards:
   );
 }
 
-/** The deck's 대표 카드 (참혈 2026-10-16), up to three fanned in a square beside its name and description. From lg each
+/** The deck's 대표 카드 (참혈 2026-10-16), up to three fanned in a square left of its name and description, bigger
+ *  from lg. From lg each
  *  slot is pressed on its own (onSlot): the one being set (active) stands out, and the deck's cards pressed go into it.
  *  Below lg the square is one button (onArea), starting with the first slot and going on from there. */
 export default function CoverCards({ covers, cards, active, wide, onSlot, onArea }: {
@@ -50,7 +51,7 @@ export default function CoverCards({ covers, cards, active, wide, onSlot, onArea
 }) {
   const slots = Array.from({ length: COVERS_MAX }, (_, i) => covers[i] ?? null);
   const name = (i: number) => (slots[i] === null ? "비어 있음" : (cards.get(slots[i]!)?.name ?? ""));
-  const SIZE = "relative shrink-0 w-[116px] h-[116px] md:w-[104px] md:h-[104px]";
+  const SIZE = "relative shrink-0 w-[116px] h-[116px] lg:w-[168px] lg:h-[168px]";
 
   if (!wide) {
     return (

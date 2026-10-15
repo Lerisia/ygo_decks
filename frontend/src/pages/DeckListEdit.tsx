@@ -132,7 +132,17 @@ export default function DeckListEdit() {
               </button>
             </div>
           </div>
-          <div className="mt-3 flex gap-3">
+          {/* the 대표 카드 on the left, bigger from lg; the name and description take what is left, the description as tall
+              as the cards (참혈 2026-10-16) */}
+          <div className="mt-3 flex items-stretch gap-3 lg:gap-4">
+            <CoverCards
+              covers={deck.covers}
+              cards={cards}
+              active={coverSlot}
+              wide={wide}
+              onSlot={(i) => setCoverSlot(coverSlot === i ? null : i)}
+              onArea={() => setCoverSlot(coverSlot === null ? 0 : null)}
+            />
             <div className="min-w-0 flex-1 flex flex-col gap-2">
               <input
                 aria-label="덱 이름"
@@ -149,17 +159,9 @@ export default function DeckListEdit() {
                 maxLength={500}
                 value={deck.description}
                 onChange={(e) => setDeck({ ...deck, description: e.target.value })}
-                className={`${FIELD} resize-y`}
+                className={`${FIELD} flex-1 min-h-[3.5rem] resize-y`}
               />
             </div>
-            <CoverCards
-              covers={deck.covers}
-              cards={cards}
-              active={coverSlot}
-              wide={wide}
-              onSlot={(i) => setCoverSlot(coverSlot === i ? null : i)}
-              onArea={() => setCoverSlot(coverSlot === null ? 0 : null)}
-            />
           </div>
           {/* one line kept for what to do now: the 대표 카드 being set, or that a guest saves by signing in */}
           <p className="mt-2 h-5 flex items-center gap-2 text-xs break-keep whitespace-nowrap overflow-hidden" aria-live="polite">
