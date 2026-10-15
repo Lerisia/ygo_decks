@@ -5,7 +5,7 @@ import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { getPackShowcase, type PackShowcase } from "@/api/packApi";
 import { CONTACT_PATH, DONATE_URL } from "@/lib/siteMenu";
-import RecorderDownload from "@/components/RecorderDownload";
+import RecorderDownload, { WindowsOnly } from "@/components/RecorderDownload";
 import DeckPickerModal from "@/components/DeckPickerModal";
 import CardPickerModal from "@/components/CardPickerModal";
 import { useDexCounts } from "@/components/DexTabs";
@@ -214,7 +214,7 @@ function Info() {
         {/* Shown everywhere for the pitch, the download on Windows only (참혈 2026-10-15; phones skipped it from 특이점 10/08). */}
         <section aria-labelledby="home-rec" className="flex rounded-2xl p-5 md:p-6 flex-col gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
           <span className="text-xs font-bold tracking-wide text-amber-700 dark:text-amber-400">YGO Decks 레코더 · PC</span>
-          <h2 id="home-rec" className="text-xl md:text-2xl font-extrabold tracking-tight">게임만 하세요. 전적은 저절로 쌓입니다</h2>
+          <h2 id="home-rec" className="text-xl md:text-2xl font-extrabold tracking-tight">게임만 하세요. 전적은 저절로 쌓입니다<WindowsOnly /></h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 min-h-[20px]">
             {rec ? (
               <><b className="text-gray-900 dark:text-white tabular-nums">{rec.users.toLocaleString()}</b>명이 <b className="text-gray-900 dark:text-white tabular-nums">{rec.games.toLocaleString()}</b>판을 기록했어요</>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getTrackerClientStatus } from "@/api/trackerPendingApi";
 import type { TrackerClientStatus } from "@/api/trackerPendingApi";
-import RecorderDownload from "@/components/RecorderDownload";
+import RecorderDownload, { WindowsOnly } from "@/components/RecorderDownload";
 
 // The recorder card on the sheet list (/records) alone, not on a sheet where games are recorded (참혈 2026-10-15); drawn
 // as the home page's recorder pillar and as wide as the meta stats above it (참혈 2026-10-14). Short, since the home
@@ -29,7 +29,7 @@ export default function PcTrackerBanner() {
               {outdated ? "베타 버전 사용 중 — 정식 버전으로 교체해 주세요" : `새 버전 ${status?.latest} 나옴`}
             </span>
           )}
-          <h2 id="pc-recorder-banner" className="text-lg md:text-xl font-extrabold tracking-tight">YGO Decks 레코더</h2>
+          <h2 id="pc-recorder-banner" className="text-lg md:text-xl font-extrabold tracking-tight">YGO Decks 레코더<WindowsOnly /></h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 break-keep">
             {outdated
               ? `쓰고 계신 버전(${status?.version ?? "베타"})은 베타 버전이라 더 이상 기록되지 않습니다. 정식 버전으로 교체해 주세요.`
@@ -41,7 +41,7 @@ export default function PcTrackerBanner() {
         </div>
         <div className="shrink-0 sm:w-40 flex flex-col items-stretch gap-1.5">
           <RecorderDownload />
-          <span className="self-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+          <span className="self-start sm:self-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
             무료{status?.latest ? ` · ${status.latest}` : ""}
             <Link to="/recorder" className="ml-2 underline">자세히</Link>
           </span>
