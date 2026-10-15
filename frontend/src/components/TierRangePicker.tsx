@@ -136,13 +136,14 @@ export default function TierRangePicker({
 
       <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-2 pt-4 pb-2">
         <div className="relative">
-          {/* behind the bar and the labels, the columns of the tiers not for newcomers, named at the band's top */}
+          {/* behind the bar and the labels, the columns of the tiers not for newcomers, named at the band's top; light red,
+              a warning (특이점 2026-10-15) */}
           {newcomerFrom !== undefined && (
             <div
-              className="pointer-events-none absolute -top-3 bottom-0 right-0 rounded-lg bg-orange-500/10 dark:bg-orange-400/10"
+              className="pointer-events-none absolute -top-3 bottom-0 right-0 rounded-lg bg-red-500/10 dark:bg-red-400/10"
               style={{ left: `${(newcomerFrom / tiers.length) * 100}%` }}
             >
-              <span className="absolute inset-x-0 top-0.5 text-center text-[10px] sm:text-[11px] leading-3 font-semibold text-orange-600 dark:text-orange-300">
+              <span className="absolute inset-x-0 top-0.5 text-center text-[10px] sm:text-[11px] leading-3 font-semibold text-red-500 dark:text-red-300">
                 입문자 비추천
               </span>
             </div>
@@ -219,7 +220,7 @@ export default function TierRangePicker({
         {newcomerFrom !== undefined && (
           <p
             aria-hidden={!warn}
-            className={`h-4 text-xs leading-4 text-right break-keep text-orange-600 dark:text-orange-300 transition-opacity duration-200 motion-reduce:transition-none ${warn ? "opacity-100" : "opacity-0"}`}
+            className={`h-4 text-xs leading-4 text-right break-keep text-red-500 dark:text-red-300 transition-opacity duration-200 motion-reduce:transition-none ${warn ? "opacity-100" : "opacity-0"}`}
           >
             ⚠ {tiers[newcomerFrom]}{noteSuffix} 이하는 입문자에게 추천하지 않아요
           </p>
