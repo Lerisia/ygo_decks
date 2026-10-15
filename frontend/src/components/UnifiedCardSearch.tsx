@@ -7,17 +7,14 @@ import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rem
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
+import { orderSuggestions, type RankedSuggestion } from "@/lib/suggestionOrder";
 import { matchRank, nameKeys } from "@/utils/hangul";
 
 const GROUPS_SHOWN = 6;
 const CARDS_SHOWN = 6;
 const SHOWN = 10;
-// among suggestions that answer the typing as closely, cards come first, then 카드군, then 서포트 (참혈 2026-10-14)
-const KIND_ORDER = { card: 0, group: 1, support: 2 } as const;
-
-type Suggestion = {
+type Suggestion = RankedSuggestion & {
   key: string; name: string; tag: string; sub?: string; group?: ComboItem; card?: CardListItem;
-  rank: number; kind: keyof typeof KIND_ORDER; order: number;
 };
 
 /** One box for the card book's name search and its 카드군·서포트 pick (/dev/cards, a trial — 참혈 2026-10-14). What is
@@ -92,11 +89,11 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
     };
   }, [typed, chips]);
 
-  // one list, the closest answers first whatever they are (참혈 2026-10-14); a card found by its Japanese or English
-  // name counts as answering anywhere
+  // one list in orderSuggestions' order (the closest 카드군·서포트 on top, under cards named exactly, 참혈 2026-10-15);
+  // a card found by its Japanese or English name counts as answering anywhere
   const suggestions: Suggestion[] = useMemo(() => {
     const rank = matchRank(typed);
-    return [
+    return orderSuggestions<Suggestion>([
       ...groups.map(({ it, rank, order }) => {
         const support = it.tag === "카드";
         return {
@@ -108,9 +105,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
       ...(typed ? cards : []).map((c, i) => ({
         key: `card${c.id}`, name: c.name, tag: cardTag(c), card: c, rank: rank(nameKeys(c.name)), kind: "card" as const, order: i,
       })),
-    ]
-      .sort((a, b) => a.rank - b.rank || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.order - b.order)
-      .slice(0, SHOWN);
+    ], SHOWN);
   }, [groups, cards, typed]);
   // with the box empty, the recent searches in place of the suggestions (참혈 2026-10-14)
   const [recent, setRecent] = useState<RecentSearch[]>(loadRecent);
