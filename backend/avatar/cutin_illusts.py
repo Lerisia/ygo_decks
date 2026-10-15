@@ -102,8 +102,9 @@ def _blur(image, k):
 def _toned(base, colour, alpha, k):
     """The figure's colour with the art's smooth shift laid on it: a haze, a tint or a light the art paints over
     the monster goes on the sharp figure instead of leaving the blurred art in its place (엘리스 10/15: 라이징
-    리벨리온 팔콘 "묘하게 흐리지 않나요"). Only where the art and the figure draw the same thing (their edges
-    correlate) or the shift is slight; a thing the art puts in front of the monster (an island, a hand) stays."""
+    리벨리온 팔콘 "묘하게 흐리지 않나요"). Only where the art and the figure draw the same thing (their big shapes
+    correlate) or the shift is slight; a thing the art puts in front of the monster (an island, a hand) stays.
+    Returns the toned colour and the map of where the drawing matches."""
     blur = lambda im, s: cv2.GaussianBlur(im, (0, 0), s * k)
     m = (alpha[:, :, 0] > 0.95).astype(np.float32)
     m3 = m[:, :, None]
@@ -118,20 +119,22 @@ def _toned(base, colour, alpha, k):
     mean = lambda im: blur(im, 96)
     spread = (mean(art_edges ** 2) - mean(art_edges) ** 2) * (mean(fig_edges ** 2) - mean(fig_edges) ** 2)
     same = (mean(art_edges * fig_edges) - mean(art_edges) * mean(fig_edges)) / np.sqrt(np.maximum(spread, 1e-3))
-    allowed = ((same > 0.22) | (np.abs(shift).mean(axis=2) < 20)).astype(np.float32)
-    return np.clip(colour + shift * blur(allowed, 2)[:, :, None] * alpha, 0, 255)
+    drawn = blur((same > 0.12).astype(np.float32), 2)
+    allowed = np.maximum(drawn, (np.abs(shift).mean(axis=2) < 20).astype(np.float32))
+    return np.clip(colour + shift * blur(allowed, 2)[:, :, None] * alpha, 0, 255), drawn
 
 
 def _finished(base, colour, alpha, out):
     """The laid figure, toned like the art, over the art where the two agree, and the figures of merit."""
     k = out / 1024
-    colour = _toned(base, colour, alpha, k)
+    colour, drawn = _toned(base, colour, alpha, k)
     whole = base * (1 - alpha) + colour
     differs = np.abs(_blur(whole, k) - _blur(base, k)).mean(axis=2)
     solid = alpha[:, :, 0] > 0.95
     covered = float((solid & (differs > 40)).sum() / max(solid.sum(), 1))
     gap = float(differs[solid].mean()) if solid.any() else 255.0
-    agree = (differs < 30).astype(np.float32)
+    # where the art and the figure draw the same thing, haze textures and thin bolts over it do not keep the figure out
+    agree = (differs < np.where(drawn > 0.5, 60, 30)).astype(np.float32)
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
