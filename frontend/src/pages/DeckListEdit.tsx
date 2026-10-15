@@ -15,6 +15,7 @@ import {
   setCover, tabDraft,
 } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
+import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
 
 const BUTTON = "shrink-0 inline-flex items-center justify-center h-9 px-4 rounded-lg font-semibold text-sm transition";
 const PRIMARY = `${BUTTON} bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed`;
@@ -44,10 +45,14 @@ export default function DeckListEdit() {
   const noticeTimer = useRef<number | undefined>(undefined);
   const wide = useMediaQuery("(min-width: 1024px)");
   const [coverSlot, setCoverSlot] = useState<number | null>(null);   // the 대표 카드 slot being set
+  // undo / redo of the deck's cards and 대표 카드 (참혈 2026-10-16); Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside the boxes
+  const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
+  const historyKeys = useRef({ undo: () => {}, redo: () => {} });
   const { cards, order, loading, error, remember } = useDeckCards(deck ? [...deck.main, ...deck.extra] : null);
 
   useEffect(() => {
     if (!admin) return;
+    setHistory(EMPTY_HISTORY);
     if (code === undefined) {
       setDeck(tabDraft() ?? blankDeck());
       return;
@@ -63,6 +68,19 @@ export default function DeckListEdit() {
     };
   }, [admin, code, signedIn]);
   useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable='true']")) return;   // a box undoes its own typing
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) historyKeys.current.undo();
+      else if ((key === "z" && e.shiftKey) || key === "y") historyKeys.current.redo();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const closeSheet = useCallback(() => setShowing(null), []);
   // Esc stops setting the 대표 카드 (a card shown takes its own Esc first)
   useEffect(() => {
@@ -79,18 +97,32 @@ export default function DeckListEdit() {
     window.clearTimeout(noticeTimer.current);
     noticeTimer.current = window.setTimeout(() => setNotice(""), 2500);
   };
+  // a change to the deck's cards or 대표 카드 can be undone
+  const change = (next: DeckDraft) => {
+    if (!deck) return;
+    setHistory((h) => record(h, deck));
+    setDeck(next);
+  };
+  const step = (move: typeof undo) => {
+    if (!deck) return;
+    const r = move(history, deck);
+    if (!r) return;
+    setHistory(r[0]);
+    setDeck({ ...deck, ...r[1] });
+  };
+  historyKeys.current = { undo: () => step(undo), redo: () => step(redo) };
   const pick = (card: CardListItem) => {
     if (!deck) return;
     remember(card);
     const r = addCard(deck, card, cards);
     if ("error" in r) say(r.error);
-    else setDeck(r.deck);
+    else change(r.deck);
   };
-  const remove = (zone: DeckZone, id: number) => deck && setDeck(removeCard(deck, zone, id));
+  const remove = (zone: DeckZone, id: number) => deck && change(removeCard(deck, zone, id));
   // the slot set (or emptied), then the next one, and done after the third
   const putCover = (id: number | null) => {
     if (!deck || coverSlot === null) return;
-    setDeck(setCover(deck, coverSlot, id));
+    change(setCover(deck, coverSlot, id));
     setCoverSlot(coverSlot + 1 < COVERS_MAX ? coverSlot + 1 : null);
   };
   const cancel = () => {
@@ -194,7 +226,15 @@ export default function DeckListEdit() {
               marks={marks}
             />
             <div className="lg:relative">
-              <CardSearchPanel deck={deck} cards={cards} onPick={pick} onShow={setShowing} notice={notice} ready={!loading} />
+              <CardSearchPanel
+                deck={deck}
+                cards={cards}
+                onPick={pick}
+                onShow={setShowing}
+                notice={notice}
+                ready={!loading}
+                history={{ canUndo: history.past.length > 0, canRedo: history.future.length > 0, onUndo: () => step(undo), onRedo: () => step(redo) }}
+              />
             </div>
           </div>
           {showing && (
