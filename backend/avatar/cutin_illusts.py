@@ -152,7 +152,8 @@ def _finished(base, colour, alpha, out):
     # 네가로기어 아제우스's hands: "라투디가 존재하는 영역의 선을 흐리게 하는 일은 없었으면"). A hazed part, an
     # occluded part or a part the rest pose holds elsewhere (라이징 리벨리온 팔콘's lower body) has no such match
     # (its correlation sits near 0) and keeps the strict bar, so it never doubles up.
-    sure = cv2.GaussianBlur((_lines_match(base, colour, k) > 0.7).astype(np.float32), (0, 0), 2 * k)
+    # a region, not a speck: most of a neighbourhood (σ 6 at 1024) must match
+    sure = cv2.GaussianBlur((_lines_match(base, colour, k) > 0.45).astype(np.float32), (0, 0), 6 * k)
     agree = (differs < np.where(sure > 0.5, 80, 30)).astype(np.float32)
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
