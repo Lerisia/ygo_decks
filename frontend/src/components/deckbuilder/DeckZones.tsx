@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
+import CardKindTag from "@/components/CardKindTag";
 import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, overLimit, sortedZone } from "@/lib/deckDrafts";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
@@ -60,14 +61,15 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
           {zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
           {over.length > 0 && <span className={WARN} title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
         </h2>
-        <p className="min-h-5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums break-keep sm:text-right">
+        <p className="min-h-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:justify-end text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums">
           {loading && ids.length ? (
             <span className="inline-block h-3.5 w-44 rounded bg-gray-200 dark:bg-gray-700 animate-pulse align-middle" />
           ) : (
-            counts.map(({ label, count }, i) => (
-              <span key={label}>
-                {i > 0 && " / "}
-                <span className="whitespace-nowrap">{label} : {count}장</span>
+            // each kind tagged as the card search tags it, in its frame colour (참혈 2026-10-16)
+            counts.map(({ label, count }) => (
+              <span key={label} className="inline-flex items-center gap-1 whitespace-nowrap">
+                <CardKindTag tag={label} />
+                {count}장
               </span>
             ))
           )}

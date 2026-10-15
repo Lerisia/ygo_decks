@@ -108,7 +108,7 @@ function kindOf(c: CardInfo) {
 
 const KINDS = ["몬스터", "마법", "함정", ...EXTRA_KINDS.map(([, label]) => label)];
 
-/** A zone's header: how many of each kind, in this order, those with none left out (몬스터 : 18장 / 마법 : 12장). */
+/** A zone's header: how many of each kind, in this order, those with none left out ([몬스터] 18장 [마법] 12장). */
 export function kindCounts(ids: number[], cards: Map<number, CardInfo>) {
   const n = new Map<string, number>();
   for (const id of ids) {

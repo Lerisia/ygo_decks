@@ -2,7 +2,8 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type Rea
 import { Camera } from "lucide-react";
 import SearchForm from "./SearchForm";
 import ImageCardSearch from "./ImageCardSearch";
-import { cardTag, cardTagLook } from "@/lib/cardTag";
+import { cardTag } from "@/lib/cardTag";
+import CardKindTag from "./CardKindTag";
 import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rememberSearch } from "@/lib/recentCardSearches";
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
@@ -260,8 +261,6 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
           {rows.length ? (
             <ul id={`${id}-list`} role="listbox" aria-label={showingRecent ? "최근 검색" : "검색 추천"}>
               {rows.map((it, i) => {
-                // a card's tag in its frame colour (참혈 2026-10-15); 카드군·서포트·검색 stay grey
-                const look = cardTagLook(it.tag, it.frame);
                 return (
                   <li
                     key={it.key}
@@ -273,14 +272,8 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
                     className={`px-3 py-2 flex items-center justify-between gap-3 text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        style={look?.style}
-                        className={`shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold ${
-                          look ? (look.dark ? "dark:ring-1 dark:ring-white/30" : "") : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                        }`}
-                      >
-                        {it.tag}
-                      </span>
+                      {/* a card's tag in its frame colour (참혈 2026-10-15); 카드군·서포트·검색 stay grey */}
+                      <CardKindTag tag={it.tag} frame={it.frame} />
                       <span className="break-keep">{it.name}</span>
                     </span>
                     {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
