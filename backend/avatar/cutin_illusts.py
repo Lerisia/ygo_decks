@@ -99,9 +99,32 @@ def _blur(image, k):
     return cv2.GaussianBlur(image, (0, 0), 4 * k)
 
 
+def _toned(base, colour, alpha, k):
+    """The figure's colour with the art's smooth shift laid on it: a haze, a tint or a light the art paints over
+    the monster goes on the sharp figure instead of leaving the blurred art in its place (엘리스 10/15: 라이징
+    리벨리온 팔콘 "묘하게 흐리지 않나요"). Only where the art and the figure draw the same thing (their edges
+    correlate) or the shift is slight; a thing the art puts in front of the monster (an island, a hand) stays."""
+    blur = lambda im, s: cv2.GaussianBlur(im, (0, 0), s * k)
+    m = (alpha[:, :, 0] > 0.95).astype(np.float32)
+    m3 = m[:, :, None]
+    near = np.maximum(blur(m, 4), 1e-3)[:, :, None]
+    gap = (blur(base * m3, 4) / near - blur(colour * m3, 4) / near) * m3
+    shift = blur(gap, 16) / np.maximum(blur(m, 16), 1e-3)[:, :, None]
+    art_edges = cv2.cvtColor(base.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    fig_edges = cv2.cvtColor(np.clip(colour, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    art_edges = blur(art_edges, 2) - blur(art_edges, 6)
+    fig_edges = blur(fig_edges, 2) - blur(fig_edges, 6)
+    mean = lambda im: blur(im, 20)
+    spread = (mean(art_edges ** 2) - mean(art_edges) ** 2) * (mean(fig_edges ** 2) - mean(fig_edges) ** 2)
+    same = (mean(art_edges * fig_edges) - mean(art_edges) * mean(fig_edges)) / np.sqrt(np.maximum(spread, 1e-3))
+    allowed = ((same > 0.3) | (np.abs(shift).mean(axis=2) < 20)).astype(np.float32)
+    return np.clip(colour + shift * blur(allowed, 2)[:, :, None] * alpha, 0, 255)
+
+
 def _finished(base, colour, alpha, out):
-    """The laid figure over the art where the two agree, and the figures of merit."""
+    """The laid figure, toned like the art, over the art where the two agree, and the figures of merit."""
     k = out / 1024
+    colour = _toned(base, colour, alpha, k)
     whole = base * (1 - alpha) + colour
     differs = np.abs(_blur(whole, k) - _blur(base, k)).mean(axis=2)
     solid = alpha[:, :, 0] > 0.95

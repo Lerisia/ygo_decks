@@ -89,13 +89,17 @@ class ComposeTest(SimpleTestCase):
         art = drawn_art(1)
         art[140:170, 140:170] = (50, 60, 70)
         figure = figure_from(art)
-        figure[:, :, :3] = np.clip(figure[:, :, :3].astype(int) + 8, 0, 255)   # the sharp figure, told apart by a shade
+        # the sharp figure, told apart by a fine weave the blurred art has not
+        weave = ((np.indices(figure.shape[:2]).sum(axis=0) // 2) % 2 * 12 - 6)[:, :, None]
+        figure[:, :, :3] = np.clip(figure[:, :, :3].astype(int) + weave, 0, 255)
         art[200:300, 200:300] = (255, 255, 255)                                # a splash the art paints over the monster
         M = np.float32([[0.5, 0, 128], [0, 0.5, 128]])
         img, covered, cover, _ = compose(figure, M, art, out=1024)
         self.assertEqual(img.shape, (1024, 1024, 3))
-        np.testing.assert_allclose(img[310, 310], (58, 68, 78), atol=2)        # the figure, where the art agrees
+        np.testing.assert_allclose(img[300:320, 300:320].mean(axis=(0, 1)), (50, 60, 70), atol=3)   # the art's tone
+        self.assertGreater(img[300:320, 300:320].std(), 2.5)                   # the figure's weave, where the art agrees
         np.testing.assert_allclose(img[500, 500], (255, 255, 255), atol=2)     # the splash, kept
+        self.assertLess(img[480:520, 480:520].std(), 1)
         self.assertTrue(0.08 < covered < 0.2, covered)                          # the splash's share of the figure
         self.assertTrue(0.25 < cover < 0.35, cover)                             # the figure's share of the picture
 
