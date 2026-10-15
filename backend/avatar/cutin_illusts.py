@@ -142,8 +142,11 @@ def _lines_match(base, colour, k):
     return (mean(art * fig) - mean(art) * mean(fig)) / np.sqrt(np.maximum(spread, 1e-3))
 
 
-def _finished(base, colour, alpha, out):
-    """The laid figure, toned like the art, over the art where the two agree, and the figures of merit."""
+def _finished(base, colour, alpha, out, keep_lights=True):
+    """The laid figure, toned like the art, over the art where the two agree, and the figures of merit. With
+    `keep_lights` off, a light the art paints over the figure no longer holds the figure out (a card whose haze
+    the art lights everywhere, so that nothing of the figure would show: 엘리스 10/16, 라이징 리벨리온 팔콘
+    "빛 무시하구 넣어보면요") — the lights go soft and a thing in front may let the figure through, so only by name."""
     k = out / 1024
     colour, _ = _toned(base, colour, alpha, k)
     whole = base * (1 - alpha) + colour
@@ -163,8 +166,9 @@ def _finished(base, colour, alpha, out):
     # beneath it, which the smooth toning cannot give: it stays the art's, however well the lines match beneath
     # (엘리스 10/15, 구스타프 맥스: "포문 쪽 빛 터지는 게 좀 사라졌어요")
     luminance = lambda im: cv2.cvtColor(np.clip(im, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
-    glow = cv2.GaussianBlur(np.clip(luminance(base) - luminance(whole), 0, 255), (0, 0), 2 * k)
-    agree = np.minimum(agree, np.clip((GLOW + 10 - glow) / 20, 0, 1))
+    if keep_lights:
+        glow = cv2.GaussianBlur(np.clip(luminance(base) - luminance(whole), 0, 255), (0, 0), 2 * k)
+        agree = np.minimum(agree, np.clip((GLOW + 10 - glow) / 20, 0, 1))
     # the margin eroded off the agreeing area keeps a seam from showing, but it also took the thin tips (claws,
     # fingers) off a figure that is plainly in place; there the figure keeps its own edge (10/16)
     eroded = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
@@ -173,16 +177,16 @@ def _finished(base, colour, alpha, out):
     return picture.clip(0, 255).astype(np.uint8), covered, float((alpha > 0.5).mean()), gap
 
 
-def compose(figure, M, art, out=OUT):
+def compose(figure, M, art, out=OUT, keep_lights=True):
     """The figure (BGRA, any square size) laid on the art by M (ALIGN px -> ART px), the art's shape with its longer
     side `out` px: the picture (BGR), the share of the figure the art covers with something else, the share of the
     picture the figure fills, and how far the figure is from the art on average where it is solid (the gap: a
     figure wearing the wrong face scores higher)."""
     base = enlarged(art, out).astype(np.float32)
-    return _finished(base, *_laid(figure, M, base, out), out)
+    return _finished(base, *_laid(figure, M, base, out), out, keep_lights)
 
 
-def compose_looks(figures, M, art, out=OUT):
+def compose_looks(figures, M, art, out=OUT, keep_lights=True):
     """Several renders of the same pose in different looks (eyes shut or open, a slot faded in or not), laid on the
     art together. Where the looks differ from one another, each connected patch of difference is taken whole from
     the look nearest the art over that patch: the open eyes win the face (a face is one patch, so its chin line is
@@ -209,7 +213,7 @@ def compose_looks(figures, M, art, out=OUT):
     alpha = sum(w * a for w, (_, a) in zip(weights, laid)) / total
     solid = alpha[:, :, 0] > 0.95
     shares = [round(float(((choice == i) & solid).sum() / max(solid.sum(), 1)), 3) for i in range(len(laid))]
-    return (*_finished(base, colour, alpha, out), shares)
+    return (*_finished(base, colour, alpha, out, keep_lights), shares)
 
 
 def art_file(md_id):
@@ -247,7 +251,7 @@ def save_illust(print_, data, replace=False):
 LOOKS = (None, 0.15, 0.35, 0.55, 0.75, 0.95)
 
 
-def make(md_id, render, out_dir):
+def make(md_id, render, out_dir, keep_lights=True):
     """One print's illustration, `render(size, look)` drawing its cut-in at rest on a transparent square of that
     size (BGRA), wearing the animation's look at `look` (0..1) or its own (None). The look nearest the art wins:
     the rest pose often has the eyes shut, and the art the open ones (엘리스 10/15: "얼굴이 흐릿해요"). The row says
@@ -270,11 +274,11 @@ def make(md_id, render, out_dir):
     want = int(min(4096, max(OUT, round(DRAW * found.scale / 256) * 256)))
     size = max(want, DRAW)
     figures = [figure if look is None and size == DRAW else render(size, look) for look in LOOKS]
-    picture, covered, cover, gap, shares = compose_looks(figures, found.M, art)
+    picture, covered, cover, gap, shares = compose_looks(figures, found.M, art, keep_lights=keep_lights)
     file = Path(out_dir, f"{md_id}.webp")
     cv2.imwrite(str(file), picture, [cv2.IMWRITE_WEBP_QUALITY, 92])
     return row | {"verdict": "clean" if covered <= CLEAN else "check", "covered": round(covered, 4), "cover": round(cover, 3),
-                  "looks": dict(zip(map(str, LOOKS), shares)), "gap": round(gap, 2), "file": str(file)}
+                  "looks": dict(zip(map(str, LOOKS), shares)), "lights": keep_lights, "gap": round(gap, 2), "file": str(file)}
 
 
 class PoseRenderer:

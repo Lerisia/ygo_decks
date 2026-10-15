@@ -19,6 +19,7 @@ class Command(BaseCommand):
         parser.add_argument("--accept", action="store_true", help="with --save: the ones waiting for a look go in too (엘리스 10/15: 걍 다 넣어요)")
         parser.add_argument("--replace", action="store_true", help="with --save: make the pool's picture again")
         parser.add_argument("--redo", action="store_true", help="do prints the report already has")
+        parser.add_argument("--no-glow", action="store_true", help="let the figure through the art's lights on the prints named (엘리스 10/16, 라이징 리벨리온 팔콘)")
 
     def handle(self, *args, **options):
         out = Path(options["out"])
@@ -36,7 +37,8 @@ class Command(BaseCommand):
                 if made:
                     entry = entries[str(md_id)]
                     try:
-                        row = make(md_id, lambda size, look=None: renderer.render(md_id, entry["v"], size, None if look is None else (entry["anim"], look)), out)
+                        row = make(md_id, lambda size, look=None: renderer.render(md_id, entry["v"], size, None if look is None else (entry["anim"], look)), out,
+                                   keep_lights=not (options["no_glow"] and options["cards"]))
                     except Exception as e:   # noqa: BLE001 — one print's trouble must not end the night's run
                         row = {"md_id": md_id, "name": "", "verdict": "error", "error": f"{type(e).__name__}: {e}"[:300]}
                 saved = options["save"] and row["verdict"] in wanted and ("illust" not in row or options["replace"])
