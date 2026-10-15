@@ -104,6 +104,9 @@ export default function StrengthRangePicker({
     return () => clearTimeout(timer);
   }, [note, shownNote]);
   const whole = lo === 0 && hi === LAST;
+  // a range reaching into the band says so once more, under the range (특이점 2026-10-15); not while it is the
+  // whole bar, which is no choice yet
+  const warn = !whole && hi >= NOT_FOR_NEWCOMERS;
   const rangeLabel = lo === hi ? STRENGTH_TIERS[lo] : `${STRENGTH_TIERS[lo]} ~ ${STRENGTH_TIERS[hi]}`;
 
   const handle = (which: "lo" | "hi", step: number) => (
@@ -197,7 +200,7 @@ export default function StrengthRangePicker({
         </p>
       </div>
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-col items-end gap-0.5">
         <p className="text-sm text-right break-keep">
           <span className="font-semibold text-gray-900 dark:text-white">{whole ? "전체 (상관 없음)" : rangeLabel}</span>
           {count !== null && (
@@ -205,6 +208,13 @@ export default function StrengthRangePicker({
               {count === 0 ? "· 남은 덱 없음" : `· 덱 ${count.toLocaleString()}개`}
             </span>
           )}
+        </p>
+        {/* its line is always kept, so the button below never moves */}
+        <p
+          aria-hidden={!warn}
+          className={`h-4 text-xs leading-4 text-right break-keep text-orange-600 dark:text-orange-300 transition-opacity duration-200 motion-reduce:transition-none ${warn ? "opacity-100" : "opacity-0"}`}
+        >
+          ⚠ 중하위권 이하는 입문자에게 추천하지 않아요
         </p>
       </div>
 
