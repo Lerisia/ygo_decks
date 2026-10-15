@@ -112,12 +112,13 @@ def _toned(base, colour, alpha, k):
     shift = blur(gap, 16) / np.maximum(blur(m, 16), 1e-3)[:, :, None]
     art_edges = cv2.cvtColor(base.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
     fig_edges = cv2.cvtColor(np.clip(colour, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
-    art_edges = blur(art_edges, 2) - blur(art_edges, 6)
-    fig_edges = blur(fig_edges, 2) - blur(fig_edges, 6)
-    mean = lambda im: blur(im, 20)
+    # the big shapes (σ 12–36 at 1024 px) over a wide window: the art's blur and haze wash out anything finer
+    art_edges = blur(art_edges, 12) - blur(art_edges, 36)
+    fig_edges = blur(fig_edges, 12) - blur(fig_edges, 36)
+    mean = lambda im: blur(im, 96)
     spread = (mean(art_edges ** 2) - mean(art_edges) ** 2) * (mean(fig_edges ** 2) - mean(fig_edges) ** 2)
     same = (mean(art_edges * fig_edges) - mean(art_edges) * mean(fig_edges)) / np.sqrt(np.maximum(spread, 1e-3))
-    allowed = ((same > 0.3) | (np.abs(shift).mean(axis=2) < 20)).astype(np.float32)
+    allowed = ((same > 0.22) | (np.abs(shift).mean(axis=2) < 20)).astype(np.float32)
     return np.clip(colour + shift * blur(allowed, 2)[:, :, None] * alpha, 0, 255)
 
 
