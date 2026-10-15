@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type Rea
 import { Camera } from "lucide-react";
 import SearchForm from "./SearchForm";
 import ImageCardSearch from "./ImageCardSearch";
-import { cardTag } from "@/lib/cardTag";
+import { cardTag, cardTagLook } from "@/lib/cardTag";
 import { type RecentSearch, clearRecent, forgetSearch, loadRecent, recentId, rememberSearch } from "@/lib/recentCardSearches";
 import type { ComboItem } from "./ComboBox";
 import { EMPTY_FILTERS, listCards, type CardFilters, type CardListItem } from "@/api/cardDexApi";
@@ -110,7 +110,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
   // with the box empty, the recent searches in place of the suggestions (참혈 2026-10-14)
   const [recent, setRecent] = useState<RecentSearch[]>(loadRecent);
   const showingRecent = !query.trim();
-  const rows: { key: string; name: string; tag: string; sub?: string; go: () => void; forget?: () => void }[] = showingRecent
+  const rows: { key: string; name: string; tag: string; frame?: string; sub?: string; go: () => void; forget?: () => void }[] = showingRecent
     ? recent.map((r) => ({
         key: recentId(r),
         name: r.kind === "q" ? r.text : r.name,
@@ -118,7 +118,7 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
         go: () => (r.kind === "q" ? onSearchText?.(r.text) : r.kind === "group" ? onPick(r.key) : onPickCard(r.id)),
         forget: () => setRecent(forgetSearch(recentId(r))),
       }))
-    : suggestions.map((it) => ({ key: it.key, name: it.name, tag: it.tag, sub: it.sub, go: () => pickSuggestion(it) }));
+    : suggestions.map((it) => ({ key: it.key, name: it.name, tag: it.tag, frame: it.card?.frame, sub: it.sub, go: () => pickSuggestion(it) }));
   // the drop-down opens with the box: the chips always, then the suggestions or the recent searches
   const shown = open && !imageSearch;
 
@@ -259,38 +259,47 @@ export default function UnifiedCardSearch({ query, onQueryChange, onSubmit, item
           )}
           {rows.length ? (
             <ul id={`${id}-list`} role="listbox" aria-label={showingRecent ? "최근 검색" : "검색 추천"}>
-              {rows.map((it, i) => (
-                <li
-                  key={it.key}
-                  id={`${id}-${i}`}
-                  role="option"
-                  aria-selected={i === active}
-                  onClick={() => go(i)}
-                  onMouseEnter={() => setActive(i)}
-                  className={`px-3 py-2 flex items-center justify-between gap-3 text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
-                >
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                      {it.tag}
+              {rows.map((it, i) => {
+                // a card's tag in its frame colour (참혈 2026-10-15); 카드군·서포트·검색 stay grey
+                const look = cardTagLook(it.tag, it.frame);
+                return (
+                  <li
+                    key={it.key}
+                    id={`${id}-${i}`}
+                    role="option"
+                    aria-selected={i === active}
+                    onClick={() => go(i)}
+                    onMouseEnter={() => setActive(i)}
+                    className={`px-3 py-2 flex items-center justify-between gap-3 text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
+                  >
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        style={look?.style}
+                        className={`shrink-0 w-10 text-center rounded text-[11px] leading-5 font-semibold ${
+                          look ? (look.dark ? "dark:ring-1 dark:ring-white/30" : "") : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        }`}
+                      >
+                        {it.tag}
+                      </span>
+                      <span className="break-keep">{it.name}</span>
                     </span>
-                    <span className="break-keep">{it.name}</span>
-                  </span>
-                  {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
-                  {it.forget && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        it.forget?.();
-                      }}
-                      aria-label={`${it.name} 기록 지우기`}
-                      className="shrink-0 w-6 h-6 -mr-1 rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </li>
-              ))}
+                    {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
+                    {it.forget && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          it.forget?.();
+                        }}
+                        aria-label={`${it.name} 기록 지우기`}
+                        className="shrink-0 w-6 h-6 -mr-1 rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
