@@ -124,6 +124,20 @@ def _toned(base, colour, alpha, k):
     return np.clip(colour + shift * blur(allowed, 2)[:, :, None] * alpha, 0, 255), drawn
 
 
+def _lines_match(base, colour, k):
+    """How well the fine lines (4–12 px bands at 1024) of the art and of the laid figure coincide, window by
+    window: near 1 where the art shows the very figure, near 0 under haze, behind a thing in front, or where the
+    figure sits elsewhere than the art's."""
+    blur = lambda im, s: cv2.GaussianBlur(im, (0, 0), s * k)
+    art = cv2.cvtColor(base.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    fig = cv2.cvtColor(np.clip(colour, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    art = blur(art, 2) - blur(art, 6)
+    fig = blur(fig, 2) - blur(fig, 6)
+    mean = lambda im: blur(im, 20)
+    spread = (mean(art * art) - mean(art) ** 2) * (mean(fig * fig) - mean(fig) ** 2)
+    return (mean(art * fig) - mean(art) * mean(fig)) / np.sqrt(np.maximum(spread, 1e-3))
+
+
 def _finished(base, colour, alpha, out):
     """The laid figure, toned like the art, over the art where the two agree, and the figures of merit."""
     k = out / 1024
@@ -133,9 +147,13 @@ def _finished(base, colour, alpha, out):
     solid = alpha[:, :, 0] > 0.95
     covered = float((solid & (differs > 40)).sum() / max(solid.sum(), 1))
     gap = float(differs[solid].mean()) if solid.any() else 255.0
-    # a part the rest pose holds elsewhere than the art (라이징 리벨리온 팔콘's lower body) must stay the art's: the
-    # bar is the same where the drawing matches, since the toning has already closed the colour gap there
-    agree = (differs < 30).astype(np.float32)
+    # Where the fine lines of the art and of the figure coincide, the figure is plainly in place and the same
+    # drawing, so it keeps its lines even under the sparks and bolts the art paints across it (엘리스 10/15,
+    # 네가로기어 아제우스's hands: "라투디가 존재하는 영역의 선을 흐리게 하는 일은 없었으면"). A hazed part, an
+    # occluded part or a part the rest pose holds elsewhere (라이징 리벨리온 팔콘's lower body) has no such match
+    # (its correlation sits near 0) and keeps the strict bar, so it never doubles up.
+    sure = cv2.GaussianBlur((_lines_match(base, colour, k) > 0.7).astype(np.float32), (0, 0), 2 * k)
+    agree = (differs < np.where(sure > 0.5, 80, 30)).astype(np.float32)
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
