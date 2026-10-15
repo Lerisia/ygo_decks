@@ -18,7 +18,7 @@ export default function RecorderDownload({ className = "", note }: { className?:
   return note ? <p className={`text-sm text-gray-600 dark:text-gray-300 break-keep ${className}`}>{note}</p> : null;
 }
 
-/** A small "Windows 전용" beside a recorder card's title, on every device. */
+/** A small "Windows 전용" beside a recorder card's title, on every device, in the amber the old box had (참혈 2026-10-15). */
 export function WindowsOnly() {
-  return <span className="ml-1.5 align-middle text-xs font-semibold tracking-normal text-gray-500 dark:text-gray-400 whitespace-nowrap">Windows 전용</span>;
+  return <span className="ml-1.5 align-middle text-xs font-semibold tracking-normal text-amber-800 dark:text-amber-300 whitespace-nowrap">Windows 전용</span>;
 }
