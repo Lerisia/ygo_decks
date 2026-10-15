@@ -1206,9 +1206,11 @@ import tempfile
 
 from django.conf import settings
 
-from .models import DeckSubmission, DeckSubmissionCard
+from .models import DeckSubmission
 from .scanning import scan_deck_image
 from .serializers import DeckSubmissionSerializer
+from decklists.models import DeckList
+from decklists.rules import is_extra
 
 MAX_COPIES = 3
 
@@ -1261,6 +1263,50 @@ def _deck_target(t, request):
     return entrant, (_membership(t, request.user) if entrant.is_team else None), None
 
 
+def _deck_counts(submission):
+    """The submission's cards by id with how many, from its deck list."""
+    from collections import Counter
+    d = submission.deck_list
+    return Counter(d.main + d.extra) if d else Counter()
+
+
+def _set_deck(submission, counts, scan):
+    """Keep `counts` ({card id: copies}) as the submission's deck list — made on first use as the entrant's own
+    "entry" deck in the deck builder, named after the tournament — with `scan` as what is known of each card."""
+    from carddb.models import Card
+    cards = Card.objects.in_bulk(counts)
+    main, extra = [], []
+    for cid in sorted(counts):
+        card = cards.get(cid)
+        if card is None:
+            continue
+        (extra if is_extra(card) else main).extend([cid] * min(counts[cid], MAX_COPIES))
+    d = submission.deck_list
+    if d is None:
+        t = submission.entrant.tournament
+        d = DeckList.objects.create(owner=submission.owner, code=DeckList.new_code(), kind=DeckList.Kind.ENTRY,
+                                    name=f"{t.name} 덱 {submission.slot + 1}"[:40], main=main, extra=extra)
+        submission.deck_list = d
+    else:
+        d.main, d.extra = main, extra
+        d.save(update_fields=["main", "extra", "updated_at"])
+    submission.scan = {str(cid): meta for cid, meta in scan.items() if cid in cards}
+    submission.save()
+    return submission
+
+
+def _deck_writer(t, request):
+    """(entrant, member, slot, error) for a change to the caller's own deck, while the tournament takes entrants."""
+    entrant = _own_active_entrant(t, request.user)
+    if not entrant:
+        return None, None, None, _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
+    if t.status != "recruiting":
+        return None, None, None, _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    member = _membership(t, request.user) if entrant.is_team else None
+    slot, err = _deck_slot(t, request)
+    return entrant, member, slot, err
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def deck_submission(request, tournament_id):
@@ -1281,19 +1327,12 @@ def deck_submission(request, tournament_id):
         return _deck_response(submission)
 
     # POST: upload screenshot and (re)scan
-    entrant = _own_active_entrant(t, request.user)
-    if not entrant:
-        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
-    if t.status != "recruiting":
-        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    entrant, member, slot, err = _deck_writer(t, request)
+    if err:
+        return err
     image = request.FILES.get("image")
     if not image:
         return _err("image 파일이 필요합니다.")
-
-    member = _membership(t, request.user) if entrant.is_team else None
-    slot, err = _deck_slot(t, request)
-    if err:
-        return err
     submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member, slot=slot)
     submission.image = image
     submission.save()
@@ -1319,15 +1358,8 @@ def deck_submission(request, tournament_id):
             continue
         counts[card_id] = min(counts.get(card_id, 0) + 1, MAX_COPIES)
         best_conf[card_id] = max(best_conf.get(card_id, 0.0), float(confidence))
-
-    submission.cards.all().delete()
-    DeckSubmissionCard.objects.bulk_create([
-        DeckSubmissionCard(submission=submission, new_card_id=cid, quantity=qty,
-                           confidence=best_conf[cid], source="auto")
-        for cid, qty in counts.items()
-    ])
     submission.unmatched_count = unmatched
-    submission.save(update_fields=["unmatched_count"])
+    _set_deck(submission, counts, {cid: {"confidence": best_conf[cid], "source": "auto"} for cid in counts})
     return _deck_response(submission)
 
 
@@ -1337,11 +1369,9 @@ def deck_card_add(request, tournament_id):
     t, err = _get_tournament(tournament_id)
     if err:
         return err
-    entrant = _own_active_entrant(t, request.user)
-    if not entrant:
-        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
-    if t.status != "recruiting":
-        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
+    entrant, member, slot, err = _deck_writer(t, request)
+    if err:
+        return err
     try:
         quantity = int(request.data.get("quantity", 1))
     except (TypeError, ValueError):
@@ -1355,34 +1385,31 @@ def deck_card_add(request, tournament_id):
         card = None
     if not card:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
-    member = _membership(t, request.user) if entrant.is_team else None
-    slot, err = _deck_slot(t, request)
-    if err:
-        return err
     submission, _ = DeckSubmission.objects.get_or_create(entrant=entrant, member=member, slot=slot)
-    DeckSubmissionCard.objects.update_or_create(
-        submission=submission, new_card=card,
-        defaults={"quantity": quantity, "confidence": None, "source": "manual"},
-    )
+    counts = _deck_counts(submission)
+    counts[card.id] = quantity
+    scan = {int(k): v for k, v in submission.scan.items()}
+    scan[card.id] = {"confidence": None, "source": "manual"}
+    _set_deck(submission, counts, scan)
     return _deck_response(submission)
 
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def deck_card_remove(request, tournament_id, row_id):
+def deck_card_remove(request, tournament_id, card_id):
     t, err = _get_tournament(tournament_id)
     if err:
         return err
-    entrant = _own_active_entrant(t, request.user)
-    if not entrant:
-        return _err("참가 중이 아닙니다.", status.HTTP_403_FORBIDDEN)
-    if t.status != "recruiting":
-        return _err("대회 시작 후에는 덱을 수정할 수 없습니다.")
-    member = _membership(t, request.user) if entrant.is_team else None
-    row = DeckSubmissionCard.objects.filter(id=row_id, submission__entrant=entrant, submission__member=member).first()
-    if not row:
+    entrant, member, slot, err = _deck_writer(t, request)
+    if err:
+        return err
+    submission = DeckSubmission.objects.filter(entrant=entrant, member=member, slot=slot).first()
+    counts = _deck_counts(submission) if submission else {}
+    if card_id not in counts:
         return _err("카드를 찾을 수 없습니다.", status.HTTP_404_NOT_FOUND)
-    row.delete()
+    del counts[card_id]
+    scan = {int(k): v for k, v in submission.scan.items() if int(k) != card_id}
+    _set_deck(submission, counts, scan)
     return Response({"ok": True})
 
 

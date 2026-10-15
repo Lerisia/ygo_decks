@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Tournament(models.Model):
@@ -188,11 +190,16 @@ class ChatMessage(models.Model):
 
 
 class DeckSubmission(models.Model):
-    """One deck per entrant (per member in team play): screenshot in, scanned card list out, manual fixes on top."""
+    """One deck per entrant (per member in team play) and slot: the screenshot handed in, and the cards as a deck
+    list of the deck builder's (decklists.DeckList, kind "entry": the entrant's own copy, read in the builder but
+    changed only here, 엘리스 2026-10-15) with, per card, what the scanner made of it or that someone typed it."""
     entrant = models.ForeignKey(Entrant, on_delete=models.CASCADE, related_name="deck_submissions")
     member = models.ForeignKey(TeamMember, null=True, blank=True, on_delete=models.CASCADE, related_name="deck_submissions")
     image = models.ImageField(upload_to="tournament_decks/", null=True, blank=True)
     slot = models.PositiveSmallIntegerField(default=0)  # which of the tournament's deck_count lists this is
+    deck_list = models.OneToOneField("decklists.DeckList", null=True, blank=True, on_delete=models.SET_NULL, related_name="tournament_submission")
+    # per card id (as a string): {"confidence": the scanner's similarity or None, "source": "auto" | "manual"}
+    scan = models.JSONField(default=dict, blank=True)
     unmatched_count = models.PositiveIntegerField(default=0)  # scanner crops with no DB match
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -205,18 +212,15 @@ class DeckSubmission(models.Model):
     def __str__(self):
         return f"Deck of {self.member or self.entrant}"
 
+    @property
+    def owner(self):
+        """Whose deck it is: the member's in team play, else the entrant's."""
+        return self.member.user if self.member_id else self.entrant.user
 
-class DeckSubmissionCard(models.Model):
-    SOURCE_CHOICES = [("auto", "스캐너"), ("manual", "수동")]
 
-    submission = models.ForeignKey(DeckSubmission, on_delete=models.CASCADE, related_name="cards")
-    card = models.ForeignKey("card.Card", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
-    new_card = models.ForeignKey("carddb.Card", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
-    quantity = models.PositiveIntegerField(default=1)
-    confidence = models.FloatField(null=True, blank=True)  # null for manual entries
-    source = models.CharField(max_length=8, choices=SOURCE_CHOICES, default="manual")
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["submission", "new_card"], name="unique_submission_new_card"),
-        ]
+@receiver(post_delete, sender=DeckSubmission)
+def _drop_entry_deck(sender, instance, **kwargs):
+    """The submission's copy of the deck goes with it (an entrant withdrawn, a tournament deleted)."""
+    if instance.deck_list_id:
+        from decklists.models import DeckList
+        DeckList.objects.filter(id=instance.deck_list_id, kind=DeckList.Kind.ENTRY).delete()

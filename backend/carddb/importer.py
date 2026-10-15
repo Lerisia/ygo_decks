@@ -277,7 +277,7 @@ def map_legacy_cards():
 
 
 NEW_CARD_LINKS = [
-    ("avatar", "CardIcon"), ("multiplayer", "DuchMindWord"), ("tournament", "DeckSubmissionCard"),
+    ("avatar", "CardIcon"), ("multiplayer", "DuchMindWord"),
     ("solo", "SoloDrawing"), ("solo", "SoloTwentyGame"), ("card", "CardDetection"),
 ]
 

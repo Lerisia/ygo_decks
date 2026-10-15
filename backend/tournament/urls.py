@@ -32,7 +32,7 @@ urlpatterns = [
     path("<int:tournament_id>/standings/", standings),
     path("<int:tournament_id>/deck/", deck_submission),
     path("<int:tournament_id>/deck/cards/", deck_card_add),
-    path("<int:tournament_id>/deck/cards/<int:row_id>/", deck_card_remove),
+    path("<int:tournament_id>/deck/cards/<int:card_id>/", deck_card_remove),
     path("<int:tournament_id>/announcements/", announcements),
     path("announcements/<int:announcement_id>/", delete_announcement),
     path("<int:tournament_id>/chat/", chat),

@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from avatar.serializers import BorderSerializer, CardIconSerializer
 from avatar.views import _resolve_default_border, _resolve_default_icon
-from .models import Board, DeckSubmission, DeckSubmissionCard, Announcement, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
+from .models import Board, DeckSubmission, Announcement, ChatMessage, Entrant, Match, Round, TeamMember, Tournament
 
 
 def user_avatar(user):
@@ -172,34 +172,46 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         return user_avatar(obj.user)[1]
 
 
-class DeckSubmissionCardSerializer(serializers.ModelSerializer):
-    card = serializers.SerializerMethodField()
-
-    class Meta:
-        model = DeckSubmissionCard
-        fields = ["id", "card", "quantity", "confidence", "source"]
-
-    def get_card(self, obj):
-        from carddb.display import art_url, display_name
-        return {
-            "id": obj.new_card_id,
-            "name": display_name(obj.new_card),
-            "image_url": art_url(obj.new_card_id),
-        }
-
-
 class DeckSubmissionSerializer(serializers.ModelSerializer):
+    """The handed-in deck: its cards from the deck list (id = the card's id), each with how many, the scanner's
+    confidence (None when typed) and its source, and the deck list's code for the builder."""
     cards = serializers.SerializerMethodField()
     locked = serializers.SerializerMethodField()
+    deck_list_code = serializers.SerializerMethodField()
     entrant_id = serializers.IntegerField(source="entrant.id", read_only=True)
 
     class Meta:
         model = DeckSubmission
-        fields = ["id", "entrant_id", "member", "slot", "image", "unmatched_count", "cards", "locked", "updated_at"]
+        fields = ["id", "entrant_id", "member", "slot", "image", "unmatched_count", "cards", "deck_list_code", "locked", "updated_at"]
 
     def get_cards(self, obj):
-        qs = obj.cards.select_related("new_card").order_by("new_card__name_ko", "new_card_id")
-        return DeckSubmissionCardSerializer(qs, many=True).data
+        from collections import Counter
+
+        from carddb.display import art_url, display_name
+        from carddb.models import Card
+        d = obj.deck_list
+        if d is None:
+            return []
+        copies = Counter(d.main + d.extra)
+        cards = Card.objects.in_bulk(copies)
+        rows = []
+        for cid, n in copies.items():
+            card = cards.get(cid)
+            if card is None:
+                continue
+            meta = obj.scan.get(str(cid), {})
+            rows.append({
+                "id": cid,
+                "card": {"id": cid, "name": display_name(card), "image_url": art_url(cid)},
+                "zone": "extra" if cid in d.extra else "main",
+                "quantity": n,
+                "confidence": meta.get("confidence"),
+                "source": meta.get("source", "manual"),
+            })
+        return sorted(rows, key=lambda r: (r["zone"] == "extra", r["card"]["name"], r["id"]))
+
+    def get_deck_list_code(self, obj):
+        return obj.deck_list.code if obj.deck_list_id else None
 
     def get_locked(self, obj):
         return obj.entrant.tournament.status != "recruiting"

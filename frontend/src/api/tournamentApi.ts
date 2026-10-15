@@ -209,9 +209,12 @@ export const overrideMatch = (matchId: number, result: "p1" | "p2" | "draw") =>
 
 // --- deck submission / announcements / chat ---------------------------------
 
+// A handed-in deck lives as a deck list of the builder (엘리스 2026-10-15): `id` is the card's id, `zone` where it
+// sits, `deck_list_code` the list to read it at /decklists/:code.
 export type DeckCard = {
   id: number;
   card: { id: number; name: string; image_url: string | null };
+  zone: "main" | "extra";
   quantity: number;
   confidence: number | null;
   source: "auto" | "manual";
@@ -223,6 +226,7 @@ export type DeckSubmission = {
   image: string | null;
   unmatched_count: number;
   cards: DeckCard[];
+  deck_list_code: string | null;
   locked: boolean;
   updated_at: string;
 };

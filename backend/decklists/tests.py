@@ -45,6 +45,18 @@ class DeckListApiTest(TestCase):
         self.assertEqual(self.c.delete(f"/api/decklists/{code}/").status_code, 204)
         self.assertFalse(DeckList.objects.exists())
 
+    def test_an_entry_deck_is_read_here_but_kept_elsewhere(self):
+        """A tournament's copy of a deck (kind "entry", 2026-10-15): not in the list, readable by its owner, not
+        changed or deleted from the builder."""
+        entry = DeckList.objects.create(owner=self.me, code="entry001", kind=DeckList.Kind.ENTRY, name="대회 덱 1", main=[1], extra=[3])
+        DeckList.objects.create(owner=self.me, code="own00001", name="내 덱", main=[1, 2, 3], extra=[])
+        self.assertEqual([d["code"] for d in self.c.get("/api/decklists/").json()["decks"]], ["own00001"])
+        self.assertEqual(self.c.get("/api/decklists/entry001/").json()["kind"], "entry")
+        self.assertEqual(self.c.put("/api/decklists/entry001/", {"name": "x", "main": [1] * 40, "extra": []}, format="json").status_code, 403)
+        self.assertEqual(self.c.delete("/api/decklists/entry001/").status_code, 403)
+        self.assertTrue(DeckList.objects.filter(code="entry001").exists())
+        self.assertNotEqual(DeckList.new_code(), "new")
+
     def test_guests_and_others_cannot(self):
         code = self.c.post("/api/decklists/", self.body(), format="json").json()["code"]
         guest = APIClient()

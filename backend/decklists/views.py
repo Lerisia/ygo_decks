@@ -1,6 +1,3 @@
-import secrets
-import string
-
 from django.db import transaction
 from django.http import Http404
 from rest_framework import status
@@ -12,18 +9,11 @@ from .models import DeckList
 from .rules import DeckError, check, issues
 
 DECKS_MAX = 300   # a member's deck lists, at most
-ALPHABET = string.ascii_lowercase + string.digits
-
-
-def _code():
-    while True:
-        code = "".join(secrets.choice(ALPHABET) for _ in range(8))
-        if code != "new" and not DeckList.objects.filter(code=code).exists():
-            return code
+ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
 
 
 def _row(d):
-    return {"code": d.code, "name": d.name, "description": d.description, "main_count": len(d.main),
+    return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
             "extra_count": len(d.extra), "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
 
 
@@ -51,15 +41,15 @@ def _fields(data):
 def deck_lists(request):
     """The signed-in member's deck lists, the last changed first; or a new one saved."""
     if request.method == "GET":
-        return Response({"decks": [_row(d) for d in DeckList.objects.filter(owner=request.user)]})
+        return Response({"decks": [_row(d) for d in DeckList.objects.filter(owner=request.user, kind=DeckList.Kind.OWN)]})
     try:
         fields = _fields(request.data)
     except DeckError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     with transaction.atomic():
-        if DeckList.objects.filter(owner=request.user).count() >= DECKS_MAX:
+        if DeckList.objects.filter(owner=request.user, kind=DeckList.Kind.OWN).count() >= DECKS_MAX:
             return Response({"error": f"덱은 {DECKS_MAX}개까지 저장할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
-        d = DeckList.objects.create(owner=request.user, code=_code(), **fields)
+        d = DeckList.objects.create(owner=request.user, code=DeckList.new_code(), **fields)
     return Response(_full(d), status=status.HTTP_201_CREATED)
 
 
@@ -70,6 +60,8 @@ def deck_list(request, code):
     d = DeckList.objects.filter(code=code, owner=request.user).first()
     if d is None:
         raise Http404
+    if request.method != "GET" and d.kind == DeckList.Kind.ENTRY:
+        return Response({"error": ENTRY_ERROR}, status=status.HTTP_403_FORBIDDEN)
     if request.method == "DELETE":
         d.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

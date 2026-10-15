@@ -466,14 +466,14 @@ class DeckSubmissionTest(TournamentApiTestBase):
     def setUpTestData(cls):
         from carddb.models import Card, LegacyCard, MdArt, MdPrint
         made = []
-        for old_id, (cid, name) in enumerate(((4007, "푸른 눈의 백룡"), (4041, "블랙 매지션"), (4844, "욕망의 항아리"), (5392, "천재지변")), 1):
-            card = Card.objects.create(id=cid, category="monster", name_ja=name, name_ko=name, frame="normal")
+        for old_id, (cid, name) in enumerate(((4007, "푸른 눈의 백룡"), (4041, "블랙 매지션"), (4844, "욕망의 항아리"), (5392, "천재지변"), (5000, "궁극의 푸른 눈의 백룡")), 1):
+            card = Card.objects.create(id=cid, category="monster", name_ja=name, name_ko=name, frame="fusion" if cid == 5000 else "normal")
             if cid != 5392:
                 MdPrint.objects.create(md_id=cid, card=card)
                 MdArt.objects.create(md_print_id=cid, version="common", image=f"cards/art/common/{cid}.webp")
             LegacyCard.objects.create(old_id=old_id, old_card_id=str(old_id), card=card, how="konami")
             made.append(card)
-        cls.c1, cls.c2, cls.c3, cls.ocg_only = made
+        cls.c1, cls.c2, cls.c3, cls.ocg_only, cls.fusion = made
 
     def setUp(self):
         from carddb import display
@@ -544,6 +544,29 @@ class DeckSubmissionTest(TournamentApiTestBase):
         resp = self.c.delete(f"/api/tournaments/{self.t.id}/deck/cards/{row['id']}/")
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("욕망의 항아리", [c["card"]["name"] for c in self.c.get(f"/api/tournaments/{self.t.id}/deck/").json()["cards"]])
+
+    def test_the_deck_is_an_entry_deck_list_of_the_builder(self):
+        """엘리스 2026-10-15: the cards live in decklists.DeckList — the entrant's own "entry" deck, named after the
+        tournament, sorted into main and extra, read in the builder but changed only here, gone with the entry."""
+        from decklists.models import DeckList
+        resp = self._upload(self.c, [(4007, 0.9), (5000, 0.8)])
+        body = resp.json()
+        d = DeckList.objects.get(code=body["deck_list_code"])
+        self.assertEqual((d.owner, d.kind, d.main, d.extra), (self.u, "entry", [4007], [5000]))
+        self.assertEqual(d.name, f"{self.t.name} 덱 1")
+        zones = {c["card"]["name"]: c["zone"] for c in body["cards"]}
+        self.assertEqual(zones, {"푸른 눈의 백룡": "main", "궁극의 푸른 눈의 백룡": "extra"})
+        # the builder lists the member's own decks only, shows this one, and will not change or delete it
+        self.assertEqual(self.c.get("/api/decklists/").json()["decks"], [])
+        self.assertEqual(self.c.get(f"/api/decklists/{d.code}/").status_code, 200)
+        self.assertEqual(self.c.put(f"/api/decklists/{d.code}/", {"name": "x", "main": [], "extra": []}, format="json").status_code, 403)
+        self.assertEqual(self.c.delete(f"/api/decklists/{d.code}/").status_code, 403)
+        # a manual change keeps the same deck list; leaving the tournament drops it
+        self.c.post(f"/api/tournaments/{self.t.id}/deck/cards/", {"card_id": self.c3.id, "quantity": 2}, format="json")
+        d.refresh_from_db()
+        self.assertEqual(d.main, [4007, 4844, 4844])
+        Entrant.objects.get(tournament=self.t, user=self.u).delete()
+        self.assertFalse(DeckList.objects.filter(code=d.code).exists())
 
     def test_locked_after_start(self):
         self._upload(self.c, [(4007, 0.9)])
