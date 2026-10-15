@@ -286,7 +286,8 @@ class PoseRenderer:
     def __init__(self, work):
         self.work = Path(work)
 
-    PATIENCE = 600   # seconds a drawing may take before the browser is given up on
+    PATIENCE = 180   # seconds a drawing may take before the browser is given up on (one takes 10–60; a dead driver
+                     # answers never, and must be replaced well inside the watch a long run keeps on its log)
 
     def __enter__(self):
         subprocess.run([str(FRONTEND / "node_modules/.bin/esbuild"), str(FRONTEND / "src/tools/cutinPose.ts"), "--bundle",
