@@ -7,7 +7,6 @@ import { ResultChips, BarStat, CoinSplit, rate, pctText, COIN_FRONT, COIN_BACK }
 import { getTrackerPending, discardTrackerPending } from "@/api/trackerPendingApi";
 import type { TrackerPendingMatch } from "@/api/trackerPendingApi";
 import TrackerPendingPanel from "@/components/TrackerPendingPanel";
-import PcTrackerBanner from "@/components/PcTrackerBanner";
 import SheetMembersPanel from "@/components/SheetMembersPanel";
 import { getAllDecks } from "@/api/deckApi";
 import { getUserDecks } from "@/api/accountApi";
@@ -868,7 +867,6 @@ const RecordGroupDetailPage = () => {
           />
         </div>
       </div>
-      {canWrite && <PcTrackerBanner dismissible className="mb-4" />}
       {canWrite && (
         <TrackerPendingPanel items={pending} activeId={activePendingId} onFill={fillFromPending} onDiscard={discardPending} />
       )}

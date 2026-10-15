@@ -4,14 +4,11 @@ import { getTrackerClientStatus } from "@/api/trackerPendingApi";
 import type { TrackerClientStatus } from "@/api/trackerPendingApi";
 import RecorderDownload from "@/components/RecorderDownload";
 
-const DISMISS_KEY = "pc_tracker_banner_dismissed";
-
-// The recorder card on the record pages, drawn as the home page's recorder pillar and as wide as the meta stats above
-// it (참혈 2026-10-14). Short, since the home page already tells what it does; the rest (how to set it up, how many
-// points) is on /recorder behind 자세히, and the download shows on Windows only (참혈 2026-10-15).
-// `dismissible` is used on the sheet detail page, where it would otherwise sit above the form every visit.
-export default function PcTrackerBanner({ dismissible = false, className = "" }: { dismissible?: boolean; className?: string }) {
-  const [hidden, setHidden] = useState(() => dismissible && localStorage.getItem(DISMISS_KEY) === "1");
+// The recorder card on the sheet list (/records) alone, not on a sheet where games are recorded (참혈 2026-10-15); drawn
+// as the home page's recorder pillar and as wide as the meta stats above it (참혈 2026-10-14). Short, since the home
+// page already tells what it does; the rest (how to set it up, how many points) is on /recorder behind 자세히, and the
+// download shows on Windows only (참혈 2026-10-15).
+export default function PcTrackerBanner() {
   const [status, setStatus] = useState<TrackerClientStatus | null>(null);
 
   useEffect(() => {
@@ -20,22 +17,11 @@ export default function PcTrackerBanner({ dismissible = false, className = "" }:
 
   const outdated = !!status?.outdated;
   const updatable = !outdated && !!status?.update_available;
-  if (hidden && !outdated) return null;   // an out-of-date recorder is worth showing even if dismissed
   return (
     <section
       aria-labelledby="pc-recorder-banner"
-      className={`relative w-full rounded-xl pl-5 py-4 ${dismissible && !outdated ? "pr-12" : "pr-5"} bg-amber-50 dark:bg-amber-900/10 border ${outdated ? "border-red-300 dark:border-red-800" : "border-amber-200 dark:border-amber-800/50"} ${className}`}
+      className={`relative w-full rounded-xl px-5 py-4 bg-amber-50 dark:bg-amber-900/10 border ${outdated ? "border-red-300 dark:border-red-800" : "border-amber-200 dark:border-amber-800/50"}`}
     >
-      {dismissible && !outdated && (
-        <button
-          type="button"
-          aria-label="닫기"
-          onClick={() => { localStorage.setItem(DISMISS_KEY, "1"); setHidden(true); }}
-          className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center p-0 border-0 rounded-full bg-transparent text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-        >
-          ✕
-        </button>
-      )}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
         <div className="flex-1 min-w-0 flex flex-col gap-1">
           {(outdated || updatable) && (
