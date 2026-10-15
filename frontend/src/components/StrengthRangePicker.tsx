@@ -4,6 +4,9 @@ import { STRENGTH_TIERS, countInRange, moveHandle, pickHandle } from "../utils/r
 const LAST = STRENGTH_TIERS.length - 1;
 const pct = (step: number) => `${(step / LAST) * 100}%`;
 
+// The tiers from 중하위 down carry a band marking them 입문자 비추천, always shown (특이점 2026-10-15).
+const NOT_FOR_NEWCOMERS = 3;
+
 // What each tier means, shown under the bar for the tier under the cursor or the one just chosen (특이점 2026-10-11).
 const TIER_NOTES = [
   "현재 기준으로 마스터 듀얼에서 맹활약중인, 가장 강력한 최상위 티어 덱",
@@ -126,47 +129,58 @@ export default function StrengthRangePicker({
       </p>
 
       <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-2 pt-4 pb-2">
-        {/* The track spans the centres of the six label columns, so each point sits right over its label. */}
-        <div
-          className="relative h-10 mx-[8.333%] touch-none select-none cursor-pointer"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onPointerLeave={() => setHovered(null)}
-        >
-          <div ref={trackRef} className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gray-300 dark:bg-gray-600" />
+        <div className="relative">
+          {/* behind the bar and the labels, the columns of the tiers not for newcomers, named at the band's top */}
           <div
-            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-blue-600"
-            style={{ left: pct(lo), width: `calc(${pct(hi)} - ${pct(lo)})` }}
-          />
-          {STRENGTH_TIERS.map((_, i) => (
-            <span
-              key={i}
-              className={`absolute top-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full ${i >= lo && i <= hi ? "bg-blue-600" : "bg-gray-400 dark:bg-gray-500"}`}
-              style={{ left: pct(i) }}
+            className="pointer-events-none absolute -top-3 bottom-0 right-0 rounded-lg bg-orange-500/10 dark:bg-orange-400/10"
+            style={{ left: `${(NOT_FOR_NEWCOMERS / STRENGTH_TIERS.length) * 100}%` }}
+          >
+            <span className="absolute inset-x-0 top-0.5 text-center text-[10px] sm:text-[11px] leading-3 font-semibold text-orange-600 dark:text-orange-300">
+              입문자 비추천
+            </span>
+          </div>
+          {/* The track spans the centres of the six label columns, so each point sits right over its label. */}
+          <div
+            className="relative h-10 mx-[8.333%] touch-none select-none cursor-pointer"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onPointerLeave={() => setHovered(null)}
+          >
+            <div ref={trackRef} className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gray-300 dark:bg-gray-600" />
+            <div
+              className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-blue-600"
+              style={{ left: pct(lo), width: `calc(${pct(hi)} - ${pct(lo)})` }}
             />
-          ))}
-          {handle("lo", lo)}
-          {handle("hi", hi)}
-        </div>
-        <div className="grid grid-cols-6 mt-1 text-center text-xs sm:text-sm break-keep">
-          {STRENGTH_TIERS.map((label, i) => {
-            const inRange = i >= lo && i <= hi;
-            const empty = tierCounts ? tierCounts[i] === 0 : false;
-            return (
+            {STRENGTH_TIERS.map((_, i) => (
               <span
-                key={label}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-                onClick={() => press(i)}
-                className={`cursor-pointer ${inRange ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-gray-400"} ${empty ? "opacity-40" : ""}`}
-                title={empty ? "남은 덱 없음" : undefined}
-              >
-                {label}
-              </span>
-            );
-          })}
+                key={i}
+                className={`absolute top-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full ${i >= lo && i <= hi ? "bg-blue-600" : "bg-gray-400 dark:bg-gray-500"}`}
+                style={{ left: pct(i) }}
+              />
+            ))}
+            {handle("lo", lo)}
+            {handle("hi", hi)}
+          </div>
+          <div className="grid grid-cols-6 mt-1 text-center text-xs sm:text-sm break-keep">
+            {STRENGTH_TIERS.map((label, i) => {
+              const inRange = i >= lo && i <= hi;
+              const empty = tierCounts ? tierCounts[i] === 0 : false;
+              return (
+                <span
+                  key={label}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => press(i)}
+                  className={`cursor-pointer ${inRange ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-gray-400"} ${empty ? "opacity-40" : ""}`}
+                  title={empty ? "남은 덱 없음" : undefined}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
         </div>
         {/* Room for the longest note — two lines on a phone, one on a wider screen — so nothing moves as notes change. */}
         <p className="mt-2 px-1 min-h-[2.5rem] sm:min-h-[1.25rem] text-xs leading-5 break-keep text-gray-600 dark:text-gray-300" aria-live="polite">
