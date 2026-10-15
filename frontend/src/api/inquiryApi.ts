@@ -7,7 +7,7 @@ export const BOARD_INFO: Record<InquiryBoard, { title: string; icon: string; des
   deck: {
     title: "덱 관련 제보 / 건의 게시판",
     icon: "🃏",
-    desc: "덱 정보·설명·스탯이 틀렸을 때, 새 덱 추가나 덱 분류 건의",
+    desc: "덱 정보·설명·스탯 관련 문의, 또는 새 덱 추가나 덱 분류 건의",
     placeholder: "어떤 덱의 무엇이 틀렸는지, 어떻게 바뀌면 좋을지 적어 주세요.\n근거(카드 텍스트, 공략 링크 등)를 함께 적어 주시면 더 빨리 반영할 수 있어요.",
   },
   site: {
