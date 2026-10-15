@@ -140,10 +140,11 @@ describe("decks kept outside the server", () => {
 
 describe("the pages' paths", () => {
   it("knows the making and changing pages, where the search sits at the bottom", () => {
-    expect(isDeckEditorPath("/decklists/new")).toBe(true);
-    expect(isDeckEditorPath("/decklists/ab12cd34/edit")).toBe(true);
-    expect(isDeckEditorPath("/decklists")).toBe(false);
-    expect(isDeckEditorPath("/decklists/ab12cd34")).toBe(false);
+    expect(isDeckEditorPath("/dev/decklists/new")).toBe(true);
+    expect(isDeckEditorPath("/dev/decklists/ab12cd34/edit")).toBe(true);
+    expect(isDeckEditorPath("/dev/decklists")).toBe(false);
+    expect(isDeckEditorPath("/dev/decklists/ab12cd34")).toBe(false);
+    expect(isDeckEditorPath("/decklists/new")).toBe(false);   // the old address only sends on
     expect(isDeckEditorPath("/cards/new")).toBe(false);
   });
 });

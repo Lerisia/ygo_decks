@@ -10,7 +10,7 @@ import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
 const BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
 
-/** A deck list (/decklists/:code): its main and extra decks, each card opening its page, and what keeps it from being
+/** A deck list (/dev/decklists/:code): its main and extra decks, each card opening its page, and what keeps it from being
  *  played today (덱 구축, 참혈 2026-10-13; from the server 2026-10-14). Its owner's alone for now. Operators only. */
 export default function DeckListView() {
   const admin = useAdminOnly();

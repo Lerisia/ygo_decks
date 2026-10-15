@@ -24,7 +24,7 @@ export type DeckDraft = {
 const KEY = "deck_drafts_v0";
 /** A guest's deck, kept in this tab while they go to sign in to save it (guests save nothing: 엘리스 2026-10-14). */
 const SESSION_KEY = "deck_draft_tab";
-/** The code of a deck not saved yet (/decklists/new). */
+/** The code of a deck not saved yet (/dev/decklists/new). */
 export const NEW_CODE = "new";
 
 export const ZONES: DeckZone[] = ["main", "extra"];

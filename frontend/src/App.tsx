@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { lazyChunk } from "@/lib/lazyChunk";
-import { DECK_EDITOR_ROOM, isDeckEditorPath } from "@/lib/deckListPaths";
+import { DECK_EDITOR_ROOM, DECK_LISTS_PATH, OLD_DECK_LISTS_PATH, isDeckEditorPath } from "@/lib/deckListPaths";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './App.css'
 import Navbar from "./components/Navbar";
@@ -98,6 +98,12 @@ function prefetchCommonPages() {
                       () => import("./pages/CardDetail")]) {
     load().catch(() => {});
   }
+}
+
+/** The deck list pages moved under /dev (참혈 2026-10-15): an old address goes to the same page there. */
+function OldDeckListPath() {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`${DECK_LISTS_PATH}${pathname.slice(OLD_DECK_LISTS_PATH.length)}${search}`} replace />;
 }
 
 function App() {
@@ -253,10 +259,11 @@ function App() {
             <Route path="/inquiry/post/:id" element={<InquiryPostPage />} />
             <Route path="/inquiry/:board" element={<InquiryBoardPage />} />
             {/* 덱 구축 (참혈 2026-10-13): operators only while it is laid out, linked from nowhere yet */}
-            <Route path="/decklists" element={<DeckLists />} />
-            <Route path="/decklists/new" element={<DeckListEdit />} />
-            <Route path="/decklists/:code" element={<DeckListView />} />
-            <Route path="/decklists/:code/edit" element={<DeckListEdit />} />
+            <Route path={DECK_LISTS_PATH} element={<DeckLists />} />
+            <Route path={`${DECK_LISTS_PATH}/new`} element={<DeckListEdit />} />
+            <Route path={`${DECK_LISTS_PATH}/:code`} element={<DeckListView />} />
+            <Route path={`${DECK_LISTS_PATH}/:code/edit`} element={<DeckListEdit />} />
+            <Route path={`${OLD_DECK_LISTS_PATH}/*`} element={<OldDeckListPath />} />
             <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>

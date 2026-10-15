@@ -5,7 +5,7 @@ import { createDeckList, listDeckLists, type DeckListRow } from "@/api/deckListA
 import DeckListCard, { DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { type DeckDraft, clearLocalDrafts, localDrafts } from "@/lib/deckDrafts";
-import { NEW_DECK_PATH, deckListPath } from "@/lib/deckListPaths";
+import { DECK_LISTS_PATH, NEW_DECK_PATH, deckListPath } from "@/lib/deckListPaths";
 
 const ADD_BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
 
@@ -23,7 +23,7 @@ async function moveLocalDrafts() {
   if (local.length) clearLocalDrafts(kept);
 }
 
-/** 내 덱 리스트 (/decklists): the decks a member has saved (덱 구축, 참혈 2026-10-13; on the server from 2026-10-14).
+/** 내 덱 리스트 (/dev/decklists): the decks a member has saved (덱 구축, 참혈 2026-10-13; on the server from 2026-10-14).
  *  Operators only while it is laid out; linked from nowhere yet. With none, a dashed card is the way to make the
  *  first (참혈 2026-10-14). A guest is asked to sign in, and may still build one. */
 export default function DeckLists() {
@@ -54,7 +54,7 @@ export default function DeckLists() {
         <div className="py-16 flex flex-col items-center gap-4 text-center">
           <p className="text-gray-600 dark:text-gray-300 break-keep">로그인하면 덱을 저장하고 모아 볼 수 있습니다.</p>
           <div className="flex gap-2">
-            <Link to={`/login?next=${encodeURIComponent("/decklists")}`} className={ADD_BUTTON}>로그인</Link>
+            <Link to={`/login?next=${encodeURIComponent(DECK_LISTS_PATH)}`} className={ADD_BUTTON}>로그인</Link>
             <Link to={NEW_DECK_PATH} className={`${ADD_BUTTON} bg-gray-500 hover:bg-gray-600`}>덱 짜 보기</Link>
           </div>
         </div>

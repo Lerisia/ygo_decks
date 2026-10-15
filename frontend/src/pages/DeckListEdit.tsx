@@ -18,7 +18,7 @@ const PRIMARY = `${BUTTON} bg-blue-600 hover:bg-blue-700 text-white disabled:bg-
 const SECONDARY = `${BUTTON} bg-gray-500 hover:bg-gray-600 text-white`;
 const FIELD = "w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-/** Making a deck list (/decklists/new) or changing one (/decklists/:code/edit) (덱 구축, 참혈 2026-10-13): its name and
+/** Making a deck list (/dev/decklists/new) or changing one (/dev/decklists/:code/edit) (덱 구축, 참혈 2026-10-13): its name and
  *  description on top, then the deck, cards going in from the search and coming out when pressed, shown when held or
  *  right-clicked. Members save it to their account (2026-10-14); a guest builds as freely but saves nothing — the
  *  deck waits in the tab while they go to sign in (엘리스: "비로그인이면 사진을 캡처해서 가지는 정도"). Operators only
@@ -27,7 +27,7 @@ export default function DeckListEdit() {
   const admin = useAdminOnly();
   const navigate = useNavigate();
   const location = useLocation();
-  const { code } = useParams();   // none on /decklists/new
+  const { code } = useParams();   // none on /dev/decklists/new
   const signedIn = isAuthenticated();
   // undefined until read, null when there is no such deck (or not this member's)
   const [deck, setDeck] = useState<DeckDraft | null | undefined>(undefined);
