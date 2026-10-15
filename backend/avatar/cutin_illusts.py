@@ -219,25 +219,40 @@ class PoseRenderer:
     def __init__(self, work):
         self.work = Path(work)
 
+    PATIENCE = 600   # seconds a drawing may take before the browser is given up on
+
     def __enter__(self):
         subprocess.run([str(FRONTEND / "node_modules/.bin/esbuild"), str(FRONTEND / "src/tools/cutinPose.ts"), "--bundle",
                         "--format=iife", "--log-level=warning", f"--outfile={self.work / 'render.js'}"], check=True)
         (self.work / "index.html").write_text('<!doctype html><meta charset="utf-8"><script src="/render.js"></script>')
+        self._launch()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop()
+
+    def _launch(self):
         self.requests, self.replies = queue.Queue(), queue.Queue()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
         self._reply()   # the page is up, or the launch failed
-        return self
 
-    def __exit__(self, *exc):
+    def _stop(self):
         self.requests.put(None)
-        self.thread.join()
+        self.thread.join(timeout=30)
 
     def _reply(self):
-        reply = self.replies.get()
+        try:
+            reply = self.replies.get(timeout=self.PATIENCE)
+        except queue.Empty:
+            raise RuntimeError("the browser stopped answering") from None
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+    @staticmethod
+    def _browser_gone(e):
+        return isinstance(e, RuntimeError) or any(s in str(e) for s in ("Connection closed", "Target closed", "has been closed", "crashed"))
 
     def _run(self):
         from playwright.sync_api import sync_playwright
@@ -253,7 +268,10 @@ class PoseRenderer:
                         self.replies.put(self._draw(page, *request))
                     except Exception as e:   # noqa: BLE001 — handed to the caller's thread
                         self.replies.put(e)
-                browser.close()
+                try:
+                    browser.close()
+                except Exception:   # noqa: BLE001 — already gone
+                    pass
         except Exception as e:   # noqa: BLE001
             self.replies.put(e)
 
@@ -285,6 +303,15 @@ class PoseRenderer:
 
     def render(self, md_id, version, size, look=None):
         """The print's cut-in at rest, fitted on a transparent `size` px square: BGRA. `look` = (animation name,
-        0..1) dresses it in what that moment of the animation shows."""
+        0..1) dresses it in what that moment of the animation shows. A browser that died or stopped answering
+        (2026-10-15: a night's run hung at card 463) is replaced and the drawing asked for once more."""
         self.requests.put((md_id, version, size, look))
-        return self._reply()
+        try:
+            return self._reply()
+        except Exception as e:   # noqa: BLE001
+            if not self._browser_gone(e):
+                raise
+            self._stop()
+            self._launch()
+            self.requests.put((md_id, version, size, look))
+            return self._reply()
