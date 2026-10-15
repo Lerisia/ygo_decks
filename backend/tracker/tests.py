@@ -742,36 +742,36 @@ class TrackerStatsTest(TestCase):
 
 
 class TrackerEngineDemotionTest(TestCase):
-    """엔진 덱은 비엔진 후보가 함께 보이면 뒤로, 단 낙인은 예외 (특이점 2026-09-15)."""
+    """엔진 덱이라고 뒤로 보내지 않는다 (특이점 2026-10-15: 9/15의 엔진 강등을 없앰, 섞어 쓰는 쌍은 우선순위로 하나씩)."""
 
     def setUp(self):
         self.engine = _create_deck("엘펜노츠")
         self.engine.is_engine = True
         self.engine.save(update_fields=["is_engine"])
-        self.plain = _create_deck("싱크론")
+        self.plain = _create_deck("킬러튠")
         self.branded = _create_deck("낙인")
         self.branded.is_engine = True
         self.branded.save(update_fields=["is_engine"])
         link_group(deck=self.engine, name="Elfnote")
-        link_group(deck=self.plain, name="Synchron")
+        link_group(deck=self.plain, name="Killer Tune")
         link_group(deck=self.branded, name="Branded")
-        for kid, arch in [("101", "Elfnote"), ("102", "Synchron"), ("103", "Branded")]:
+        for kid, arch in [("101", "Elfnote"), ("102", "Killer Tune"), ("103", "Branded")]:
             old_style_card(card_id=f"c{kid}", konami_id=kid, name=f"card{kid}", archetype=arch)
 
-    def test_non_engine_beats_engine_even_with_fewer_cards(self):
+    def test_an_engine_deck_ranks_by_its_cards_like_any_other(self):
         cands, _ = infer_decks([101, 101, 101, 101, 102])
-        self.assertEqual([c["name"] for c in cands], ["싱크론", "엘펜노츠"])
-        self.assertTrue(cands[1]["is_engine"])
-        self.assertFalse(cands[0]["is_engine"])
-        self.assertEqual(cands[1]["score"], 4.0)
+        self.assertEqual([c["name"] for c in cands], ["엘펜노츠", "킬러튠"])
+        self.assertTrue(cands[0]["is_engine"])
 
-    def test_engine_keeps_top_when_non_engine_is_negligible(self):
-        cands, _ = infer_decks([101] * 10 + [102])
-        self.assertEqual([c["name"] for c in cands], ["엘펜노츠", "싱크론"])
+    def test_more_cards_of_the_other_deck_still_win(self):
+        cands, _ = infer_decks([101, 102, 102])
+        self.assertEqual(cands[0]["name"], "킬러튠")
 
-    def test_branded_is_exempt_from_demotion(self):
-        cands, _ = infer_decks([103, 103, 103, 103, 102])
-        self.assertEqual([c["name"] for c in cands], ["낙인", "싱크론"])
+    def test_a_mix_goes_where_its_priority_says(self):
+        from deck.models import DeckInferencePriority
+        DeckInferencePriority.objects.create(winner=self.engine, loser=self.plain, note="엘펜노츠·킬러튠 섞이면 엘펜노츠")
+        cands, _ = infer_decks([101, 102, 102])
+        self.assertEqual(cands[0]["name"], "엘펜노츠")
 
     def test_engine_only_candidates_keep_score_order(self):
         cands, _ = infer_decks([101, 101, 103])
@@ -918,7 +918,7 @@ class TrackerDeckPriorityTest(TestCase):
         self.assertEqual(cands[0]["name"], "현람")
 
     def test_a_beaten_loser_neither_demotes_nor_dilutes_its_winner(self):
-        # 엘펜노츠 is an engine, 감옥신 a plain deck (특이점 2026-10-15): 감옥신's cards in a mix must not push 엘펜노츠
+        # 엘펜노츠 is an engine, 감옥신 a plain deck (특이점 2026-10-15): 감옥신's cards in a mix must not leave 엘펜노츠
         # under a third deck seen in passing, nor make the mix too unsure to record
         from tracker.inference import infer_opponent
         from tracker.models import TrackerCardDeckStat

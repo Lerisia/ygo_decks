@@ -16,15 +16,10 @@ SPEC_FULL_SHARE = 0.6
 SPEC_FLOOR = 0.1
 EXTRA_PRIOR = 0.6
 EXTRA_FRAME_WORDS = ("fusion", "synchro", "xyz", "link")
-# 엔진 덱을 뒤로 미는 근거는 지엽적인 카드(가중치 SPECIFIC_MIN 이상)만 인정한다 — 범용 카드 한 장이 전용 카드를 보인
-# 엔진 덱을 밀어내지 않게.
-SPECIFIC_MIN = 0.5
-
-# 엔진 덱은 다른 덱의 용병으로 섞이는 경우가 많아, 비엔진 덱이 함께 보이면 그쪽을 먼저 제안한다
-# (특이점 2026-09-15). 비엔진 후보 점수가 엔진 후보 점수의 이 비율 이상이면 엔진 후보를 뒤로 보낸다.
-ENGINE_DEMOTE_MIN_RATIO = 0.2
-# 순수 구축이 압도적이라 엔진 표시에도 불구하고 강등하지 않는 덱
-ENGINE_ALWAYS_TOP = {"낙인"}
+# 엔진 덱이라고 뒤로 보내지 않는다 — 9/15의 엔진 강등은 10/15 특이점 결정으로 없앴다("케이스 바이 케이스").
+# 섞어 쓰는 덱 쌍은 덱 인식 우선순위(DeckInferencePriority)로 하나씩 정한다.
+# 이 덱들의 카드는 다른 덱에 섞여도 순수 구축이 압도적이라 표를 줄이지 않는다
+FULL_WEIGHT_DECKS = {"낙인"}
 
 # 상대 덱은 확신이 없으면 제안하지 않는다 = 레코더가 모름/기타로 기록 (특이점 2026-10-03). 9/30~10/3 기록 1,840판에서
 # 1순위 근거가 엑스트라 덱 카드뿐이거나(다른 덱 카드가 묘지로 보낸 것일 수 있음) 1순위 표가 전체의 절반 미만이면
@@ -126,8 +121,8 @@ def infer_decks(card_ids, limit=3):
 
     Returns (candidates, unknown_ids): candidates = [{"deck_id", "name", "score", "share", "is_engine"}] sorted by
     score, share = score / total votes (0..1). Each card votes once, for every deck card_decks gives it; cards with
-    no deck contribute nothing. Engine decks drop below a non-engine candidate that reaches
-    ENGINE_DEMOTE_MIN_RATIO of their score, but stay in the list.
+    no deck contribute nothing. Being an engine deck moves nothing (특이점 2026-10-15); a DeckInferencePriority puts
+    its winner over its loser when both show.
     """
     resolved = resolve_aliases(card_ids)
     counts = Counter(str(c) for c in resolved if c)
@@ -141,7 +136,7 @@ def infer_decks(card_ids, limit=3):
     decks = Deck.objects.in_bulk({d for m in links.values() for d in m})
     weights = card_specificity(links, decks, cards)
     scores = defaultdict(float)
-    specific, has_main = defaultdict(float), defaultdict(bool)   # has_main: does any main-deck card vote for it?
+    has_main = defaultdict(bool)   # does any main-deck card vote for it?
     total = 0.0
     for kid, m in links.items():
         vote = counts[kid] * weights[kid]
@@ -149,7 +144,6 @@ def infer_decks(card_ids, limit=3):
         main = not any(w in (cards[kid].frame_type or "") for w in EXTRA_FRAME_WORDS)
         for deck_id, w in m.items():
             scores[deck_id] += vote * w
-            specific[deck_id] = max(specific[deck_id], weights[kid])
             has_main[deck_id] = has_main[deck_id] or main
     names = {d: decks[d].name for d in scores}
     engines = {d: decks[d].is_engine for d in scores}
@@ -160,9 +154,8 @@ def infer_decks(card_ids, limit=3):
         if any(p.winner_id in m and p.loser_id not in m for m in links.values()):
             wins[p.winner_id].add(p.loser_id)
     beaten = set().union(*wins.values())
-    # a beaten loser is part of its winner's deck: it neither demotes the winner as a plain deck would an engine, nor
-    # takes the winner's share — its cards count toward it (특이점 2026-10-15)
-    best_plain = max((s for d, s in scores.items() if not engines[d] and d not in beaten and specific[d] >= SPECIFIC_MIN), default=0.0)
+    # a beaten loser is part of its winner's deck: it doesn't take the winner's share — its cards count toward it
+    # (특이점 2026-10-15)
     covered = dict(scores)
     for kid, m in links.items():
         vote = counts[kid] * weights[kid]
@@ -170,10 +163,7 @@ def infer_decks(card_ids, limit=3):
             if winner not in m:
                 covered[winner] += vote * max((m[l] for l in losers if l in m), default=0.0)
 
-    def demoted(deck_id, score):
-        return engines[deck_id] and names[deck_id] not in ENGINE_ALWAYS_TOP and best_plain >= ENGINE_DEMOTE_MIN_RATIO * score
-
-    ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, demoted(*kv), -kv[1], names[kv[0]]))[:limit]
+    ranked = sorted(scores.items(), key=lambda kv: (kv[0] in beaten, -kv[1], names[kv[0]]))[:limit]
     if not ranked:
         return learned_decks(resolved, limit), unknown
     return [{"deck_id": d, "name": names[d], "score": round(s, 2), "share": round(min(1.0, covered[d] / total), 3), "is_engine": engines[d],
@@ -208,7 +198,7 @@ def card_specificity(links, decks, cards):
             hits[k] += n
     weights = {}
     for kid in links:
-        if any(decks[d].name in ENGINE_ALWAYS_TOP for d in links[kid]):
+        if any(decks[d].name in FULL_WEIGHT_DECKS for d in links[kid]):
             weights[kid] = 1.0   # 낙인: its cards also get splashed elsewhere, but pure builds dominate — keep full weight
         elif seen[kid] >= SPEC_MIN_GAMES:
             share = (hits[kid] + 1) / (seen[kid] + 2)   # smoothed so one odd label doesn't swing it
