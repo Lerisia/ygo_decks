@@ -25,6 +25,10 @@ ALIGN = 1536    # the render matched against the art
 ART = 1024      # the art's longer side, enlarged, for the matching: its features at a scale nearer the render's
 DRAW = 3072     # the first render; a figure the art shows larger is drawn again, up to 4096
 CLEAN = 0.03    # a figure the art covers this little goes into the pool unseen; more, and someone looks first
+LINES = 0.45    # how well the fine lines must coincide for the figure to count as plainly in place
+BAR = 30        # how far (blurred levels) the figure may differ from the art and still replace it...
+BAR_SURE = 80   # ...and where it is plainly in place
+GLOW = 15       # how much brighter than the toned figure the art must be for a light to count as the art's own
 KEY = "cutin:{}"   # CustomIllust.source_tweet_id of the illustration made from a print's cut-in
 INDEX = "md_ui/cutin/index.json"
 FRONTEND = Path(settings.BASE_DIR).parent / "frontend"
@@ -153,8 +157,14 @@ def _finished(base, colour, alpha, out):
     # occluded part or a part the rest pose holds elsewhere (라이징 리벨리온 팔콘's lower body) has no such match
     # (its correlation sits near 0) and keeps the strict bar, so it never doubles up.
     # a region, not a speck: most of a neighbourhood (σ 6 at 1024) must match
-    sure = cv2.GaussianBlur((_lines_match(base, colour, k) > 0.45).astype(np.float32), (0, 0), 6 * k)
-    agree = (differs < np.where(sure > 0.5, 80, 30)).astype(np.float32)
+    sure = cv2.GaussianBlur((_lines_match(base, colour, k) > LINES).astype(np.float32), (0, 0), 6 * k)
+    agree = (differs < np.where(sure > 0.5, BAR_SURE, BAR)).astype(np.float32)
+    # a light the art adds over the figure (a muzzle flash, a burst, rays) is far brighter than the toned figure
+    # beneath it, which the smooth toning cannot give: it stays the art's, however well the lines match beneath
+    # (엘리스 10/15, 구스타프 맥스: "포문 쪽 빛 터지는 게 좀 사라졌어요")
+    luminance = lambda im: cv2.cvtColor(np.clip(im, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    glow = cv2.GaussianBlur(np.clip(luminance(base) - luminance(whole), 0, 255), (0, 0), 2 * k)
+    agree = np.minimum(agree, np.clip((GLOW + 10 - glow) / 20, 0, 1))
     agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
     agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
