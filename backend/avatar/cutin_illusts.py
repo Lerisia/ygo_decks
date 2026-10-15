@@ -125,18 +125,25 @@ def compose(figure, M, art, out=OUT):
 
 def compose_looks(figures, M, art, out=OUT):
     """Several renders of the same pose in different looks (eyes shut or open, a slot faded in or not), laid on the
-    art together: each pixel comes from the look nearest the art there, so the open eyes win the eyes and the rest
-    pose wins where a later look adds something the art has not. Returns what `compose` does, then each look's
-    share of the solid figure."""
+    art together. Where the looks differ from one another, each connected patch of difference is taken whole from
+    the look nearest the art over that patch: the open eyes win the face (a face is one patch, so its chin line is
+    not stitched from two faces, 2026-10-15 아폴로우사), the rest pose wins a patch where a later look adds what the
+    art has not. Returns what `compose` does, then each look's share of the solid figure."""
     k = out / 1024
     base = enlarged(art, out).astype(np.float32)
     laid = [_laid(f, M, base, out) for f in figures]
-    far = []
-    for colour, alpha in laid:
-        differs = np.abs(_blur(base * (1 - alpha) + colour, k) - _blur(base, k)).mean(axis=2)
-        far.append(np.where(alpha[:, :, 0] > 0.95, differs, np.inf))   # only where the look shows something solid
-    far = np.stack(far)
-    choice = np.where(np.isfinite(far).any(axis=0), far.argmin(axis=0), 0)
+    wholes = [base * (1 - a) + c for c, a in laid]
+    soft = [cv2.GaussianBlur(w, (0, 0), 2 * k) for w in wholes]
+    base_soft = cv2.GaussianBlur(base, (0, 0), 2 * k)
+    far = np.stack([np.where(a[:, :, 0] > 0.95, np.abs(sw - base_soft).mean(axis=2), 255.0) for sw, (_, a) in zip(soft, laid)])
+    spread = (np.max(soft, axis=0) - np.min(soft, axis=0)).max(axis=2)   # where the looks disagree among themselves
+    count, patches = cv2.connectedComponents((spread > 10).astype(np.uint8), connectivity=8)
+    choice = np.zeros(base.shape[:2], np.int32)
+    if count > 1:
+        sums = np.stack([np.bincount(patches.ravel(), weights=f.ravel(), minlength=count) for f in far])   # look × patch
+        best = sums.argmin(axis=0)
+        best[0] = 0
+        choice = best[patches]
     weights = [cv2.GaussianBlur((choice == i).astype(np.float32), (0, 0), 3 * k)[:, :, None] for i in range(len(laid))]
     total = np.maximum(sum(weights), 1e-6)
     colour = sum(w * c for w, (c, _) in zip(weights, laid)) / total
