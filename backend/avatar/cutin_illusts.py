@@ -165,8 +165,10 @@ def _finished(base, colour, alpha, out):
     luminance = lambda im: cv2.cvtColor(np.clip(im, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
     glow = cv2.GaussianBlur(np.clip(luminance(base) - luminance(whole), 0, 255), (0, 0), 2 * k)
     agree = np.minimum(agree, np.clip((GLOW + 10 - glow) / 20, 0, 1))
-    agree = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
-    agree = cv2.GaussianBlur(agree, (0, 0), 1.5 * k)[:, :, None]
+    # the margin eroded off the agreeing area keeps a seam from showing, but it also took the thin tips (claws,
+    # fingers) off a figure that is plainly in place; there the figure keeps its own edge (10/16)
+    eroded = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
+    agree = cv2.GaussianBlur(np.where(sure > 0.5, agree, eroded), (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
     return picture.clip(0, 255).astype(np.uint8), covered, float((alpha > 0.5).mean()), gap
 
