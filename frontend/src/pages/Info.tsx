@@ -4,14 +4,20 @@ import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
 import { getPopularDecks, type PopularDeck } from "@/api/deckApi";
 import { getRecorderStats, type RecorderStats } from "@/api/recorderApi";
 import { getPackShowcase, type PackShowcase } from "@/api/packApi";
+import { getHomeSeason, type HomeSeason } from "@/api/homeApi";
 import { CONTACT_PATH, DONATE_URL } from "@/lib/siteMenu";
 import RecorderDownload, { WindowsOnly } from "@/components/RecorderDownload";
 import DeckPickerModal from "@/components/DeckPickerModal";
 import CardPickerModal from "@/components/CardPickerModal";
 import { useDexCounts } from "@/components/DexTabs";
+import { useAdminOnly } from "@/hooks/useAdminOnly";
+import { HOME_TILES_NEXT, HOME_TILES_NOW, metaChip, type NextTile } from "@/lib/homeTiles";
+import { mdSeason } from "@/utils/mdSeason";
 
 // Home (redesign 2026-10): the pillars, the 도감 (decks and cards), 레코더 and the 팩깡 시뮬레이터 (as big as the 도감,
 // 엘리스 2026-10-13); the rest as small tiles; 문의·후원 at the bottom.
+// layout "next" (/dev/home, operators only, 참혈 2026-10-16): the 팩깡 pillar becomes a tile so the search leads, and the
+// tiles are lib/homeTiles HOME_TILES_NEXT. It goes live by making "next" the default.
 
 const COLLAGE = 6;   // phone shows the first 4
 // How far each picture in the strip overlaps the one before it, as a share of a picture's width
@@ -28,15 +34,6 @@ const blendStyle = (i: number) => (i === 0 ? { left: 0, width: `calc(100% + ${BL
 });
 const packLink = (p: { id: number; version: number | null }) => `/packs/${p.id}${p.version ? `?v=${p.version}` : ""}`;
 
-const tiles: { to?: string; title: string; desc: string; soon?: boolean }[] = [
-  { to: "/records", title: "전적 시트", desc: "메타 통계·내 전적" },
-  { to: "/playground", title: "놀이터", desc: "퀴즈·미니게임" },
-  { to: "/tier-list-maker", title: "티어표 만들기", desc: "만들고 이미지로" },
-  { to: "/deck-scanner", title: "AI 덱 스캔", desc: "사진으로 덱 알아보기" },
-  { to: "/icon-shop", title: "포인트 상점", desc: "포인트로 아이콘·프레임 사기" },
-  { title: "대회", desc: "준비 중", soon: true },
-];
-
 const DISMISSED_KEY = "dismissed_changelog_id";
 // The notice last fetched, shown at once on the next visit so the page does not drop down when it arrives.
 const LATEST_KEY = "home_latest_notice";
@@ -48,14 +45,91 @@ const cachedNotice = (): Notice | null => {
     return null;
   }
 };
+// The cup stage last fetched, so the 메타 통계 tile opens in its colour; the season is worked out here.
+const SEASON_KEY = "home_season";
+const cachedSeason = (): HomeSeason => {
+  let cupStage: HomeSeason["cup_stage"] = null;
+  try {
+    const s = JSON.parse(localStorage.getItem(SEASON_KEY) || "null");
+    if (s?.cup_stage === 1 || s?.cup_stage === 2) cupStage = s.cup_stage;
+  } catch {
+    // none kept
+  }
+  return { season: mdSeason(new Date()), cup_stage: cupStage };
+};
 
-function Info() {
+// 「더 둘러보기」 on /dev/home: title line (title, then its chip) over the description, every tile the same height. On
+// phones the chip takes a line under the title, as no 3-column tile there is wide enough for both (참혈 2026-10-16).
+const TILE_BOX = "px-1.5 min-[375px]:px-2 py-2.5 sm:p-3 md:p-4 rounded-xl border flex flex-col gap-1 transition";
+const TILE_PLAIN = "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-400";
+const TILE_TONE = {
+  season: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:border-blue-500",
+  cup: "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 hover:border-purple-500",
+  // the 알림·신규 yellow: just added
+  packs: "bg-yellow-300/25 dark:bg-yellow-500/10 border-yellow-400 dark:border-yellow-500 hover:border-yellow-500 dark:hover:border-yellow-400",
+};
+const CHIP = "self-start sm:self-auto shrink-0 whitespace-nowrap text-[10px] font-bold leading-4 px-1.5 rounded-full";
+const CHIP_TONE = {
+  season: "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300",
+  cup: "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300",
+  packs: "bg-amber-500 text-white",
+  soon: "bg-gray-100 dark:bg-gray-700",
+};
+
+export function NextTiles({ season }: { season: HomeSeason }) {
+  const meta = metaChip(season.season, season.cup_stage);
+  const body = (t: NextTile) => {
+    const chip =
+      t.kind === "meta" ? (
+        <span className={`${CHIP} ${CHIP_TONE[meta.tone]}`} data-chip={meta.tone}>
+          {meta.label}
+          {meta.tail && <span className="hidden md:inline">{meta.tail}</span>}
+        </span>
+      ) : t.chip ? (
+        <span className={`${CHIP} ${CHIP_TONE[t.kind === "packs" ? "packs" : "soon"]}`}>{t.chip}</span>
+      ) : null;
+    return (
+      <>
+        <span className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+          <b className="text-[13px] sm:text-sm md:text-base break-keep">{t.title}</b>
+          {chip}
+        </span>
+        <span className={`text-[11px] min-[375px]:text-xs break-keep${t.soon ? "" : " text-gray-500 dark:text-gray-400"}`}>{t.desc}</span>
+      </>
+    );
+  };
+  return (
+    <div className="grid grid-cols-3 auto-rows-fr gap-2 md:gap-3">
+      {HOME_TILES_NEXT.map((t) =>
+        t.soon || !t.to ? (
+          // no page yet: the same tile, greyed, and nothing to press
+          <div key={t.title} aria-disabled="true" className={`${TILE_BOX} bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-default`}>
+            {body(t)}
+          </div>
+        ) : (
+          <Link
+            key={t.title}
+            to={t.to}
+            className={`${TILE_BOX} ${t.kind === "meta" ? TILE_TONE[meta.tone] : t.kind === "packs" ? TILE_TONE.packs : TILE_PLAIN}`}
+          >
+            {body(t)}
+          </Link>
+        ),
+      )}
+    </div>
+  );
+}
+
+function Info({ layout = "now" }: { layout?: "now" | "next" }) {
+  const next = layout === "next";
+  const admin = useAdminOnly(next);
   const navigate = useNavigate();
   const [latest, setLatest] = useState<Notice | null>(cachedNotice);
   const [dismissed, setDismissed] = useState(() => latest !== null && localStorage.getItem(DISMISSED_KEY) === String(latest.id));
   const [popular, setPopular] = useState<{ total: number; decks: PopularDeck[] } | null>(null);
   const [rec, setRec] = useState<RecorderStats | null>(null);
   const [show, setShow] = useState<PackShowcase | null>(null);
+  const [season, setSeason] = useState<HomeSeason>(cachedSeason);
   const counts = useDexCounts();
   const [picker, setPicker] = useState<"deck" | "card" | null>(null);
   // Desktop opens the search out in place; phones keep the modal (특이점 2026-10-08). Cards search the same way (엘리스 2026-10-11).
@@ -90,8 +164,17 @@ function Info() {
       .catch(() => {});
     getPopularDecks(COLLAGE).then(setPopular).catch(() => setPopular({ total: 0, decks: [] }));
     getRecorderStats().then(setRec).catch(() => {});
-    getPackShowcase().then(setShow).catch(() => setShow({ count: 0, packs: [] }));
-  }, []);
+    if (next) {
+      getHomeSeason()
+        .then((s) => {
+          setSeason(s);
+          localStorage.setItem(SEASON_KEY, JSON.stringify(s));
+        })
+        .catch(() => {});
+    } else {
+      getPackShowcase().then(setShow).catch(() => setShow({ count: 0, packs: [] }));
+    }
+  }, [next]);
 
   const handleDismiss = () => {
     if (!latest) return;
@@ -100,6 +183,7 @@ function Info() {
   };
 
   const decks = popular?.decks ?? [];
+  if (!admin) return <div className="min-h-screen" />;
 
   return (
     <div className="min-h-screen px-4 pt-6 pb-5 md:pb-8 max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex flex-col gap-4 md:gap-5 text-gray-900 dark:text-white">
@@ -237,7 +321,7 @@ function Info() {
         </section>
 
         {/* Pillar 3: the pack simulator, built as the deck book is (엘리스 2026-10-13: "크게 넣고 싶어요 도감처럼") */}
-        <section aria-labelledby="home-packs" className="lg:col-span-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        {!next && <section aria-labelledby="home-packs" className="lg:col-span-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <Link to="/packs" tabIndex={-1} aria-hidden="true" className="home-collage-fade relative grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 h-28 md:h-40 rounded-t-[15px] overflow-hidden bg-gray-200 dark:bg-gray-700">
             {Array.from({ length: PACK_STRIP }, (_, i) => {
               const p = show?.packs[i];
@@ -279,7 +363,7 @@ function Info() {
               <span className="text-sm font-bold text-violet-600 dark:text-violet-400 whitespace-nowrap">팩 열러 가기 →</span>
             </Link>
           </div>
-        </section>
+        </section>}
       </div>
 
       <section aria-labelledby="home-more">
@@ -287,8 +371,8 @@ function Info() {
           <h2 id="home-more" className="text-base md:text-lg font-bold">더 둘러보기</h2>
           <Link to="/all" className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600">더보기 →</Link>
         </div>
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
-          {tiles.map((t) =>
+        {next ? <NextTiles season={season} /> : <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+          {HOME_TILES_NOW.map((t) =>
             t.soon ? (
               <div key={t.title} className="p-3 md:p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col gap-1 min-h-[76px] text-gray-400 dark:text-gray-500">
                 <span className="self-start text-[10px] font-bold px-1.5 rounded-full bg-gray-100 dark:bg-gray-700">준비 중</span>
@@ -301,7 +385,7 @@ function Info() {
               </Link>
             ),
           )}
-        </div>
+        </div>}
       </section>
 
       <section aria-labelledby="home-support" className="rounded-2xl p-4 md:p-6 bg-gray-100 dark:bg-gray-800/60 flex flex-col md:flex-row md:items-center gap-3 md:gap-6">

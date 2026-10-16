@@ -8,6 +8,7 @@ from .views import (
     remove_record_group_member, record_group_contributors
 )
 from .dev_icons import icon_choices
+from .season import home_season
 
 urlpatterns = [
     path("record-groups/create/", create_record_group, name="create-record-group"),
@@ -29,5 +30,6 @@ urlpatterns = [
     path("match-records/<int:match_id>/update/", update_match_record, name="update-match-record"),\
     path("recent-meta-deck-stats/", recent_meta_deck_stats, name="recent_meta_deck_stats"),
     path("dev/icon-choices/", icon_choices, name="dev-icon-choices"),
+    path("home/season/", home_season, name="home-season"),
     path("record-groups/<int:record_group_id>/rank-history/", get_record_group_rank_history, name="record-group-rank-history"),
 ]

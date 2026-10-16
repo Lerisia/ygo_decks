@@ -206,6 +206,8 @@ function App() {
             {/* the site's design in one page: colours, type, components, how often each is used (operators only, 참혈 2026-10-14) */}
             <Route path="/dev/palette" element={<DevPalette />} />
             <Route path="/dev/icons" element={<DevIcons />} />
+            {/* the home page's next layout, tuned here before it goes live (operators only, 참혈 2026-10-16) */}
+            <Route path="/dev/home" element={<Info key="dev-home" layout="next" />} />
             {/* the card faces' letters: every piece's place, size and font, tuned over faces drawn without them (operators only, 참혈 2026-10-14) */}
             <Route path="/dev/cardlayout" element={<DevCardLayout />} />
             <Route path="/records" element={<RecordGroups />} />

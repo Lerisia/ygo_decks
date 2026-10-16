@@ -163,8 +163,9 @@ function Navbar() {
           )}
         </div>
       </div>
-      {/* Name and points under the phone bar on the home page only; elsewhere the bar stays one row (참혈 2026-10-11). */}
-      {isLoggedIn && userInfo && !inMultiplayerRoom && location.pathname === "/" && (
+      {/* Name and points under the phone bar on the home page only (and its /dev/home trial); elsewhere the bar stays one
+          row (참혈 2026-10-11). */}
+      {isLoggedIn && userInfo && !inMultiplayerRoom && (location.pathname === "/" || location.pathname === "/dev/home") && (
         <div className="sm:hidden flex items-center justify-between px-4 h-8 text-xs bg-gray-50 dark:bg-gray-900/60 border-b border-gray-100 dark:border-gray-800">
           <span className="truncate"><span className="font-semibold">{userInfo.username}</span>님</span>
           {pointsLink}
