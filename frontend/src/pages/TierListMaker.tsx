@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DndProvider, useDrag, useDrop, useDragLayer } from "react-dnd";
 import { MultiBackend, TouchTransition, MouseTransition } from "react-dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 import { toPng } from "html-to-image";
 import { getAllDecks } from "@/api/deckApi";
+import { getUserDecks, isAuthenticated } from "@/api/accountApi";
 import SearchForm from "@/components/SearchForm";
 
 type Deck = {
@@ -480,6 +481,9 @@ export default function TierListMaker() {
   const [showLabels, setShowLabels] = useState(true);
   const [aestheticTags, setAestheticTags] = useState<string[]>([]);
   const [selectedAestheticTags, setSelectedAestheticTags] = useState<string[]>([]);
+  // null = logged out or not loaded, so the owned-only filter stays hidden
+  const [ownedIds, setOwnedIds] = useState<Set<number> | null>(null);
+  const [ownedOnly, setOwnedOnly] = useState(false);
 
   useEffect(() => {
     getAllDecks().then((data) => setAllDecks(data.decks || [])).catch(() => {});
@@ -487,6 +491,15 @@ export default function TierListMaker() {
       .then((res) => res.json())
       .then((data) => setAestheticTags(data.aesthetic_tags || []))
       .catch(() => {});
+    if (isAuthenticated()) {
+      getUserDecks()
+        .then((data) => {
+          if (Array.isArray(data?.owned_decks)) {
+            setOwnedIds(new Set(data.owned_decks.map((d: { id: number }) => d.id)));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const toggleAestheticTag = (tag: string) => {
@@ -502,12 +515,13 @@ export default function TierListMaker() {
     return allDecks
       .filter((d) => !placedIds.has(d.id))
       .filter((d) => !q || d.name.toLowerCase().includes(q))
+      .filter((d) => !ownedOnly || !ownedIds || ownedIds.has(d.id))
       .filter(
         (d) =>
           selectedAestheticTags.length === 0 ||
           selectedAestheticTags.every((tag) => d.aesthetic_tags?.includes(tag))
       );
-  }, [allDecks, placedIds, search, selectedAestheticTags]);
+  }, [allDecks, placedIds, search, selectedAestheticTags, ownedOnly, ownedIds]);
 
   const deckById = useMemo(() => {
     const m = new Map<number, Deck>();
@@ -718,6 +732,18 @@ export default function TierListMaker() {
           </SearchForm>
         </div>
 
+        {ownedIds && (
+          <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={ownedOnly}
+              onChange={(e) => setOwnedOnly(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <span className="text-sm font-medium">보유한 덱만 보기</span>
+          </label>
+        )}
+
         {aestheticTags.length > 0 && (
           <div className="mb-3">
             <p className="text-left text-sm font-semibold mb-2">태그 (비성능적)</p>
@@ -813,9 +839,20 @@ export default function TierListMaker() {
           <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 justify-items-center">
             {filteredPool.length === 0 ? (
               <div className="col-span-full text-center text-gray-400 py-6 text-sm">
-                {search || selectedAestheticTags.length > 0
-                  ? "검색 결과가 없습니다"
-                  : "모든 덱이 배치되었습니다"}
+                {search || selectedAestheticTags.length > 0 ? (
+                  "검색 결과가 없습니다"
+                ) : ownedOnly && ownedIds?.size === 0 ? (
+                  <>
+                    등록한 보유 덱이 없습니다 ·{" "}
+                    <Link to="/mypage/mydecks" className="text-blue-600 dark:text-blue-400 hover:underline">
+                      보유 덱 관리
+                    </Link>
+                  </>
+                ) : ownedOnly ? (
+                  "보유한 덱이 모두 배치되었습니다"
+                ) : (
+                  "모든 덱이 배치되었습니다"
+                )}
               </div>
             ) : (
               filteredPool.map((d, idx) => (
