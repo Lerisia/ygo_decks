@@ -77,10 +77,15 @@ export default function DeckListView() {
           }
           description={deck.description && <p className="m-0 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line break-keep">{deck.description}</p>}
           // 「MD • 최신」, its day in the title (참혈 2026-10-16)
+          // 「금제 |」 before it on the page alone (참혈 2026-10-16)
           banlist={
-            <span className="min-w-0 truncate font-semibold text-gray-700 dark:text-gray-200" title={banlistTitle(draft.banlist, banlists)}>
-              {banlistName(draft.banlist, banlists)}
-            </span>
+            <>
+              <span className="shrink-0">금제</span>
+              <span className="shrink-0 mx-1.5 text-gray-300 dark:text-gray-600" aria-hidden>|</span>
+              <span className="min-w-0 truncate font-semibold text-gray-700 dark:text-gray-200" title={banlistTitle(draft.banlist, banlists)}>
+                {banlistName(draft.banlist, banlists)}
+              </span>
+            </>
           }
           warnings={deckWarnings(draft, cards, rule)}
           error={error}

@@ -25,7 +25,7 @@ export function DeckWarnings({ short, over, later }: ReturnType<typeof deckWarni
 
 /** A deck's page and its editor laid out as one (참혈 2026-10-16: "수정사항이 같이 반영되도록"), each page putting in only
  *  its own pieces: the top line; the 대표 카드 on the left, beside them the name's line — its icons at the end — and
- *  the description under it, as tall as the cards; 24px down, 「금제 |」 and the list on the left of a line of a fixed
+ *  the description under it, as tall as the cards; 24px down, the 금제 on the left of a line of a fixed
  *  height, the warnings on its right; then the deck. Spacing, order and heights live here alone. */
 export default function DeckPage({ top, topEnd, cover, name, actions, description, banlist, warnings, error, children }: {
   /** the top line's left: the editor's title, the page's way back */
@@ -38,7 +38,7 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
   actions: ReactNode;
   /** filling the height left beside the cards */
   description?: ReactNode;
-  /** after 「금제 |」 */
+  /** the page's 「금제 | MD • 최신」, the editor's picker alone (참혈 2026-10-16) */
   banlist: ReactNode;
   warnings: ReturnType<typeof deckWarnings>;
   error?: string | null;
@@ -62,11 +62,7 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
         </div>
       </div>
       <div className="mt-2 h-8 flex items-center gap-2 sm:gap-3 text-xs">
-        <div className="min-w-0 flex items-center tabular-nums text-gray-500 dark:text-gray-400">
-          <span className="shrink-0">금제</span>
-          <span className="shrink-0 mx-1.5 text-gray-300 dark:text-gray-600" aria-hidden>|</span>
-          {banlist}
-        </div>
+        <div className="min-w-0 flex items-center tabular-nums text-gray-500 dark:text-gray-400">{banlist}</div>
         <DeckWarnings {...warnings} />
       </div>
       {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

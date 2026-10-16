@@ -255,7 +255,7 @@ export default function DeckListEdit() {
                 onDone={() => setCoverSlot(null)}
               />
             }
-            // as tall as the page's name and as big from sm, so going between the two moves nothing (참혈 2026-10-16)
+            // a box like the description's, in its size and weight (참혈 2026-10-16)
             name={
               <input
                 aria-label="덱 이름"
@@ -263,7 +263,7 @@ export default function DeckListEdit() {
                 maxLength={40}
                 value={deck.name}
                 onChange={(e) => setDeck({ ...deck, name: e.target.value })}
-                className={`${FIELD} block h-8 px-2.5 text-base sm:text-xl font-bold placeholder:font-normal`}
+                className={`${FIELD} block px-3 py-2 text-base md:text-sm`}
               />
             }
             // 취소 and 저장 as bare icons where the page has 수정 and 삭제, 저장 in blue (참혈 2026-10-16)
@@ -300,7 +300,8 @@ export default function DeckListEdit() {
             error={error}
           >
             {/* From lg the search stands beside the zones, as tall as the two of them (참혈 2026-10-14): it fills its cell
-                without making it taller, so the zones alone decide the row's height. */}
+                without making it taller, so the zones decide the row's height — but never below three rows of results
+                with the 카드군/서포트 suggestions shown (참혈 2026-10-16). */}
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch lg:gap-4">
               <DeckZones
                 deck={deck}
@@ -313,7 +314,7 @@ export default function DeckListEdit() {
                 picking={coverSlot !== null}
                 marks={marks}
               />
-              <div className="lg:relative">
+              <div className="lg:relative lg:min-h-[850px]">
                 <CardSearchPanel
                   deck={deck}
                   cards={cards}
