@@ -409,8 +409,16 @@ def cards(request):
     if str(p.get("card", "")).isdigit():
         named = Card.objects.filter(id=int(p["card"])).first()
         extra["card_filter"] = {"id": named.id, "name": display_name(named)} if named else None
+    alts = None
+    if _asked_ids(p) is not None:   # a deck's cards: its copies may be drawn in an alternate art (참혈 2026-10-16)
+        alts = defaultdict(list)
+        for cid, md in (MdPrint.objects.filter(card_id__in=[r.id for r in chunk], is_alt_art=True)
+                        .order_by("md_id").values_list("card_id", "md_id")):
+            thumb = face_thumb_url(md)
+            if thumb:
+                alts[cid].append({"id": md, "thumb": thumb})
     return Response({**extra,
-        "results": [{"id": r.id, "name": r.name,
+        "results": [{**({"alts": alts[r.id]} if alts is not None else {}), "id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
                      "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban,

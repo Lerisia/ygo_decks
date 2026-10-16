@@ -1,10 +1,11 @@
 import { useRef } from "react";
 
-const HOLD_MS = 450;   // held this long, a touch shows the card instead of pressing it
-const SLOP = 10;       // a finger that moves further is scrolling
+const HOLD_MS = 450;   // held this long, a press shows the card instead
+const SLOP = 10;       // a finger (or a mouse dragged) that moves further is scrolling or dragging
 
-/** A card that does one thing when pressed and shows itself when held (a phone) or right-clicked (a computer), as
- *  Master Duel's deck editor does (엘리스 2026-10-14). The props go on the card's button. */
+/** A card that does one thing when pressed and shows itself when held or right-clicked, as Master Duel's deck
+ *  editor does (엘리스 2026-10-14); a mouse held down shows it too (참혈 2026-10-16). The props go on the card's
+ *  button. */
 export function usePressCard() {
   const timer = useRef<number | undefined>(undefined);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -16,7 +17,7 @@ export function usePressCard() {
   return (onPress: () => void, onShow: () => void) => ({
     onPointerDown: (e: React.PointerEvent) => {
       held.current = false;
-      if (e.pointerType === "mouse") return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;   // the right button shows it on its own (onContextMenu)
       start.current = { x: e.clientX, y: e.clientY };
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {

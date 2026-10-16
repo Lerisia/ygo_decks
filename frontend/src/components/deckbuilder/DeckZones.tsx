@@ -2,7 +2,9 @@ import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
-import { type DeckDraft, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, overLimit, sortedZone } from "@/lib/deckDrafts";
+import {
+  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, lookThumb, overLimit, sortedCopies,
+} from "@/lib/deckDrafts";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
 // deck two on phones and tablets and three from lg, the extra deck one (deck-zone-reserve in index.css).
@@ -11,17 +13,33 @@ const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준�
 // what a zone lacks or holds too many of, by its title, in yellow (참혈 2026-10-16)
 const WARN = "text-xs font-semibold text-amber-600 dark:text-amber-400";
 
-/** A card's picture as the card book draws it, its 금제 in the corner. */
-export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: boolean }) {
+const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
+
+/** A copy in 샤인 or 로얄 on a small card (참혈 2026-10-16): a still sheen over it and a small gem in the corner, not
+ *  the shader, which a deck's worth of would weigh too much (card-sheen in index.css). */
+export function FinishMark({ finish }: { finish: CardLook["finish"] | undefined }) {
+  if (finish !== "shine" && finish !== "royal") return null;
+  return (
+    <>
+      <span className={`card-sheen card-sheen-${finish} absolute inset-0 card-corner pointer-events-none`} aria-hidden />
+      <span className={`card-gem card-gem-${finish} absolute bottom-[3%] left-[5%] pointer-events-none`} title={FINISH_LABEL[finish]} aria-label={FINISH_LABEL[finish]} />
+    </>
+  );
+}
+
+/** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look) — its 금제 in
+ *  the corner. */
+export function DeckCardFace({ card, look, dim = false }: { card: CardListItem; look?: CardLook | null; dim?: boolean }) {
   return (
     <span className="relative block">
       <img
         loading="lazy"
         decoding="async"
-        src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
+        src={lookThumb(card, look)}
         alt={card.name}
         className={`w-full aspect-[704/1024] object-contain card-corner transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`}
       />
+      <FinishMark finish={look?.finish} />
       {card.ban && (
         <img
           src={`/media/md_ui/info/limit/${card.ban}.webp`}
@@ -35,17 +53,21 @@ export function DeckCardFace({ card, dim = false }: { card: CardListItem; dim?: 
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, marks }: {
+function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reserve, picking, marks }: {
   zone: DeckZone;
+  /** as kept: an id once per copy, in the order they went in */
   ids: number[];
+  looks: (CardLook | null)[];
+  order: Map<number, number>;
   cards: Map<number, CardListItem>;
   loading: boolean;
-  /** `copy`: which copy of the card was pressed (0 for the first), for a 대표 카드 marked on it */
-  onRemove?: (id: number, copy: number) => void;
-  onShow?: (card: CardListItem) => void;
+  /** `at`: the copy pressed, by its place in ids */
+  onRemove?: (at: number) => void;
+  onShow?: (card: CardListItem, at: number) => void;
   reserve: boolean;
   picking?: boolean;
-  marks?: Map<number, { slot: number; copy: number }>;
+  /** the 대표 카드 slot (1–3) of the copy at each place marked */
+  marks?: Map<number, number>;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
@@ -82,26 +104,24 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
       <div className={`deck-zone ${reserve ? RESERVE[zone] : ""}`}>
       {ids.length ? (
         <div className={`deck-zone-grid ${reserve ? "deck-zone-reserve" : ""}`}>
-          {ids.map((id, i) => {
+          {/* each copy in the 디폴트 순, pressed or shown as itself: its look, its 대표 카드 mark (참혈 2026-10-16) */}
+          {sortedCopies(ids, order).map((at) => {
+            const id = ids[at];
             const card = cards.get(id);
-            // a 대표 카드 is marked on the one copy picked, not on every copy of the card (참혈 2026-10-16)
-            const copy = i - ids.indexOf(id);
             if (!card) {
-              return <span key={`${id}-${i}`} className={`${TILE_BLANK} ${loading ? "animate-pulse" : ""}`} />;
+              return <span key={`${id}-${at}`} className={`${TILE_BLANK} ${loading ? "animate-pulse" : ""}`} />;
             }
-            const m = marks?.get(id);
-            // (fewer copies left than the one picked: the last of them)
-            const mark = m && copy === Math.min(m.copy, ids.lastIndexOf(id) - ids.indexOf(id)) ? m.slot : undefined;
+            const mark = marks?.get(at);
             return onRemove ? (
               <button
-                key={`${id}-${i}`}
+                key={`${id}-${at}`}
                 type="button"
-                {...press(() => onRemove(id, copy), () => onShow?.(card))}
+                {...press(() => onRemove(at), () => onShow?.(card, at))}
                 title={picking ? `${card.name} (눌러서 대표 카드로)` : `${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
-                <DeckCardFace card={card} />
+                <DeckCardFace card={card} look={looks[at]} />
                 {overIds.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
                 {mark !== undefined && (
                   <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
@@ -110,8 +130,8 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
                 )}
               </button>
             ) : (
-              <Link key={`${id}-${i}`} to={`/cards/${id}`} title={card.name} className="group block">
-                <DeckCardFace card={card} />
+              <Link key={`${id}-${at}`} to={`/cards/${id}`} title={card.name} className="group block">
+                <DeckCardFace card={card} look={looks[at]} />
               </Link>
             );
           })}
@@ -130,16 +150,18 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
 export default function DeckZones({ deck, cards, order, loading, onRemove, onShow, picking, marks }: {
-  deck: Pick<DeckDraft, DeckZone>;
+  deck: Pick<DeckDraft, DeckZone> & { looks: DeckLooks };
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
   loading: boolean;
-  onRemove?: (zone: DeckZone, id: number, copy: number) => void;
-  /** Building: a card held (phone) or right-clicked (computer) is shown. */
-  onShow?: (card: CardListItem) => void;
-  /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: the slot of each. */
+  /** Building: the copy pressed, by its place in the zone as kept. */
+  onRemove?: (zone: DeckZone, at: number) => void;
+  /** Building: a copy held or right-clicked is shown. */
+  onShow?: (card: CardListItem, zone: DeckZone, at: number) => void;
+  /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: each zone's places
+   *  holding one, with their slot. */
   picking?: boolean;
-  marks?: Map<number, { slot: number; copy: number }>;
+  marks?: Record<DeckZone, Map<number, number>>;
 }) {
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -147,14 +169,16 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
         <Zone
           key={z}
           zone={z}
-          ids={sortedZone(deck[z], order)}
+          ids={deck[z]}
+          looks={deck.looks[z]}
+          order={order}
           cards={cards}
           loading={loading}
-          onRemove={onRemove && ((id, copy) => onRemove(z, id, copy))}
-          onShow={onShow}
+          onRemove={onRemove && ((at) => onRemove(z, at))}
+          onShow={onShow && ((card, at) => onShow(card, z, at))}
           reserve={!!onRemove}
           picking={picking}
-          marks={marks}
+          marks={marks?.[z]}
         />
       ))}
     </div>

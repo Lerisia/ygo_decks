@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_HISTORY, record, redo, undo } from "./deckHistory";
 
-const deck = (main: number[], covers: (number | null)[] = []) => ({ main, extra: [] as number[], covers });
+const deck = (main: number[], covers: ({ id: number; copy: number } | null)[] = []) => ({
+  main, extra: [] as number[], looks: { main: main.map(() => null), extra: [] }, covers,
+});
 
 describe("deck builder undo / redo (참혈 2026-10-16)", () => {
   it("steps back and forward through the changes", () => {
@@ -27,8 +29,13 @@ describe("deck builder undo / redo (참혈 2026-10-16)", () => {
   });
   it("keeps the 대표 카드 with the cards and at most 100 steps", () => {
     let h = EMPTY_HISTORY;
-    for (let i = 0; i < 120; i++) h = record(h, deck([i], [i]));
+    for (let i = 0; i < 120; i++) h = record(h, deck([i], [{ id: i, copy: 0 }]));
     expect(h.past.length).toBe(100);
-    expect(undo(h, deck([0]))![1].covers).toEqual([119]);
+    expect(undo(h, deck([0]))![1].covers).toEqual([{ id: 119, copy: 0 }]);
+  });
+  it("keeps each copy's look with the cards", () => {
+    const before = { ...deck([1]), looks: { main: [{ face: 9, finish: "shine" as const }], extra: [] } };
+    const h = record(EMPTY_HISTORY, before);
+    expect(undo(h, deck([1]))![1].looks).toEqual(before.looks);
   });
 });

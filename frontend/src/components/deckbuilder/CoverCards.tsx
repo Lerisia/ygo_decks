@@ -1,5 +1,6 @@
 import type { CardListItem } from "@/api/cardDexApi";
-import { COVERS_MAX } from "@/lib/deckDrafts";
+import { type CardLook, type CoverPick, COVERS_MAX, lookThumb } from "@/lib/deckDrafts";
+import { FinishMark } from "./DeckZones";
 
 // The three slots fanned in one square (참혈 2026-10-16): the first in front in the middle, the second behind on the
 // left, the third behind on the right. Drawn back to front; the slot being set comes to the front.
@@ -13,35 +14,42 @@ const CARD = "absolute w-1/2 aspect-[704/1024] card-corner transition";
 // where a slot's number shows on an empty card: in the part the front card leaves uncovered
 const NUMBER_AT = ["inset-0 items-center justify-center", "inset-y-0 left-[12%] items-start pt-[18%]", "inset-y-0 right-[12%] items-start pt-[18%]"];
 
-function Slot({ at, id, cards, active }: { at: number; id: number | null; cards: Map<number, CardListItem>; active: boolean }) {
-  const card = id === null ? undefined : cards.get(id);
-  // the slot being set: one solid blue edge and a tint, never a ring around a border (참혈 2026-10-16)
-  const ring = active ? "ring-2 ring-blue-500" : "";
-  if (id === null) {
+function Slot({ at, pick, look, cards, active }: {
+  at: number; pick: CoverPick | null; look: CardLook | null; cards: Map<number, CardListItem>; active: boolean;
+}) {
+  const card = pick === null ? undefined : cards.get(pick.id);
+  // the slot being set (참혈 2026-10-16): an empty one keeps its dashed card's look, its edge alone turning solid
+  // blue; one holding a card is not marked
+  if (pick === null) {
     return (
-      <span className={`flex border-2 w-full h-full card-corner ${active ? "border-solid border-blue-500 bg-blue-50 dark:bg-blue-900/40" : "border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"}`}>
-        <span className={`absolute flex font-semibold ${active ? "text-blue-600 dark:text-blue-300" : "text-gray-400 dark:text-gray-500"} ${NUMBER_AT[at]}`}>
+      <span className={`flex border-2 w-full h-full card-corner bg-gray-50 dark:bg-gray-800 ${active ? "border-solid border-blue-500" : "border-dashed border-gray-300 dark:border-gray-600"}`}>
+        <span className={`absolute flex font-semibold text-gray-400 dark:text-gray-500 ${NUMBER_AT[at]}`}>
           {at === 0 ? <span className="text-[11px] lg:text-[13px] leading-tight text-center break-keep px-1">대표<br />카드</span> : <span className="text-xs lg:text-sm">{at + 1}</span>}
         </span>
       </span>
     );
   }
-  if (!card) return <span className={`block w-full h-full card-corner bg-gray-200 dark:bg-gray-700 animate-pulse ${ring}`} />;
+  if (!card) return <span className="block w-full h-full card-corner bg-gray-200 dark:bg-gray-700 animate-pulse" />;
+  // drawn as the copy picked looks (참혈 2026-10-16)
   return (
-    <img
-      src={card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"}
-      alt={card.name}
-      className={`block w-full h-full object-contain card-corner shadow-md ${ring}`}
-    />
+    <span className="relative block w-full h-full card-corner shadow-md">
+      <img src={lookThumb(card, look)} alt={card.name} className="block w-full h-full object-contain card-corner" />
+      <FinishMark finish={look?.finish} />
+    </span>
   );
 }
 
+// while a slot is being set, under the cards: the way out (참혈 2026-10-16)
+const DONE = "absolute left-1/2 -translate-x-1/2 bottom-1 z-50 h-6 px-2.5 inline-flex items-center rounded-md bg-gray-900/80 dark:bg-black/80 text-white text-[11px] lg:text-xs font-semibold whitespace-nowrap shadow-md";
+
 /** The deck's 대표 카드 (참혈 2026-10-16), up to three fanned in a square left of its name and description, bigger
- *  from lg. From lg each
- *  slot is pressed on its own (onSlot): the one being set (active) stands out, and the deck's cards pressed go into it.
- *  Below lg the square is one button (onArea), starting with the first slot and going on from there. */
-export default function CoverCards({ covers, cards, active, wide, onSlot, onArea }: {
-  covers: (number | null)[];
+ *  from lg, each drawn as the copy picked looks. From lg each slot is pressed on its own (onSlot): the one being set
+ *  (active) comes to the front, and the deck's cards pressed go into it. Below lg the square is one button (onArea),
+ *  starting with the first slot and going on from there. While one is set, 「눌러서 종료」 floats at the square's
+ *  bottom: from lg it, or the slot being set pressed again, stops (onDone); below lg the whole square does. */
+export default function CoverCards({ covers, lookOf, cards, active, wide, onSlot, onArea, onDone }: {
+  covers: (CoverPick | null)[];
+  lookOf: (pick: CoverPick) => CardLook | null;
   cards: Map<number, CardListItem>;
   /** the slot being set, or null */
   active: number | null;
@@ -49,9 +57,11 @@ export default function CoverCards({ covers, cards, active, wide, onSlot, onArea
   wide: boolean;
   onSlot: (slot: number) => void;
   onArea: () => void;
+  onDone: () => void;
 }) {
   const slots = Array.from({ length: COVERS_MAX }, (_, i) => covers[i] ?? null);
-  const name = (i: number) => (slots[i] === null ? "비어 있음" : (cards.get(slots[i]!)?.name ?? ""));
+  const name = (i: number) => (slots[i] === null ? "비어 있음" : (cards.get(slots[i]!.id)?.name ?? ""));
+  const slot = (i: number) => <Slot at={i} pick={slots[i]} look={slots[i] && lookOf(slots[i]!)} cards={cards} active={active === i} />;
   const SIZE = "relative shrink-0 w-[116px] h-[116px] lg:w-[168px] lg:h-[168px]";
 
   if (!wide) {
@@ -65,9 +75,10 @@ export default function CoverCards({ covers, cards, active, wide, onSlot, onArea
       >
         {DRAW_ORDER.map((i) => (
           <span key={i} className={`${CARD} ${SLOT_LOOK[i]} ${active === i ? "!z-40" : ""}`}>
-            <Slot at={i} id={slots[i]} cards={cards} active={active === i} />
+            {slot(i)}
           </span>
         ))}
+        {active !== null && <span className={DONE}>눌러서 종료</span>}
       </button>
     );
   }
@@ -80,12 +91,15 @@ export default function CoverCards({ covers, cards, active, wide, onSlot, onArea
           onClick={() => onSlot(i)}
           aria-pressed={active === i}
           aria-label={`대표 카드 ${i + 1}: ${name(i)}`}
-          title={active === i ? "다시 누르면 취소" : `대표 카드 ${i + 1}`}
+          title={active === i ? "다시 누르면 종료" : `대표 카드 ${i + 1}`}
           className={`${CARD} ${SLOT_LOOK[i]} p-0 border-0 bg-transparent hover:-translate-y-1 ${active === i ? "!z-40" : ""}`}
         >
-          <Slot at={i} id={slots[i]} cards={cards} active={active === i} />
+          {slot(i)}
         </button>
       ))}
+      {active !== null && (
+        <button type="button" onClick={onDone} className={`${DONE} border-0 hover:bg-gray-900 dark:hover:bg-black`}>눌러서 종료</button>
+      )}
     </div>
   );
 }

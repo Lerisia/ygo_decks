@@ -5,7 +5,7 @@ import { deleteDeckList, getDeckList, type DeckListDoc } from "@/api/deckListApi
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { useDeckCards } from "@/hooks/useDeckCards";
-import { deckDay } from "@/lib/deckDrafts";
+import { deckDay, fitLooks } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
 const BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
@@ -72,7 +72,7 @@ export default function DeckListView() {
           )}
           {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="mt-4">
-            <DeckZones deck={deck} cards={cards} order={order} loading={loading} />
+            <DeckZones deck={{ ...deck, looks: fitLooks(deck) }} cards={cards} order={order} loading={loading} />
           </div>
         </>
       ) : (

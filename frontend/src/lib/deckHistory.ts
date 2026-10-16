@@ -1,14 +1,14 @@
 import type { DeckDraft } from "./deckDrafts";
 
-/** The deck builder's undo / redo (참혈 2026-10-16): what the deck holds — its cards and 대표 카드 — before each change.
- *  Its name and description are typed in boxes that undo on their own, so they are left as they are. */
-export type DeckSnap = Pick<DeckDraft, "main" | "extra" | "covers">;
+/** The deck builder's undo / redo (참혈 2026-10-16): what the deck holds — its cards, their looks and 대표 카드 — before
+ *  each change. Its name and description are typed in boxes that undo on their own, so they are left as they are. */
+export type DeckSnap = Pick<DeckDraft, "main" | "extra" | "looks" | "covers">;
 export type DeckHistory = { past: DeckSnap[]; future: DeckSnap[] };
 
 export const EMPTY_HISTORY: DeckHistory = { past: [], future: [] };
 const LIMIT = 100;
 
-const snap = (d: DeckSnap): DeckSnap => ({ main: d.main, extra: d.extra, covers: d.covers });
+const snap = (d: DeckSnap): DeckSnap => ({ main: d.main, extra: d.extra, looks: d.looks, covers: d.covers });
 
 /** A change is made: the deck before it can be gone back to, and nothing can be redone any more. */
 export const record = (h: DeckHistory, before: DeckSnap): DeckHistory => ({ past: [...h.past, snap(before)].slice(-LIMIT), future: [] });

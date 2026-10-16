@@ -3,7 +3,7 @@ from datetime import date
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from carddb.models import Banlist, BanlistEntry, Card
+from carddb.models import Banlist, BanlistEntry, Card, MdPrint
 from user.models import User
 
 from .models import DeckList
@@ -121,3 +121,58 @@ class DeckListApiTest(TestCase):
         r = self.c.put(f"/api/decklists/{code}/", self.body(extra=[]), format="json")
         self.assertEqual((r.status_code, r.json()["cover_cards"]), (200, [1]))
         self.assertEqual(self.c.post("/api/decklists/", self.body(), format="json").json()["cover_cards"], [])
+
+    def test_each_copy_keeps_its_look(self):
+        """Each copy's print (its own or a Master Duel alternate art) and finish (일반 / 샤인 / 로얄), lined up with the
+        cards (참혈 2026-10-16); 로얄 on an SR / UR print only, as the card page offers it."""
+        MdPrint.objects.create(md_id=1, card=self.ash, rarity="R")
+        MdPrint.objects.create(md_id=9001, card=self.ash, is_alt_art=True, rarity="UR")
+        MdPrint.objects.create(md_id=2, card=self.pot, rarity="SR")
+        looks = {"main": [None, {"face": 9001, "finish": "royal"}, {"face": 1, "finish": "shine"}, None, None, {"face": 2, "finish": "royal"}],
+                 "extra": [None]}
+        r = self.c.post("/api/decklists/", self.body(looks=looks), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        code = r.json()["code"]
+        self.assertEqual(self.c.get(f"/api/decklists/{code}/").json()["looks"], looks)
+        # its own print in 일반 is kept as none; all plain is kept as nothing
+        plain = {"main": [{"face": 1, "finish": "normal"}] + [None] * 5, "extra": [None]}
+        r = self.c.put(f"/api/decklists/{code}/", self.body(looks=plain), format="json")
+        self.assertEqual(r.json()["looks"], {"main": [None] * 6, "extra": [None]})
+        self.assertEqual(DeckList.objects.get(code=code).looks, {})
+        bad = {
+            "not lined up": {"main": [None] * 5, "extra": [None]},
+            "another card's print": {"main": [{"face": 2, "finish": "normal"}] + [None] * 5},
+            "no such print": {"main": [{"face": 9002, "finish": "normal"}] + [None] * 5},
+            "로얄 on an R print": {"main": [{"face": 1, "finish": "royal"}] + [None] * 5},
+            "no such finish": {"main": [{"face": 1, "finish": "gold"}] + [None] * 5},
+            "not a look": {"main": [1] + [None] * 5},
+            "not a dict": [None],
+        }
+        for why, looks in bad.items():
+            r = self.c.put(f"/api/decklists/{code}/", self.body(looks=looks), format="json")
+            self.assertEqual(r.status_code, 400, why)
+            self.assertTrue(r.json().get("error"), why)
+        # a page from before looks keeps them while the cards stay as they were, and lets them go when they change
+        self.c.put(f"/api/decklists/{code}/", self.body(looks={"main": [None] * 5 + [{"face": 2, "finish": "shine"}]}), format="json")
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", self.body(), format="json").json()["looks"]["main"][5], {"face": 2, "finish": "shine"})
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", self.body(main=[2, 1]), format="json").json()["looks"], {"main": [None, None], "extra": [None]})
+        # a deck saved before looks, or a tournament's copy (cards changed there), reads as all plain
+        entry = DeckList.objects.create(owner=self.me, code="entry001", kind=DeckList.Kind.ENTRY, name="대회", main=[1, 2], extra=[], looks={"main": [None]})
+        self.assertEqual(self.c.get(f"/api/decklists/{entry.code}/").json()["looks"], {"main": [None, None], "extra": []})
+
+    def test_cover_copies(self):
+        """Which copy of each 대표 카드 was pressed (0 the first), so it is drawn in that copy's look (참혈 2026-10-16)."""
+        r = self.c.post("/api/decklists/", self.body(cover_cards=[1, 3], cover_copies=[2, 0]), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        code = r.json()["code"]
+        got = self.c.get(f"/api/decklists/{code}/").json()
+        self.assertEqual((got["cover_cards"], got["cover_copies"]), ([1, 3], [2, 0]))
+        self.assertEqual(self.c.get("/api/decklists/").json()["decks"][0]["cover_copies"], [2, 0])
+        for why, copies in {"a 4th copy": [3, 0], "not lined up": [0], "not a number": ["0", 0], "below 0": [-1, 0]}.items():
+            r = self.c.put(f"/api/decklists/{code}/", self.body(cover_cards=[1, 3], cover_copies=copies), format="json")
+            self.assertEqual(r.status_code, 400, why)
+        # 대표 카드 sent without copies are the first ones; none sent keeps the deck's, a copy gone moving to the last
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", self.body(cover_cards=[3, 1]), format="json").json()["cover_copies"], [0, 0])
+        self.c.put(f"/api/decklists/{code}/", self.body(cover_cards=[1], cover_copies=[2]), format="json")
+        r = self.c.put(f"/api/decklists/{code}/", self.body(main=[1, 1, 2]), format="json")
+        self.assertEqual((r.json()["cover_cards"], r.json()["cover_copies"]), ([1], [1]))

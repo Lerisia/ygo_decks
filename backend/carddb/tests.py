@@ -1407,6 +1407,12 @@ class CardFaceTest(CardFaceCase):
         self.assertEqual([f["cutin"] for f in body["faces"]], [None, {"anim": "animation", "view": [0, 0, 500]}])
         self.assertEqual(body["cutin_sound"], "wind")
         self.assertEqual(body["faces"][0]["face"], first)
+        # a deck's cards asked by ids come with their alternate arts' small faces, for copies drawn in them
+        # (덱 구축, 참혈 2026-10-16); a search does not
+        row = self.client.get("/api/carddb/cards/?ids=7").json()["results"][0]
+        self.assertEqual([a["id"] for a in row["alts"]], [3907])
+        self.assertRegex(row["alts"][0]["thumb"], r"^/media/cards/face_thumb/3907\.webp\?v=\w+$")
+        self.assertNotIn("alts", self.client.get("/api/carddb/cards/").json()["results"][0])
         # the name alone, for the Shine / Royal shaders to paint (the card's top sixth at 1.5×)
         self.assertRegex(body["faces"][0]["name_mask"], r"^/media/cards/face_name/7\.png\?v=\w+$")
         from PIL import Image

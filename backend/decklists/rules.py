@@ -8,13 +8,16 @@ from django.utils import timezone
 
 from carddb import banlist
 from carddb.display import display_name
-from carddb.models import Banlist, Card
+from carddb.models import Banlist, Card, MdPrint
 
 MAIN_MIN, MAIN_MAX, EXTRA_MAX, COPIES_MAX = 40, 60, 15, 3
 COVERS_MAX = 3
 EXTRA_FRAMES = ("fusion", "synchro", "xyz", "link")
 LIMIT = {"forbidden": 0, "limited": 1, "semi_limited": 2}
 LIMIT_WORD = {"limited": "제한", "semi_limited": "준제한"}
+FINISHES = ("normal", "shine", "royal")
+ROYAL_RARITIES = {"SR", "UR", ""}   # 로얄 as the card page offers it ("" a print whose rarity is not known)
+ZONES = ("main", "extra")
 
 
 class DeckError(ValueError):
@@ -49,9 +52,14 @@ def check(main, extra):
     return cards
 
 
-def check_covers(covers, main, extra):
-    """The deck's 대표 카드 (참혈 2026-10-16): up to 3 of its own cards, each once, or DeckError."""
-    if not isinstance(covers, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in covers):
+def _ints(x):
+    return isinstance(x, list) and all(isinstance(i, int) and not isinstance(i, bool) for i in x)
+
+
+def check_covers(covers, main, extra, copies=None):
+    """The deck's 대표 카드 (참혈 2026-10-16): up to 3 of its own cards, each once, and which copy of each (0 the
+    first; none said, the first), or DeckError."""
+    if not _ints(covers):
         raise DeckError("대표 카드가 올바르지 않습니다.")
     if len(covers) > COVERS_MAX:
         raise DeckError(f"대표 카드는 {COVERS_MAX}장까지입니다.")
@@ -59,6 +67,70 @@ def check_covers(covers, main, extra):
         raise DeckError("같은 카드를 대표 카드로 두 번 고를 수 없습니다.")
     if not set(covers) <= set(main) | set(extra):
         raise DeckError("대표 카드는 덱에 든 카드에서 고릅니다.")
+    copies = [0] * len(covers) if copies is None else copies
+    held = Counter(main + extra)
+    if not _ints(copies) or len(copies) != len(covers) or not all(0 <= k < held[c] for c, k in zip(covers, copies)):
+        raise DeckError("대표 카드가 올바르지 않습니다.")
+    return copies
+
+
+def _prints(ids):
+    """{card id: {md id of each of its prints: its rarity}}: its own print and Master Duel's alternate arts, an alternate
+    art of unknown rarity taking the card's."""
+    base = dict(MdPrint.objects.filter(md_id__in=ids).values_list("md_id", "rarity"))
+    out = {i: {i: base.get(i, "")} for i in ids}
+    for cid, md, rarity in MdPrint.objects.filter(card_id__in=ids, is_alt_art=True).values_list("card_id", "md_id", "rarity"):
+        out[cid][md] = rarity or base.get(cid, "")
+    return out
+
+
+def check_looks(looks, main, extra, cards):
+    """Each copy's print and finish (참혈 2026-10-16), lined up with the zones: null (its own print in 일반) or
+    {"face": one of the card's prints, "finish": 일반 / 샤인 / 로얄}, 로얄 on an SR or UR print only. A zone left out
+    is all plain. Kept without the plain ones: {} when every copy is."""
+    if looks is None or looks == {}:
+        return {}
+    if not isinstance(looks, dict) or set(looks) - set(ZONES):
+        raise DeckError("카드 모습이 올바르지 않습니다.")
+    prints = None
+    out = {}
+    for zone, ids in zip(ZONES, (main, extra)):
+        got = looks.get(zone)
+        got = [None] * len(ids) if got is None else got
+        if not isinstance(got, list) or len(got) != len(ids):
+            raise DeckError("카드 모습이 올바르지 않습니다.")
+        row = []
+        for cid, look in zip(ids, got):
+            if look is None:
+                row.append(None)
+                continue
+            if (not isinstance(look, dict) or set(look) != {"face", "finish"} or not isinstance(look["face"], int)
+                    or isinstance(look["face"], bool) or look["finish"] not in FINISHES):
+                raise DeckError("카드 모습이 올바르지 않습니다.")
+            prints = prints or _prints(set(main) | set(extra))
+            rarity = prints[cid].get(look["face"])
+            if rarity is None:
+                raise DeckError(f"{display_name(cards[cid])}: 이 카드의 일러스트가 아닙니다.")
+            if look["finish"] == "royal" and rarity not in ROYAL_RARITIES:
+                raise DeckError(f"{display_name(cards[cid])}: 로얄은 SR·UR 카드만 고를 수 있습니다.")
+            plain = look["face"] == cid and look["finish"] == "normal"
+            row.append(None if plain else {"face": look["face"], "finish": look["finish"]})
+        out[zone] = row
+    return out if any(look for row in out.values() for look in row) else {}
+
+
+def looks_of(d):
+    """A saved deck's looks lined up with its cards; a zone whose looks don't line up (saved before them, or a
+    tournament's copy changed there) is all plain."""
+    looks = d.looks if isinstance(d.looks, dict) else {}
+    return {zone: (looks[zone] if isinstance(looks.get(zone), list) and len(looks[zone]) == len(ids) else [None] * len(ids))
+            for zone, ids in zip(ZONES, (d.main, d.extra))}
+
+
+def cover_copies_of(d):
+    """Which copy each of a saved deck's 대표 카드 is, the first for those saved before it was kept."""
+    copies = d.cover_copies if _ints(d.cover_copies) and len(d.cover_copies) == len(d.cover_cards) else []
+    return copies or [0] * len(d.cover_cards)
 
 
 def issues(main, extra):

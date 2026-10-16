@@ -6,20 +6,13 @@ import BackToDex from "@/components/BackToDex";
 import { type BanStatus, type CardDoc, type CardTexts, getCard } from "@/api/cardDexApi";
 import { type CutinInfo, hasPlayed, prefetchSummon } from "@/lib/cutinPrefetch";
 import { type CutinSound, primeCutinSound } from "@/lib/cutinSound";
-import { type FinishParams, type FinishStyle, finishSupported } from "@/lib/cardFinish";
+import { type FinishParams, finishSupported } from "@/lib/cardFinish";
+import { type FinishKey, FaceThumbs, FinishToggle, faceParams, finishesFor } from "@/components/CardLookPicker";
 import { FRAME_COLORS } from "@/lib/cardFrames";
 
 // The finishes' shaders and the summon player arrive when first used, not with the page (2026-10-12)
 const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
 const CutinOverlay = lazyChunk(() => import("@/components/CutinOverlay"));
-
-// Master Duel's finishes (가공), drawn with the game's own shaders (엘리스 2026-10-11); 로얄 comes in SR and UR only
-const ROYAL_RARITIES = new Set(["SR", "UR", ""]);   // "" for a print whose rarity is not known
-const FINISHES: { key: "normal" | FinishStyle; label: string }[] = [
-  { key: "normal", label: "일반" },
-  { key: "shine", label: "샤인" },
-  { key: "royal", label: "로얄" },
-];
 
 const MARKERS = ["top_left", "top", "top_right", "left", "", "right", "bottom_left", "bottom", "bottom_right"];
 const ARROWS: Record<string, string> = {
@@ -262,7 +255,7 @@ export default function CardDetail() {
   const [zoomed, setZoomed] = useState(false);
   const [cutin, setCutin] = useState<{ id: number; info: CutinInfo; sound: CutinSound | null } | null>(null);
   const closeCutin = useCallback(() => setCutin(null), []);
-  const [finish, setFinish] = useState<"normal" | FinishStyle>("normal");
+  const [finish, setFinish] = useState<FinishKey>("normal");
   const [canFinish] = useState(finishSupported);
   const preloaded = useRef<{ card: number; images: HTMLImageElement[] }>({ card: 0, images: [] });
 
@@ -307,12 +300,8 @@ export default function CardDetail() {
   const isLink = card.frame === "link";
   const texts = ja && card.texts.ja ? card.texts.ja : card.texts.ko;
   const pickedFace = card.faces.find((f) => f.face === picked);
-  const finishParams: FinishParams = {
-    ...card.finish, frame: pickedFace?.overframe ? "overframe" : card.finish.frame, name: pickedFace?.name_mask ?? null,
-  };
-  // the print picked decides: an N / R card's UR 오버프레임 comes in 로얄, the card itself does not
-  // a token comes in neither 샤인 nor 로얄 (엘리스 10/12)
-  const finishes = card.frame === "token" ? [] : FINISHES.filter((f) => f.key !== "royal" || ROYAL_RARITIES.has(pickedFace?.rarity ?? card.rarity));
+  const finishParams: FinishParams = faceParams(card, pickedFace);
+  const finishes = finishesFor(card, pickedFace);
   const shown = finishes.some((f) => f.key === finish) ? finish : "normal";
   const levelName = (card.level_label || "").split(" ")[0];
   // Once the card is on screen its other illustrations are fetched too, so picking one shows it at once rather than
@@ -462,37 +451,16 @@ export default function CardDetail() {
             <img src={card.image_url || "/default_cover.png"} alt={card.name} className="w-full aspect-square object-cover rounded-xl bg-gray-100 dark:bg-gray-800" />
           )}
           {picked && canFinish && finishes.length > 1 && (
-            <div role="radiogroup" aria-label="가공" className={`mt-2 grid ${finishes.length === 3 ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-300 dark:bg-gray-700 p-0.5 text-xs md:text-sm font-semibold`}>
-              {finishes.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={shown === f.key}
-                  onClick={() => setFinish(f.key)}
-                  className={`py-1 rounded-md transition ${
-                    shown === f.key ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow" : "text-gray-600 dark:text-gray-300"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <FinishToggle finishes={finishes} value={shown} onChange={setFinish} className="mt-2 text-xs md:text-sm" />
           )}
           {card.faces.length > 1 && (
-            <div className="mt-2 grid grid-cols-3 gap-1 md:flex md:flex-wrap md:gap-1.5">
-              {card.faces.map((f, i) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setPicked(f.face)}
-                  className={`md:w-12 card-corner overflow-hidden ring-2 ring-offset-1 transition touch-manipulation ${picked === f.face ? "ring-white ring-offset-black" : "ring-transparent ring-offset-transparent"}`}
-                  aria-label={i === 0 ? "기본 일러스트" : `다른 일러스트 ${i}`}
-                >
-                  <img src={f.thumb || f.face} alt="" loading="lazy" className="w-full aspect-[704/1024] object-contain" />
-                </button>
-              ))}
-            </div>
+            <FaceThumbs
+              faces={card.faces}
+              value={pickedFace?.id}
+              onPick={(f) => setPicked(f.face)}
+              className="mt-2 grid grid-cols-3 gap-1 md:flex md:flex-wrap md:gap-1.5"
+              itemClassName="md:w-12"
+            />
           )}
         </div>
 

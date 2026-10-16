@@ -45,5 +45,15 @@ export function useDeckCards(ids: number[] | null) {
     setCards((prev) => (prev.has(card.id) ? prev : new Map(prev).set(card.id, card)));
   }, []);
 
-  return { cards, order, loading, error, remember };
+  /** A card's alternate arts learned from its page (a card shown), so a copy put in one is drawn in it at once. */
+  const rememberAlts = useCallback((id: number, alts: { id: number; thumb: string | null }[]) => {
+    const known = alts.flatMap((a) => (a.id !== id && a.thumb ? [{ id: a.id, thumb: a.thumb }] : []));
+    setCards((prev) => {
+      const card = prev.get(id);
+      if (!card || (card.alts?.length === known.length && known.every((a, i) => card.alts![i].thumb === a.thumb))) return prev;
+      return new Map(prev).set(id, { ...card, alts: known });
+    });
+  }, []);
+
+  return { cards, order, loading, error, remember, rememberAlts };
 }

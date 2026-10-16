@@ -52,6 +52,9 @@ export type CardListItem = {
   category: "monster" | "spell" | "trap";
   /** normal, effect, ritual, fusion, synchro, xyz, link (each but link also *_pendulum), token; spell / trap. */
   frame: string;
+  /** Asked by ids (a deck's cards): its Master Duel alternate arts' small faces, for copies drawn in them
+   *  (참혈 2026-10-16). */
+  alts?: { id: number; thumb: string }[];
 };
 export type CardListResponse = {
   results: CardListItem[];

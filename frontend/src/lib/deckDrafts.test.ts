@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, coverIds, deckIssues, deckUpdated, fromDoc, keepTabDraft, kindCounts,
-  localDrafts, overLimit, removeCard, setCover, sortedZone, tabDraft,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckIssues, deckUpdated, fromDoc,
+  keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll, sortedCopies,
+  sortedZone, tabDraft,
 } from "./deckDrafts";
 import { isDeckEditorPath } from "./deckListPaths";
 
@@ -23,7 +24,9 @@ const CARDS = new Map(
     card(10, "의식", "monster", "ritual"),
   ].map((c) => [c.id, c]),
 );
-const deck = (main: number[], extra: number[] = []): DeckDraft => ({ ...blankDeck(), main, extra });
+const deck = (main: number[], extra: number[] = []): DeckDraft => ({
+  ...blankDeck(), main, extra, looks: { main: main.map(() => null), extra: extra.map(() => null) },
+});
 
 describe("adding and taking out cards", () => {
   it("puts fusion, synchro, xyz and link monsters in the extra deck, the rest in the main deck", () => {
@@ -44,15 +47,17 @@ describe("adding and taking out cards", () => {
     expect(addCard(deck([]), CARDS.get(9)!, CARDS)).toHaveProperty("error");
     const full = deck(Array.from({ length: 60 }, (_, i) => 100 + i));
     expect(addCard(full, CARDS.get(3)!, CARDS)).toHaveProperty("error");
-    expect(addCard(full, CARDS.get(6)!, CARDS)).toEqual({ deck: { ...full, extra: [6] } });
+    expect(addCard(full, CARDS.get(6)!, CARDS)).toEqual({ deck: { ...full, extra: [6], looks: { ...full.looks, extra: [null] } } });
     const fullExtra = deck([], Array.from({ length: 15 }, (_, i) => 100 + i));
     expect(addCard(fullExtra, CARDS.get(6)!, CARDS)).toHaveProperty("error");
   });
 
-  it("takes out one copy", () => {
-    expect(removeCard(deck([1, 3, 1]), "main", 1)).toEqual(deck([3, 1]));
-    expect(removeCard(deck([1], [5]), "extra", 5)).toEqual(deck([1]));
-    expect(removeCard(deck([1]), "extra", 1)).toEqual(deck([1]));
+  it("takes out the one copy pressed, by its place in the zone", () => {
+    expect(removeCard(deck([1, 3, 1]), "main", 2)).toEqual(deck([1, 3]));
+    expect(removeCard(deck([1, 3, 1]), "main", 0)).toEqual(deck([3, 1]));
+    expect(removeCard(deck([1], [5]), "extra", 0)).toEqual(deck([1]));
+    expect(removeCard(deck([1]), "extra", 0)).toEqual(deck([1]));
+    expect(removeCard(deck([1]), "main", 4)).toEqual(deck([1]));
   });
 });
 
@@ -70,6 +75,8 @@ describe("a zone's lines", () => {
   it("orders a zone as the server ordered the cards, copies together, cards it hasn't placed last", () => {
     const order = new Map([[3, 2], [1, 0], [4, 1]]);
     expect(sortedZone([3, 1, 9, 4, 1, 3], order)).toEqual([1, 1, 4, 3, 3, 9]);
+    // the places behind them: copies of a card keep the order they went in
+    expect(sortedCopies([3, 1, 9, 4, 1, 3], order)).toEqual([1, 4, 3, 0, 5, 2]);
   });
 });
 
@@ -101,22 +108,79 @@ describe("today's 금제", () => {
   });
 });
 
-describe("대표 카드", () => {
-  it("fills the slot pressed, a card already in another slot trading places with it", () => {
-    const d = deck([1, 3, 4], [5]);
-    const one = setCover(d, 0, 3);
-    expect(one.covers).toEqual([3, null, null]);
-    expect(setCover(one, 2, 5).covers).toEqual([3, null, 5]);
-    expect(setCover(setCover(one, 2, 5), 2, 3).covers).toEqual([5, null, 3]);
-    expect(setCover(setCover(one, 1, 4), 0, null).covers).toEqual([null, 4, null]);
+describe("each copy's look (참혈 2026-10-16)", () => {
+  const shine = (face: number) => ({ face, finish: "shine" as const });
+
+  it("goes in with the look picked, its own print in 일반 kept as none", () => {
+    expect(addCard(deck([]), CARDS.get(1)!, CARDS, shine(9001))).toEqual({ deck: { ...deck([1]), looks: { main: [shine(9001)], extra: [] } } });
+    expect(addCard(deck([]), CARDS.get(1)!, CARDS, { face: 1, finish: "normal" })).toEqual({ deck: deck([1]) });
+    expect(addCard(deck([]), CARDS.get(5)!, CARDS, { face: 5, finish: "royal" })).toEqual({
+      deck: { ...deck([], [5]), looks: { main: [], extra: [{ face: 5, finish: "royal" }] } },
+    });
   });
 
-  it("lets a card go when its last copy leaves the deck, and saves them without the gaps", () => {
-    const d = { ...deck([1, 1, 3], [5]), covers: [1, 3, 5] };
-    expect(removeCard(d, "main", 1).covers).toEqual([1, 3, 5]);
-    expect(removeCard(removeCard(d, "main", 1), "main", 1).covers).toEqual([null, 3, 5]);
-    expect(coverIds({ ...d, covers: [null, 3, 5] })).toEqual([3, 5]);
-    expect(coverIds({ ...d, extra: [], covers: [5, 1] })).toEqual([1]);
+  it("is set on one copy, or on every copy of the card, and leaves with its copy", () => {
+    const d = setLook(deck([1, 3, 1]), "main", 2, shine(9001));
+    expect(d.looks.main).toEqual([null, null, shine(9001)]);
+    expect(lookAt(d, "main", 2)).toEqual(shine(9001));
+    expect(lookAt(d, "main", 0)).toEqual({ face: 1, finish: "normal" });
+    expect(setLook(d, "main", 2, { face: 1, finish: "normal" }).looks.main).toEqual([null, null, null]);
+    expect(removeCard(d, "main", 0).looks.main).toEqual([null, shine(9001)]);
+    expect(setLookAll(d, "main", 1, { face: 1, finish: "royal" }).looks.main).toEqual([{ face: 1, finish: "royal" }, null, { face: 1, finish: "royal" }]);
+  });
+
+  it("tells which copy of its card a place holds, and back", () => {
+    expect(copyRank([1, 3, 1, 1], 3)).toBe(2);
+    expect(copyRank([1, 3, 1, 1], 1)).toBe(0);
+    expect(copyIndex([1, 3, 1, 1], 1, 1)).toBe(2);
+    expect(copyIndex([1, 3, 1, 1], 1, 3)).toBe(-1);
+  });
+
+  it("draws a copy in its print's small face, its own when the print is not known", () => {
+    const c = { ...CARDS.get(1)!, face_thumb_url: "/own.webp", alts: [{ id: 9001, thumb: "/alt.webp" }] };
+    expect(lookThumb(c, null)).toBe("/own.webp");
+    expect(lookThumb(c, shine(9001))).toBe("/alt.webp");
+    expect(lookThumb(c, shine(9002))).toBe("/own.webp");
+  });
+});
+
+describe("대표 카드", () => {
+  const pick = (id: number, copy = 0) => ({ id, copy });
+
+  it("fills the slot pressed, a card already in another slot trading places with it", () => {
+    const d = deck([1, 3, 4], [5]);
+    const one = setCover(d, 0, pick(3));
+    expect(one.covers).toEqual([pick(3), null, null]);
+    expect(setCover(one, 2, pick(5)).covers).toEqual([pick(3), null, pick(5)]);
+    expect(setCover(setCover(one, 2, pick(5)), 2, pick(3)).covers).toEqual([pick(5), null, pick(3)]);
+    expect(setCover(setCover(one, 1, pick(4)), 0, null).covers).toEqual([null, pick(4), null]);
+  });
+
+  it("is the copy pressed: another copy of it in the same slot or another moves it there", () => {
+    const d = setCover(deck([1, 3, 1]), 0, pick(1, 1));
+    expect(setCover(d, 0, pick(1, 0)).covers).toEqual([pick(1, 0), null, null]);
+    expect(setCover(d, 1, pick(1, 0)).covers).toEqual([null, pick(1, 0), null]);
+  });
+
+  it("follows its copy as copies leave, and lets the card go when its last copy does", () => {
+    const d = { ...deck([1, 1, 1, 3], [5]), covers: [pick(1, 1), pick(3), pick(5)] };
+    expect(removeCard(d, "main", 0).covers).toEqual([pick(1, 0), pick(3), pick(5)]);   // an earlier copy left
+    expect(removeCard(d, "main", 2).covers).toEqual([pick(1, 1), pick(3), pick(5)]);   // a later one
+    expect(removeCard(d, "main", 1).covers).toEqual([pick(1, 1), pick(3), pick(5)]);   // its own: the next takes its place
+    const last = { ...deck([3, 1, 1]), covers: [pick(1, 1)] };
+    expect(removeCard(last, "main", 2).covers).toEqual([pick(1, 0)]);                  // its own and the last: the one before
+    expect(removeCard(removeCard(last, "main", 2), "main", 1).covers).toEqual([null]);
+    expect(removeCard(d, "main", 3).covers).toEqual([pick(1, 1), null, pick(5)]);
+  });
+
+  it("is drawn in its copy's look, and saved without the gaps with which copy each is", () => {
+    const d = setLook({ ...deck([1, 1, 3], [5]), covers: [pick(1, 1), null, pick(5)] }, "main", 1, { face: 9001, finish: "royal" });
+    expect(coverLook(d, pick(1, 1))).toEqual({ face: 9001, finish: "royal" });
+    expect(coverLook(d, pick(1, 0))).toBeNull();
+    expect(coverLook(d, pick(1, 5))).toEqual({ face: 9001, finish: "royal" });   // fewer copies now: the last
+    expect(coverLook(d, pick(7))).toBeNull();
+    expect(savedCovers(d)).toEqual({ cover_cards: [1, 5], cover_copies: [1, 0] });
+    expect(savedCovers({ ...d, extra: [], covers: [pick(5), pick(1, 4)] })).toEqual({ cover_cards: [1], cover_copies: [1] });
   });
 });
 
@@ -137,11 +201,14 @@ describe("decks kept outside the server", () => {
 
   it("keeps a guest's deck in the tab until it is saved or given up, through the reload signing in makes", () => {
     expect(tabDraft()).toBeNull();
-    keepTabDraft({ ...blankDeck(), code: "whatever", name: "손님 덱", main: [1, 3] });
-    expect(tabDraft()).toEqual({ ...blankDeck(), name: "손님 덱", main: [1, 3] });   // always a new deck
+    keepTabDraft({ ...deck([1, 3]), code: "whatever", name: "손님 덱", looks: { main: [null, { face: 9, finish: "shine" }], extra: [] } });
+    expect(tabDraft()).toEqual({ ...deck([1, 3]), name: "손님 덱", looks: { main: [null, { face: 9, finish: "shine" }], extra: [] } });   // always a new deck
     expect(tabDraft()?.name).toBe("손님 덱");
     clearTabDraft();
     expect(tabDraft()).toBeNull();
+    // one kept before looks and copies: none, and the first copy
+    tab.deck_draft_tab = JSON.stringify({ ...blankDeck(), main: [1, 3], extra: [], looks: undefined, covers: [3, null] });
+    expect(tabDraft()).toEqual({ ...deck([1, 3]), covers: [{ id: 3, copy: 0 }, null] });
   });
 
   it("hands over the first layout's browser decks, keeping those that could not move", () => {
@@ -155,9 +222,17 @@ describe("decks kept outside the server", () => {
   });
 
   it("reads the server's deck as the pages hold it", () => {
-    expect(fromDoc({
-      code: "ab12cd34", name: "덱", description: "", main_count: 1, extra_count: 0, cover_cards: [1], created_at: "a", updated_at: "b", main: [1], extra: [], issues: [],
-    })).toEqual({ code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1], extra: [], covers: [1] });
+    const doc = {
+      code: "ab12cd34", name: "덱", description: "", main_count: 2, extra_count: 0, cover_cards: [1], cover_copies: [1], created_at: "a", updated_at: "b",
+      main: [1, 1], extra: [], issues: [], looks: { main: [null, { face: 9, finish: "royal" as const }], extra: [] },
+    };
+    expect(fromDoc(doc)).toEqual({
+      code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1, 1], extra: [],
+      looks: { main: [null, { face: 9, finish: "royal" }], extra: [] }, covers: [{ id: 1, copy: 1 }],
+    });
+    // a deck from before looks and copies (or one whose looks no longer line up): plain, the first copy
+    expect(fromDoc({ ...doc, looks: { main: [null], extra: [] }, cover_copies: undefined }))
+      .toMatchObject({ looks: { main: [null, null], extra: [] }, covers: [{ id: 1, copy: 0 }] });
     expect(deckUpdated({ createdAt: "2026-10-13T12:00:00.000Z" })).toBe("2026-10-13T12:00:00.000Z");
     expect(blankDeck().code).toBe(NEW_CODE);
   });

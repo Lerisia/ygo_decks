@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Camera, Redo2, Undo2 } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import DexFilterBar from "@/components/DexFilterBar";
@@ -61,16 +61,19 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   );
 }
 
-export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, ready, history }: {
+export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, ready, history, overlay }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   onPick: (card: CardListItem) => void;
-  /** A card held (phone) or right-clicked (computer) is shown. */
+  /** A card held or right-clicked is shown. */
   onShow?: (card: CardListItem) => void;
   notice: string;
   /** false while the deck's own cards are still coming (their names count toward 3). */
   ready: boolean;
   history?: DeckUndo;
+  /** From lg, what takes the search's place for a while (a card shown, 참혈 2026-10-16): the search stays as it was
+   *  underneath — its typing, chips and scroll — for when it goes. */
+  overlay?: ReactNode;
 }) {
   const press = usePressCard();
   const [qInput, setQInput] = useState("");
@@ -223,6 +226,9 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
       className={`fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
         lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3`}
     >
+      {overlay && <div className="hidden lg:block absolute inset-0 z-10 rounded-xl bg-white dark:bg-gray-800 p-3 pt-2">{overlay}</div>}
+      {/* hidden, not taken away, while something stands in its place */}
+      <div className={`contents ${overlay ? "lg:invisible" : ""}`}>
       <h2 className="hidden lg:block m-0 text-base font-bold">카드 검색</h2>
       <div className="order-5 lg:order-none lg:mt-2">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
@@ -358,6 +364,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
         )}
       </div>
       )}
+      </div>
     </aside>
   );
 }

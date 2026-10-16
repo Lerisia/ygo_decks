@@ -22,8 +22,12 @@ class DeckList(models.Model):
     description = models.TextField(blank=True, default="")
     main = models.JSONField(default=list)
     extra = models.JSONField(default=list)
-    # up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16)
+    # up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16), and which copy of each (0 the first)
     cover_cards = models.JSONField(default=list, blank=True)
+    cover_copies = models.JSONField(default=list, blank=True)
+    # each copy's print and finish, lined up with main and extra (참혈 2026-10-16): {"main": [null | {"face": md id,
+    # "finish": "normal" / "shine" / "royal"}, …], "extra": […]}; null its own print in 일반, {} when every copy is
+    looks = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
