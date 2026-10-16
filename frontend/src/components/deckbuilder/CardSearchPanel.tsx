@@ -6,6 +6,7 @@ import { ScanInfoRow, ScanState } from "@/components/ImageCardSearch";
 import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardListItem, type CardOptions } from "@/api/cardDexApi";
 import { BAR_EXTRA, barFields, barFilters, barValues, groupItems, misfit } from "@/lib/cardFilterBar";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
+import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, copiesAllowed, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
@@ -61,9 +62,11 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   );
 }
 
-export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, ready, history, overlay }: {
+export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, notice, ready, history, overlay }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
+  /** The deck's 금제 (참혈 2026-10-16): each card's mark and how many may go in. */
+  rule?: BanRule;
   onPick: (card: CardListItem) => void;
   /** A card held or right-clicked is shown. */
   onShow?: (card: CardListItem) => void;
@@ -185,7 +188,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
   // the picture held (times)
   const tile = (c: CardListItem, times?: number) => {
     const n = copiesOf(deck, c.name, cards);
-    const most = copiesAllowed(c);   // 3, or fewer on today's 금제
+    const most = copiesAllowed(c, rule);   // 3, or fewer on the deck's 금제
     const out = n >= most || c.frame === "token";
     return (
       <button
@@ -198,7 +201,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
         className={`group block text-center ${TILE} ${out ? "cursor-not-allowed" : ""}`}
       >
         <span className="relative block">
-          <DeckCardFace card={c} dim={out} />
+          <DeckCardFace card={c} dim={out} ban={banOf(c, rule)} />
           {times !== undefined && times > 1 && (
             <span className="absolute top-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-blue-600/90 text-white tabular-nums">×{times}</span>
           )}

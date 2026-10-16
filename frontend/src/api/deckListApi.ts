@@ -4,6 +4,8 @@ export type DeckListRow = {
   /** Up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16), and which copy of each (0 the first). */
   cover_cards: number[];
   cover_copies?: number[];
+  /** The 금제 it is checked by (lib/banlists: "md" Master Duel's newest, "ocg:2020-04-01", …) (참혈 2026-10-16). */
+  banlist?: string;
   created_at: string; updated_at: string;
 };
 /** How one copy in a deck looks (참혈 2026-10-16): which of the card's prints (its own md id or an alternate art's)
@@ -11,10 +13,11 @@ export type DeckListRow = {
 export type CardLook = { face: number; finish: "normal" | "shine" | "royal" };
 export type DeckLooks = { main: (CardLook | null)[]; extra: (CardLook | null)[] };
 /** A deck in full: its cards by card book id, an id once per copy, each copy's look lined up with them, and what
- *  keeps it from being played today. */
+ *  keeps it from being played under its 금제. */
 export type DeckListDoc = DeckListRow & { main: number[]; extra: number[]; looks?: DeckLooks; issues: string[] };
 export type DeckListBody = {
   name: string; description: string; main: number[]; extra: number[]; looks?: DeckLooks; cover_cards?: number[]; cover_copies?: number[];
+  banlist?: string;
 };
 
 const auth = (): Record<string, string> => {

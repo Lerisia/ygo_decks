@@ -267,3 +267,86 @@ def current_statuses(fmt, day, card=None):
     if card is not None:
         entries = entries.filter(card_id=card)
     return dict(entries.values_list("card_id", "status"))
+
+
+# A deck list's 금제 (참혈 2026-10-16), kept as a key: a game alone ("md", "ocg", "tcg") follows its newest list, the
+# next one too when it comes, as the game holds a deck to a new list; "md:2026-10-06" holds to that list;
+# "custom:<code>" is one of ours (none yet: 참혈's team plans them).
+KEY_RE = re.compile(r"^(md|ocg|tcg)(?::(\d{4}-\d\d-\d\d))?$|^custom:([A-Za-z0-9_-]{1,32})$")
+LIMITS = (BanStatus.FORBIDDEN, BanStatus.LIMITED, BanStatus.SEMI_LIMITED)
+
+# what a deck is judged by: its game, the list's day (None with no list yet), the day a card must be out by (today
+# for the newest, else the list's day), whether it follows the newest, and {card id: status} of the cards it limits
+Judge = namedtuple("Judge", "format day released_by latest limits")
+
+
+def parse_key(key):
+    """(game or "custom", the day held to or None, the code or None) for a key, None when it is no key."""
+    m = KEY_RE.match(key) if isinstance(key, str) else None
+    if not m:
+        return None
+    if m.group(3):
+        return ("custom", None, m.group(3))
+    try:
+        day = datetime.strptime(m.group(2), "%Y-%m-%d").date() if m.group(2) else None
+    except ValueError:
+        return None
+    return (m.group(1), day, None)
+
+
+def custom_list(code):
+    """One of our own lists by its code, as a Judge; none until they are made (참혈's team)."""
+    return None
+
+
+def limits_of(b):
+    """{card id: status} of the cards a list limits (금지·제한·준제한), those the card DB lacks left out."""
+    return dict(b.entries.exclude(card=None).filter(status__in=LIMITS).values_list("card_id", "status"))
+
+
+def judged_by(key, today=None):
+    """The Judge for a key (today: timezone's, for the newest), or None when there is no such list."""
+    from django.utils import timezone
+    parsed = parse_key(key)
+    if parsed is None:
+        return None
+    fmt, day, code = parsed
+    if fmt == "custom":
+        return custom_list(code)
+    today = today or timezone.localdate()
+    if day is None:
+        b = Banlist.objects.filter(format=fmt, effective__lte=today).order_by("-effective").first()
+        return Judge(fmt, b and b.effective, today, True, limits_of(b) if b else {})
+    b = Banlist.objects.filter(format=fmt, effective=day).first()
+    return b and Judge(fmt, day, day, False, limits_of(b))
+
+
+def released_days(ids, fmt):
+    """{card id: the day it came out in the game, True when out on a day not known, None when never} for many cards
+    at once, as released_on and _known have it for one."""
+    ids = set(ids)
+    out = dict.fromkeys(ids)
+    if fmt == Banlist.Format.MD:
+        # the lowest md id's print, as released_on takes
+        for cid, seen in (MdPrint.objects.filter(card_id__in=ids, is_alt_art=False).order_by("-md_id")
+                          .values_list("card_id", "first_seen")):
+            out[cid] = seen or True
+    else:
+        out.update(Card.objects.filter(id__in=ids).values_list("id", "ocg_date" if fmt == Banlist.Format.OCG else "tcg_date"))
+    from .models import BanlistEntry
+    listed = set(BanlistEntry.objects.filter(banlist__format=fmt, card_id__in=[i for i, d in out.items() if d is None])
+                 .values_list("card_id", flat=True))
+    return {i: True if d is None and i in listed else d for i, d in out.items()}
+
+
+def not_out(ids, fmt, day):
+    """The cards not out yet in the game on a day (미출시)."""
+    return {i for i, d in released_days(ids, fmt).items() if d is None or (d is not True and d > day)}
+
+
+def list_days():
+    """{game: [each list's day, newest first]}, a list announced for a later day among them."""
+    out = {fmt.value: [] for fmt in Banlist.Format}
+    for fmt, day in Banlist.objects.order_by("format", "-effective").values_list("format", "effective"):
+        out[fmt].append(day.isoformat())
+    return out

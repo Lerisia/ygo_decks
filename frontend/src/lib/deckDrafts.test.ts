@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
   type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckIssues, deckUpdated, fromDoc,
-  keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll, sortedCopies,
-  sortedZone, tabDraft,
+  keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, notOutCards, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll,
+  sortedCopies, sortedZone, tabDraft, copiesAllowed,
 } from "./deckDrafts";
+import type { BanRule } from "./banlists";
 import { isDeckEditorPath } from "./deckListPaths";
 
 const card = (id: number, name: string, category: CardListItem["category"], frame: string): CardListItem => ({
@@ -105,6 +106,51 @@ describe("today's 금제", () => {
   it("finds a zone's cards over today's list, for the warning by its title", () => {
     expect(overLimit([21, 1, 21, 20], cards).map((o) => [o.card.id, o.count])).toEqual([[20, 1], [21, 2]]);
     expect(overLimit([21, 22, 22], cards)).toEqual([]);
+  });
+});
+
+describe("the 금제 the deck picked (참혈 2026-10-16)", () => {
+  const released = (ocg: string | null) => ({ md: "2022-01-19", ocg, tcg: null });
+  const one = { ...card(30, "하나", "monster", "effect"), ban: "forbidden" as const, released: released("2019-01-01") };
+  const two = { ...card(31, "둘", "monster", "effect"), released: released("2021-06-01") };
+  const three = { ...card(32, "셋", "monster", "effect"), released: released(null) };
+  const cards = new Map([...CARDS, [30, one], [31, two], [32, three]]);
+  // an OCG list of 2020: 하나 free there (forbidden in Master Duel today), 둘 limited and not out yet, 셋 never out
+  const ocg2020: BanRule = { format: "ocg", limits: { 31: "limited" }, releasedBy: "2020-01-01" };
+
+  it("lets in and counts by that list instead of today's Master Duel one", () => {
+    expect(copiesAllowed(one)).toBe(0);
+    expect(copiesAllowed(one, ocg2020)).toBe(3);
+    expect(copiesAllowed(two, ocg2020)).toBe(1);
+    expect(addCard(deck([]), one, cards)).toEqual({ error: "금지 카드는 넣을 수 없습니다." });
+    expect(addCard(deck([]), one, cards, null, ocg2020)).toEqual({ deck: deck([30]) });
+    expect(addCard(deck([31]), two, cards, null, ocg2020)).toEqual({ error: "제한 카드는 1장까지 넣을 수 있습니다." });
+  });
+
+  it("finds the cards over it, and the cards not out yet then, each with its line", () => {
+    expect(overLimit([30, 31, 31], cards, ocg2020).map((o) => [o.card.id, o.count, o.line])).toEqual([[31, 2, "둘: 제한 카드는 1장까지입니다 (2장)."]]);
+    expect(overLimit([30, 31, 31], cards).map((o) => o.card.id)).toEqual([30]);
+    expect(notOutCards([32, 30, 31, 31], cards, ocg2020).map((o) => [o.card.id, o.line])).toEqual([
+      [31, "둘: 미출시 카드입니다."], [32, "셋: 미출시 카드입니다."],
+    ]);
+    expect(notOutCards([32, 30, 31], cards)).toEqual([]);   // Master Duel's newest before its table comes: all out
+  });
+
+  it("tells the deck as the server does: too few, then over the list, then not out yet", () => {
+    expect(deckIssues(deck([30, 31, 31, 32]), cards, ocg2020)).toEqual([
+      "메인 덱이 40장보다 적습니다 (4/40).",
+      "둘: 제한 카드는 1장까지입니다 (2장).",
+      "둘: 미출시 카드입니다.",
+      "셋: 미출시 카드입니다.",
+    ]);
+  });
+
+  it("is kept with the deck: a new deck follows Master Duel's newest, a saved one keeps its own", () => {
+    expect(blankDeck().banlist).toBe("md");
+    expect(fromDoc({ code: "abcd1234", name: "덱", description: "", main: [], extra: [], cover_cards: [], created_at: "", updated_at: "", main_count: 0, extra_count: 0, issues: [], banlist: "ocg:2020-01-01" }).banlist)
+      .toBe("ocg:2020-01-01");
+    expect(fromDoc({ code: "abcd1234", name: "덱", description: "", main: [], extra: [], cover_cards: [], created_at: "", updated_at: "", main_count: 0, extra_count: 0, issues: [] }).banlist)
+      .toBe("md");
   });
 });
 
@@ -209,6 +255,11 @@ describe("decks kept outside the server", () => {
     // one kept before looks and copies: none, and the first copy
     tab.deck_draft_tab = JSON.stringify({ ...blankDeck(), main: [1, 3], extra: [], looks: undefined, covers: [3, null] });
     expect(tabDraft()).toEqual({ ...deck([1, 3]), covers: [{ id: 3, copy: 0 }, null] });
+    // the 금제 picked (참혈 2026-10-16) goes along; one kept before it is Master Duel's newest
+    keepTabDraft({ ...deck([1]), banlist: "tcg:2025-04-07" });
+    expect(tabDraft()?.banlist).toBe("tcg:2025-04-07");
+    tab.deck_draft_tab = JSON.stringify({ main: [1], extra: [] });
+    expect(tabDraft()?.banlist).toBe("md");
   });
 
   it("hands over the first layout's browser decks, keeping those that could not move", () => {
@@ -228,7 +279,7 @@ describe("decks kept outside the server", () => {
     };
     expect(fromDoc(doc)).toEqual({
       code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1, 1], extra: [],
-      looks: { main: [null, { face: 9, finish: "royal" }], extra: [] }, covers: [{ id: 1, copy: 1 }],
+      looks: { main: [null, { face: 9, finish: "royal" }], extra: [] }, covers: [{ id: 1, copy: 1 }], banlist: "md",
     });
     // a deck from before looks and copies (or one whose looks no longer line up): plain, the first copy
     expect(fromDoc({ ...doc, looks: { main: [null], extra: [] }, cover_copies: undefined }))

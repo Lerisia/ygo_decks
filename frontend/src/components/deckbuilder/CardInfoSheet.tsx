@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { getCard, type CardDoc, type CardListItem } from "@/api/cardDexApi";
 import { FaceThumbs, FinishToggle, faceParams, finishesFor } from "@/components/CardLookPicker";
 import { finishSupported } from "@/lib/cardFinish";
+import type { BanLimit } from "@/lib/banlists";
 import { type CardLook, lookThumb } from "@/lib/deckDrafts";
 import { lazyChunk } from "@/lib/lazyChunk";
 
@@ -15,6 +16,10 @@ const SMALL = "h-7 px-2 rounded-md border border-gray-300 dark:border-gray-600 b
 
 export type CardInfoProps = {
   card: CardListItem;
+  /** Its 금제 on the deck's list (참혈 2026-10-16; today's Master Duel one when not given), and whether it was not out
+   *  yet then (미출시). */
+  ban?: BanLimit | "";
+  notOut?: boolean;
   /** How many copies of its name the deck holds. */
   inDeck: number;
   /** How it is shown: the copy's look (a copy in the deck), or the look the next copy put in takes (참혈 2026-10-16). */
@@ -35,7 +40,7 @@ export type CardInfoProps = {
  *  lg in the search's place): the card as the look picked draws it, its prints and 일반 / 샤인 / 로얄 under it as on
  *  the card page, its text in Korean, and a copy in or out without leaving the deck. pane: stacked for the
  *  search's narrow column. */
-function CardInfoBody({ card, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
+function CardInfoBody({ card, ban = card.ban, notOut, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
   const [doc, setDoc] = useState<CardDoc | null>(null);
   const [failed, setFailed] = useState(false);
   const [canFinish] = useState(finishSupported);
@@ -104,7 +109,8 @@ function CardInfoBody({ card, inDeck, look, onLook, copies = 0, sameLook, onLook
       <h2 className="m-0 text-base font-bold break-keep">{card.name}</h2>
       <p className="mt-1 mb-0 text-xs text-gray-500 dark:text-gray-400">
         {rarity && <span className="mr-2">{rarity}</span>}
-        {card.ban && <span className="font-semibold text-red-600 dark:text-red-400">{BAN_LABEL[card.ban]}</span>}
+        {ban && <span className="font-semibold text-red-600 dark:text-red-400">{BAN_LABEL[ban]}</span>}
+        {notOut && <span className={`font-semibold text-amber-600 dark:text-amber-400 ${ban ? "ml-2" : ""}`}>미출시</span>}
         {inDeck > 0 && <span className="ml-2 tabular-nums">덱에 {inDeck}장</span>}
       </p>
     </>

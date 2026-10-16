@@ -1,9 +1,11 @@
 /** 덱 구축 (참혈 2026-10-13, first layout): members' deck lists, kept on the server from 2026-10-14 (api/deckListApi).
- *  Here: the rules of a deck as Master Duel's editor keeps them (3 of a name, today's 금제, zone sizes, no side deck),
+ *  Here: the rules of a deck as Master Duel's editor keeps them (3 of a name, the 금제 it picked — lib/banlists, today's
+ *  Master Duel list by default — zone sizes, no side deck),
  *  what a deck is told while it breaks one (deckIssues), a guest's deck kept in the tab while they go to sign in, and
  *  the decks the first layout kept in this browser, moved to the member's account once. */
 import type { CardListItem } from "@/api/cardDexApi";
 import type { CardLook, DeckListDoc, DeckLooks } from "@/api/deckListApi";
+import { type BanRule, DEFAULT_BANLIST, banOf, notOut, parseBanlistKey } from "./banlists";
 
 export type { CardLook, DeckLooks };
 export type DeckZone = "main" | "extra";
@@ -25,6 +27,8 @@ export type DeckDraft = {
   looks: DeckLooks;
   /** The 대표 카드 by slot (참혈 2026-10-16): a slot left empty is null; saved without the gaps (savedCovers). */
   covers: (CoverPick | null)[];
+  /** The 금제 it is checked by, as kept (lib/banlists: "md" Master Duel's newest, "ocg:2020-04-01", …) (참혈 2026-10-16). */
+  banlist: string;
 };
 
 /** Where the first layout kept decks in this browser (before 2026-10-14). */
@@ -43,6 +47,7 @@ export const COVERS_MAX = 3;
 
 export const blankDeck = (): DeckDraft => ({
   code: NEW_CODE, name: "", description: "", createdAt: "", main: [], extra: [], looks: { main: [], extra: [] }, covers: [],
+  banlist: DEFAULT_BANLIST,
 });
 
 /** The looks lined up with the zones' cards: a zone whose looks don't (a deck from before them) is all plain. */
@@ -58,6 +63,7 @@ export const fitLooks = (d: Pick<DeckDraft, DeckZone> & { looks?: Partial<DeckLo
 export const fromDoc = (d: DeckListDoc): DeckDraft => ({
   code: d.code, name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at, main: d.main, extra: d.extra,
   looks: fitLooks(d), covers: (d.cover_cards ?? []).map((id, i) => ({ id, copy: d.cover_copies?.[i] ?? 0 })),
+  banlist: d.banlist || DEFAULT_BANLIST,
 });
 
 /** The decks the first layout kept in this browser, to move to the member's account. */
@@ -98,7 +104,7 @@ export function tabDraft(): DeckDraft | null {
     if (!(d && Array.isArray(d.main) && Array.isArray(d.extra))) return null;
     // one kept before looks and copies (10-16): plain, the first copy
     const covers = (Array.isArray(d.covers) ? d.covers : []).map((c: CoverPick | number | null) => (typeof c === "number" ? { id: c, copy: 0 } : c));
-    return { ...blankDeck(), ...d, code: NEW_CODE, looks: fitLooks(d), covers };
+    return { ...blankDeck(), ...d, code: NEW_CODE, looks: fitLooks(d), covers, banlist: parseBanlistKey(d.banlist) ? d.banlist : DEFAULT_BANLIST };
   } catch {
     return null;
   }
@@ -182,48 +188,66 @@ export function copiesOf(deck: Pick<DeckDraft, DeckZone>, name: string, cards: M
   return ZONES.reduce((n, z) => n + deck[z].filter((id) => cards.get(id)?.name === name).length, 0);
 }
 
-type BanInfo = Pick<CardListItem, "ban">;
+type BanInfo = Pick<CardListItem, "id" | "ban">;
 const BAN_LIMIT = { forbidden: 0, limited: 1, semi_limited: 2 } as const;
 const BAN_WORD = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
 
-/** How many of a card a deck may hold today: 3, or fewer on Master Duel's list (금지 0, 제한 1, 준제한 2). */
-export const copiesAllowed = (card: BanInfo) => (card.ban ? BAN_LIMIT[card.ban] : COPIES_MAX);
+/** How many of a card a deck may hold under its 금제 (rule; today's Master Duel list when none): 3, or fewer on the
+ *  list (금지 0, 제한 1, 준제한 2). */
+export function copiesAllowed(card: BanInfo, rule?: BanRule) {
+  const ban = banOf(card, rule);
+  return ban ? BAN_LIMIT[ban] : COPIES_MAX;
+}
 
-/** A card picked in the search: into the extra or main deck by its frame, as many as its name and today's 금제
- *  allow, in the look picked for it (its own print in 일반 by default). */
-export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards: Map<number, CardInfo>, look?: CardLook | null):
+/** A card picked in the search: into the extra or main deck by its frame, as many as its name and the deck's 금제
+ *  allow, in the look picked for it (its own print in 일반 by default). A card not out yet then goes in (미출시 is
+ *  only told). */
+export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards: Map<number, CardInfo>, look?: CardLook | null, rule?: BanRule):
   { deck: D } | { error: string } {
+  const ban = banOf(card, rule);
   if (card.frame === "token") return { error: "토큰은 덱에 넣을 수 없습니다." };
-  if (card.ban === "forbidden") return { error: "금지 카드는 넣을 수 없습니다." };
-  const most = copiesAllowed(card);
+  if (ban === "forbidden") return { error: "금지 카드는 넣을 수 없습니다." };
+  const most = copiesAllowed(card, rule);
   if (copiesOf(deck, card.name, cards) >= most) {
-    return { error: card.ban ? `${BAN_WORD[card.ban]} 카드는 ${most}장까지 넣을 수 있습니다.` : `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
+    return { error: ban ? `${BAN_WORD[ban]} 카드는 ${most}장까지 넣을 수 있습니다.` : `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
   }
   const zone: DeckZone = isExtraCard(card) ? "extra" : "main";
   if (deck[zone].length >= ZONE_MAX[zone]) return { error: `${ZONE_LABEL[zone]}은 ${ZONE_MAX[zone]}장까지입니다.` };
   return { deck: { ...deck, [zone]: [...deck[zone], card.id], looks: { ...deck.looks, [zone]: [...deck.looks[zone], keptLook(card.id, look)] } } };
 }
 
-/** The cards held more often than today's list allows (a 금제 since saving), the forbidden first, each with its line. */
-export function overLimit(ids: number[], cards: Map<number, CardListItem>) {
+const byName = (a: { card: CardListItem }, b: { card: CardListItem }) => (a.card.name < b.card.name ? -1 : a.card.name > b.card.name ? 1 : 0);
+
+/** The cards held more often than the deck's list allows (rule; a 금제 since saving), the forbidden first, then by
+ *  name as the server sorts them, each with its line. */
+export function overLimit(ids: number[], cards: Map<number, CardListItem>, rule?: BanRule) {
   const n = new Map<number, number>();
   for (const id of ids) n.set(id, (n.get(id) ?? 0) + 1);
-  return [...n].map(([id, count]) => ({ card: cards.get(id), count }))
-    .filter((x): x is { card: CardListItem; count: number } => !!x.card?.ban && x.count > BAN_LIMIT[x.card.ban])
-    .sort((a, b) => BAN_LIMIT[a.card.ban as keyof typeof BAN_LIMIT] - BAN_LIMIT[b.card.ban as keyof typeof BAN_LIMIT] || a.card.name.localeCompare(b.card.name))
-    .map(({ card, count }) => {
-      const ban = card.ban as keyof typeof BAN_LIMIT;
-      const line = ban === "forbidden" ? `${card.name}: 금지 카드입니다.` : `${card.name}: ${BAN_WORD[ban]} 카드는 ${BAN_LIMIT[ban]}장까지입니다 (${count}장).`;
-      return { card, count, line };
-    });
+  return [...n].flatMap(([id, count]) => {
+    const card = cards.get(id);
+    const ban = card && banOf(card, rule);
+    if (!card || !ban || count <= BAN_LIMIT[ban]) return [];
+    const line = ban === "forbidden" ? `${card.name}: 금지 카드입니다.` : `${card.name}: ${BAN_WORD[ban]} 카드는 ${BAN_LIMIT[ban]}장까지입니다 (${count}장).`;
+    return [{ card, count, ban, line }];
+  }).sort((a, b) => BAN_LIMIT[a.ban] - BAN_LIMIT[b.ban] || byName(a, b));
 }
 
-/** What keeps the deck from being played today, as the server says it (decklists/rules.py): too few in the main,
- *  then each card over today's list, the forbidden first. */
-export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>): string[] {
+/** The cards not out yet in the list's game by its day (미출시, 참혈 2026-10-16), by name, each with its line. */
+export function notOutCards(ids: number[], cards: Map<number, CardListItem>, rule?: BanRule) {
+  if (!rule) return [];
+  return [...new Set(ids)].flatMap((id) => {
+    const card = cards.get(id);
+    return card && notOut(card, rule) ? [{ card, line: `${card.name}: 미출시 카드입니다.` }] : [];
+  }).sort(byName);
+}
+
+/** What keeps the deck from being played under its 금제, as the server says it (decklists/rules.py): too few in the
+ *  main, then each card over the list, the forbidden first, then each card not out yet then. */
+export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>, rule?: BanRule): string[] {
   const out: string[] = [];
   if (deck.main.length < MAIN_MIN) out.push(`메인 덱이 ${MAIN_MIN}장보다 적습니다 (${deck.main.length}/${MAIN_MIN}).`);
-  return [...out, ...overLimit([...deck.main, ...deck.extra], cards).map((o) => o.line)];
+  const all = [...deck.main, ...deck.extra];
+  return [...out, ...overLimit(all, cards, rule).map((o) => o.line), ...notOutCards(all, cards, rule).map((o) => o.line)];
 }
 
 /** A copy named by which of its card's copies it is, once the `rank`-th copy of card `id` has left (`left` copies of

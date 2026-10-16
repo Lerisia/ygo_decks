@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
+import { type BanLimit, type BanRule, banOf } from "@/lib/banlists";
 import {
-  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, lookThumb, overLimit, sortedCopies,
+  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, lookThumb, notOutCards, overLimit,
+  sortedCopies,
 } from "@/lib/deckDrafts";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
@@ -28,8 +30,8 @@ export function FinishMark({ finish }: { finish: CardLook["finish"] | undefined 
 }
 
 /** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look) — its 금제 in
- *  the corner. */
-export function DeckCardFace({ card, look, dim = false }: { card: CardListItem; look?: CardLook | null; dim?: boolean }) {
+ *  the corner: the deck's list's (ban), today's Master Duel one (on the card) when none is given. */
+export function DeckCardFace({ card, look, dim = false, ban = card.ban }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | "" }) {
   return (
     <span className="relative block">
       <img
@@ -40,10 +42,10 @@ export function DeckCardFace({ card, look, dim = false }: { card: CardListItem; 
         className={`w-full aspect-[704/1024] object-contain card-corner transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`}
       />
       <FinishMark finish={look?.finish} />
-      {card.ban && (
+      {ban && (
         <img
-          src={`/media/md_ui/info/limit/${card.ban}.webp`}
-          alt={BAN_LABEL[card.ban]}
+          src={`/media/md_ui/info/limit/${ban}.webp`}
+          alt={BAN_LABEL[ban]}
           className="absolute top-[3%] left-[4%] w-[22%] h-auto drop-shadow"
         />
       )}
@@ -53,7 +55,7 @@ export function DeckCardFace({ card, look, dim = false }: { card: CardListItem; 
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reserve, picking, marks }: {
+function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, reserve, picking, marks }: {
   zone: DeckZone;
   /** as kept: an id once per copy, in the order they went in */
   ids: number[];
@@ -61,6 +63,7 @@ function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reser
   order: Map<number, number>;
   cards: Map<number, CardListItem>;
   loading: boolean;
+  rule?: BanRule;
   /** `at`: the copy pressed, by its place in ids */
   onRemove?: (at: number) => void;
   onShow?: (card: CardListItem, at: number) => void;
@@ -71,10 +74,10 @@ function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reser
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
-  // while it is built, cards over today's 금제 (one saved before it) are ringed in the zone; the editor shows no count
-  // warnings by the title (참혈 2026-10-16), a deck being looked at still says it is short
-  const over = onRemove ? overLimit(ids, cards) : [];
-  const overIds = new Set(over.map((o) => o.card.id));
+  // while it is built, cards over the deck's 금제 (one saved before it) and cards not out yet then are ringed in the
+  // zone; the editor shows no count warnings by the title (참혈 2026-10-16), a deck being looked at still says it is
+  // short
+  const ringed = new Set(onRemove ? [...overLimit(ids, cards, rule), ...notOutCards(ids, cards, rule)].map((o) => o.card.id) : []);
   return (
     <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
       {/* the zone on the left, how many of each kind on the right, on a phone too (참혈 2026-10-16) */}
@@ -121,8 +124,8 @@ function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reser
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
-                <DeckCardFace card={card} look={looks[at]} />
-                {overIds.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
+                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} />
+                {ringed.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
                 {mark !== undefined && (
                   <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
                     {mark}
@@ -131,7 +134,7 @@ function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reser
               </button>
             ) : (
               <Link key={`${id}-${at}`} to={`/cards/${id}`} title={card.name} className="group block">
-                <DeckCardFace card={card} look={looks[at]} />
+                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} />
               </Link>
             );
           })}
@@ -149,11 +152,13 @@ function Zone({ zone, ids, looks, order, cards, loading, onRemove, onShow, reser
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, onRemove, onShow, picking, marks }: {
+export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, picking, marks }: {
   deck: Pick<DeckDraft, DeckZone> & { looks: DeckLooks };
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
   loading: boolean;
+  /** The deck's 금제 (lib/banlists; today's Master Duel list when none). */
+  rule?: BanRule;
   /** Building: the copy pressed, by its place in the zone as kept. */
   onRemove?: (zone: DeckZone, at: number) => void;
   /** Building: a copy held or right-clicked is shown. */
@@ -174,6 +179,7 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
           order={order}
           cards={cards}
           loading={loading}
+          rule={rule}
           onRemove={onRemove && ((at) => onRemove(z, at))}
           onShow={onShow && ((card, at) => onShow(card, z, at))}
           reserve={!!onRemove}

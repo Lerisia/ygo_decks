@@ -28,6 +28,9 @@ class DeckList(models.Model):
     # each copy's print and finish, lined up with main and extra (참혈 2026-10-16): {"main": [null | {"face": md id,
     # "finish": "normal" / "shine" / "royal"}, …], "extra": […]}; null its own print in 일반, {} when every copy is
     looks = models.JSONField(default=dict, blank=True)
+    # the 금제 it is checked by (참혈 2026-10-16): "md" / "ocg" / "tcg" that game's newest, following the next one;
+    # "md:2026-10-06" one list held to; "custom:<code>" one of ours (carddb.banlist.parse_key)
+    banlist = models.CharField(max_length=48, default="md", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

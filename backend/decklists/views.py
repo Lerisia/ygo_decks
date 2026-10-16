@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import DeckList
-from .rules import DeckError, check, check_covers, check_looks, cover_copies_of, issues, looks_of
+from .rules import DeckError, check, check_banlist, check_covers, check_looks, cover_copies_of, issues, looks_of
 
 DECKS_MAX = 300   # a member's deck lists, at most
 ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
@@ -14,16 +14,16 @@ ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
 
 def _row(d):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
-            "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d),
+            "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d), "banlist": d.banlist,
             "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
 
 
 def _full(d):
-    return {**_row(d), "main": d.main, "extra": d.extra, "looks": looks_of(d), "issues": issues(d.main, d.extra)}
+    return {**_row(d), "main": d.main, "extra": d.extra, "looks": looks_of(d), "issues": issues(d.main, d.extra, d.banlist)}
 
 
 def _fields(data, d=None):
-    """The name, description, cards, their looks and 대표 카드 sent, checked; DeckError on a rule broken. A body from a
+    """The name, description, cards, their looks, 대표 카드 and 금제 sent, checked; DeckError on a rule broken. A body from a
     page before them keeps the deck's own (d): its 대표 카드 still in it (a copy gone, the last left), its looks while
     its cards are as they were."""
     name = " ".join(str(data.get("name") or "").split())
@@ -47,8 +47,10 @@ def _fields(data, d=None):
         looks = check_looks(data["looks"], main, extra, cards)
     else:
         looks = d.looks if d and (d.main, d.extra) == (main, extra) else {}
+    # its 금제 (참혈 2026-10-16); a page from before it keeps the deck's own, a new deck Master Duel's newest
+    list_key = check_banlist(data["banlist"]) if "banlist" in data else (d.banlist if d else "md")
     return {"name": name, "description": description, "main": main, "extra": extra, "looks": looks,
-            "cover_cards": covers, "cover_copies": copies}
+            "cover_cards": covers, "cover_copies": copies, "banlist": list_key}
 
 
 @api_view(["GET", "POST"])

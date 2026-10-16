@@ -87,6 +87,8 @@ class DeckListApiTest(TestCase):
 
     def test_what_it_is_only_told(self):
         # fewer than 40 in the main, or more of a card than today's Master Duel list allows: saved, and said
+        for c in (self.ash, self.link):   # in Master Duel (the others are, being on its list)
+            MdPrint.objects.create(md_id=c.id, card=c)
         bl = Banlist.objects.create(format=Banlist.Format.MD, effective=date(2026, 1, 1))
         BanlistEntry.objects.create(banlist=bl, card=self.limited, name="제한 카드", status="limited")
         BanlistEntry.objects.create(banlist=bl, card=self.pot, name="강욕한 항아리", status="forbidden")
@@ -176,3 +178,84 @@ class DeckListApiTest(TestCase):
         self.c.put(f"/api/decklists/{code}/", self.body(cover_cards=[1], cover_copies=[2]), format="json")
         r = self.c.put(f"/api/decklists/{code}/", self.body(main=[1, 1, 2]), format="json")
         self.assertEqual((r.json()["cover_cards"], r.json()["cover_copies"]), ([1], [1]))
+
+
+class DeckBanlistTest(TestCase):
+    """The 금제 a deck is checked by, picked and kept with it (참혈 2026-10-16): Master Duel's, the OCG's or the TCG's
+    newest — following the next one when it comes — or one held to by its day, or one of ours by its code. What it
+    is told follows that list: more of a card than it allows, and cards not out yet then."""
+
+    def setUp(self):
+        self.me = User.objects.create_user(email="me@test.com", username="me", password="pass1234")
+        self.c = APIClient()
+        self.c.force_authenticate(self.me)
+        self.ash = card(1, "재와 유령")
+        self.pot = card(2, "강욕한 항아리", category="spell", frame="spell")
+        self.link = card(3, "링크 몬스터", frame="link")
+        self.newer = card(5, "새 카드")
+        Card.objects.filter(id__in=[1, 2, 3]).update(ocg_date=date(2019, 1, 1))
+        Card.objects.filter(id=5).update(ocg_date=date(2021, 6, 1))
+        for c in (self.ash, self.pot, self.link):
+            MdPrint.objects.create(md_id=c.id, card=c, first_seen=date(2022, 1, 19))
+        MdPrint.objects.create(md_id=5, card=self.newer, first_seen=date(2022, 5, 9))
+        jan = Banlist.objects.create(format="md", effective=date(2022, 1, 19))
+        may = Banlist.objects.create(format="md", effective=date(2022, 5, 9))
+        BanlistEntry.objects.create(banlist=jan, card=self.pot, name="강욕한 항아리", status="forbidden")
+        BanlistEntry.objects.create(banlist=may, card=self.ash, name="재와 유령", status="limited")
+        ocg = Banlist.objects.create(format="ocg", effective=date(2020, 1, 1))
+        BanlistEntry.objects.create(banlist=ocg, card=self.ash, name="재와 유령", status="semi_limited")
+
+    def body(self, **kw):
+        return {"name": "재록", "description": "", "main": [1, 1, 2, 5], "extra": [3], **kw}
+
+    def test_a_new_deck_follows_master_duels_newest(self):
+        r = self.c.post("/api/decklists/", self.body(), format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["banlist"], "md")
+        self.assertEqual(r.json()["issues"], ["메인 덱이 40장보다 적습니다 (4/40).", "재와 유령: 제한 카드는 1장까지입니다 (2장)."])
+        self.assertEqual(self.c.get("/api/decklists/").json()["decks"][0]["banlist"], "md")
+
+    def test_kept_and_checked_by_the_list_picked(self):
+        r = self.c.post("/api/decklists/", self.body(banlist="md:2022-01-19"), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        code = r.json()["code"]
+        self.assertEqual(self.c.get(f"/api/decklists/{code}/").json()["banlist"], "md:2022-01-19")
+        # January's list: the pot forbidden, the ash free, the new card not out yet
+        self.assertEqual(r.json()["issues"], ["메인 덱이 40장보다 적습니다 (4/40).", "강욕한 항아리: 금지 카드입니다.", "새 카드: 미출시 카드입니다."])
+        r = self.c.put(f"/api/decklists/{code}/", self.body(banlist="ocg:2020-01-01"), format="json")
+        self.assertEqual(r.json()["issues"][1:], ["새 카드: 미출시 카드입니다."])   # 2 of a semi-limited card are fine
+        r = self.c.put(f"/api/decklists/{code}/", self.body(banlist="tcg"), format="json")
+        # no TCG list yet: nothing limited, and none of these out in the TCG
+        self.assertEqual(r.json()["banlist"], "tcg")
+        self.assertEqual(r.json()["issues"][1:], [f"{n}: 미출시 카드입니다." for n in ("강욕한 항아리", "링크 몬스터", "새 카드", "재와 유령")])
+        # a page from before it keeps the deck's own
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", self.body(), format="json").json()["banlist"], "tcg")
+
+    def test_a_list_that_is_not_there(self):
+        code = self.c.post("/api/decklists/", self.body(), format="json").json()["code"]
+        bad = {
+            "a day without a list": "md:2022-01-20",
+            "no such game": "xx",
+            "not a day": "ocg:someday",
+            "not a string": 3,
+            "a code of ours (none yet)": "custom:ours",
+            "an empty code": "custom:",
+        }
+        for why, key in bad.items():
+            r = self.c.put(f"/api/decklists/{code}/", self.body(banlist=key), format="json")
+            self.assertEqual(r.status_code, 400, why)
+            self.assertTrue(r.json().get("error"), why)
+        r = self.c.put(f"/api/decklists/{code}/", self.body(banlist="custom:ours"), format="json")
+        self.assertEqual(r.json()["error"], "없는 금제 코드입니다.")
+        self.assertEqual(DeckList.objects.get(code=code).banlist, "md")
+
+    def test_a_list_gone_since_falls_back_to_its_games_newest(self):
+        d = DeckList.objects.create(owner=self.me, code="old00001", name="옛 덱", main=[1, 1], extra=[], banlist="md:2021-01-01")
+        self.assertEqual(self.c.get(f"/api/decklists/{d.code}/").json()["issues"][1:], ["재와 유령: 제한 카드는 1장까지입니다 (2장)."])
+
+    def test_a_tournament_entry_stays_on_master_duels_newest(self):
+        """A tournament's copy (kind "entry") is made without a list: Master Duel's newest, as before."""
+        entry = DeckList.objects.create(owner=self.me, code="entry001", kind=DeckList.Kind.ENTRY, name="대회 덱", main=[1, 1], extra=[])
+        self.assertEqual(entry.banlist, "md")
+        got = self.c.get(f"/api/decklists/{entry.code}/").json()
+        self.assertEqual((got["banlist"], got["issues"][1:]), ("md", ["재와 유령: 제한 카드는 1장까지입니다 (2장)."]))

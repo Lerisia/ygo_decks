@@ -994,6 +994,16 @@ class CardDexApiTest(TestCase):
         body = self.get(ids=",".join(str(i) for i in range(100, 170)), page=2)
         self.assertEqual((len(body["results"]), body["page"], body["has_more"]), (70, 1, False))
 
+    def test_ids_tell_when_each_card_came_out(self):
+        """A deck's cards carry the day each came out in each game, for the 금제 the deck picks to tell 미출시 by
+        (참혈 2026-10-16): a day, true when out on a day not known, null when never; the card book's rows don't."""
+        MdPrint.objects.filter(md_id=1).update(first_seen=date(2022, 1, 19))
+        Card.objects.filter(id=1).update(tcg_date=date(2002, 3, 8))
+        rows = {r["id"]: r["released"] for r in self.get(ids="1,4")["results"]}
+        self.assertEqual(rows[1], {"md": "2022-01-19", "ocg": "1999-02-04", "tcg": "2002-03-08"})
+        self.assertEqual(rows[4], {"md": True, "ocg": "2024-01-01", "tcg": None})
+        self.assertNotIn("released", self.get()["results"][0])
+
     def test_ids_are_capped(self):
         from unittest.mock import patch
         from . import dex

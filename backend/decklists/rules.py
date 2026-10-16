@@ -1,10 +1,9 @@
 """The rules of a deck list, as Master Duel's deck editor keeps them (엘리스 2026-10-14: "저장과 규칙부터"). Some a
 saved deck may not break (its zones' sizes, 3 of a name, tokens, extra deck monsters in the extra deck); the rest it
 is only told about, as the game tells a deck that a later 금제 has made unusable: fewer than 40 in the main, more of a
-card than today's list allows."""
+card than its list allows, cards not out yet then. The list is the deck's pick (참혈 2026-10-16): a game's newest
+(Master Duel's by default), one of its lists by day, or one of ours by code."""
 from collections import Counter
-
-from django.utils import timezone
 
 from carddb import banlist
 from carddb.display import display_name
@@ -133,13 +132,32 @@ def cover_copies_of(d):
     return copies or [0] * len(d.cover_cards)
 
 
-def issues(main, extra):
-    """What keeps a saved deck from being played today, in words: too few in the main, then each card over today's
-    Master Duel list in the deck's order."""
+def check_banlist(key):
+    """The 금제 a deck is kept with, or DeckError: a game's newest, a list of its that is there, or a code of ours that
+    is (none yet)."""
+    parsed = banlist.parse_key(key)
+    if parsed and parsed[0] == "custom" and banlist.custom_list(parsed[2]) is None:
+        raise DeckError("없는 금제 코드입니다.")
+    if parsed is None or banlist.judged_by(key) is None:
+        raise DeckError("없는 금제입니다.")
+    return key
+
+
+def judge_of(key):
+    """The list a saved deck is checked by; one gone since (or a code no longer there), its game's newest."""
+    parsed = banlist.parse_key(key)
+    fallback = parsed[0] if parsed and parsed[0] != "custom" else Banlist.Format.MD
+    return banlist.judged_by(key) or banlist.judged_by(fallback)
+
+
+def issues(main, extra, key="md"):
+    """What keeps a saved deck from being played under its 금제, in words: too few in the main, then each card over
+    the list (the forbidden first, then by name), then each card not out yet then (미출시), by name."""
     out = []
     if len(main) < MAIN_MIN:
         out.append(f"메인 덱이 {MAIN_MIN}장보다 적습니다 ({len(main)}/{MAIN_MIN}).")
-    statuses = banlist.current_statuses(Banlist.Format.MD, timezone.localdate())
+    judge = judge_of(key)
+    statuses = judge.limits
     cards = Card.objects.in_bulk(set(main) | set(extra))
     copies = Counter(main + extra)
     seen = set()
@@ -153,4 +171,6 @@ def issues(main, extra):
             out.append(f"{name}: 금지 카드입니다.")
         else:
             out.append(f"{name}: {LIMIT_WORD[status]} 카드는 {LIMIT[status]}장까지입니다 ({copies[i]}장).")
+    later = banlist.not_out(cards, judge.format, judge.released_by)
+    out += [f"{name}: 미출시 카드입니다." for name in sorted(display_name(cards[i]) for i in later)]
     return out

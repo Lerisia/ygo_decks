@@ -334,3 +334,116 @@ class CardHistoryTest(TestCase):
         BanlistEntry.objects.create(banlist=Banlist.objects.get(format="ocg"), card=c, name="8", status="forbidden")
         ocg = banlist.card_history(c)[1]
         self.assertEqual(ocg["events"], [{"day": "2020-01-01", "status": "forbidden", "event": ""}])
+
+
+class DeckBanlistTest(TestCase):
+    """The lists a deck list is checked by (참혈 2026-10-16): a game's newest, which a deck following it moves on with,
+    or one held to by its day; each one's limited cards, and the cards not out yet in that game."""
+
+    def setUp(self):
+        def card(cid, md_day=False, **dates):
+            c = Card.objects.create(id=cid, category="spell", name_ja=str(cid), name_en=str(cid), frame="spell", **dates)
+            if md_day is not False:
+                MdPrint.objects.create(md_id=cid, card=c, first_seen=md_day)
+            return c
+        self.old = card(1, date(2022, 1, 19), ocg_date=date(2019, 1, 1), tcg_date=date(2019, 3, 1))
+        self.new = card(2, date(2022, 5, 9), ocg_date=date(2021, 4, 1))           # never out in the TCG
+        self.undated = card(3, None)                                               # in Master Duel, its day unknown
+        self.listed = card(4, False)                                               # no OCG day, but on an OCG list
+        self.cards = [self.old, self.new, self.undated, self.listed]
+        self.jan = Banlist.objects.create(format="md", effective=date(2022, 1, 19))
+        self.may = Banlist.objects.create(format="md", effective=date(2022, 5, 9))
+        self.ocg = Banlist.objects.create(format="ocg", effective=date(2020, 1, 1))
+        self.ocg2 = Banlist.objects.create(format="ocg", effective=date(2021, 4, 1))
+        BanlistEntry.objects.create(banlist=self.jan, card=self.old, name="1", status="forbidden")
+        BanlistEntry.objects.create(banlist=self.may, card=self.old, name="1", status="limited", previous="forbidden")
+        BanlistEntry.objects.create(banlist=self.may, card=self.new, name="2", status="semi_limited")
+        BanlistEntry.objects.create(banlist=self.may, card=self.undated, name="3", status="unlimited", previous="limited")
+        BanlistEntry.objects.create(banlist=self.ocg, card=self.listed, name="4", status="limited")
+        BanlistEntry.objects.create(banlist=self.ocg2, name="Not in the card DB", status="forbidden")
+
+    def test_parse_key(self):
+        parse = banlist.parse_key
+        self.assertEqual(parse("md"), ("md", None, None))
+        self.assertEqual(parse("ocg:2020-01-01"), ("ocg", date(2020, 1, 1), None))
+        self.assertEqual(parse("custom:Our-List_2"), ("custom", None, "Our-List_2"))
+        for bad in ("", "xx", "md:", "md:2020-13-01", "md:20200101", "ocg:2020-01-01:x", "custom", "custom:",
+                    "custom:a b", "custom:" + "a" * 33, None, 3):
+            self.assertIsNone(parse(bad), bad)
+
+    def test_judged_by(self):
+        today = date(2026, 10, 16)
+        # the newest list in effect: its day, the cards it limits (unlimited left out), cards out by today
+        j = banlist.judged_by("md", today)
+        self.assertEqual((j.format, j.day, j.released_by, j.latest), ("md", date(2022, 5, 9), today, True))
+        self.assertEqual(j.limits, {1: "limited", 2: "semi_limited"})
+        # a list held to by its day: cards out by that day
+        j = banlist.judged_by("md:2022-01-19", today)
+        self.assertEqual((j.day, j.released_by, j.latest, j.limits), (date(2022, 1, 19), date(2022, 1, 19), False, {1: "forbidden"}))
+        self.assertEqual(banlist.judged_by("ocg", today).limits, {})   # a card the card DB lacks is left out
+        # a list announced for a later day waits for it
+        Banlist.objects.create(format="md", effective=date(2026, 11, 1))
+        self.assertEqual(banlist.judged_by("md", today).day, date(2022, 5, 9))
+        # a game with no list yet limits nothing
+        j = banlist.judged_by("tcg", today)
+        self.assertEqual((j.day, j.limits), (None, {}))
+        for none in ("md:2022-01-20", "custom:ours", "xx"):
+            self.assertIsNone(banlist.judged_by(none, today), none)
+
+    def test_not_out_agrees_with_status_on(self):
+        ids = [c.id for c in self.cards]
+        for fmt, days in (("md", [date(2022, 1, 19), date(2022, 5, 8), date(2022, 5, 9), date(2026, 1, 1)]),
+                          ("ocg", [date(2020, 1, 1), date(2021, 3, 31), date(2021, 4, 1)])):
+            for day in days:
+                not_out = banlist.not_out(ids, fmt, day)
+                for c in self.cards:
+                    self.assertEqual(c.id in not_out, banlist.status_on(c, day, fmt) == BanStatus.UNRELEASED, (fmt, day, c.id))
+        self.assertEqual(banlist.not_out(ids, "tcg", date(2026, 1, 1)), {2, 3, 4})
+
+    def test_released_days(self):
+        ids = [c.id for c in self.cards]
+        self.assertEqual(banlist.released_days(ids, "md"), {1: date(2022, 1, 19), 2: date(2022, 5, 9), 3: True, 4: None})
+        self.assertEqual(banlist.released_days(ids, "ocg"), {1: date(2019, 1, 1), 2: date(2021, 4, 1), 3: None, 4: True})
+
+    def test_index(self):
+        Banlist.objects.create(format="tcg", effective=date(2019, 4, 1))
+        self.assertEqual(banlist.list_days(), {"md": ["2022-05-09", "2022-01-19"], "ocg": ["2021-04-01", "2020-01-01"],
+                                               "tcg": ["2019-04-01"]})
+
+
+class BanlistApiTest(TestCase):
+    """GET /api/banlists/: each game's lists, newest first; GET /api/banlists/<game>/<day or latest>/: the cards one
+    limits (참혈 2026-10-16, the deck builder's 금제)."""
+
+    def setUp(self):
+        c = Card.objects.create(id=1, category="spell", name_ja="1", name_en="1", frame="spell")
+        self.jan = Banlist.objects.create(format="md", effective=date(2022, 1, 19))
+        self.may = Banlist.objects.create(format="md", effective=date(2022, 5, 9))
+        BanlistEntry.objects.create(banlist=self.jan, card=c, name="1", status="forbidden")
+        BanlistEntry.objects.create(banlist=self.may, card=c, name="1", status="semi_limited")
+
+    def test_index(self):
+        r = self.client.get("/api/banlists/")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["lists"], {"md": ["2022-05-09", "2022-01-19"], "ocg": [], "tcg": []})
+        self.assertRegex(body["today"], r"^\d{4}-\d\d-\d\d$")
+        self.assertIn("max-age", r["Cache-Control"])
+
+    def test_a_list(self):
+        r = self.client.get("/api/banlists/md/latest/")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual((body["format"], body["day"], body["latest"], body["limits"]), ("md", "2022-05-09", True, {"1": "semi_limited"}))
+        self.assertEqual(body["released_by"], body["today"])
+        body = self.client.get("/api/banlists/md/2022-01-19/").json()
+        self.assertEqual((body["day"], body["released_by"], body["latest"], body["limits"]), ("2022-01-19", "2022-01-19", False, {"1": "forbidden"}))
+        self.assertEqual(self.client.get("/api/banlists/ocg/latest/").json()["limits"], {})
+        for missing in ("md/2022-01-20/", "md/someday/", "xx/latest/"):
+            self.assertEqual(self.client.get(f"/api/banlists/{missing}").status_code, 404, missing)
+
+    def test_no_custom_list_yet(self):
+        # our own lists come later (참혈's team): a code is asked for, and none is found yet
+        r = self.client.get("/api/banlists/custom/ours/")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.json()["error"], "없는 금제 코드입니다.")

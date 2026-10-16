@@ -4,14 +4,17 @@ import { isAuthenticated } from "@/api/accountApi";
 import { deleteDeckList, getDeckList, type DeckListDoc } from "@/api/deckListApi";
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
+import { useBanlist } from "@/hooks/useBanlist";
 import { useDeckCards } from "@/hooks/useDeckCards";
+import { banlistName } from "@/lib/banlists";
 import { deckDay, fitLooks } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
 const BUTTON = "shrink-0 inline-flex items-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white";
 
-/** A deck list (/dev/decklists/:code): its main and extra decks, each card opening its page, and what keeps it from being
- *  played today (덱 구축, 참혈 2026-10-13; from the server 2026-10-14). Its owner's alone for now. Operators only. */
+/** A deck list (/dev/decklists/:code): its main and extra decks, each card opening its page, the 금제 it is checked by
+ *  and what keeps it from being played under it (덱 구축, 참혈 2026-10-13; from the server 2026-10-14; its 금제
+ *  2026-10-16). Its owner's alone for now. Operators only. */
 export default function DeckListView() {
   const admin = useAdminOnly();
   const navigate = useNavigate();
@@ -20,6 +23,7 @@ export default function DeckListView() {
   // undefined while asked, null when there is no such deck of this member's
   const [deck, setDeck] = useState<DeckListDoc | null | undefined>(undefined);
   const { cards, order, loading, error } = useDeckCards(deck ? [...deck.main, ...deck.extra] : null);
+  const { index: banlists, rule } = useBanlist(deck?.banlist || "md");
   useEffect(() => {
     if (!admin) return;
     if (!signedIn) {
@@ -55,6 +59,8 @@ export default function DeckListView() {
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
                 등록일 {deckDay(deck.created_at)}
                 {deckDay(deck.updated_at) !== deckDay(deck.created_at) && <> · 갱신일 {deckDay(deck.updated_at)}</>}
+                {/* the list it is checked by (참혈 2026-10-16) */}
+                {" · "}<span className="font-semibold text-gray-700 dark:text-gray-200">{banlistName(deck.banlist || "md", banlists)}</span>
               </p>
             </div>
             <div className="flex gap-2">
@@ -72,7 +78,7 @@ export default function DeckListView() {
           )}
           {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="mt-4">
-            <DeckZones deck={{ ...deck, looks: fitLooks(deck) }} cards={cards} order={order} loading={loading} />
+            <DeckZones deck={{ ...deck, looks: fitLooks(deck) }} cards={cards} order={order} loading={loading} rule={rule} />
           </div>
         </>
       ) : (

@@ -55,6 +55,9 @@ export type CardListItem = {
   /** Asked by ids (a deck's cards): its Master Duel alternate arts' small faces, for copies drawn in them
    *  (참혈 2026-10-16). */
   alts?: { id: number; thumb: string }[];
+  /** Asked by ids: the day it came out in each game (true: out, the day not known; null: never), for the 금제 a deck
+   *  picks to tell 미출시 by (참혈 2026-10-16). */
+  released?: { md: string | true | null; ocg: string | true | null; tcg: string | true | null };
 };
 export type CardListResponse = {
   results: CardListItem[];

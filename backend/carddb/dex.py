@@ -1,6 +1,6 @@
 """카드 도감: the public card list (search, filters, sort, 60 a page) and card documents — Master Duel cards with art."""
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 import os
 import time
 import unicodedata
@@ -417,8 +417,13 @@ def cards(request):
             thumb = face_thumb_url(md)
             if thumb:
                 alts[cid].append({"id": md, "thumb": thumb})
+    released = None
+    if _asked_ids(p) is not None:   # and the day each came out in each game, for the 금제 the deck picks (참혈 2026-10-16)
+        days = {fmt.value: banlist.released_days([r.id for r in chunk], fmt) for fmt in Banlist.Format}
+        iso = lambda d: d.isoformat() if isinstance(d, date) else d   # true: out, the day not known; None: never
+        released = {r.id: {fmt: iso(by_id[r.id]) for fmt, by_id in days.items()} for r in chunk}
     return Response({**extra,
-        "results": [{**({"alts": alts[r.id]} if alts is not None else {}), "id": r.id, "name": r.name,
+        "results": [{**({"alts": alts[r.id], "released": released[r.id]} if alts is not None else {}), "id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
                      "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban,
