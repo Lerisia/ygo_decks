@@ -1,5 +1,5 @@
 /** A Remix icon name typed on /dev/icons (참혈 2026-10-16): "ri-sword-fill", "Search line", "sword". A style typed
- *  with it is kept and used as typed; none typed, the page's 면/선 switch decides. */
+ *  with it is kept and used as typed; none typed, both 면 and 선 are shown to pick from. */
 export type RemixStyle = "fill" | "line";
 export type RemixTyped = { name: string; style: RemixStyle | null };
 
