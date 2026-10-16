@@ -53,22 +53,22 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
   const overIds = new Set(over.map((o) => o.card.id));
   return (
     <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
-      {/* the zone on the left, how many of each kind on the right (on a phone, the line below) */}
-      <header className="mb-2 sm:flex sm:items-baseline sm:justify-between sm:gap-3">
+      {/* the zone on the left, how many of each kind on the right, on a phone too (참혈 2026-10-16) */}
+      <header className="mb-2 flex items-start justify-between gap-2 sm:gap-3">
         <h2 className="m-0 h-6 flex items-baseline gap-2 shrink-0 whitespace-nowrap text-base">
           <span className="font-bold">{ZONE_LABEL[zone]}</span>
           <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{ids.length}장</span>
           {zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
           {over.length > 0 && <span className={WARN} title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
         </h2>
-        <p className="min-h-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:justify-end text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums">
+        <p className="m-0 min-w-0 min-h-6 flex flex-wrap items-center justify-end gap-x-1.5 sm:gap-x-2.5 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums">
           {loading && ids.length ? (
             <span className="inline-block h-3.5 w-44 rounded bg-gray-200 dark:bg-gray-700 animate-pulse align-middle" />
           ) : (
             // each kind tagged as the card search tags it, in its frame colour (참혈 2026-10-16)
             counts.map(({ label, count }) => (
-              <span key={label} className="inline-flex items-center gap-1 whitespace-nowrap">
-                <CardKindTag tag={label} />
+              <span key={label} className="inline-flex items-center gap-0.5 sm:gap-1 whitespace-nowrap">
+                <CardKindTag tag={label} compact />
                 {count}장
               </span>
             ))

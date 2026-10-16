@@ -45,10 +45,9 @@ function TileSkeleton() {
  *  and its cards stay while the search goes back and forth. */
 export type DeckUndo = { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void };
 
-const STEP_BUTTON = "w-7 h-7 lg:w-8 lg:h-8 p-0 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:text-gray-300 dark:disabled:text-gray-600 disabled:bg-white dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
+const STEP_BUTTON = "w-7 h-7 p-0 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:text-gray-300 dark:disabled:text-gray-600 disabled:bg-white dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
 
-/** 되돌리기 · 다시 실행 for the deck being built (참혈 2026-10-16): in the search's title row from lg, at the end of
- *  the filter chip row over the box below lg. */
+/** 되돌리기 · 다시 실행 for the deck being built (참혈 2026-10-16), at the end of the filter chip row. */
 function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   return (
     <span className="flex items-center gap-1">
@@ -224,10 +223,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
       className={`fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
         lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3`}
     >
-      <div className="hidden lg:flex items-center justify-between gap-2">
-        <h2 className="m-0 text-base font-bold">카드 검색</h2>
-        {history && <UndoButtons {...history} />}
-      </div>
+      <h2 className="hidden lg:block m-0 text-base font-bold">카드 검색</h2>
       <div className="order-5 lg:order-none lg:mt-2">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
           <div className="flex items-center gap-1.5 h-10 lg:h-9 w-full rounded-lg border border-input bg-white dark:bg-gray-900 lg:dark:bg-transparent pl-1.5 pr-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
@@ -280,7 +276,7 @@ export default function CardSearchPanel({ deck, cards, onPick, onShow, notice, r
           onChange={(v) => setBar(barFilters(v))}
           isDisabled={misfit}
           trial
-          right={history && <span className="lg:hidden"><UndoButtons {...history} /></span>}
+          right={history && <UndoButtons {...history} />}
         />
       </div>
       {imaging && scan.status.kind === "done" && (
