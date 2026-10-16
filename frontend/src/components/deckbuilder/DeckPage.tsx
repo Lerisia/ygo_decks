@@ -35,7 +35,8 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
   cover?: ReactNode;
   /** 32px tall: the page's name, the editor's box */
   name: ReactNode;
-  actions: ReactNode;
+  /** the page's icons on its name's line (the editor has its own on the title's) */
+  actions?: ReactNode;
   /** filling the height left beside the cards */
   description?: ReactNode;
   /** the page's 「금제 | MD • 최신」, the editor's picker alone (참혈 2026-10-16) */
@@ -56,7 +57,7 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
         <div className="min-w-0 flex-1 flex flex-col">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1 min-h-8">{name}</div>
-            <div className="shrink-0 flex items-center gap-1">{actions}</div>
+            {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
           </div>
           {description && <div className="mt-2 flex-1 flex flex-col">{description}</div>}
         </div>

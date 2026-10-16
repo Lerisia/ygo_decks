@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Check, Loader2, X } from "lucide-react";
+import { Loader2, Save, X } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -239,9 +239,28 @@ export default function DeckListEdit() {
       {deck ? (
         <>
           <DeckPage
-            top={<h1 className="m-0 text-xl leading-8 font-bold truncate">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>}
-            // over the 저장 icon, at the top line's end: the line has room for it on a phone too (참혈 2026-10-16)
-            topEnd={!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
+            top={<h1 className="m-0 shrink-0 text-xl leading-8 font-bold">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>}
+            // 취소 and 저장 (a diskette, in blue) as bare icons on the title's line (참혈 2026-10-16), a guest's note before them
+            topEnd={
+              <div className="min-w-0 flex items-center gap-2">
+                {!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
+                <div className="shrink-0 flex items-center gap-1">
+                  <button type="button" onClick={cancel} aria-label="취소" title="취소" className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100`}>
+                    <X className={DECK_ICON_SIZE} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={!named || saving}
+                    aria-label={saveLabel}
+                    title={named ? saveLabel : "덱 이름을 넣으면 저장할 수 있습니다"}
+                    className={`${DECK_ICON} text-blue-600 dark:text-blue-400 enabled:hover:text-blue-800 dark:enabled:hover:text-blue-300 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
+                  >
+                    {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <Save className={DECK_ICON_SIZE} aria-hidden />}
+                  </button>
+                </div>
+              </div>
+            }
             // the 대표 카드 on the left, bigger from lg; the description as tall as them (참혈 2026-10-16)
             cover={
               <CoverCards
@@ -265,24 +284,6 @@ export default function DeckListEdit() {
                 onChange={(e) => setDeck({ ...deck, name: e.target.value })}
                 className={`${FIELD} block px-3 py-2 text-base md:text-sm`}
               />
-            }
-            // 취소 and 저장 as bare icons where the page has 수정 and 삭제, 저장 in blue (참혈 2026-10-16)
-            actions={
-              <>
-                <button type="button" onClick={cancel} aria-label="취소" title="취소" className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100`}>
-                  <X className={DECK_ICON_SIZE} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={!named || saving}
-                  aria-label={saveLabel}
-                  title={named ? saveLabel : "덱 이름을 넣으면 저장할 수 있습니다"}
-                  className={`${DECK_ICON} text-blue-600 dark:text-blue-400 enabled:hover:text-blue-800 dark:enabled:hover:text-blue-300 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
-                >
-                  {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <Check className={DECK_ICON_SIZE} strokeWidth={2.5} aria-hidden />}
-                </button>
-              </>
             }
             description={
               <textarea
