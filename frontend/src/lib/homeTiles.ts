@@ -29,8 +29,9 @@ export const HOME_TILES_NEXT: NextTile[] = [
 export type CupStage = 1 | 2 | null;
 export type MetaChip = { tone: "season" | "cup"; label: string; tail: string };
 
-/** The 메타 통계 tile's chip: the season, or the Duelist Cup stage while one runs. `tail` is the part narrow tiles drop. */
+/** The 메타 통계 tile's chip: the season, or the Duelist Cup stage while one runs ("DC 1st Stage", no bullet: 참혈
+ *  2026-10-16). `tail` is the part narrow tiles drop. */
 export function metaChip(season: number, cupStage: CupStage): MetaChip {
-  if (cupStage) return { tone: "cup", label: `DC • ${cupStage === 1 ? "1st" : "2nd"}`, tail: " Stage" };
+  if (cupStage) return { tone: "cup", label: `DC ${cupStage === 1 ? "1st" : "2nd"}`, tail: " Stage" };
   return { tone: "season", label: `Season ${season}`, tail: "" };
 }

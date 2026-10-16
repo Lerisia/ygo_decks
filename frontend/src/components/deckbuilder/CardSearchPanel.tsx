@@ -232,8 +232,8 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
       {overlay && <div className="hidden lg:block absolute inset-0 z-10 rounded-xl bg-white dark:bg-gray-800 p-3 pt-2">{overlay}</div>}
       {/* hidden, not taken away, while something stands in its place */}
       <div className={`contents ${overlay ? "lg:invisible" : ""}`}>
-      <h2 className="hidden lg:block m-0 text-base font-bold">카드 검색</h2>
-      <div className="order-5 lg:order-none lg:mt-2">
+      {/* no 「카드 검색」 title over it: the box's placeholder says as much (참혈 2026-10-16) */}
+      <div className="order-5 lg:order-none">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
           <div className="flex items-center gap-1.5 h-10 lg:h-9 w-full rounded-lg border border-input bg-white dark:bg-gray-900 lg:dark:bg-transparent pl-1.5 pr-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
             {chosenItem && (

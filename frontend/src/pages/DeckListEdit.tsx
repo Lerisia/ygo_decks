@@ -350,7 +350,7 @@ export default function DeckListEdit() {
                 picking={coverSlot !== null}
                 marks={marks}
               />
-              <div className="lg:relative lg:min-h-[678px]">
+              <div className="lg:relative lg:min-h-[645px]">
                 <CardSearchPanel
                   deck={deck}
                   cards={cards}

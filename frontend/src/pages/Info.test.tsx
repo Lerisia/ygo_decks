@@ -58,7 +58,7 @@ describe("/dev/home", () => {
     expect(text(html)).toContain("Season 58");
     expect(html).toMatch(/<a class="[^"]*border-blue-300[^"]*" href="\/records"/);
     const cup = render(<NextTiles season={{ season: 58, cup_stage: 2 }} />);
-    expect(text(cup)).toContain("DC • 2nd Stage");
+    expect(text(cup)).toContain("DC 2nd Stage");
     expect(cup).toMatch(/<a class="[^"]*border-purple-300[^"]*" href="\/records"/);
   });
 });
@@ -68,7 +68,7 @@ describe("metaChip", () => {
     expect(metaChip(58, null)).toEqual({ tone: "season", label: "Season 58", tail: "" });
   });
   it("is the stage during one", () => {
-    expect(metaChip(58, 1)).toEqual({ tone: "cup", label: "DC • 1st", tail: " Stage" });
-    expect(metaChip(59, 2)).toEqual({ tone: "cup", label: "DC • 2nd", tail: " Stage" });
+    expect(metaChip(58, 1)).toEqual({ tone: "cup", label: "DC 1st", tail: " Stage" });
+    expect(metaChip(59, 2)).toEqual({ tone: "cup", label: "DC 2nd", tail: " Stage" });
   });
 });
