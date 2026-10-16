@@ -118,6 +118,14 @@ export function deckDay(iso: string) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** The one day a deck's page shows (참혈 2026-10-16): its last save's, as 갱신일, unless that fell on the day it was first
+ *  saved — then 등록일. */
+export function deckDayLine(deck: Pick<DeckDraft, "createdAt" | "updatedAt">) {
+  const made = deckDay(deck.createdAt);
+  const saved = deckDay(deckUpdated(deck));
+  return saved === made ? `등록일 ${made}` : `갱신일 ${saved}`;
+}
+
 type CardInfo = Pick<CardListItem, "name" | "category" | "frame">;
 
 const EXTRA_KINDS = [["fusion", "융합"], ["synchro", "싱크로"], ["xyz", "엑시즈"], ["link", "링크"]] as const;

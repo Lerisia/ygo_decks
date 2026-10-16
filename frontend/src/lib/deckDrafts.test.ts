@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckIssues, deckUpdated, fromDoc,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckUpdated, fromDoc,
   keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, notOutCards, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll,
   sortedCopies, sortedZone, tabDraft, copiesAllowed,
 } from "./deckDrafts";
@@ -297,5 +297,13 @@ describe("the pages' paths", () => {
     expect(isDeckEditorPath("/dev/decklists/ab12cd34")).toBe(false);
     expect(isDeckEditorPath("/decklists/new")).toBe(false);   // the old address only sends on
     expect(isDeckEditorPath("/cards/new")).toBe(false);
+  });
+});
+
+describe("the day a deck shows (참혈 2026-10-16)", () => {
+  it("shows the later of its first and last save, 등록일 when they fall on one day", () => {
+    expect(deckDayLine({ createdAt: "2026-10-16T03:00:00Z", updatedAt: "2026-10-16T05:00:00.5Z" })).toBe("등록일 2026.10.16");
+    expect(deckDayLine({ createdAt: "2026-10-14T03:00:00Z", updatedAt: "2026-10-16T05:00:00Z" })).toBe("갱신일 2026.10.16");
+    expect(deckDayLine({ createdAt: "2026-10-14T03:00:00Z", updatedAt: "" })).toBe("등록일 2026.10.14");
   });
 });

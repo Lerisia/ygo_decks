@@ -56,13 +56,24 @@ export function banlistOptions(format: BanFormat, index: BanlistIndex | null): B
   ];
 }
 
-/** A deck's list in words, for its page: "마듀 26.10.06 금제 (최신)". */
+// a deck's page writes the game out (참혈 2026-10-16), the picker keeps 마듀
+const PAGE_LABEL: Record<BanKind, string> = { ...KIND_LABEL, md: "마스터 듀얼" };
+
+/** A deck's list in words, for its page: "마스터 듀얼 최신 금제" — the newest with no day (참혈 2026-10-16) —,
+ *  "OCG 26.07 금제". */
 export function banlistName(key: string, index: BanlistIndex | null) {
   const choice = parseBanlistKey(key) ?? { kind: "md" as const, day: null };
-  if (choice.kind === "custom") return `${KIND_LABEL.custom} ${choice.code} 금제`;
-  const day = choice.day ?? (index && latestDay(index, choice.kind));
-  const label = day ? `${KIND_LABEL[choice.kind]} ${dayLabel(choice.kind, day, index?.lists[choice.kind])} 금제` : `${KIND_LABEL[choice.kind]} 최신 금제`;
-  return day && !choice.day ? `${label} (최신)` : label;
+  if (choice.kind === "custom") return `${PAGE_LABEL.custom} ${choice.code} 금제`;
+  return `${PAGE_LABEL[choice.kind]} ${choice.day ? dayLabel(choice.kind, choice.day, index?.lists[choice.kind]) : "최신"} 금제`;
+}
+
+/** Its title: the list's whole day, the newest's too. */
+export function banlistTitle(key: string, index: BanlistIndex | null) {
+  const choice = parseBanlistKey(key) ?? { kind: "md" as const, day: null };
+  if (choice.kind === "custom") return "";
+  if (choice.day) return fullDay(choice.day);
+  const latest = index && latestDay(index, choice.kind);
+  return latest ? `${fullDay(latest)} · ${FOLLOWS}` : FOLLOWS;
 }
 
 /** A list as the server sends it (/api/banlists/<game>/<day or latest>/): the cards it limits, and the day a card

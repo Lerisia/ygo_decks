@@ -4,7 +4,7 @@ import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
 import { type BanLimit, type BanRule, banOf } from "@/lib/banlists";
 import {
-  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, notOutCards, overLimit,
+  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, ZONES, ZONE_LABEL, kindCounts, notOutCards, overLimit,
   sortedCopies,
 } from "@/lib/deckDrafts";
 import CopyFace from "./DeckFinish";
@@ -14,7 +14,6 @@ import CopyFace from "./DeckFinish";
 const RESERVE: Record<DeckZone, string> = { main: "[--rows:2] lg:[--rows:3]", extra: "[--rows:1]" };
 const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
 // what a zone lacks or holds too many of, by its title, in yellow (참혈 2026-10-16)
-const WARN = "text-xs font-semibold text-amber-600 dark:text-amber-400";
 
 /** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look, the finish
  *  moving: DeckFinish) — its 금제 in the corner: the deck's list's (ban), today's Master Duel one (on the card) when
@@ -56,8 +55,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
   // while it is built, cards over the deck's 금제 (one saved before it) and cards not out yet then are ringed in the
-  // zone; the editor shows no count warnings by the title (참혈 2026-10-16), a deck being looked at still says it is
-  // short
+  // zone; no count warnings by the title, the pages' line under the name has them (참혈 2026-10-16)
   const ringed = new Set(onRemove ? [...overLimit(ids, cards, rule), ...notOutCards(ids, cards, rule)].map((o) => o.card.id) : []);
   return (
     <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
@@ -66,7 +64,6 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
         <h2 className="m-0 h-6 flex items-baseline gap-2 shrink-0 whitespace-nowrap text-base">
           <span className="font-bold">{ZONE_LABEL[zone]}</span>
           <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{ids.length}장</span>
-          {!onRemove && zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
         </h2>
         <p className="m-0 min-w-0 min-h-6 flex flex-wrap items-center justify-end gap-x-1.5 sm:gap-x-2.5 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums">
           {loading && ids.length ? (

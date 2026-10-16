@@ -46,23 +46,35 @@ const DONE = "absolute left-1/2 -translate-x-1/2 bottom-1 z-50 h-6 px-2.5 inline
  *  (active) comes to the front, and the deck's cards pressed go into it. Below lg the square is one button (onArea),
  *  starting with the first slot and going on from there. While one is set, 「눌러서 종료」 floats at the square's
  *  bottom: from lg it, or the slot being set pressed again, stops (onDone); below lg the whole square does. */
-export default function CoverCards({ covers, lookOf, cards, active, wide, onSlot, onArea, onDone }: {
+export default function CoverCards({ covers, lookOf, cards, active = null, wide = false, onSlot, onArea, onDone }: {
   covers: (CoverPick | null)[];
   lookOf: (pick: CoverPick) => CardLook | null;
   cards: Map<number, CardListItem>;
   /** the slot being set, or null */
-  active: number | null;
+  active?: number | null;
   /** from lg: the slots pressed one by one */
-  wide: boolean;
-  onSlot: (slot: number) => void;
-  onArea: () => void;
-  onDone: () => void;
+  wide?: boolean;
+  /** none: the deck's page, which only shows the cards set (참혈 2026-10-16) */
+  onSlot?: (slot: number) => void;
+  onArea?: () => void;
+  onDone?: () => void;
 }) {
   const slots = Array.from({ length: COVERS_MAX }, (_, i) => covers[i] ?? null);
   const name = (i: number) => (slots[i] === null ? "비어 있음" : (cards.get(slots[i]!.id)?.name ?? ""));
   const slot = (i: number) => <Slot at={i} pick={slots[i]} look={slots[i] && lookOf(slots[i]!)} cards={cards} active={active === i} />;
   const SIZE = "relative shrink-0 w-[116px] h-[116px] lg:w-[168px] lg:h-[168px]";
 
+  if (!onSlot || !onArea || !onDone) {
+    return (
+      <div role="group" aria-label="대표 카드" className={SIZE}>
+        {DRAW_ORDER.filter((i) => slots[i] !== null).map((i) => (
+          <span key={i} className={`${CARD} ${SLOT_LOOK[i]}`} title={name(i)}>
+            {slot(i)}
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (!wide) {
     return (
       <button

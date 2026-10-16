@@ -215,6 +215,14 @@ class DeckBanlistTest(TestCase):
         self.assertEqual(r.json()["issues"], ["메인 덱이 40장보다 적습니다 (4/40).", "재와 유령: 제한 카드는 1장까지입니다 (2장)."])
         self.assertEqual(self.c.get("/api/decklists/").json()["decks"][0]["banlist"], "md")
 
+    def test_one_saved_on_the_newest_moves_on_with_the_next(self):
+        code = self.c.post("/api/decklists/", self.body(), format="json").json()["code"]
+        later = Banlist.objects.create(format="md", effective=date(2022, 8, 1))
+        BanlistEntry.objects.create(banlist=later, card=self.ash, name="재와 유령", status="semi_limited")
+        r = self.c.get(f"/api/decklists/{code}/").json()
+        self.assertEqual(r["banlist"], "md")
+        self.assertEqual(r["issues"], ["메인 덱이 40장보다 적습니다 (4/40)."])   # 2 of a semi-limited card are fine now
+
     def test_kept_and_checked_by_the_list_picked(self):
         r = self.c.post("/api/decklists/", self.body(banlist="md:2022-01-19"), format="json")
         self.assertEqual(r.status_code, 201, r.json())
