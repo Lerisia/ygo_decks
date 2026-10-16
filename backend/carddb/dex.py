@@ -19,7 +19,7 @@ from PIL import Image
 from . import banlist
 from .display import ART_ORDER, THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
-from .models import Banlist, BanlistEntry, Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
+from .models import Banlist, BanlistEntry, Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_picture
 
 PAGE_SIZE = 60
 IDS_MAX = 200   # ids=…: a deck's cards asked at once (90 at most), all on one page
@@ -159,7 +159,7 @@ def _card_index():
     cutin_cards = {alt_of.get(md_id, md_id) for md_id in _cutins()}
     rows = []
     for (cid, ko, ja, en, ocg, tcg, kr, category, frame, attribute, race, level, rank, link,
-         st, atk, def_value) in Card.objects.filter(has_art()).values_list(
+         st, atk, def_value) in Card.objects.filter(has_picture()).values_list(
             "id", "name_ko", "name_ja", "name_en", "ocg_date", "tcg_date", "kr_date", "category", "frame", "attribute",
             "race", "level", "rank", "link_rating", "spell_trap_subtype", "atk", "def_value"):
         r = _Row()
@@ -463,7 +463,7 @@ def filtered_counts(request):
 def dex_counts(request):
     """How many decks and cards the 도감 holds (its tabs and the home page show them)."""
     from deck.models import Deck
-    return Response({"decks": Deck.objects.count(), "cards": Card.objects.filter(has_art()).count()})
+    return Response({"decks": Deck.objects.count(), "cards": Card.objects.filter(has_picture()).count()})
 
 
 def _options(labels):
@@ -477,7 +477,7 @@ def card_options(request):
     ways with the same cards)."""
     members, info = defaultdict(set), {}
     for gid, cid, name, text in (CardGroupMember.objects.filter(group__needs_review=False)
-                                 .filter(has_art("card_id")).exclude(how=CardGroupMember.How.REMOVED)
+                                 .filter(has_picture("card_id")).exclude(how=CardGroupMember.How.REMOVED)
                                  .values_list("group_id", "card_id", "group__name_ko", "group__text")):
         members[gid].add(cid)
         info[gid] = name or text
@@ -563,7 +563,7 @@ def card(request, card_id):
     from deck.models import DeckCard, DeckCardGroup
     from deck.views import _phone_cover_url
 
-    c = Card.objects.filter(has_art(), id=card_id).prefetch_related("texts").first()
+    c = Card.objects.filter(has_picture(), id=card_id).prefetch_related("texts").first()
     if not c:
         raise Http404
     if c.category == "monster":
@@ -586,7 +586,7 @@ def card(request, card_id):
     # a card of its own 카드군 is none of its 서포트 (엘리스 10/12)
     targets = [s.target_id for s in supports if s.target_id]
     theirs = _shown_groups(targets)
-    shown_cards = set(Card.objects.filter(has_art(), id__in=[t for t in targets if not theirs[t] & own_groups])
+    shown_cards = set(Card.objects.filter(has_picture(), id__in=[t for t in targets if not theirs[t] & own_groups])
                       .values_list("id", flat=True))
     # a card naming this one back supports it too: the pair is marked as mutual (의식 몬스터 ↔ 의식 마법)
     back = set(CardSupport.objects.filter(target=c, how=CardSupport.How.CARD).values_list("card_id", flat=True))
@@ -628,7 +628,7 @@ def card(request, card_id):
     rarity = {c.id: base.rarity if base else ""} | {m: r or (base.rarity if base else "") for m, r in alts}
     cutins = _cutins()
     # the cards naming this one or bearing its name, but none of its own 카드군 (엘리스 10/12)
-    naming = list(CardSupport.objects.filter(target=c, card__in=Card.objects.filter(has_art()))
+    naming = list(CardSupport.objects.filter(target=c, card__in=Card.objects.filter(has_picture()))
                   .exclude(card=c).values_list("card_id", flat=True))
     naming_groups = _shown_groups(naming)
     supporters = [cid for cid in naming if not naming_groups[cid] & own_groups]
@@ -649,10 +649,13 @@ def card(request, card_id):
         # each print's Master Duel art in each version (일본판 ocg / 한국판 tcg), for a deck cover picked from the card
         # book (특이점 10/17)
         "arts": [{"id": m, "version": v, "url": settings.MEDIA_URL + versions[v], "overframe": _overframe(m)}
-                 for m, versions in ((m, art_names().get(m) or {}) for m in rarity) for v in ART_ORDER if v in versions],
+                 for m, versions in ((m, art_names().get(m) or {}) for m in rarity)
+                 for v in ART_ORDER if v in versions and v != "provisional"],
         # the cut-in's sound is the attribute's
         "cutin_sound": c.attribute if c.category == "monster" and c.attribute in ATTRIBUTES else "",
         "rarity": base.rarity if base else "",
+        # outside Master Duel: the picture is the stand-in cut from the published card image (provisional.py)
+        "provisional": base is None,
         "dates": {"md": base.first_seen if base else None, "ocg": c.ocg_date, "kr": c.kr_date, "tcg": c.tcg_date},
         "groups": [{"id": g.id, "name": g.name_ko or g.text, "parent_id": g.parent_id} for g in groups],
         "supports": named,

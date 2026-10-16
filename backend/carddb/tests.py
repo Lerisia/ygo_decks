@@ -826,8 +826,8 @@ class CardGroupReviewApiTest(CardGroupTest):
 class CardDexApiTest(TestCase):
     """카드 도감: Master Duel cards with art, searched, filtered, sorted newest first, 60 a page; card documents."""
 
-    def card(self, cid, ko, ja="", en="", art=True, md=True, **fields):
-        from .models import MdArt
+    def card(self, cid, ko, ja="", en="", art=True, md=True, provisional=False, **fields):
+        from .models import MdArt, ProvisionalArt
         values = dict(category="monster", frame="effect", types=["effect"], attribute="dark", race="spellcaster",
                       level=4, atk=1800, def_value=1000)
         values.update(fields)
@@ -836,7 +836,25 @@ class CardDexApiTest(TestCase):
             MdPrint.objects.create(md_id=cid, card=c, rarity="SR")
             if art:
                 MdArt.objects.create(md_print_id=cid, version="common", image=f"cards/art/common/{cid}.webp")
+        if provisional:   # outside Master Duel, with the stand-in cut from the published card image
+            ProvisionalArt.objects.create(card=c, image=f"cards/art/provisional/{cid}.webp")
         return c
+
+    def test_a_card_outside_master_duel_with_stand_in_art_is_in_the_book(self):
+        """마듀 미출시 OCG 카드도 임시 일러가 있으면 목록·문서에 나온다 (엘리스 10/17); 그림 없는 카드는 전처럼 빠진다."""
+        self.card(23902, "울툼의 마룡왕", "ウルトゥムの魔竜王", md=False, provisional=True, ocg_date=date(2026, 10, 1))
+        self.card(23903, "그림 없는 카드", md=False)
+        ids = [r["id"] for r in self.client.get("/api/carddb/cards/", {"q": ""}).json()["results"]]
+        self.assertIn(23902, ids)
+        self.assertNotIn(23903, ids)
+        row = next(r for r in self.client.get("/api/carddb/cards/").json()["results"] if r["id"] == 23902)
+        self.assertEqual((row["image_url"], row["rarity"]), ("/media/cards/art/provisional/23902.webp", ""))
+        doc = self.client.get("/api/carddb/cards/23902/").json()
+        self.assertEqual((doc["image_url"], doc["provisional"], doc["rarity"], doc["dates"]["md"]),
+                         ("/media/cards/art/provisional/23902.webp", True, "", None))
+        self.assertEqual(doc["arts"], [])   # a deck cover is picked from Master Duel art only
+        self.assertEqual(self.client.get("/api/carddb/cards/23903/").status_code, 404)
+        self.assertFalse(self.client.get("/api/carddb/cards/1/").json()["provisional"])
 
     def setUp(self):
         from django.test import override_settings

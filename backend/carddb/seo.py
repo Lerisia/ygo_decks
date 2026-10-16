@@ -11,7 +11,7 @@ from django.http import HttpResponse
 
 from .display import display_name
 from .face import face_url
-from .models import Card, has_art
+from .models import Card, has_picture
 
 SITE = "https://ygodecks.com"
 TITLE = "YGO Decks - 유희왕 마스터 듀얼 종합 정보"
@@ -88,7 +88,7 @@ def _kind(card):
 
 
 def card_page(request, card_id):
-    card = Card.objects.filter(has_art(), id=card_id).prefetch_related("texts").first()
+    card = Card.objects.filter(has_picture(), id=card_id).prefetch_related("texts").first()
     if not card:
         return page(f"/cards/{card_id}", TITLE, DESCRIPTION, status=404)
     name = display_name(card)
@@ -129,7 +129,7 @@ def sitemap(request):
     from deck.models import Deck
     urls = ["/", "/cards", "/database", "/recorder", "/records", "/recommend"]
     urls += [f"/database/{i}" for i in Deck.objects.order_by("id").values_list("id", flat=True)]
-    urls += [f"/cards/{i}" for i in Card.objects.filter(has_art()).order_by("id").values_list("id", flat=True)]
+    urls += [f"/cards/{i}" for i in Card.objects.filter(has_picture()).order_by("id").values_list("id", flat=True)]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     xml += [f"<url><loc>{SITE}{u}</loc></url>" for u in urls]
     xml.append("</urlset>")

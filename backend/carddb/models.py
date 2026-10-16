@@ -296,6 +296,13 @@ def has_art(card_field="pk"):
     return models.Exists(MdArt.objects.filter(md_print_id=models.OuterRef(card_field)))
 
 
+def has_picture(card_field="pk"):
+    """Filter for cards with any picture to show: Master Duel art, or the stand-in cut from the published card image
+    for a card Master Duel has not released (provisional.py). The card book and its search pages use this; games,
+    icons and the scanner keep to `has_art` (엘리스 2026-10-17)."""
+    return has_art(card_field) | models.Exists(ProvisionalArt.objects.filter(card_id=models.OuterRef(card_field)))
+
+
 class MdPack(models.Model):
     """A Master Duel pack or deck, as masterduelmeta.com lists it, and the cards it holds (엘리스 2026-10-12, the pack
     simulator). A pack the source stops listing is kept."""
