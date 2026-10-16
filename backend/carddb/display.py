@@ -4,9 +4,10 @@ import time
 from django.conf import settings
 from PIL import Image
 
-from .models import MdArt
+from .models import MdArt, ProvisionalArt
 
-ART_ORDER = ("ocg", "common", "tcg")
+# Master Duel's arts first; a stand-in cut from the published card image (provisional.py) only when there is none.
+ART_ORDER = ("ocg", "common", "tcg", "provisional")
 THUMB_DIR = "cards/thumb256"
 THUMB_SIZE = 256
 TTL = 300
@@ -18,6 +19,8 @@ def art_names():
         m = {}
         for md_id, version, image in MdArt.objects.values_list("md_print_id", "version", "image"):
             m.setdefault(md_id, {})[version] = image
+        for card_id, image in ProvisionalArt.objects.values_list("card_id", "image"):
+            m.setdefault(card_id, {})["provisional"] = image
         _art["map"], _art["at"] = m, time.time()
     return _art["map"]
 

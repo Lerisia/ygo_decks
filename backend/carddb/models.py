@@ -89,6 +89,16 @@ class MdArt(models.Model):
         constraints = [models.UniqueConstraint(fields=["md_print", "version"], name="carddb_art_print_version")]
 
 
+class ProvisionalArt(models.Model):
+    """A stand-in illustration for a card Master Duel has not released: cut from the card image Konami published
+    (via ygoprodeck, by Konami id), shown until a Master Duel print brings the real art (엘리스 2026-10-17)."""
+
+    card = models.OneToOneField(Card, on_delete=models.CASCADE, related_name="provisional_art")
+    image = models.ImageField(upload_to="cards/art/provisional/")
+    source_id = models.CharField(max_length=20, blank=True, help_text="ygoprodeck의 id (발매 전엔 임시 번호)")
+    fetched_at = models.DateTimeField(auto_now=True)
+
+
 class SrcMd(models.Model):
     md_id = models.PositiveIntegerField()
     lang = models.CharField(max_length=2)
