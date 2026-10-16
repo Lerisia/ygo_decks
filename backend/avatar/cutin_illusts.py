@@ -7,6 +7,7 @@ import base64
 import json
 import queue
 import subprocess
+import hashlib
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -186,7 +187,53 @@ def compose(figure, M, art, out=OUT, keep_lights=True):
     return _finished(base, *_laid(figure, M, base, out), out, keep_lights)
 
 
-def compose_looks(figures, M, art, out=OUT, keep_lights=True):
+def erase_and_lay(base, colour, alpha, out):
+    """The figure trusted over the art (엘리스 10/16: "원본을 지운다", "배경을 채우는 방식으로 아예 삭제"): the art's
+    monster — everything that is not background haze within the figure's reach — is cut out and the hole filled
+    with a quilt of the art's own calm haze, then the figure is laid on that plate. For a card whose pose the
+    cut-in moved a little (라이징 리벨리온 팔콘's head and lower body), so that the art's old parts would show
+    beside the new; never where something stands in front of the figure, since that goes too. The plate's low
+    frequencies come from an inpaint of the hole, its grain from real haze tiles (half-overlap, feathered), so the
+    hole carries the sky's gradient and its texture without the monster's ghost."""
+    k = out / 1024
+    art = base.astype(np.uint8)
+    footprint = (alpha[:, :, 0] > 0.5).astype(np.uint8)
+    hsv = cv2.cvtColor(art, cv2.COLOR_BGR2HSV)
+    haze = ((hsv[:, :, 2] > 150) & (hsv[:, :, 1] < 90)).astype(np.uint8)
+    reach = cv2.dilate(footprint, np.ones((int(80 * k) + 1,) * 2, np.uint8))
+    monster = ((reach > 0) & ((footprint > 0) | (haze == 0))).astype(np.uint8)
+    monster = cv2.dilate(monster, np.ones((int(8 * k) + 1,) * 2, np.uint8))
+    low = cv2.GaussianBlur(cv2.inpaint(art, monster, 25, cv2.INPAINT_TELEA).astype(np.float32), (0, 0), 40 * k)
+    texture = base - cv2.GaussianBlur(base, (0, 0), 40 * k)
+    fine = np.abs(base - cv2.GaussianBlur(base, (0, 0), 1.5 * k)).mean(axis=2)
+    calm = cv2.GaussianBlur(fine, (0, 0), 8 * k) < 1.2                     # haze grain, not a bolt
+    clean = cv2.erode(((monster == 0) & calm).astype(np.uint8), np.ones((int(8 * k) + 1,) * 2, np.uint8))
+    H, W = art.shape[:2]
+    T, O = int(96 * k), int(48 * k)
+    rng = np.random.default_rng(int(base[::64, ::64].sum()) & 0xFFFF)
+    ys, xs = np.where(clean[O:H - T - O, O:W - T - O] > 0)
+    quilt = np.zeros((H, W, 3), np.float32)
+    weight = np.zeros((H, W, 1), np.float32)
+    ramp = np.minimum(np.minimum(np.arange(T), np.arange(T)[::-1]) + 1, O) / O
+    feather = (ramp[:, None] * ramp[None, :])[:, :, None].astype(np.float32)
+    if len(ys):
+        for y in range(0, H - T + 1, T - O):
+            for x in range(0, W - T + 1, T - O):
+                for _ in range(300):
+                    i = rng.integers(len(ys))
+                    sy, sx = ys[i] + O, xs[i] + O
+                    if clean[sy:sy + T, sx:sx + T].all():
+                        break
+                quilt[y:y + T, x:x + T] += texture[sy:sy + T, sx:sx + T] * feather
+                weight[y:y + T, x:x + T] += feather
+    plate = np.where(monster[:, :, None] > 0, low + 0.6 * quilt / np.maximum(weight, 1e-3), base)
+    toned, _ = _toned(base, colour, alpha, k)
+    picture = (plate * (1 - alpha) + toned).clip(0, 255).astype(np.uint8)
+    solid = alpha[:, :, 0] > 0.95
+    return picture, 0.0, float((alpha > 0.5).mean()), 0.0
+
+
+def compose_looks(figures, M, art, out=OUT, keep_lights=True, erase=False):
     """Several renders of the same pose in different looks (eyes shut or open, a slot faded in or not), laid on the
     art together. Where the looks differ from one another, each connected patch of difference is taken whole from
     the look nearest the art over that patch: the open eyes win the face (a face is one patch, so its chin line is
@@ -213,6 +260,8 @@ def compose_looks(figures, M, art, out=OUT, keep_lights=True):
     alpha = sum(w * a for w, (_, a) in zip(weights, laid)) / total
     solid = alpha[:, :, 0] > 0.95
     shares = [round(float(((choice == i) & solid).sum() / max(solid.sum(), 1)), 3) for i in range(len(laid))]
+    if erase:
+        return (*erase_and_lay(base, colour, alpha, out), shares)
     return (*_finished(base, colour, alpha, out, keep_lights), shares)
 
 
@@ -241,7 +290,9 @@ def save_illust(print_, data, replace=False):
     obj.name = illust_name(print_)[:100]
     if obj.image:
         obj.image.delete(save=False)
-    obj.image.save(f"cutin_{print_.md_id}.webp", ContentFile(data), save=False)
+    # the name carries the picture's own hash: nginx has browsers keep /media/ for ten years, so a picture made
+    # again under the old name would never reach a phone that has seen it, while an unchanged one keeps its address (10/16)
+    obj.image.save(f"cutin_{print_.md_id}_{hashlib.sha1(data).hexdigest()[:8]}.webp", ContentFile(data), save=False)
     obj.save()
     return obj, created
 
@@ -251,7 +302,7 @@ def save_illust(print_, data, replace=False):
 LOOKS = (None, 0.15, 0.35, 0.55, 0.75, 0.95)
 
 
-def make(md_id, render, out_dir, keep_lights=True):
+def make(md_id, render, out_dir, keep_lights=True, erase=False):
     """One print's illustration, `render(size, look)` drawing its cut-in at rest on a transparent square of that
     size (BGRA), wearing the animation's look at `look` (0..1) or its own (None). The look nearest the art wins:
     the rest pose often has the eyes shut, and the art the open ones (엘리스 10/15: "얼굴이 흐릿해요"). The row says
@@ -274,11 +325,11 @@ def make(md_id, render, out_dir, keep_lights=True):
     want = int(min(4096, max(OUT, round(DRAW * found.scale / 256) * 256)))
     size = max(want, DRAW)
     figures = [figure if look is None and size == DRAW else render(size, look) for look in LOOKS]
-    picture, covered, cover, gap, shares = compose_looks(figures, found.M, art, keep_lights=keep_lights)
+    picture, covered, cover, gap, shares = compose_looks(figures, found.M, art, keep_lights=keep_lights, erase=erase)
     file = Path(out_dir, f"{md_id}.webp")
     cv2.imwrite(str(file), picture, [cv2.IMWRITE_WEBP_QUALITY, 92])
     return row | {"verdict": "clean" if covered <= CLEAN else "check", "covered": round(covered, 4), "cover": round(cover, 3),
-                  "looks": dict(zip(map(str, LOOKS), shares)), "lights": keep_lights, "gap": round(gap, 2), "file": str(file)}
+                  "looks": dict(zip(map(str, LOOKS), shares)), "lights": keep_lights, "erase": erase, "gap": round(gap, 2), "file": str(file)}
 
 
 class PoseRenderer:

@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 
-from avatar.cutin_illusts import ALIGN, LOOKS, align, compose, illust_name, make, save_illust
+from avatar.cutin_illusts import ALIGN, LOOKS, align, compose, erase_and_lay, illust_name, make, save_illust
 from avatar.models import CustomIllust
 from carddb.models import Card, MdArt, MdPrint
 
@@ -84,6 +84,35 @@ class AlignTest(SimpleTestCase):
         self.assertTrue(found is None or not found.fits())
 
 
+class EraseTest(SimpleTestCase):
+    def test_the_art_s_monster_goes_and_its_haze_fills_the_hole_under_the_figure(self):
+        """엘리스 10/16: the art's monster, a little away from where the cut-in holds it, is cut out and the hole is
+        filled from the art's own haze; the figure then stands alone, with no old edge beside it."""
+        rng = np.random.default_rng(5)
+        haze = np.full((512, 512, 3), (225, 175, 230), np.uint8)                                  # pink haze (BGR)
+        haze = np.clip(haze.astype(int) + rng.integers(-6, 7, (512, 512, 3)), 0, 255).astype(np.uint8)
+        art = haze.copy()
+        cv2.rectangle(art, (150, 150), (330, 330), (40, 30, 60), -1)                                # the art's dark monster
+        # the cut-in's monster, 20 art px to the right of the art's: M maps figure px -> art-1024 px as 0.5 x + 128,
+        # so art px a (at 512) sits at figure px (2 a - 128) / 0.5
+        figure = np.zeros((ALIGN, ALIGN, 4), np.uint8)
+        fx = lambda a_px: int((2 * a_px - 128) / 0.5)
+        x0, y0, x1, y1 = fx(170), fx(150), fx(350), fx(330)
+        figure[y0:y1, x0:x1, :3] = (40, 30, 60)
+        figure[y0:y1, x0:x1, 3] = 255
+        M = np.float32([[0.5, 0, 128], [0, 0.5, 128]])                                               # figure px -> art-1024 px
+        from avatar.cutin_illusts import enlarged, _laid
+        base = enlarged(art, 1024).astype(np.float32)
+        colour, alpha = _laid(figure, M, base, 1024)
+        picture = erase_and_lay(base, colour, alpha, 1024)[0]
+        # the strip the monster occupied but the figure does not (x 300..340 at 1024) is haze now, not the monster
+        strip = picture[400:600, 302:336]
+        np.testing.assert_allclose(strip.mean(axis=(0, 1)), (225, 175, 230), atol=12)
+        self.assertLess(cv2.cvtColor(strip, cv2.COLOR_BGR2GRAY).std(), 10)        # flat haze: no edge, no ghost across it
+        # and the figure stands where the cut-in holds it
+        np.testing.assert_allclose(picture[500, 500], (40, 30, 60), atol=8)
+
+
 class ComposeTest(SimpleTestCase):
     def test_a_light_the_art_paints_over_the_figure_stays_unless_told_otherwise(self):
         art = drawn_art(1)
@@ -150,6 +179,7 @@ class IllustTest(TestCase):
     def test_saves_once_and_makes_the_picture_again_only_on_request(self):
         obj, created = save_illust(self.print, webp_bytes((255, 0, 0)))
         self.assertTrue(created)
+        first_name = obj.image.name
         self.assertEqual((obj.name, obj.source_tweet_id), ("푸른 눈의 백룡 (고화질)", "cutin:4007"))
         self.assertEqual(Image.open(obj.image.path).getpixel((0, 0)), (255, 0, 0))
         again, created = save_illust(self.print, webp_bytes((0, 255, 0)))
@@ -161,6 +191,7 @@ class IllustTest(TestCase):
         self.assertEqual(redone.id, obj.id)
         self.assertEqual(Image.open(redone.image.path).getpixel((0, 0)), (0, 255, 0))
         self.assertEqual(CustomIllust.objects.count(), 1)
+        self.assertNotEqual(redone.image.name, first_name)   # a remade picture takes a new address: browsers keep the old one for years
 
     def test_a_fitting_cut_in_becomes_a_clean_illustration(self):
         art = drawn_art(3)
@@ -254,6 +285,40 @@ class IllustTest(TestCase):
         with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
             call_command("cutin_illusts", out=str(out), save=True, verbosity=0)
         self.assertEqual(CustomIllust.objects.count(), 1)
+
+    def test_erase_named_draws_the_print_again_even_when_the_report_has_it(self):
+        art = drawn_art(3)
+        self.with_art(4007, art)
+        Path(MEDIA, "md_ui/cutin").mkdir(parents=True, exist_ok=True)
+        Path(MEDIA, "md_ui/cutin/index.json").write_text(json.dumps({"4007": {"anim": "animation", "v": 3}}))
+        out = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out, True)
+        drawn = []
+
+        class FakeRenderer:
+            def __init__(self, work):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def render(self, md_id, version, size, look=None):
+                drawn.append(md_id)
+                return figure_from(art, size)
+
+        with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
+            call_command("cutin_illusts", "4007", out=str(out), save=True, verbosity=0)
+            first = json.loads((out / "report.json").read_text())["4007"]
+            self.assertFalse(first["erase"])
+            call_command("cutin_illusts", "4007", out=str(out), save=True, replace=True, erase=True, verbosity=0)
+        second = json.loads((out / "report.json").read_text())["4007"]
+        self.assertTrue(second["erase"])                   # drawn again, in the mode asked for, without --redo
+        self.assertEqual(len(drawn), 12)                   # six looks each time
+        illust = CustomIllust.objects.get(source_tweet_id="cutin:4007")
+        self.assertEqual(second["illust"], illust.id)
 
     def test_a_covered_one_waits_for_a_look_and_goes_in_on_accept_without_a_new_drawing(self):
         art = drawn_art(3)
