@@ -115,22 +115,22 @@ class EraseTest(SimpleTestCase):
 
 class ComposeTest(SimpleTestCase):
     def test_a_light_the_art_paints_over_the_figure_stays_unless_told_otherwise(self):
+        """The light gate alone: the toning is held out of the way (a plain lift on the drawing is otherwise handed
+        to the figure as a shift, as it should be — the gate is for a light the toning cannot give, a flash whose
+        brightness the smooth shift does not reach)."""
         art = drawn_art(1)
         figure = figure_from(art)
-        # a burst of light the art paints over the monster: a sharp lift on the art's own drawing, so the toning
-        # (smooth, σ16) cannot give it to the figure, while the lines beneath still match and the colour bar passes
-        # (an opaque flash with no drawing under it is held out by the bar alone, whatever the lights setting)
         disc_mask = np.zeros(art.shape[:2], np.uint8)
         cv2.circle(disc_mask, (250, 250), 24, 255, -1)
-        art[disc_mask > 0] = np.clip(art[disc_mask > 0].astype(int) + 40, 0, 255).astype(np.uint8)
+        art[disc_mask > 0] = np.clip(art[disc_mask > 0].astype(int) + 60, 0, 255).astype(np.uint8)   # lit by 60: past GLOW, within the sure bar
         M = np.float32([[0.5, 0, 128], [0, 0.5, 128]])
-        kept = compose(figure, M, art, out=1024)[0].astype(int)
-        through = compose(figure, M, art, out=1024, keep_lights=False)[0].astype(int)
+        with mock.patch("avatar.cutin_illusts._toned", lambda base, colour, alpha, k: (colour, None)):
+            kept = compose(figure, M, art, out=1024)[0].astype(int)
+            through = compose(figure, M, art, out=1024, keep_lights=False)[0].astype(int)
         changed = np.abs(kept - through).max(axis=2) > 6
-        self.assertTrue(changed.any())                                           # the switch does something...
         disc_out = cv2.resize(disc_mask, (1024, 1024), interpolation=cv2.INTER_NEAREST) > 0
-        self.assertGreater(changed[disc_out].mean(), 0.3)                        # ...under the light...
-        self.assertLess(changed[~disc_out].mean(), 0.01)                          # ...and nowhere else
+        self.assertGreater(changed[disc_out].mean(), 0.3)                        # under the light the switch tells
+        self.assertLess(changed[~disc_out].mean(), 0.01)                          # nowhere else
         self.assertGreater(kept[disc_out].mean(), through[disc_out].mean())      # kept: the lit art; off: the darker figure
 
     def test_takes_the_figure_where_the_art_shows_it_and_keeps_what_the_art_paints_over_it(self):

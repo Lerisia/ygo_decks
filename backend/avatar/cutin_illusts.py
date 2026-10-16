@@ -29,7 +29,8 @@ CLEAN = 0.03    # a figure the art covers this little goes into the pool unseen;
 LINES = 0.45    # how well the fine lines must coincide for the figure to count as plainly in place
 BAR = 30        # how far (blurred levels) the figure may differ from the art and still replace it...
 BAR_SURE = 80   # ...and where it is plainly in place
-GLOW = 15       # how much brighter than the toned figure the art must be for a light to count as the art's own
+GLOW = 25       # how much brighter than the toned figure the art must be for a light to count as the art's own: a
+                # skin highlight or bloom lifts a face by 5–16 and must pass whole, a muzzle flash or ray by far more (10/16)
 KEY = "cutin:{}"   # CustomIllust.source_tweet_id of the illustration made from a print's cut-in
 INDEX = "md_ui/cutin/index.json"
 FRONTEND = Path(settings.BASE_DIR).parent / "frontend"
@@ -169,7 +170,8 @@ def _finished(base, colour, alpha, out, keep_lights=True):
     luminance = lambda im: cv2.cvtColor(np.clip(im, 0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
     if keep_lights:
         glow = cv2.GaussianBlur(np.clip(luminance(base) - luminance(whole), 0, 255), (0, 0), 2 * k)
-        agree = np.minimum(agree, np.clip((GLOW + 10 - glow) / 20, 0, 1))
+        # a ramp that began at 5 dimmed every lit face by 15–40% of blurred art (10/16, 로즈마리); it starts at GLOW now
+        agree = np.minimum(agree, np.clip((GLOW + 20 - glow) / 20, 0, 1))
     # the margin eroded off the agreeing area keeps a seam from showing, but it also took the thin tips (claws,
     # fingers) off a figure that is plainly in place; there the figure keeps its own edge (10/16)
     eroded = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
