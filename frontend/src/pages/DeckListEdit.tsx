@@ -273,7 +273,8 @@ export default function DeckListEdit() {
           <p className="mt-2 mb-0 h-5 flex items-center justify-between gap-3 text-xs whitespace-nowrap overflow-hidden">
             <span className="min-w-0 truncate text-gray-500 dark:text-gray-400">{!signedIn && "로그인하면 덱을 저장할 수 있습니다."}</span>
             <span className="shrink-0 flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400" aria-live="polite">
-              {short && <span>메인 덱 {MAIN_MIN}장 이상 필요</span>}
+              {/* a phone leaves 메인 덱 out, so a guest's line still fits beside it */}
+              {short && <span><span className="hidden sm:inline">메인 덱 </span>{MAIN_MIN}장 이상 필요</span>}
               {over.length > 0 && <span title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
             </span>
           </p>

@@ -87,7 +87,7 @@ function CardInfoBody({ card, inDeck, look, onLook, copies = 0, sameLook, onLook
           value={face?.id}
           // a finish the print picked doesn't come in (로얄 on an R print) goes back to 일반
           onPick={(f) => onLook({ face: f.id, finish: finishesFor(doc, f).some((x) => x.key === shown) ? shown : "normal" })}
-          className={`mt-2 grid gap-1.5 ${pane ? "grid-cols-4" : "grid-cols-3"}`}
+          className={`mt-2 grid gap-1.5 ${pane ? "grid-cols-4" : "grid-cols-3 sm:grid-cols-4"}`}
           ring="ring-blue-500 ring-offset-white dark:ring-offset-gray-800"
         />
       )}
