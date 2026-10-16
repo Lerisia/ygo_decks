@@ -56,7 +56,7 @@ export default function DeckListView() {
       {deck && draft ? (
         // laid out as the editor, through the same parts (참혈 2026-10-16)
         <DeckPage
-          top={<Link to={DECK_LISTS_PATH} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 내 덱 리스트</Link>}
+          back={<Link to={DECK_LISTS_PATH} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 내 덱 리스트</Link>}
           cover={draft.covers.length > 0 && <CoverCards covers={draft.covers} lookOf={(c) => coverLook(draft, c)} cards={cards} />}
           name={
             // its day beside it (참혈 2026-10-16)

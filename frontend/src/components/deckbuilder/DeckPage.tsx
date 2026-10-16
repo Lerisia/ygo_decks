@@ -24,12 +24,14 @@ export function DeckWarnings({ short, over, later }: ReturnType<typeof deckWarni
 }
 
 /** A deck's page and its editor laid out as one (참혈 2026-10-16: "수정사항이 같이 반영되도록"), each page putting in only
- *  its own pieces: the top line; the 대표 카드 on the left, beside them the name's line — its icons at the end — and
+ *  its own pieces: the way back and, in the editor, the title's line; the 대표 카드 on the left, beside them the name's line — its icons at the end — and
  *  the description under it, as tall as the cards; 24px down, the 금제 on the left of a line of a fixed
  *  height, the warnings on its right; then the deck. Spacing, order and heights live here alone. */
-export default function DeckPage({ top, topEnd, cover, name, actions, description, banlist, warnings, error, children }: {
-  /** the top line's left: the editor's title, the page's way back */
-  top: ReactNode;
+export default function DeckPage({ back, top, topEnd, cover, name, actions, description, banlist, warnings, error, children }: {
+  /** the first line: the way back (참혈 2026-10-16) */
+  back: ReactNode;
+  /** a line under it: the editor's title, its icons at the end */
+  top?: ReactNode;
   topEnd?: ReactNode;
   /** none: no room kept (a page with no 대표 카드) */
   cover?: ReactNode;
@@ -48,10 +50,13 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
 }) {
   return (
     <>
-      <div className="h-8 flex items-center justify-between gap-3">
-        {top}
-        {topEnd}
-      </div>
+      <div className="h-8 flex items-center">{back}</div>
+      {top && (
+        <div className="h-8 flex items-center justify-between gap-3">
+          {top}
+          {topEnd}
+        </div>
+      )}
       <div className="mt-3 mb-6 flex items-stretch gap-5 sm:gap-6 lg:gap-8">
         {cover}
         <div className="min-w-0 flex-1 flex flex-col">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -9,6 +9,7 @@ import CardInfoSheet, { type CardInfoProps, CardInfoPane } from "@/components/de
 import CardSearchPanel from "@/components/deckbuilder/CardSearchPanel";
 import CoverCards from "@/components/deckbuilder/CoverCards";
 import DeckPage, { DECK_ICON, DECK_ICON_SIZE, DeckNotFound } from "@/components/deckbuilder/DeckPage";
+import ResetLeftLineIcon from "@/components/icons/ResetLeftLineIcon";
 import SaveLineIcon from "@/components/icons/SaveLineIcon";
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
@@ -58,6 +59,8 @@ export default function DeckListEdit() {
   const [coverSlot, setCoverSlot] = useState<number | null>(null);   // the 대표 카드 slot being set
   // undo / redo of the deck's cards and 대표 카드 (참혈 2026-10-16); Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside the boxes
   const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
+  // the deck as saved (a new one: empty), which 초기화 brings back (참혈 2026-10-16)
+  const saved = useRef<DeckDraft | null>(null);
   const historyKeys = useRef({ undo: () => {}, redo: () => {} });
   const { cards, order, loading, error, remember, rememberAlts } = useDeckCards(deck ? [...deck.main, ...deck.extra] : null);
   // the 금제 the deck is checked by (참혈 2026-10-16): its marks, how many may go in, and what it is told
@@ -67,7 +70,8 @@ export default function DeckListEdit() {
     if (!admin) return;
     setHistory(EMPTY_HISTORY);
     if (code === undefined) {
-      setDeck(tabDraft() ?? blankDeck());
+      saved.current = blankDeck();
+      setDeck(tabDraft() ?? structuredClone(saved.current));
       return;
     }
     if (!signedIn) {
@@ -75,7 +79,11 @@ export default function DeckListEdit() {
       return;
     }
     let alive = true;
-    getDeckList(code).then((d) => alive && setDeck(fromDoc(d)), () => alive && setDeck(null));
+    getDeckList(code).then((d) => {
+      if (!alive) return;
+      saved.current = fromDoc(d);
+      setDeck(structuredClone(saved.current));
+    }, () => alive && setDeck(null));
     return () => {
       alive = false;
     };
@@ -156,10 +164,23 @@ export default function DeckListEdit() {
     change(setCover(deck, coverSlot, pickNow));
     setCoverSlot(coverSlot + 1 < COVERS_MAX ? coverSlot + 1 : null);
   };
-  const cancel = () => {
+  // ← 뒤로 leaves without saving, as 취소 did (참혈 2026-10-16)
+  const leave = () => {
     if (code === undefined) clearTabDraft();
     if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
     else navigate(code === undefined ? DECK_LISTS_PATH : deckListPath(code));
+  };
+  const changed = !!deck && !!saved.current && JSON.stringify(deck) !== JSON.stringify(saved.current);
+  // 초기화: every change since it was saved (or, new, since it was empty) goes, undo included (참혈 2026-10-16)
+  const reset = () => {
+    if (!changed || !saved.current) return;
+    if (!window.confirm(code === undefined ? "만든 내용을 모두 지울까요?" : "수정한 내용을 지우고 저장된 상태로 되돌릴까요?")) return;
+    if (code === undefined) clearTabDraft();
+    setDeck(structuredClone(saved.current));
+    setHistory(EMPTY_HISTORY);
+    setCoverSlot(null);
+    setShowing(null);
+    setNextLook(null);
   };
   const save = async () => {
     if (!deck) return;
@@ -240,14 +261,27 @@ export default function DeckListEdit() {
       {deck ? (
         <>
           <DeckPage
+            back={
+              <button type="button" onClick={leave} className="p-0 border-0 bg-transparent text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                ← 뒤로
+              </button>
+            }
             top={<h1 className="m-0 shrink-0 text-xl leading-8 font-bold">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>}
-            // 취소 and 저장 (Remix save-line, gray as 취소) as bare icons on the title's line (참혈 2026-10-16), a guest's note before them
+            // 초기화 (Remix reset-left-line) and 저장 (save-line) as bare gray icons on the title's line (참혈 2026-10-16), a
+            // guest's note before them
             topEnd={
               <div className="min-w-0 flex items-center gap-2">
                 {!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
                 <div className="shrink-0 flex items-center gap-1">
-                  <button type="button" onClick={cancel} aria-label="취소" title="취소" className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100`}>
-                    <X className={DECK_ICON_SIZE} aria-hidden />
+                  <button
+                    type="button"
+                    onClick={reset}
+                    disabled={!changed}
+                    aria-label="초기화"
+                    title={changed ? (code === undefined ? "초기화: 만든 내용을 모두 지웁니다" : "초기화: 저장된 상태로 되돌립니다") : "바뀐 내용이 없습니다"}
+                    className={`${DECK_ICON} text-gray-500 dark:text-gray-400 enabled:hover:text-gray-800 dark:enabled:hover:text-gray-100 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
+                  >
+                    <ResetLeftLineIcon className={DECK_ICON_SIZE} />
                   </button>
                   <button
                     type="button"
