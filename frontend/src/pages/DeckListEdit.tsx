@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2, Save, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -9,6 +9,7 @@ import CardInfoSheet, { type CardInfoProps, CardInfoPane } from "@/components/de
 import CardSearchPanel from "@/components/deckbuilder/CardSearchPanel";
 import CoverCards from "@/components/deckbuilder/CoverCards";
 import DeckPage, { DECK_ICON, DECK_ICON_SIZE, DeckNotFound } from "@/components/deckbuilder/DeckPage";
+import SaveFillIcon from "@/components/icons/SaveFillIcon";
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { useBanlist } from "@/hooks/useBanlist";
@@ -240,7 +241,7 @@ export default function DeckListEdit() {
         <>
           <DeckPage
             top={<h1 className="m-0 shrink-0 text-xl leading-8 font-bold">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>}
-            // 취소 and 저장 (a diskette, in blue) as bare icons on the title's line (참혈 2026-10-16), a guest's note before them
+            // 취소 and 저장 (Remix save-fill, gray as 취소) as bare icons on the title's line (참혈 2026-10-16), a guest's note before them
             topEnd={
               <div className="min-w-0 flex items-center gap-2">
                 {!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
@@ -254,9 +255,9 @@ export default function DeckListEdit() {
                     disabled={!named || saving}
                     aria-label={saveLabel}
                     title={named ? saveLabel : "덱 이름을 넣으면 저장할 수 있습니다"}
-                    className={`${DECK_ICON} text-blue-600 dark:text-blue-400 enabled:hover:text-blue-800 dark:enabled:hover:text-blue-300 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
+                    className={`${DECK_ICON} text-gray-500 dark:text-gray-400 enabled:hover:text-gray-800 dark:enabled:hover:text-gray-100 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
                   >
-                    {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <Save className={DECK_ICON_SIZE} aria-hidden />}
+                    {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <SaveFillIcon className={DECK_ICON_SIZE} />}
                   </button>
                 </div>
               </div>
