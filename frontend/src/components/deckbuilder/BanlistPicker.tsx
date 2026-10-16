@@ -12,7 +12,7 @@ const FIRST = "w-[4.75rem] pr-2 rounded-l-lg rounded-r-none";
 const SECOND = "w-[5.5rem] border-l-0 rounded-l-none rounded-r-lg";
 const KINDS = BAN_KINDS.map((k) => ({ value: k.kind, label: k.label }));
 
-/** The 금제 a deck is checked by, after 「금제 |」 on the line under its name (참혈 2026-10-16): [마스터 듀얼 / OCG / TCG /
+/** The 금제 a deck is checked by, on the left of the line under its name (참혈 2026-10-16): [마스터 듀얼 / OCG / TCG /
  *  커스텀] [the list], both the site's own drop-down, the kind's with no ▾. A game's 최신 (followed to the next list,
  *  「최신」 closed and its day in the open list), or one of its lists by day, newest first; a kind changed goes to its
  *  최신. 커스텀 takes a code, asked for on Enter; the deck keeps being checked by the list before until a code is

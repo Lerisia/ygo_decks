@@ -67,10 +67,10 @@ describe("a list's day as the picker writes it", () => {
     expect(BAN_KINDS.map((k) => k.label)).toEqual(["마스터 듀얼", "OCG", "TCG", "커스텀"]);
   });
 
-  it("names a deck's list on its page as 「MD • 최신」, the newest with no day, a held one by its whole year (참혈 2026-10-16)", () => {
-    expect(banlistName("md", INDEX)).toBe("MD • 최신");
-    expect(banlistName("md", null)).toBe("MD • 최신");
-    expect(banlistName("md:2026-07-01", INDEX)).toBe("MD • 2026.07.01");
+  it("names a deck's list on its page as 「마스터 듀얼 • 최신」, the newest with no day, a held one by its whole year (참혈 2026-10-16)", () => {
+    expect(banlistName("md", INDEX)).toBe("마스터 듀얼 • 최신");
+    expect(banlistName("md", null)).toBe("마스터 듀얼 • 최신");
+    expect(banlistName("md:2026-07-01", INDEX)).toBe("마스터 듀얼 • 2026.07.01");
     expect(banlistName("ocg:2026-07-01", INDEX)).toBe("OCG • 2026.07");
     expect(banlistName("tcg", INDEX)).toBe("TCG • 최신");
     expect(banlistName("tcg:2026-06-02", null)).toBe("TCG • 2026.06.02");

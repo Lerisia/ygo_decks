@@ -61,11 +61,11 @@ export function banlistOptions(format: BanFormat, index: BanlistIndex | null): B
   ];
 }
 
-// a deck's page names the game short (참혈 2026-10-16), the picker in full
-const PAGE_LABEL: Record<BanKind, string> = { ...KIND_LABEL, md: "MD" };
+// a deck's page names the game as the picker does (참혈 2026-10-16)
+const PAGE_LABEL = KIND_LABEL;
 
-/** A deck's list for its page, after 「금제 |」 (참혈 2026-10-16): "MD • 최신" — the newest with no day —,
- *  "MD • 2026.07.01", "OCG • 2026.01" (by month as the picker has it). */
+/** A deck's list for its page (참혈 2026-10-16): "마스터 듀얼 • 최신" — the newest with no day —,
+ *  "마스터 듀얼 • 2026.07.01", "OCG • 2026.01" (by month as the picker has it). */
 export function banlistName(key: string, index: BanlistIndex | null) {
   const choice = parseBanlistKey(key) ?? { kind: "md" as const, day: null };
   if (choice.kind === "custom") return `${PAGE_LABEL.custom} • ${choice.code}`;

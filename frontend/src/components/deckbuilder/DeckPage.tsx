@@ -39,7 +39,7 @@ export default function DeckPage({ top, topEnd, cover, name, actions, descriptio
   actions?: ReactNode;
   /** filling the height left beside the cards */
   description?: ReactNode;
-  /** the page's 「금제 | MD • 최신」, the editor's picker alone (참혈 2026-10-16) */
+  /** the page's 「마스터 듀얼 • 최신」, the editor's picker (참혈 2026-10-16) */
   banlist: ReactNode;
   warnings: ReturnType<typeof deckWarnings>;
   error?: string | null;
