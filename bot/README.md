@@ -2,6 +2,14 @@
 
 부운영자가 Discord로 자연어 요청을 보내면, 이 서버에서 `claude` CLI(Claude Code)를 호출해서 코드 수정·commit·push까지 처리하는 봇입니다. **배포(`deploy.sh`)는 절대 봇이 하지 않습니다** — 사장님이 GitHub에서 브랜치 검토 후 merge → deploy.
 
+## 대화 단위 (2026-10-16)
+
+- 채널 본문에 요청을 쓰면 봇이 그 글에서 **스레드를 열고** 거기서 진행 상황과 답을 씁니다. 스레드 하나 = Claude 세션 하나 = 워크트리 하나(`thread-<글 id>`).
+- 이어서 시킬 일은 **그 스레드 안에** 쓰면 같은 세션으로 이어집니다. 본문에 새로 쓰면 새 작업(새 스레드)이고, 본문 글이 앞선 요청에 대한 디스코드 "답장"이면 그 요청의 스레드로 보냅니다.
+- 그래서 여러 사람이 동시에 써도 세션이 섞이지 않고 나란히 돕니다(배포만 ship 잠금으로 차례대로). 한 스레드 안의 요청은 한 번에 하나씩 처리합니다.
+- `!reset`은 스레드 안에서 그 스레드의 세션만 초기화합니다.
+- 봇 역할에 "공개 스레드 만들기" 권한이 없으면 예전처럼 채널 세션 하나를 같이 쓰고, 권한을 켜 달라는 안내를 한 번 남깁니다.
+
 ## 최초 세팅 (사장님 1회)
 
 ### 1. Discord bot 생성
@@ -10,7 +18,7 @@
 3. Bot 탭 하단 **MESSAGE CONTENT INTENT** 활성화
 4. OAuth2 → URL Generator:
    - scopes: `bot`
-   - Bot Permissions: `Send Messages`, `Read Message History`, `Add Reactions`, `Embed Links`
+   - Bot Permissions: `Send Messages`, `Read Message History`, `Add Reactions`, `Embed Links`, `Create Public Threads`, `Send Messages in Threads`
    - 생성된 URL을 브라우저에 열어서 사장님 Discord 서버에 초대
 
 ### 2. 필요한 ID 수집 (Discord 개발자 모드 필요)

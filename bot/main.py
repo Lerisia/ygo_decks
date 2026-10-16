@@ -6,9 +6,13 @@ in DMs from whitelisted users), hands the message to a
 by editing its Discord reply as tool calls and assistant text stream in. Final
 result overwrites the same message.
 
-Conversations: the channel is one Claude session, each thread under it is its
-own, each DM user has one. Requests in a thread run one at a time, so a
-thread's conversation stays in a single session.
+Conversations: each thread under the channel is its own Claude session, each
+DM user has one. A request typed in the channel itself opens a thread of its
+own (named after the sender and the request) and is answered there, so two
+people working at once never share a session (엘리스 2026-10-16); a reply to
+such a request continues in its thread. Requests in a thread run one at a
+time, so a thread's conversation stays in a single session. Only when the bot
+may not create threads does the channel fall back to one shared session.
 """
 
 from __future__ import annotations
@@ -576,6 +580,58 @@ async def _reply(message: discord.Message, text: str) -> discord.Message:
         return await message.channel.send(text)
 
 
+THREAD_NAME_LIMIT = 100          # Discord's
+THREAD_ARCHIVE_MINUTES = 1440    # a day without a message and Discord folds the thread away (it stays usable)
+
+
+def thread_name_for(message) -> str:
+    """"참혈: 이모지 선택 페이지 갱신 좀 하자" — who asked and the start of what they asked, on one line."""
+    who = message.author.display_name or message.author.name
+    what = " ".join(message.content.split())
+    return f"{who}: {what}"[:THREAD_NAME_LIMIT]
+
+
+async def thread_for_request(message) -> discord.Thread | None:
+    """The thread a request typed in the channel is answered in.
+
+    A Discord reply to an earlier request goes on in that request's thread (a thread made from a message carries the
+    message's id). Anything else gets a thread of its own, made from the message. None when the bot may not make
+    threads: the caller then answers in the channel as before.
+    """
+    ref = getattr(message, "reference", None)
+    ref_id = getattr(ref, "message_id", None)
+    if ref_id:
+        thread = message.channel.get_thread(ref_id)
+        if thread is None:
+            try:
+                thread = await bot.fetch_channel(ref_id)
+            except (discord.HTTPException, discord.ClientException):
+                thread = None
+        if thread is not None and getattr(thread, "parent_id", None) == COOP_CHANNEL_ID:
+            return thread
+    try:
+        return await message.create_thread(name=thread_name_for(message), auto_archive_duration=THREAD_ARCHIVE_MINUTES)
+    except discord.Forbidden:
+        return None
+
+
+_thread_permission_warned = False
+
+
+async def _warn_no_thread_permission(message):
+    global _thread_permission_warned
+    if _thread_permission_warned:
+        return
+    _thread_permission_warned = True
+    try:
+        await message.channel.send(
+            "⚠️ 봇에게 '공개 스레드 만들기' 권한이 없어 요청마다 스레드를 열지 못합니다. 그동안은 채널 세션 하나를 같이 씁니다. "
+            "봇 역할에 그 권한을 켜 주세요."
+        )
+    except discord.HTTPException:
+        pass
+
+
 @bot.event
 async def on_ready():
     log.info("Logged in as %s (id=%s)", bot.user, bot.user.id if bot.user else "?")
@@ -603,24 +659,33 @@ async def on_message(message: discord.Message):
     session_key = session_key_for(message)
     if session_key is None:
         return
-    in_thread = session_key.startswith(THREAD_KEY_PREFIX)
-
-    log.info("Request from %s%s: %s", message.author.name, f" in {session_key}" if in_thread else "", message.content[:200])
+    in_channel = session_key == str(COOP_CHANNEL_ID)
+    place = None   # where the answer goes when it is not a reply to the message itself: the request's thread
 
     try:
         if message.content.strip().lower() in RESET_COMMANDS:
             await clear_session(session_key)
-            await _reply(message, "🧹 세션을 초기화했습니다. 다음 요청부터 새 대화로 시작합니다.")
+            await _reply(message, "🧹 세션을 초기화했습니다. 다음 요청부터 새 대화로 시작합니다." if not in_channel
+                         else "🧹 채널 세션을 초기화했습니다. 요청은 스레드마다 따로 이어지니, 초기화도 그 스레드 안에서 하면 됩니다.")
             return
+        if in_channel:
+            place = await thread_for_request(message)
+            if place is None:
+                await _warn_no_thread_permission(message)
+            else:
+                session_key = f"{THREAD_KEY_PREFIX}{place.id}"
+        in_thread = session_key.startswith(THREAD_KEY_PREFIX)
+        log.info("Request from %s%s: %s", message.author.name, f" in {session_key}" if in_thread else "", message.content[:200])
         if is_busy(session_key):
-            await _reply(message, "⏳ 이 스레드의 앞선 요청을 처리하고 있습니다. 끝나는 대로 이어서 처리합니다.")
+            notice = "⏳ 이 스레드의 앞선 요청을 처리하고 있습니다. 끝나는 대로 이어서 처리합니다."
+            await (place.send(notice) if place is not None else _reply(message, notice))
         async with conversation_turn(session_key):
-            await _handle_request(message, session_key)
+            await _handle_request(message, session_key, place)
     except discord.Forbidden:
         # Usually a thread the bot's role may read but not write in.
         log.warning("No permission to answer %s in %s", message.author.name, session_key)
-        parent = getattr(message.channel, "parent", None)
-        if in_thread and parent is not None:
+        parent = message.channel if place is not None else getattr(message.channel, "parent", None)
+        if parent is not None and session_key.startswith(THREAD_KEY_PREFIX):
             try:
                 await parent.send(
                     f"{message.author.mention} 스레드에 글을 쓸 권한이 봇에게 없습니다. "
@@ -630,9 +695,11 @@ async def on_message(message: discord.Message):
                 pass
 
 
-async def _handle_request(message: discord.Message, session_key: str):
-    """One request, start to finish, in the conversation `session_key` names."""
+async def _handle_request(message: discord.Message, session_key: str, place=None):
+    """One request, start to finish, in the conversation `session_key` names. The answer is a reply to the message,
+    or goes into `place` (the thread opened for a request typed in the channel)."""
     sender_role = "오너" if message.author.name == "rb_elyss" else "부운영자"
+    out = place if place is not None else message.channel
     raw_msg = message.content
     user_msg = build_user_message(
         sender_name=message.author.display_name or message.author.name,
@@ -650,7 +717,8 @@ async def _handle_request(message: discord.Message, session_key: str):
             user_msg = preamble + user_msg
 
     prefix = "🔄 이어가는 중" if resume_id else "🆕 새 세션"
-    status_msg = await _reply(message, f"🤔 작업 시작... ({prefix}, 최대 {CLAUDE_TIMEOUT_SEC // 60}분)")
+    opening = f"🤔 작업 시작... ({prefix}, 최대 {CLAUDE_TIMEOUT_SEC // 60}분)"
+    status_msg = await (place.send(opening) if place is not None else _reply(message, opening))
 
     # Debounce edits so we don't hit Discord's rate limit even if events arrive
     # rapidly (a batch of tool calls can fire back-to-back).
@@ -713,7 +781,7 @@ async def _handle_request(message: discord.Message, session_key: str):
         log.warning("Final edit failed: %s", e)
     for chunk in chunks[1:]:
         try:
-            await message.channel.send(chunk)
+            await out.send(chunk)
         except discord.HTTPException as e:
             log.warning("Follow-up send failed: %s", e)
             break
