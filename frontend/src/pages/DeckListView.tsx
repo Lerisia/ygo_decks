@@ -60,18 +60,8 @@ export default function DeckListView() {
 
   return (
     <div className="min-h-screen w-full max-w-5xl mx-auto px-4 py-6">
-      <div className="h-8 flex items-center justify-between gap-3">
+      <div className="h-8 flex items-center">
         <Link to={DECK_LISTS_PATH} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">← 내 덱 리스트</Link>
-        {deck && (
-          <div className="flex items-center gap-1">
-            <Link to={deckListEditPath(deck.code)} aria-label="수정" title="수정" className={`${ICON} hover:text-blue-600 dark:hover:text-blue-400`}>
-              <Pencil className="w-[18px] h-[18px]" aria-hidden />
-            </Link>
-            <button type="button" onClick={remove} aria-label="삭제" title="삭제" className={`${ICON} hover:text-red-600 dark:hover:text-red-400`}>
-              <Trash2 className="w-[18px] h-[18px]" aria-hidden />
-            </button>
-          </div>
-        )}
       </div>
       {deck && draft ? (
         <>
@@ -80,20 +70,34 @@ export default function DeckListView() {
           <div className="mt-3 mb-6 flex items-start gap-3 lg:gap-4">
             {draft.covers.length > 0 && <CoverCards covers={draft.covers} lookOf={(c) => coverLook(draft, c)} cards={cards} />}
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold break-keep">{deck.name}</h1>
+              {/* the name with its day beside it, 수정 and 삭제 at the end of the same line (참혈 2026-10-16) */}
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-2">
+                  <h1 className="m-0 text-xl leading-8 font-bold break-keep">{deck.name}</h1>
+                  <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{deckDayLine(draft)}</span>
+                </div>
+                <div className="shrink-0 flex items-center gap-1">
+                  <Link to={deckListEditPath(deck.code)} aria-label="수정" title="수정" className={`${ICON} hover:text-blue-600 dark:hover:text-blue-400`}>
+                    <Pencil className="w-[18px] h-[18px]" aria-hidden />
+                  </Link>
+                  <button type="button" onClick={remove} aria-label="삭제" title="삭제" className={`${ICON} hover:text-red-600 dark:hover:text-red-400`}>
+                    <Trash2 className="w-[18px] h-[18px]" aria-hidden />
+                  </button>
+                </div>
+              </div>
               {deck.description && (
                 <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line break-keep">{deck.description}</p>
               )}
             </div>
           </div>
-          {/* the edit page's line: the 금제 and the day on the left, what keeps the deck from being played on the right in
+          {/* the edit page's line: 「금제 | MD • 최신」 on the left, what keeps the deck from being played on the right in
               yellow (참혈 2026-10-16) */}
           <div className="mt-2 h-8 flex items-center gap-2 sm:gap-3 text-xs">
             <span className="min-w-0 shrink truncate tabular-nums text-gray-500 dark:text-gray-400">
+              금제<span className="mx-1.5 text-gray-300 dark:text-gray-600" aria-hidden>|</span>
               <span className="font-semibold text-gray-700 dark:text-gray-200" title={banlistTitle(draft.banlist, banlists)}>
                 {banlistName(draft.banlist, banlists)}
               </span>
-              {" · "}{deckDayLine(draft)}
             </span>
             <span
               className="min-w-0 flex-1 flex flex-wrap sm:flex-nowrap items-center content-center justify-end gap-x-2 leading-[14px] font-semibold text-amber-600 dark:text-amber-400"

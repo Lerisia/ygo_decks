@@ -58,14 +58,14 @@ describe("a list's day as the picker writes it", () => {
     expect(banlistOptions("md", null)).toEqual([{ value: "md", label: "최신", title: "새 금제가 나오면 따라갑니다" }]);
   });
 
-  it("names a deck's list on its page: 마스터 듀얼 in full, the newest as 최신 with no day (참혈 2026-10-16)", () => {
-    expect(banlistName("md", INDEX)).toBe("마스터 듀얼 최신 금제");
-    expect(banlistName("md", null)).toBe("마스터 듀얼 최신 금제");
-    expect(banlistName("md:2026-07-01", INDEX)).toBe("마스터 듀얼 26.07.01 금제");
-    expect(banlistName("ocg:2026-07-01", INDEX)).toBe("OCG 26.07 금제");
-    expect(banlistName("tcg", INDEX)).toBe("TCG 최신 금제");
-    expect(banlistName("tcg:2026-06-02", null)).toBe("TCG 26.06.02 금제");
-    expect(banlistName("custom:ours", INDEX)).toBe("커스텀 ours 금제");
+  it("names a deck's list on its page as 「MD • 최신」, the newest with no day, a held one by its whole year (참혈 2026-10-16)", () => {
+    expect(banlistName("md", INDEX)).toBe("MD • 최신");
+    expect(banlistName("md", null)).toBe("MD • 최신");
+    expect(banlistName("md:2026-07-01", INDEX)).toBe("MD • 2026.07.01");
+    expect(banlistName("ocg:2026-07-01", INDEX)).toBe("OCG • 2026.07");
+    expect(banlistName("tcg", INDEX)).toBe("TCG • 최신");
+    expect(banlistName("tcg:2026-06-02", null)).toBe("TCG • 2026.06.02");
+    expect(banlistName("custom:ours", INDEX)).toBe("커스텀 • ours");
   });
 
   it("gives the newest list's day in the name's title", () => {

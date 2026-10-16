@@ -56,15 +56,17 @@ export function banlistOptions(format: BanFormat, index: BanlistIndex | null): B
   ];
 }
 
-// a deck's page writes the game out (참혈 2026-10-16), the picker keeps 마듀
-const PAGE_LABEL: Record<BanKind, string> = { ...KIND_LABEL, md: "마스터 듀얼" };
+// a deck's page names the game short (참혈 2026-10-16), the picker keeps 마듀
+const PAGE_LABEL: Record<BanKind, string> = { ...KIND_LABEL, md: "MD" };
 
-/** A deck's list in words, for its page: "마스터 듀얼 최신 금제" — the newest with no day (참혈 2026-10-16) —,
- *  "OCG 26.07 금제". */
+/** A deck's list for its page, after 「금제 |」 (참혈 2026-10-16): "MD • 최신" — the newest with no day —,
+ *  "MD • 2026.07.01", "OCG • 2026.01" (by month as the picker has it). */
 export function banlistName(key: string, index: BanlistIndex | null) {
   const choice = parseBanlistKey(key) ?? { kind: "md" as const, day: null };
-  if (choice.kind === "custom") return `${PAGE_LABEL.custom} ${choice.code} 금제`;
-  return `${PAGE_LABEL[choice.kind]} ${choice.day ? dayLabel(choice.kind, choice.day, index?.lists[choice.kind]) : "최신"} 금제`;
+  if (choice.kind === "custom") return `${PAGE_LABEL.custom} • ${choice.code}`;
+  if (!choice.day) return `${PAGE_LABEL[choice.kind]} • 최신`;
+  const label = dayLabel(choice.kind, choice.day, index?.lists[choice.kind]);
+  return `${PAGE_LABEL[choice.kind]} • ${choice.day.slice(0, 2)}${label}`;
 }
 
 /** Its title: the list's whole day, the newest's too. */
