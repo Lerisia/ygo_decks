@@ -236,8 +236,8 @@ export default function DeckListEdit() {
             </div>
           </div>
           {/* the 대표 카드 on the left, bigger from lg; the name and description take what is left, the description as tall
-              as the cards (참혈 2026-10-16) */}
-          <div className="mt-3 flex items-stretch gap-3 lg:gap-4">
+              as the cards (참혈 2026-10-16); 24px below it, so the line under it starts the deck's part */}
+          <div className="mt-3 mb-6 flex items-stretch gap-3 lg:gap-4">
             <CoverCards
               covers={deck.covers}
               lookOf={(c) => coverLook(deck, c)}
