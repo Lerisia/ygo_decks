@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from PIL import Image
 
 from . import banlist
-from .display import THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
+from .display import ART_ORDER, THUMB_DIR as CARD_THUMB_DIR, art_names, art_path, art_url, display_name, thumb_url
 from .face import THUMB_DIR as FACE_THUMB_DIR, face_thumb_url, face_url, is_overframe, name_mask_url
 from .models import Banlist, BanlistEntry, Card, CardGroup, CardGroupMember, CardSupport, MdPrint, has_art
 
@@ -646,6 +646,10 @@ def card(request, card_id):
         "faces": [{"id": m, "face": face_url(m), "thumb": face_thumb_url(m), "overframe": _overframe(m), "rarity": r,
                    "name_mask": name_mask_url(m), "cutin": cutins.get(m)}
                   for m, r in rarity.items() if face_url(m)],
+        # each print's Master Duel art in each version (일본판 ocg / 한국판 tcg), for a deck cover picked from the card
+        # book (특이점 10/17)
+        "arts": [{"id": m, "version": v, "url": settings.MEDIA_URL + versions[v], "overframe": _overframe(m)}
+                 for m, versions in ((m, art_names().get(m) or {}) for m in rarity) for v in ART_ORDER if v in versions],
         # the cut-in's sound is the attribute's
         "cutin_sound": c.attribute if c.category == "monster" and c.attribute in ATTRIBUTES else "",
         "rarity": base.rarity if base else "",

@@ -10,11 +10,14 @@ import {
   DeckStats,
   SavedDeck,
 } from "@/api/deckApi";
+import { getCard, type CardDoc } from "@/api/cardDexApi";
 import { chipClass } from "@/components/ThemeSearchChip";
+import CardPickerModal from "@/components/CardPickerModal";
+import { artLabels, cardArtCover, COVER_SPOTS, defaultSpot, type CoverSpot } from "@/lib/cardArtCover";
 import { UNKNOWN_STAT } from "@/utils/deckStats";
 
 // 운영자 전용 (특이점 2026-10-03): 덱 문서에서 덱 정보·스탯을 고치고, deckId 없이 열면 도감에 새 덱을 추가한다.
-// 이름·별칭·대표 이미지·짧은 설명도 같은 창에서 다룬다.
+// 이름·별칭·대표 이미지·짧은 설명도 같은 창에서 다룬다. 대표 이미지는 카드 도감의 일러스트로도 고른다 (10/17).
 
 const STATS: { key: keyof DeckStats; label: string }[] = [
   { key: "consistency", label: "안정성" },
@@ -49,6 +52,11 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cardPicking, setCardPicking] = useState(false);
+  const [artCard, setArtCard] = useState<Pick<CardDoc, "id" | "name" | "arts"> | null>(null);
+  const [artPick, setArtPick] = useState<{ index: number; spot: CoverSpot } | null>(null);
+  const [artSizes, setArtSizes] = useState<Record<number, [number, number]>>({});
+  const [artError, setArtError] = useState("");
 
   useEffect(() => {
     (creating ? getNewDeckInfo() : getDeckEditInfo(deckId))
@@ -67,11 +75,43 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
     return () => URL.revokeObjectURL(url);
   }, [cover]);
 
+  // read before the card search's own Esc closes it (capture), so one Esc closes only the search
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !saving && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, saving]);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !saving && !cardPicking && onClose();
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose, saving, cardPicking]);
+
+  // the picked art (and where its square is) becomes the cover file, as if it had been chosen from the device
+  useEffect(() => {
+    const art = artPick && artCard?.arts[artPick.index];
+    if (!art || !artPick) return;
+    let live = true;
+    setArtError("");
+    cardArtCover(art, artPick.spot)
+      .then((file) => live && setCover(file))
+      .catch((e) => live && setArtError(e instanceof Error ? e.message : "일러스트를 불러오지 못했습니다."));
+    return () => {
+      live = false;
+    };
+  }, [artPick, artCard]);
+
+  const pickCard = (cardId: number) => {
+    setCardPicking(false);
+    setArtError("");
+    getCard(cardId)
+      .then((c) => {
+        setArtCard({ id: c.id, name: c.name, arts: c.arts });
+        setArtSizes({});
+        setArtPick(c.arts.length === 1 ? { index: 0, spot: defaultSpot(c.arts[0].overframe) } : null);
+      })
+      .catch(() => setArtError("카드를 불러오지 못했습니다."));
+  };
+
+  const labels = artCard ? artLabels(artCard.arts) : [];
+  const pickedArt = artPick && artCard ? artCard.arts[artPick.index] : null;
+  const pickedSize = artPick ? artSizes[artPick.index] : undefined;
+  const pickedTall = !!pickedArt && (pickedArt.overframe || (!!pickedSize && pickedSize[0] !== pickedSize[1]));
 
   const formChanged = !!info && !!form && JSON.stringify(info.values) !== JSON.stringify(form);
   const dirty = formChanged || !!cover;
@@ -166,7 +206,12 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     className="hidden"
-                    onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      setCover(e.target.files?.[0] ?? null);
+                      setArtCard(null);
+                      setArtPick(null);
+                      e.target.value = "";
+                    }}
                   />
                   <button
                     type="button"
@@ -174,6 +219,13 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
                     className="mt-1.5 w-full px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
                   >
                     {preview || coverUrl ? "이미지 바꾸기" : "이미지 고르기"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardPicking(true)}
+                    className="mt-1 w-full px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    카드에서 찾기
                   </button>
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
@@ -203,6 +255,74 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
               <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
                 대표 이미지는 마스터 듀얼에 있는 카드 일러스트로, 정사각형에 가까운 그림 · 10MB 이하
               </p>
+              {artError && !artCard && <p className="-mt-2 text-xs text-red-500">{artError}</p>}
+              {artCard && (
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <p className="flex-1 min-w-0 text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+                      {artCard.name}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCardPicking(true)}
+                      className="shrink-0 px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      다른 카드
+                    </button>
+                  </div>
+                  {artCard.arts.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">이 카드는 마스터 듀얼 일러스트가 없습니다.</p>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {artCard.arts.map((a, i) => {
+                        const label = labels[i];
+                        return (
+                          <button
+                            key={`${a.id}-${a.version}`}
+                            type="button"
+                            onClick={() => setArtPick({ index: i, spot: defaultSpot(a.overframe) })}
+                            aria-pressed={artPick?.index === i}
+                            className="min-w-0 text-center"
+                          >
+                            <img
+                              loading="lazy"
+                              src={a.url}
+                              alt=""
+                              onLoad={(e) => {
+                                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                                setArtSizes((s) => ({ ...s, [i]: [w, h] }));
+                              }}
+                              className={`w-full aspect-square object-cover object-top rounded-lg ${
+                                artPick?.index === i ? "ring-2 ring-blue-600" : ""
+                              }`}
+                            />
+                            <span className="mt-1 block text-[11px] leading-tight text-gray-600 dark:text-gray-400 break-keep">
+                              {label.print}
+                              {label.version && <span className="block">{label.version}</span>}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {pickedTall && artPick && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">정사각형 위치</span>
+                      {COVER_SPOTS.map((p) => (
+                        <button
+                          key={p.key}
+                          type="button"
+                          className={chipClass(artPick.spot === p.key)}
+                          onClick={() => setArtPick({ ...artPick, spot: p.key })}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {artError && <p className="text-xs text-red-500">{artError}</p>}
+                </div>
+              )}
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 짧은 설명 <span className="font-normal text-xs text-gray-500 dark:text-gray-400">표 옆에 나오는 2~3문장</span>
                 <textarea
@@ -289,6 +409,8 @@ export default function DeckInfoEditModal({ deckId, deckName, coverUrl, onClose,
             </>
           )}
         </div>
+
+        <CardPickerModal open={cardPicking} onClose={() => setCardPicking(false)} onPick={pickCard} browseAll={false} />
 
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
           {saveError && <p className="flex-1 text-sm text-red-500">{saveError}</p>}

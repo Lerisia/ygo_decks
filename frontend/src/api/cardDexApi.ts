@@ -131,6 +131,8 @@ export type CardDoc = {
     /** Master Duel's monster cut-in for this print: the animation and the game's camera view. */
     cutin: { anim: string; view: [number, number, number] | null; mp?: number; v?: number } | null;
   }[];
+  /** Each print's Master Duel art (its own first) in each version there is: ocg 일본판, tcg 한국판, else common. */
+  arts: { id: number; version: "common" | "ocg" | "tcg"; url: string; overframe: boolean }[];
   /** The attribute whose sound goes with a cut-in. */
   cutin_sound: string;
   rarity: string;

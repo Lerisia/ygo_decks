@@ -3,10 +3,11 @@ import PickerModal, { PickerPanel, type PickerItem, type PickerStatus } from "./
 import { EMPTY_FILTERS, listCards } from "@/api/cardDexApi";
 
 /** Pick one card of the card book by its Korean, Japanese or English name, shown as the whole card — the deck
- *  picker's twin. The server ranks the names (exact → prefix → substring) as the query is typed. */
+ *  picker's twin. The server ranks the names (exact → prefix → substring) as the query is typed. `browseAll` off
+ *  drops the link to the card book's results, for a pick inside a form that leaving would lose. */
 export default function CardPickerModal({
-  open, onClose, onPick, inline = false,
-}: { open: boolean; onClose: () => void; onPick: (cardId: number) => void; inline?: boolean }) {
+  open, onClose, onPick, inline = false, browseAll = true,
+}: { open: boolean; onClose: () => void; onPick: (cardId: number) => void; inline?: boolean; browseAll?: boolean }) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<PickerItem[]>([]);
   const [status, setStatus] = useState<PickerStatus>("idle");
@@ -54,7 +55,7 @@ export default function CardPickerModal({
     imageFit: "contain" as const,
     imageAspect: "aspect-[704/1024]",
     imageCorner: "card-corner",
-    allResults: { to: `/cards?q=${encodeURIComponent(query.trim())}`, count: total, unit: "장" },
+    allResults: browseAll ? { to: `/cards?q=${encodeURIComponent(query.trim())}`, count: total, unit: "장" } : undefined,
   };
   // Inline: drawn where the caller puts it (the home page on desktop opens the search out in place).
   if (inline) return open ? <PickerPanel {...panel} variant="inline" /> : null;

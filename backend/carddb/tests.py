@@ -1157,6 +1157,16 @@ class CardDexApiTest(TestCase):
         self.assertEqual([d["name"] for d in body["decks"]], ["블랙 매지션"])
         self.assertEqual(body["rarity"], "SR")
         self.assertEqual((body["face_url"], body["faces"]), (None, []))   # not drawn yet
+        # its prints' arts, drawn faces or not: its own first, each in the versions there are (일본판 before 한국판)
+        self.assertEqual([(a["id"], a["version"], a["url"], a["overframe"]) for a in body["arts"]],
+                         [(3, "common", "/media/cards/art/common/3.webp", False),
+                          (3901, "common", "/media/cards/art/common/3901.webp", False)])
+        MdArt.objects.filter(md_print_id=3).update(version="tcg", image="cards/art/tcg/3.webp")
+        MdArt.objects.create(md_print_id=3, version="ocg", image="cards/art/ocg/3.webp")
+        from . import display
+        display.forget_art()
+        arts = self.client.get("/api/carddb/cards/3/").json()["arts"]
+        self.assertEqual([(a["id"], a["version"]) for a in arts], [(3, "ocg"), (3, "tcg"), (3901, "common")])
         self.assertEqual(body["history"], [])   # no 금제 lists stored here
         self.assertEqual(body["ban"], "")         # nor a Master Duel 금제 for the icon beside its name
         link = self.client.get("/api/carddb/cards/6/").json()
