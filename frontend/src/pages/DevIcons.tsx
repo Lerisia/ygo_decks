@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getIconChoices, saveIconChoices, type IconChoice, type IconChoices, type IconLib } from "@/api/devIconsApi";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { FA_REGULAR, FA_SOLID, MATERIAL_ICONS, MATERIAL_SYMBOLS, REMIX_FILL, REMIX_LINE, type Glyph } from "@/lib/iconSamples";
+import { type RemixTyped, remixKey, remixTyped } from "@/lib/remixName";
 
 function Icon({ g, size, className = "" }: { g: Glyph; size: number; className?: string }) {
   return (
@@ -131,8 +132,6 @@ const rowKey = (r: Row) => `${r.emoji} ${r.where}`;
 type RemixAll = Record<string, string[][]>;
 let remixAll: Promise<RemixAll> | null = null;
 const loadRemixAll = () => (remixAll ??= import("@/lib/remixIconsAll.json").then((m) => m.default.icons as RemixAll));
-/** "ri-sword-fill", "Sword line", "sword" → "sword" */
-const remixName = (typed: string) => typed.trim().toLowerCase().replace(/\s+/g, "-").replace(/^ri-/, "").replace(/-(fill|line)$/, "");
 
 function Labeled({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -192,6 +191,8 @@ export default function DevIcons() {
   };
   const rx = (name: string) => rxGlyph(name)!;
   const rxLib: IconLib = rxLine ? "remix-line" : "remix-fill";
+  // a name typed with its style keeps it; one typed bare follows the 면/선 switch (참혈 2026-10-16)
+  const typedLib = (t: RemixTyped): IconLib => (t.style ? `remix-${t.style}` : rxLib);
   const glyphOf = (c: IconChoice): Glyph | undefined =>
     c.lib === "fa" ? FA_SOLID[c.name] : c.lib === "fa-regular" ? FA_REGULAR[c.name]
       : c.lib === "remix-fill" || c.lib === "remix-line" ? rxGlyph(c.name, c.lib === "remix-line")
@@ -229,19 +230,20 @@ export default function DevIcons() {
   };
   const takeName = () => {
     if (!typing) return;
-    const name = remixName(typing.text);
+    const typed = remixTyped(typing.text);
+    const { name } = typed;
     if (!name) return setTyping(null);
     if (!all) return setTyping({ ...typing, error: "Remix 목록을 불러오는 중입니다." });
     if (!all[name]) return setTyping({ ...typing, error: `Remix에 '${name}'이(가) 없습니다.` });
-    // already among the row's own: just picked, not shown twice
-    if (!typing.listed.includes(name)) setCustom((c) => ({ ...c, [typing.row]: name }));
-    setChoices((c) => ({ ...c, [typing.row]: { lib: rxLib, name } }));
+    // already among the row's own and typed bare: just picked, not shown twice
+    if (typed.style || !typing.listed.includes(name)) setCustom((c) => ({ ...c, [typing.row]: remixKey(typed) }));
+    setChoices((c) => ({ ...c, [typing.row]: { lib: typedLib(typed), name } }));
     setDirty(true);
     setMsg("");
     setTyping(null);
   };
   const dropName = (row: string) => {
-    const name = custom[row];
+    const { name } = remixTyped(custom[row] ?? "");
     setCustom(({ [row]: _, ...rest }) => rest);
     setChoices((c) => {
       if (c[row]?.name !== name || family(c[row].lib) !== "remix") return c;
@@ -327,17 +329,18 @@ export default function DevIcons() {
             className="w-36 h-12 px-2 rounded-lg border border-dashed border-blue-400 bg-white dark:bg-gray-900 text-sm"
           />
           <span className={`text-[11px] max-w-[9rem] break-keep ${typing.error ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
-            {typing.error || (all ? "Enter로 고르기 · 예: sword" : "목록 불러오는 중…")}
+            {typing.error || (all ? "Enter로 고르기 · 예: sword, search-line" : "목록 불러오는 중…")}
           </span>
         </div>
       );
     }
-    const name = custom[row];
-    const g = name ? rxGlyph(name) : undefined;
-    if (name && g) {
+    const typed = custom[row] ? remixTyped(custom[row]) : null;
+    const name = typed?.name;
+    const g = typed ? rxGlyph(typed.name, typed.style ? typed.style === "line" : rxLine) : undefined;
+    if (typed && name && g) {
       return (
         <div className="relative">
-          {cell(row, { lib: rxLib, name, g }, tints)}
+          {cell(row, { lib: typedLib(typed), name, g }, tints)}
           <button
             type="button"
             onClick={() => dropName(row)}
@@ -395,7 +398,7 @@ export default function DevIcons() {
       </p>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 break-keep">
         아이콘을 누르면 그 줄에 쓸 것으로 고르고, 다시 누르면 풉니다. 점선 칸에는 remixicon.com에서 찾은 이름을 넣을 수 있습니다(예: sword,
-        ri-sword-fill). 다 고르면 아래 저장을 누르세요. 저장한 내용은 코딩봇이 읽습니다.
+        search-line). 뒤에 -fill·-line을 붙이면 그대로 쓰고, 안 붙이면 위의 면/선 설정을 따릅니다. 다 고르면 아래 저장을 누르세요. 저장한 내용은 코딩봇이 읽습니다.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
