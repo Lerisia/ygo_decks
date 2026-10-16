@@ -1423,6 +1423,11 @@ class CardFaceTest(CardFaceCase):
         self.assertEqual([a["id"] for a in row["alts"]], [3907])
         self.assertRegex(row["alts"][0]["thumb"], r"^/media/cards/face_thumb/3907\.webp\?v=\w+$")
         self.assertNotIn("alts", self.client.get("/api/carddb/cards/").json()["results"][0])
+        # and with what the Shine / Royal shaders draw each print in, for the copies in a finish (참혈 2026-10-16)
+        self.assertEqual(row["finish"], {"attribute": 5, "level": 8, "frame": "normal"})
+        self.assertEqual([(f["id"], f["overframe"]) for f in row["prints"]], [(7, False), (3907, True)])
+        self.assertRegex(row["prints"][0]["name_mask"], r"^/media/cards/face_name/7\.png\?v=\w+$")
+        self.assertNotIn("prints", self.client.get("/api/carddb/cards/").json()["results"][0])
         # the name alone, for the Shine / Royal shaders to paint (the card's top sixth at 1.5×)
         self.assertRegex(body["faces"][0]["name_mask"], r"^/media/cards/face_name/7\.png\?v=\w+$")
         from PIL import Image

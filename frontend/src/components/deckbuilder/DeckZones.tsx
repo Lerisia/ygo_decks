@@ -4,9 +4,10 @@ import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
 import { type BanLimit, type BanRule, banOf } from "@/lib/banlists";
 import {
-  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, lookThumb, notOutCards, overLimit,
+  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, MAIN_MIN, ZONES, ZONE_LABEL, kindCounts, notOutCards, overLimit,
   sortedCopies,
 } from "@/lib/deckDrafts";
+import CopyFace from "./DeckFinish";
 
 // While a deck is built each zone keeps room for this many rows of cards before any is in (참혈 2026-10-14): the main
 // deck two on phones and tablets and three from lg, the extra deck one (deck-zone-reserve in index.css).
@@ -15,33 +16,13 @@ const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준�
 // what a zone lacks or holds too many of, by its title, in yellow (참혈 2026-10-16)
 const WARN = "text-xs font-semibold text-amber-600 dark:text-amber-400";
 
-const FINISH_LABEL = { shine: "샤인", royal: "로얄" } as const;
-
-/** A copy in 샤인 or 로얄 on a small card (참혈 2026-10-16): a still sheen over it and a small gem in the corner, not
- *  the shader, which a deck's worth of would weigh too much (card-sheen in index.css). */
-export function FinishMark({ finish }: { finish: CardLook["finish"] | undefined }) {
-  if (finish !== "shine" && finish !== "royal") return null;
-  return (
-    <>
-      <span className={`card-sheen card-sheen-${finish} absolute inset-0 card-corner pointer-events-none`} aria-hidden />
-      <span className={`card-gem card-gem-${finish} absolute bottom-[3%] left-[5%] pointer-events-none`} title={FINISH_LABEL[finish]} aria-label={FINISH_LABEL[finish]} />
-    </>
-  );
-}
-
-/** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look) — its 금제 in
- *  the corner: the deck's list's (ban), today's Master Duel one (on the card) when none is given. */
+/** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look, the finish
+ *  moving: DeckFinish) — its 금제 in the corner: the deck's list's (ban), today's Master Duel one (on the card) when
+ *  none is given. */
 export function DeckCardFace({ card, look, dim = false, ban = card.ban }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | "" }) {
   return (
     <span className="relative block">
-      <img
-        loading="lazy"
-        decoding="async"
-        src={lookThumb(card, look)}
-        alt={card.name}
-        className={`w-full aspect-[704/1024] object-contain card-corner transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`}
-      />
-      <FinishMark finish={look?.finish} />
+      <CopyFace card={card} look={look} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
       {ban && (
         <img
           src={`/media/md_ui/info/limit/${ban}.webp`}

@@ -417,13 +417,19 @@ def cards(request):
             thumb = face_thumb_url(md)
             if thumb:
                 alts[cid].append({"id": md, "thumb": thumb})
+        # and in a finish: what the Shine / Royal shaders draw each print with (참혈 2026-10-16)
+        looks = {c.id: {"finish": _finish(c), "prints": [
+            {"id": m, "overframe": _overframe(m), "name_mask": name_mask_url(m)}
+            for m in [c.id, *(a["id"] for a in alts[c.id])] if face_url(m)]}
+            for c in Card.objects.filter(id__in=[r.id for r in chunk])}
     released = None
     if _asked_ids(p) is not None:   # and the day each came out in each game, for the 금제 the deck picks (참혈 2026-10-16)
         days = {fmt.value: banlist.released_days([r.id for r in chunk], fmt) for fmt in Banlist.Format}
         iso = lambda d: d.isoformat() if isinstance(d, date) else d   # true: out, the day not known; None: never
         released = {r.id: {fmt: iso(by_id[r.id]) for fmt, by_id in days.items()} for r in chunk}
     return Response({**extra,
-        "results": [{**({"alts": alts[r.id], "released": released[r.id]} if alts is not None else {}), "id": r.id, "name": r.name,
+        "results": [{**({"alts": alts[r.id], "released": released[r.id], **looks.get(r.id, {})} if alts is not None else {}),
+                     "id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
                      "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban,

@@ -58,6 +58,10 @@ export type CardListItem = {
   /** Asked by ids: the day it came out in each game (true: out, the day not known; null: never), for the 금제 a deck
    *  picks to tell 미출시 by (참혈 2026-10-16). */
   released?: { md: string | true | null; ocg: string | true | null; tcg: string | true | null };
+  /** Asked by ids: what the Shine / Royal shaders draw its copies in a finish with — the card's values and each
+   *  print's (its own first, then the alternate arts with a face), as on its page (참혈 2026-10-16). */
+  finish?: CardDoc["finish"];
+  prints?: { id: number; overframe: boolean; name_mask: string | null }[];
 };
 export type CardListResponse = {
   results: CardListItem[];

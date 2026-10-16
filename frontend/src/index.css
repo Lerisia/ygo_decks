@@ -321,8 +321,8 @@ button:focus-visible {
   border-radius: 3.5% / 2.4%;
 }
 
-/* A copy in 샤인 / 로얄 on the deck builder's small cards (참혈 2026-10-16): a still sheen across it and a small gem
-   in its corner, not the shader (a deck's worth of those would weigh too much). */
+/* A copy in 샤인 / 로얄 on the deck builder's small cards where the shaders can't draw it (no WebGL 2, the context
+   lost; DeckFinish, 참혈 2026-10-16): a still sheen across it and a small gem in its corner. */
 .card-sheen {
   mix-blend-mode: screen;
 }

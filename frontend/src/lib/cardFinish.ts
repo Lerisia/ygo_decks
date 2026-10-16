@@ -103,70 +103,55 @@ const SOLID: Record<string, [number, number, number, number]> = {
   "@name": [0, 0, 0, 255],         // no name to paint
 };
 
-export class CardFinish {
-  private gl: WebGL2RenderingContext;
-  private programs: Partial<Record<FinishStyle, { pr: WebGLProgram; sizes: Record<string, number> }>> = {};
-  private textures: Record<string, WebGLTexture> = {};
+/** One WebGL 2 context's finish shaders, compiled once, and the textures every card shares; a card's face and name
+ *  come with each draw. The card page draws one card on its own canvas (CardFinish); a deck's small cards are drawn
+ *  one after another in a single shared one (finishTiles, 참혈 2026-10-16), so a page holds one context, not one a card. */
+export class FinishShaders {
+  private programs: Partial<Record<FinishStyle, { pr: WebGLProgram; sizes: Record<string, number>; locs: Map<string, WebGLUniformLocation | null> }>> = {};
+  private shared: Record<string, WebGLTexture> = {};
+  private loading: Record<string, Promise<void>> = {};
   private quad: WebGLBuffer;
   private cfg!: Record<FinishStyle, StyleConfig>;
-  private frame: FinishFrame = "normal";
-  private faceCalls = 0;
   private disposed = false;
 
-  private constructor(private canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
-    this.gl = gl;
+  private constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   }
 
-  /** A renderer for the canvas with the shaders compiled, made once: a face is put on it with setFace, and changing
-   *  the face later swaps only its texture (no compiling again, and never two renderers on one canvas). */
-  static async create(canvas: HTMLCanvasElement): Promise<CardFinish> {
-    const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
-    if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
-    const f = new CardFinish(canvas, gl);
+  static async create(gl: WebGL2RenderingContext): Promise<FinishShaders> {
+    const f = new FinishShaders(gl);
     const { config, shaders } = await loadBundle();
     f.cfg = config;
     for (const s of STYLES) f.programs[s] = f.compile(vertexSource(config[s].inputs), shaders[s]);
     return f;
   }
 
-  /** Put a face, its frame and its name on the card; false when a later call has taken its place meanwhile. */
-  async setFace(faceUrl: string, frame: FinishFrame, nameUrl?: string | null): Promise<boolean> {
-    const call = ++this.faceCalls;
-    const gl = this.gl;
+  /** The shared textures a card of this frame samples in either finish, each loaded once. */
+  prepare(frame: FinishFrame): Promise<void> {
     const files = new Set(STYLES.flatMap((s) => Object.keys(this.cfg[s].textures).map((i) => this.fileAt(s, i, frame))));
-    const [face, name] = await Promise.all([
-      loadImage(faceUrl),
-      nameUrl ? loadImage(nameUrl) : Promise.resolve(null),
-      ...[...files].filter((file) => file !== "@card" && file !== "@name" && !this.textures[file]).map(async (file) => {
-        if (SOLID[file]) this.uploadSolid(file, SOLID[file]);
-        else {
-          const im = await loadImage(`${BASE}/${file}.png`);
-          if (!this.textures[file] && !this.disposed) this.upload(file, im, gl.REPEAT);
-        }
-      }),
-    ]);
-    if (call !== this.faceCalls || this.disposed) return false;
-    if (this.textures["@card"]) gl.deleteTexture(this.textures["@card"]);
-    this.upload("@card", face, gl.CLAMP_TO_EDGE);
-    if (this.textures["@name"]) gl.deleteTexture(this.textures["@name"]);
-    if (name) this.upload("@name", name, gl.CLAMP_TO_EDGE);
-    else this.uploadSolid("@name", SOLID["@name"]);
-    this.frame = frame;
-    return true;
-  }
-
-  /** Leave the canvas empty, so the plain face behind it shows until the next draw. */
-  clear() {
-    const gl = this.gl;
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    return Promise.all([...files].filter((file) => file !== "@card" && file !== "@name").map((file) => {
+      if (this.shared[file]) return;
+      if (SOLID[file]) {
+        this.shared[file] = this.solid(SOLID[file]);
+        return;
+      }
+      this.loading[file] ??= loadImage(`${BASE}/${file}.png`).then(
+        (im) => {
+          if (!this.shared[file] && !this.disposed) this.shared[file] = this.texture(im, this.gl.REPEAT);
+        },
+        (e) => {
+          delete this.loading[file];
+          throw e;
+        },
+      );
+      return this.loading[file];
+    })).then(() => undefined);
   }
 
   /** What texture slot i of the style samples for a card of this frame. */
-  private fileAt(style: FinishStyle, i: string, frame: FinishFrame = this.frame): string {
+  private fileAt(style: FinishStyle, i: string, frame: FinishFrame): string {
     return this.cfg[style].frames?.[frame]?.[i] ?? this.cfg[style].textures[i].file;
   }
 
@@ -187,10 +172,17 @@ export class CardFinish {
     if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr) || "program");
     const sizes: Record<string, number> = {};
     for (const m of fs.matchAll(/uniform vec4 cb(\d+)\[(\d+)\]/g)) sizes[m[1]] = Number(m[2]);
-    return { pr, sizes };
+    return { pr, sizes, locs: new Map<string, WebGLUniformLocation | null>() };
   }
 
-  private upload(key: string, source: TexImageSource, wrap: number) {
+  private loc(style: FinishStyle, name: string) {
+    const prog = this.programs[style]!;
+    if (!prog.locs.has(name)) prog.locs.set(name, this.gl.getUniformLocation(prog.pr, name));
+    return prog.locs.get(name)!;
+  }
+
+  /** A picture as a texture: a card's face or name clamped at its edges, a shared pattern repeated. */
+  texture(source: TexImageSource, wrap: number = this.gl.CLAMP_TO_EDGE): WebGLTexture {
     const gl = this.gl;
     const t = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, t);
@@ -201,10 +193,10 @@ export class CardFinish {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-    this.textures[key] = t;
+    return t;
   }
 
-  private uploadSolid(key: string, rgba: [number, number, number, number]) {
+  private solid(rgba: [number, number, number, number]): WebGLTexture {
     const gl = this.gl;
     const t = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, t);
@@ -212,24 +204,28 @@ export class CardFinish {
     // no mipmaps for a single pixel: without this filter the texture is incomplete and samples as transparent black
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    this.textures[key] = t;
+    return t;
   }
 
-  /** Draw one moment (seconds) of the style's animation. */
-  draw(style: FinishStyle, time: number, params: FinishParams) {
-    if (this.disposed || !this.textures["@card"]) return;
+  /** Draw one moment (seconds) of the style's animation on a card with this face and name (none: no name painted),
+   *  over the whole canvas, cleared first, or in `rect` ([x, y, w, h] from the bottom left), which it covers. */
+  draw(style: FinishStyle, time: number, params: FinishParams, card: WebGLTexture, name: WebGLTexture | null, rect?: number[]) {
+    if (this.disposed) return;
     const gl = this.gl;
     const cfg = this.cfg[style];
     const prog = this.programs[style]!;
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    if (rect) gl.viewport(rect[0], rect[1], rect[2], rect[3]);
+    else gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.useProgram(prog.pr);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    if (!name) this.shared["@name"] ??= this.solid(SOLID["@name"]);
     for (const i of Object.keys(cfg.textures)) {
+      const file = this.fileAt(style, i, params.frame);
       gl.activeTexture(gl.TEXTURE0 + Number(i));
-      gl.bindTexture(gl.TEXTURE_2D, this.textures[this.fileAt(style, i)]);
-      gl.uniform1i(gl.getUniformLocation(prog.pr, `t${i}`), Number(i));
+      gl.bindTexture(gl.TEXTURE_2D, file === "@card" ? card : file === "@name" ? (name ?? this.shared["@name"]) : this.shared[file]);
+      gl.uniform1i(this.loc(style, `t${i}`), Number(i));
     }
     const put = (a: Float32Array, row: number, vals: number[]) => vals.forEach((v, k) => { a[row * 4 + k] = v; });
     const globals = new Float32Array(134 * 4);
@@ -244,22 +240,81 @@ export class CardFinish {
     if (cfg.params.attribute !== undefined) material[cfg.params.attribute] = params.attribute;
     if (cfg.params.level !== undefined) material[cfg.params.level] = params.level;
     const data: Record<string, Float32Array> = { $Globals: globals, UnityPerDraw: draw, UnityPerMaterial: material };
-    for (const [name, idx] of Object.entries(cfg.bindings)) {
-      const loc = gl.getUniformLocation(prog.pr, `cb${idx}`);
+    for (const [bound, idx] of Object.entries(cfg.bindings)) {
+      const loc = this.loc(style, `cb${idx}`);
       const size = prog.sizes[String(idx)];
-      if (loc && size && data[name]) gl.uniform4fv(loc, data[name].subarray(0, size * 4));
+      if (loc && size && data[bound]) gl.uniform4fv(loc, data[bound].subarray(0, size * 4));
     }
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    if (!rect) {
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
   dispose() {
     this.disposed = true;
     const gl = this.gl;
-    Object.values(this.textures).forEach((t) => gl.deleteTexture(t));
+    Object.values(this.shared).forEach((t) => gl.deleteTexture(t));
     Object.values(this.programs).forEach((p) => p && gl.deleteProgram(p.pr));
     gl.deleteBuffer(this.quad);
+  }
+}
+
+/** One card on its own canvas (the card page, its zoom, the info sheet, the pack simulator). */
+export class CardFinish {
+  private card: WebGLTexture | null = null;
+  private name: WebGLTexture | null = null;
+  private frame: FinishFrame = "normal";
+  private faceCalls = 0;
+  private disposed = false;
+
+  private constructor(private shaders: FinishShaders) {}
+
+  /** A renderer for the canvas with the shaders compiled, made once: a face is put on it with setFace, and changing
+   *  the face later swaps only its texture (no compiling again, and never two renderers on one canvas). */
+  static async create(canvas: HTMLCanvasElement): Promise<CardFinish> {
+    const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
+    if (!gl) throw new Error("WebGL2를 쓸 수 없습니다.");
+    return new CardFinish(await FinishShaders.create(gl));
+  }
+
+  /** Put a face, its frame and its name on the card; false when a later call has taken its place meanwhile. */
+  async setFace(faceUrl: string, frame: FinishFrame, nameUrl?: string | null): Promise<boolean> {
+    const call = ++this.faceCalls;
+    const [face, name] = await Promise.all([
+      loadImage(faceUrl),
+      nameUrl ? loadImage(nameUrl) : Promise.resolve(null),
+      this.shaders.prepare(frame),
+    ]);
+    if (call !== this.faceCalls || this.disposed) return false;
+    const gl = this.shaders.gl;
+    if (this.card) gl.deleteTexture(this.card);
+    this.card = this.shaders.texture(face);
+    if (this.name) gl.deleteTexture(this.name);
+    this.name = name ? this.shaders.texture(name) : null;
+    this.frame = frame;
+    return true;
+  }
+
+  /** Leave the canvas empty, so the plain face behind it shows until the next draw. */
+  clear() {
+    const gl = this.shaders.gl;
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  /** Draw one moment (seconds) of the style's animation. */
+  draw(style: FinishStyle, time: number, params: FinishParams) {
+    if (this.disposed || !this.card) return;
+    this.shaders.draw(style, time, { ...params, frame: this.frame }, this.card, this.name);
+  }
+
+  dispose() {
+    this.disposed = true;
+    const gl = this.shaders.gl;
+    [this.card, this.name].forEach((t) => t && gl.deleteTexture(t));
+    this.shaders.dispose();
     // the context itself stays: a canvas has only one, and a renderer made after this one may be using it
   }
 }

@@ -1,6 +1,6 @@
 import type { CardListItem } from "@/api/cardDexApi";
-import { type CardLook, type CoverPick, COVERS_MAX, lookThumb } from "@/lib/deckDrafts";
-import { FinishMark } from "./DeckZones";
+import { type CardLook, type CoverPick, COVERS_MAX } from "@/lib/deckDrafts";
+import CopyFace from "./DeckFinish";
 
 // The three slots fanned in one square (참혈 2026-10-16): the first in front in the middle, the second behind on the
 // left, the third behind on the right. Drawn back to front; the slot being set comes to the front.
@@ -33,8 +33,7 @@ function Slot({ at, pick, look, cards, active }: {
   // drawn as the copy picked looks (참혈 2026-10-16)
   return (
     <span className="relative block w-full h-full card-corner shadow-md">
-      <img src={lookThumb(card, look)} alt={card.name} className="block w-full h-full object-contain card-corner" />
-      <FinishMark finish={look?.finish} />
+      <CopyFace card={card} look={look} className="block w-full h-full object-contain card-corner" />
     </span>
   );
 }
