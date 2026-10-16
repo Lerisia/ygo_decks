@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type BanlistIndex, type BanRule, TODAY_MD, banOf, banlistName, banlistOptions, banlistTitle, dayLabel, isCode, latestDay, notOut, parseBanlistKey,
+  type BanlistIndex, type BanRule, BAN_KINDS, TODAY_MD, banOf, banlistName, banlistOptions, banlistTitle, dayLabel, isCode, latestDay, notOut, parseBanlistKey,
   pendingRule, ruleOf,
 } from "./banlists";
 
@@ -48,14 +48,23 @@ describe("a list's day as the picker writes it", () => {
 
   it("offers 최신 first, then every list newest first, each with its whole day in the title", () => {
     expect(banlistOptions("md", INDEX).slice(0, 3)).toEqual([
-      { value: "md", label: "최신 (26.10.06)", title: "2026.10.06 · 새 금제가 나오면 따라갑니다" },
-      { value: "md:2026-10-06", label: "26.10.06", title: "2026.10.06" },
-      { value: "md:2026-07-28", label: "26.07.28", title: "2026.07.28" },
+      { value: "md", label: "최신 (26.10.06)", shown: "최신", title: "2026.10.06 · 새 금제가 나오면 따라갑니다" },
+      { value: "md:2026-10-06", label: "26.10.06", shown: "26.10.06", title: "2026.10.06" },
+      { value: "md:2026-07-28", label: "26.07.28", shown: "26.07.28", title: "2026.07.28" },
     ]);
     expect(banlistOptions("ocg", INDEX).map((o) => o.label)).toEqual(["최신 (26.10)", "26.10", "26.07", "26.04"]);
     expect(banlistOptions("tcg", INDEX)[0].label).toBe("최신 (26.09.21)");
     // before the lists are known: 최신 alone
-    expect(banlistOptions("md", null)).toEqual([{ value: "md", label: "최신", title: "새 금제가 나오면 따라갑니다" }]);
+    expect(banlistOptions("md", null)).toEqual([{ value: "md", label: "최신", shown: "최신", title: "새 금제가 나오면 따라갑니다" }]);
+  });
+
+  it("shows 최신 closed with no day, its day only in the open list; a list held to by its day either way (참혈 2026-10-16)", () => {
+    expect(banlistOptions("md", INDEX).map((o) => o.shown)).toEqual(["최신", "26.10.06", "26.07.28", "26.07.14", "26.07.01"]);
+    expect(banlistOptions("ocg", INDEX).map((o) => o.shown)).toEqual(["최신", "26.10", "26.07", "26.04"]);
+  });
+
+  it("names the kinds 마스터 듀얼, OCG, TCG and 커스텀 in the picker, the game by its Korean name (참혈 2026-10-16)", () => {
+    expect(BAN_KINDS.map((k) => k.label)).toEqual(["마스터 듀얼", "OCG", "TCG", "커스텀"]);
   });
 
   it("names a deck's list on its page as 「MD • 최신」, the newest with no day, a held one by its whole year (참혈 2026-10-16)", () => {

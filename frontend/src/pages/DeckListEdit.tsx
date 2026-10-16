@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Check, Loader2, X } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -7,32 +8,31 @@ import BanlistPicker from "@/components/deckbuilder/BanlistPicker";
 import CardInfoSheet, { type CardInfoProps, CardInfoPane } from "@/components/deckbuilder/CardInfoSheet";
 import CardSearchPanel from "@/components/deckbuilder/CardSearchPanel";
 import CoverCards from "@/components/deckbuilder/CoverCards";
+import DeckPage, { DECK_ICON, DECK_ICON_SIZE, DeckNotFound } from "@/components/deckbuilder/DeckPage";
 import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { useBanlist } from "@/hooks/useBanlist";
 import { useDeckCards } from "@/hooks/useDeckCards";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
-  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, MAIN_MIN, addCard, blankDeck, clearTabDraft, copiesOf, copyIndex,
-  copyRank, coverLook, coverPlace, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, notOutCards, overLimit, removeCard, savedCovers, setCover,
-  setLook, setLookAll, shiftCopy, tabDraft,
+  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, addCard, blankDeck, clearTabDraft, copiesOf, copyIndex, copyRank,
+  coverLook, coverPlace, deckWarnings, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, removeCard, savedCovers, setCover, setLook, setLookAll,
+  shiftCopy, tabDraft,
 } from "@/lib/deckDrafts";
 import { banOf, notOut } from "@/lib/banlists";
 import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
 import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
 
-const BUTTON = "shrink-0 inline-flex items-center justify-center h-9 px-4 rounded-lg font-semibold text-sm transition";
-const PRIMARY = `${BUTTON} bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed`;
-const SECONDARY = `${BUTTON} bg-gray-500 hover:bg-gray-600 text-white`;
 const GUEST_NOTE = "로그인하면 덱을 저장할 수 있습니다.";
-const FIELD = "w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const FIELD = "w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-/** Making a deck list (/dev/decklists/new) or changing one (/dev/decklists/:code/edit) (덱 구축, 참혈 2026-10-13): its name and
- *  description on top, then the deck, cards going in from the search and coming out when pressed, shown when held or
- *  right-clicked. Members save it to their account (2026-10-14); a guest builds as freely but saves nothing — the
+/** Making a deck list (/dev/decklists/new) or changing one (/dev/decklists/:code/edit) (덱 구축, 참혈 2026-10-13), laid out
+ *  as the deck's page through the same parts (DeckPage, 참혈 2026-10-16), 취소 and 저장 as icons where the page has 수정
+ *  and 삭제: its name and description on top, then the deck, cards going in from the search and coming out when
+ *  pressed, shown when held or right-clicked. Members save it to their account (2026-10-14); a guest builds as freely but saves nothing — the
  *  deck waits in the tab while they go to sign in (엘리스: "비로그인이면 사진을 캡처해서 가지는 정도"). Operators only
  *  while it is laid out. Under the name and description one line: on its left the 금제 the deck is checked by
- *  (참혈 2026-10-16: 마듀 / OCG / TCG / 커스텀 and the list), on its right what keeps the deck from being played under
+ *  (참혈 2026-10-16: 마스터 듀얼 / OCG / TCG / 커스텀 and the list), on its right what keeps the deck from being played under
  *  it (참혈 2026-10-16). Beside them, up to three 대표 카드 (참혈 2026-10-16): from lg a slot pressed is set
  *  from the deck — the deck's cards pressed go there instead of out — then the next, until the third is set; the
  *  slot pressed again, or 「눌러서 종료」, stops. Below lg the square pressed sets them from the first on, and pressed
@@ -191,10 +191,6 @@ export default function DeckListEdit() {
     });
     return m;
   })();
-  // what keeps the deck from being played under its 금제, on the line under the name (참혈 2026-10-16)
-  const over = deck ? overLimit([...deck.main, ...deck.extra], cards, rule) : [];
-  const later = deck ? notOutCards([...deck.main, ...deck.extra], cards, rule) : [];
-  const short = !!deck && deck.main.length < MAIN_MIN;
   // the card shown: a copy in the deck while it is still there (an undo may take it), else as from the search
   const shownZone = showing ? (showing.zone ?? (isExtraCard(showing.card) ? "extra" : "main")) : "main";
   const shownAt = showing?.zone && showing.copy !== undefined && deck ? copyIndex(deck[showing.zone], showing.card.id, showing.copy) : -1;
@@ -235,44 +231,60 @@ export default function DeckListEdit() {
     setNextLook(null);
   };
 
+  const saveLabel = signedIn ? "저장" : "로그인하고 저장";
+  const named = !!deck?.name.trim();
+
   return (
     <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6">
       {deck ? (
         <>
-          <div className="h-9 flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold truncate">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>
-            <div className="flex gap-2">
-              <button type="button" onClick={cancel} className={SECONDARY}>취소</button>
-              <button type="button" onClick={save} disabled={!deck.name.trim() || saving} className={PRIMARY}>
-                {signedIn ? "저장" : "로그인하고 저장"}
-              </button>
-            </div>
-          </div>
-          {/* a phone's line under the name has no room for it beside the 금제 and the warnings: under the button it
-              explains instead (참혈 2026-10-16) */}
-          {!signedIn && <p className="sm:hidden mt-1 mb-0 text-right text-[11px] leading-4 text-gray-500 dark:text-gray-400">{GUEST_NOTE}</p>}
-          {/* the 대표 카드 on the left, bigger from lg; the name and description take what is left, the description as tall
-              as the cards (참혈 2026-10-16); 24px below it, so the line under it starts the deck's part */}
-          <div className="mt-3 mb-6 flex items-stretch gap-3 lg:gap-4">
-            <CoverCards
-              covers={deck.covers}
-              lookOf={(c) => coverLook(deck, c)}
-              cards={cards}
-              active={coverSlot}
-              wide={wide}
-              onSlot={(i) => setCoverSlot(coverSlot === i ? null : i)}
-              onArea={() => setCoverSlot(coverSlot === null ? 0 : null)}
-              onDone={() => setCoverSlot(null)}
-            />
-            <div className="min-w-0 flex-1 flex flex-col gap-2">
+          <DeckPage
+            top={<h1 className="m-0 text-xl leading-8 font-bold truncate">{code === undefined ? "덱 리스트 만들기" : "덱 리스트 수정"}</h1>}
+            // over the 저장 icon, at the top line's end: the line has room for it on a phone too (참혈 2026-10-16)
+            topEnd={!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
+            // the 대표 카드 on the left, bigger from lg; the description as tall as them (참혈 2026-10-16)
+            cover={
+              <CoverCards
+                covers={deck.covers}
+                lookOf={(c) => coverLook(deck, c)}
+                cards={cards}
+                active={coverSlot}
+                wide={wide}
+                onSlot={(i) => setCoverSlot(coverSlot === i ? null : i)}
+                onArea={() => setCoverSlot(coverSlot === null ? 0 : null)}
+                onDone={() => setCoverSlot(null)}
+              />
+            }
+            // as tall as the page's name and as big from sm, so going between the two moves nothing (참혈 2026-10-16)
+            name={
               <input
                 aria-label="덱 이름"
                 placeholder="덱 이름"
                 maxLength={40}
                 value={deck.name}
                 onChange={(e) => setDeck({ ...deck, name: e.target.value })}
-                className={FIELD}
+                className={`${FIELD} block h-8 px-2.5 text-base sm:text-xl font-bold placeholder:font-normal`}
               />
+            }
+            // 취소 and 저장 as bare icons where the page has 수정 and 삭제, 저장 in blue (참혈 2026-10-16)
+            actions={
+              <>
+                <button type="button" onClick={cancel} aria-label="취소" title="취소" className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100`}>
+                  <X className={DECK_ICON_SIZE} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={!named || saving}
+                  aria-label={saveLabel}
+                  title={named ? saveLabel : "덱 이름을 넣으면 저장할 수 있습니다"}
+                  className={`${DECK_ICON} text-blue-600 dark:text-blue-400 enabled:hover:text-blue-800 dark:enabled:hover:text-blue-300 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
+                >
+                  {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <Check className={DECK_ICON_SIZE} strokeWidth={2.5} aria-hidden />}
+                </button>
+              </>
+            }
+            description={
               <textarea
                 aria-label="덱 설명"
                 placeholder="덱 설명 (선택)"
@@ -280,63 +292,47 @@ export default function DeckListEdit() {
                 maxLength={500}
                 value={deck.description}
                 onChange={(e) => setDeck({ ...deck, description: e.target.value })}
-                className={`${FIELD} flex-1 min-h-[3.5rem] resize-y`}
+                className={`${FIELD} px-3 py-2 text-base md:text-sm flex-1 min-h-[3.5rem] resize-y`}
               />
-            </div>
-          </div>
-          {/* one line of a fixed height (참혈 2026-10-16): the 금제 on the left, then from sm that a guest saves by signing
-              in, and what keeps the deck from being played on the right in yellow — on a phone wrapping to a second row
-              inside the same height when all of it is there */}
-          <div className="mt-2 h-8 flex items-center gap-2 sm:gap-3 text-xs">
-            <BanlistPicker value={deck.banlist} index={banlists} onChange={(banlist) => setDeck({ ...deck, banlist })} />
-            <span className="hidden sm:block min-w-0 flex-1 truncate text-gray-500 dark:text-gray-400">{!signedIn && GUEST_NOTE}</span>
-            <span
-              className="min-w-0 flex-1 sm:flex-none sm:shrink-0 flex flex-wrap sm:flex-nowrap items-center content-center justify-end gap-x-2 leading-[14px] font-semibold text-amber-600 dark:text-amber-400"
-              aria-live="polite"
-            >
-              {/* a phone leaves 메인 덱 out */}
-              {short && <span className="whitespace-nowrap"><span className="hidden sm:inline">메인 덱 </span>{MAIN_MIN}장 이상 필요</span>}
-              {over.length > 0 && <span className="whitespace-nowrap" title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
-              {later.length > 0 && <span className="whitespace-nowrap" title={later.map((o) => o.line).join("\n")}>미출시 {later.length}종</span>}
-            </span>
-          </div>
-          {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-          {/* From lg the search stands beside the zones, as tall as the two of them (참혈 2026-10-14): it fills its cell
-              without making it taller, so the zones alone decide the row's height. */}
-          <div className="mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch lg:gap-4">
-            <DeckZones
-              deck={deck}
-              cards={cards}
-              order={order}
-              loading={loading}
-              rule={rule}
-              onRemove={coverSlot === null ? remove : putCover}
-              onShow={showFromDeck}
-              picking={coverSlot !== null}
-              marks={marks}
-            />
-            <div className="lg:relative">
-              <CardSearchPanel
+            }
+            banlist={<BanlistPicker value={deck.banlist} index={banlists} onChange={(banlist) => setDeck({ ...deck, banlist })} />}
+            warnings={deckWarnings(deck, cards, rule)}
+            error={error}
+          >
+            {/* From lg the search stands beside the zones, as tall as the two of them (참혈 2026-10-14): it fills its cell
+                without making it taller, so the zones alone decide the row's height. */}
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch lg:gap-4">
+              <DeckZones
                 deck={deck}
                 cards={cards}
+                order={order}
+                loading={loading}
                 rule={rule}
-                onPick={(c) => pick(c)}
-                onShow={showFromSearch}
-                // from lg the card shown takes the search's place, ← 뒤로 bringing the search back as it was (참혈 2026-10-16)
-                overlay={wide && info ? <CardInfoPane {...info} onClose={closeSheet} /> : null}
-                notice={notice}
-                ready={!loading}
-                history={{ canUndo: history.past.length > 0, canRedo: history.future.length > 0, onUndo: () => step(undo), onRedo: () => step(redo) }}
+                onRemove={coverSlot === null ? remove : putCover}
+                onShow={showFromDeck}
+                picking={coverSlot !== null}
+                marks={marks}
               />
+              <div className="lg:relative">
+                <CardSearchPanel
+                  deck={deck}
+                  cards={cards}
+                  rule={rule}
+                  onPick={(c) => pick(c)}
+                  onShow={showFromSearch}
+                  // from lg the card shown takes the search's place, ← 뒤로 bringing the search back as it was (참혈 2026-10-16)
+                  overlay={wide && info ? <CardInfoPane {...info} onClose={closeSheet} /> : null}
+                  notice={notice}
+                  ready={!loading}
+                  history={{ canUndo: history.past.length > 0, canRedo: history.future.length > 0, onUndo: () => step(undo), onRedo: () => step(redo) }}
+                />
+              </div>
             </div>
-          </div>
+          </DeckPage>
           {!wide && info && <CardInfoSheet {...info} onClose={closeSheet} />}
         </>
       ) : (
-        <div className="py-16 flex flex-col items-center gap-4">
-          <p className="text-gray-600 dark:text-gray-300">{signedIn ? "덱을 찾을 수 없습니다." : "로그인하면 저장한 덱을 볼 수 있습니다."}</p>
-          <Link to={DECK_LISTS_PATH} className={`${BUTTON} bg-blue-600 hover:bg-blue-700 text-white`}>목록으로</Link>
-        </div>
+        <DeckNotFound signedIn={signedIn} />
       )}
     </div>
   );

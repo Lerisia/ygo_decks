@@ -249,6 +249,13 @@ export function notOutCards(ids: number[], cards: Map<number, CardListItem>, rul
   }).sort(byName);
 }
 
+/** The warning line under a deck's name, on its page and while it is built (참혈 2026-10-16): too few in the main, the
+ *  cards over its 금제, the cards not out yet under it. */
+export function deckWarnings(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>, rule?: BanRule) {
+  const ids = [...deck.main, ...deck.extra];
+  return { short: deck.main.length < MAIN_MIN, over: overLimit(ids, cards, rule), later: notOutCards(ids, cards, rule) };
+}
+
 /** What keeps the deck from being played under its 금제, as the server says it (decklists/rules.py): too few in the
  *  main, then each card over the list, the forbidden first, then each card not out yet then. */
 export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>, rule?: BanRule): string[] {

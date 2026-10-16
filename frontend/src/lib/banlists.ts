@@ -11,7 +11,7 @@ export type BanChoice = { kind: BanFormat; day: string | null } | { kind: "custo
 
 export const DEFAULT_BANLIST = "md";
 export const BAN_KINDS: { kind: BanKind; label: string }[] = [
-  { kind: "md", label: "마듀" }, { kind: "ocg", label: "OCG" }, { kind: "tcg", label: "TCG" }, { kind: "custom", label: "커스텀" },
+  { kind: "md", label: "마스터 듀얼" }, { kind: "ocg", label: "OCG" }, { kind: "tcg", label: "TCG" }, { kind: "custom", label: "커스텀" },
 ];
 const KIND_LABEL = Object.fromEntries(BAN_KINDS.map((k) => [k.kind, k.label])) as Record<BanKind, string>;
 const FOLLOWS = "새 금제가 나오면 따라갑니다";
@@ -42,21 +42,26 @@ export function dayLabel(format: BanFormat, day: string, days: string[] = []) {
 /** A game's newest list in effect on the index's day (one announced for a later day waits for it). */
 export const latestDay = (index: BanlistIndex, format: BanFormat) => index.lists[format].find((d) => d <= index.today) ?? null;
 
-export type BanOption = { value: string; label: string; title: string };
+/** label: in the open list; shown: in the closed box. */
+export type BanOption = { value: string; label: string; shown: string; title: string };
 
-/** A game's choices: 최신 (its newest list's day) first, then each list, newest first. */
+/** A game's choices: 최신 first — 「최신」 closed, with its newest list's day in the open list, so the list says which one
+ *  is in effect (참혈 2026-10-16) —, then each list by day, newest first. */
 export function banlistOptions(format: BanFormat, index: BanlistIndex | null): BanOption[] {
   const latest = index && latestDay(index, format);
   const days = index?.lists[format] ?? [];
   return [
     latest
-      ? { value: format, label: `최신 (${dayLabel(format, latest, days)})`, title: `${fullDay(latest)} · ${FOLLOWS}` }
-      : { value: format, label: "최신", title: FOLLOWS },
-    ...days.map((day) => ({ value: `${format}:${day}`, label: dayLabel(format, day, days), title: fullDay(day) })),
+      ? { value: format, label: `최신 (${dayLabel(format, latest, days)})`, shown: "최신", title: `${fullDay(latest)} · ${FOLLOWS}` }
+      : { value: format, label: "최신", shown: "최신", title: FOLLOWS },
+    ...days.map((day) => {
+      const label = dayLabel(format, day, days);
+      return { value: `${format}:${day}`, label, shown: label, title: fullDay(day) };
+    }),
   ];
 }
 
-// a deck's page names the game short (참혈 2026-10-16), the picker keeps 마듀
+// a deck's page names the game short (참혈 2026-10-16), the picker in full
 const PAGE_LABEL: Record<BanKind, string> = { ...KIND_LABEL, md: "MD" };
 
 /** A deck's list for its page, after 「금제 |」 (참혈 2026-10-16): "MD • 최신" — the newest with no day —,

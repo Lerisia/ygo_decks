@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckUpdated, fromDoc,
+  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckWarnings, deckUpdated, fromDoc,
   keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, notOutCards, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll,
   sortedCopies, sortedZone, tabDraft, copiesAllowed,
 } from "./deckDrafts";
@@ -134,6 +134,15 @@ describe("the 금제 the deck picked (참혈 2026-10-16)", () => {
       [31, "둘: 미출시 카드입니다."], [32, "셋: 미출시 카드입니다."],
     ]);
     expect(notOutCards([32, 30, 31], cards)).toEqual([]);   // Master Duel's newest before its table comes: all out
+  });
+
+  it("gives both pages' warning line one count: too few in the main, the cards over the list, the cards not out yet (참혈 2026-10-16)", () => {
+    const w = deckWarnings(deck([30, 31, 31, 32]), cards, ocg2020);
+    expect(w.short).toBe(true);
+    expect(w.over.map((o) => o.card.id)).toEqual([31]);
+    expect(w.later.map((o) => o.card.id)).toEqual([31, 32]);
+    const full = deckWarnings(deck(Array.from({ length: 40 }, () => 1), [30]), cards);
+    expect(full).toEqual({ short: false, over: [expect.objectContaining({ card: one, count: 1 })], later: [] });   // the extra deck counts too
   });
 
   it("tells the deck as the server does: too few, then over the list, then not out yet", () => {
