@@ -45,6 +45,7 @@ export default function DeckListEdit() {
   const noticeTimer = useRef<number | undefined>(undefined);
   const wide = useMediaQuery("(min-width: 1024px)");
   const [coverSlot, setCoverSlot] = useState<number | null>(null);   // the 대표 카드 slot being set
+  const [coverCopy, setCoverCopy] = useState<Record<number, number>>({});   // which copy of each 대표 카드 was pressed
   // undo / redo of the deck's cards and 대표 카드 (참혈 2026-10-16); Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside the boxes
   const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
   const historyKeys = useRef({ undo: () => {}, redo: () => {} });
@@ -119,9 +120,11 @@ export default function DeckListEdit() {
     else change(r.deck);
   };
   const remove = (zone: DeckZone, id: number) => deck && change(removeCard(deck, zone, id));
-  // the slot set (or emptied), then the next one, and done after the third
-  const putCover = (id: number | null) => {
+  // the slot set (or emptied), then the next one, and done after the third; which copy was pressed is kept for this
+  // visit, so its mark sits on that copy (참혈 2026-10-16)
+  const putCover = (id: number | null, copy = 0) => {
     if (!deck || coverSlot === null) return;
+    if (id !== null) setCoverCopy((c) => ({ ...c, [id]: copy }));
     change(setCover(deck, coverSlot, id));
     setCoverSlot(coverSlot + 1 < COVERS_MAX ? coverSlot + 1 : null);
   };
@@ -149,7 +152,9 @@ export default function DeckListEdit() {
       setSaving(false);
     }
   };
-  const marks = coverSlot === null || !deck ? undefined : new Map(deck.covers.flatMap((c, i) => (c === null ? [] : [[c, i + 1] as const])));
+  const marks = coverSlot === null || !deck
+    ? undefined
+    : new Map(deck.covers.flatMap((c, i) => (c === null ? [] : [[c, { slot: i + 1, copy: coverCopy[c] ?? 0 }] as const])));
 
   return (
     <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6">
@@ -200,7 +205,7 @@ export default function DeckListEdit() {
             {coverSlot !== null ? (
               <>
                 <span className="min-w-0 truncate font-semibold text-blue-600 dark:text-blue-400">
-                  대표 카드 {coverSlot + 1}번째: 덱에서 카드를 누르세요
+                  덱에서 카드를 누르세요
                 </span>
                 {deck.covers[coverSlot] != null && (
                   <button type="button" onClick={() => putCover(null)} className={HINT_BUTTON}>비우기</button>
@@ -220,7 +225,7 @@ export default function DeckListEdit() {
               cards={cards}
               order={order}
               loading={loading}
-              onRemove={coverSlot === null ? remove : (_zone, id) => putCover(id)}
+              onRemove={coverSlot === null ? remove : (_zone, id, copy) => putCover(id, copy)}
               onShow={setShowing}
               picking={coverSlot !== null}
               marks={marks}

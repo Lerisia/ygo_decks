@@ -40,11 +40,12 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
   ids: number[];
   cards: Map<number, CardListItem>;
   loading: boolean;
-  onRemove?: (id: number) => void;
+  /** `copy`: which copy of the card was pressed (0 for the first), for a 대표 카드 marked on it */
+  onRemove?: (id: number, copy: number) => void;
   onShow?: (card: CardListItem) => void;
   reserve: boolean;
   picking?: boolean;
-  marks?: Map<number, number>;
+  marks?: Map<number, { slot: number; copy: number }>;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
@@ -83,15 +84,19 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
         <div className={`deck-zone-grid ${reserve ? "deck-zone-reserve" : ""}`}>
           {ids.map((id, i) => {
             const card = cards.get(id);
+            // a 대표 카드 is marked on the one copy picked, not on every copy of the card (참혈 2026-10-16)
+            const copy = i - ids.indexOf(id);
             if (!card) {
               return <span key={`${id}-${i}`} className={`${TILE_BLANK} ${loading ? "animate-pulse" : ""}`} />;
             }
-            const mark = marks?.get(id);
+            const m = marks?.get(id);
+            // (fewer copies left than the one picked: the last of them)
+            const mark = m && copy === Math.min(m.copy, ids.lastIndexOf(id) - ids.indexOf(id)) ? m.slot : undefined;
             return onRemove ? (
               <button
                 key={`${id}-${i}`}
                 type="button"
-                {...press(() => onRemove(id), () => onShow?.(card))}
+                {...press(() => onRemove(id, copy), () => onShow?.(card))}
                 title={picking ? `${card.name} (눌러서 대표 카드로)` : `${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
@@ -129,12 +134,12 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
   loading: boolean;
-  onRemove?: (zone: DeckZone, id: number) => void;
+  onRemove?: (zone: DeckZone, id: number, copy: number) => void;
   /** Building: a card held (phone) or right-clicked (computer) is shown. */
   onShow?: (card: CardListItem) => void;
   /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: the slot of each. */
   picking?: boolean;
-  marks?: Map<number, number>;
+  marks?: Map<number, { slot: number; copy: number }>;
 }) {
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -145,7 +150,7 @@ export default function DeckZones({ deck, cards, order, loading, onRemove, onSho
           ids={sortedZone(deck[z], order)}
           cards={cards}
           loading={loading}
-          onRemove={onRemove && ((id) => onRemove(z, id))}
+          onRemove={onRemove && ((id, copy) => onRemove(z, id, copy))}
           onShow={onShow}
           reserve={!!onRemove}
           picking={picking}

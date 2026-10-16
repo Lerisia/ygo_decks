@@ -15,11 +15,12 @@ const NUMBER_AT = ["inset-0 items-center justify-center", "inset-y-0 left-[12%] 
 
 function Slot({ at, id, cards, active }: { at: number; id: number | null; cards: Map<number, CardListItem>; active: boolean }) {
   const card = id === null ? undefined : cards.get(id);
-  const ring = active ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900" : "";
+  // the slot being set: one solid blue edge and a tint, never a ring around a border (참혈 2026-10-16)
+  const ring = active ? "ring-2 ring-blue-500" : "";
   if (id === null) {
     return (
-      <span className={`flex border-2 border-dashed bg-gray-50 dark:bg-gray-800 ${active ? "border-blue-500" : "border-gray-300 dark:border-gray-600"} w-full h-full card-corner ${ring}`}>
-        <span className={`absolute flex text-gray-400 dark:text-gray-500 font-semibold ${NUMBER_AT[at]}`}>
+      <span className={`flex border-2 w-full h-full card-corner ${active ? "border-solid border-blue-500 bg-blue-50 dark:bg-blue-900/40" : "border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"}`}>
+        <span className={`absolute flex font-semibold ${active ? "text-blue-600 dark:text-blue-300" : "text-gray-400 dark:text-gray-500"} ${NUMBER_AT[at]}`}>
           {at === 0 ? <span className="text-[11px] lg:text-[13px] leading-tight text-center break-keep px-1">대표<br />카드</span> : <span className="text-xs lg:text-sm">{at + 1}</span>}
         </span>
       </span>

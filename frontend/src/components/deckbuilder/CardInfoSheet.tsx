@@ -33,7 +33,8 @@ export default function CardInfoSheet({ card, inDeck, onAdd, onRemove, onClose }
     <div className="fixed inset-0 z-[70] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose} role="dialog" aria-modal="true" aria-label={card.name}>
       <div className="w-full sm:max-w-lg max-h-[85svh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-800 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-4">
-          <img src={card.image_url || card.face_thumb_url || card.thumb_url || "/default_cover.png"} alt={card.name}
+          {/* the card itself, not its art alone (참혈 2026-10-16): the small face at once, the full one once it comes */}
+          <img src={doc?.face_url || card.face_thumb_url || card.thumb_url || card.image_url || "/default_cover.png"} alt={card.name}
                className="w-28 sm:w-36 shrink-0 aspect-[704/1024] object-contain card-corner self-start" />
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold break-keep">{card.name}</h2>
