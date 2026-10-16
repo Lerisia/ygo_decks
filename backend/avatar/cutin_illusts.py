@@ -172,7 +172,13 @@ def _finished(base, colour, alpha, out, keep_lights=True):
     # the margin eroded off the agreeing area keeps a seam from showing, but it also took the thin tips (claws,
     # fingers) off a figure that is plainly in place; there the figure keeps its own edge (10/16)
     eroded = cv2.erode(agree, np.ones((int(11 * k) | 1,) * 2, np.uint8))
-    agree = cv2.GaussianBlur(np.where(sure > 0.5, agree, eroded), (0, 0), 1.5 * k)[:, :, None]
+    keeps_edge = sure > 0.5
+    if not keep_lights:
+        # the lights ignored, the art's haze perforates the agreeing area and the erosion eats what is left of a
+        # head; near a part plainly in place the holes are haze over the figure, so the figure keeps its edge
+        # there too — but only near (40 px at 1024): further out a part the pose holds elsewhere would double
+        keeps_edge = cv2.dilate(keeps_edge.astype(np.uint8), np.ones((int(80 * k) + 1,) * 2, np.uint8)) > 0
+    agree = cv2.GaussianBlur(np.where(keeps_edge, agree, eroded), (0, 0), 1.5 * k)[:, :, None]
     picture = base * (1 - alpha * agree) + colour * agree
     return picture.clip(0, 255).astype(np.uint8), covered, float((alpha > 0.5).mean()), gap
 
