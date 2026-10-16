@@ -303,7 +303,7 @@ export default function DeckListEdit() {
           >
             {/* From lg the search stands beside the zones, as tall as the two of them (참혈 2026-10-14): it fills its cell
                 without making it taller, so the zones decide the row's height — but never below three rows of results
-                with the 카드군/서포트 suggestions shown (참혈 2026-10-16). */}
+                (참혈 2026-10-16; the 카드군/서포트 suggestions, when shown, push them down and the rest scroll). */}
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch lg:gap-4">
               <DeckZones
                 deck={deck}
@@ -316,7 +316,7 @@ export default function DeckListEdit() {
                 picking={coverSlot !== null}
                 marks={marks}
               />
-              <div className="lg:relative lg:min-h-[850px]">
+              <div className="lg:relative lg:min-h-[678px]">
                 <CardSearchPanel
                   deck={deck}
                   cards={cards}
