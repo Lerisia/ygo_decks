@@ -85,6 +85,26 @@ class InquiryBoardTest(TestCase):
         self.assertEqual(self._as(self.staff).get(f"/api/inquiry/{pid}/").json()["title"], "로그인이 안 돼요")
         self.assertEqual(self._as(self.other).get(f"/api/inquiry/{pid}/").json()["title"], "문의사항")
 
+    def test_a_new_deck_report_shows_its_title_to_everyone_but_not_its_body(self):
+        # 특이점 2026-10-16: so others can see a report was taken up
+        pid = self._write(board="deck", title="낙인 스탯 수정 요청").json()["id"]
+        self.assertTrue(InquiryPost.objects.get(id=pid).title_public)
+        for who in (None, self.other, self.author, self.staff):
+            row = self._as(who).get("/api/inquiry/?board=deck").json()["results"][0]
+            self.assertEqual(row["title"], "낙인 스탯 수정 요청")
+            self.assertTrue(row["title_public"])
+        locked = self._as(self.other).get(f"/api/inquiry/{pid}/")
+        self.assertEqual(locked.status_code, 403)
+        self.assertEqual(locked.json()["title"], "낙인 스탯 수정 요청")
+        self.assertNotIn("body", locked.json())
+
+    def test_deck_reports_from_before_keep_their_titles_hidden(self):
+        pid = self._write(board="deck", title="옛 제보").json()["id"]
+        InquiryPost.objects.filter(id=pid).update(title_public=False)
+        row = self._as(self.other).get("/api/inquiry/?board=deck").json()["results"][0]
+        self.assertEqual(row["title"], "문의사항")
+        self.assertEqual(self._as(self.other).get(f"/api/inquiry/{pid}/").json()["title"], "문의사항")
+
     def test_posts_are_always_private(self):
         pid = self._write(is_private=False).json()["id"]
         self.assertTrue(InquiryPost.objects.get(id=pid).is_private)

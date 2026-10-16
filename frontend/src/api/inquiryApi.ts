@@ -25,6 +25,8 @@ export type InquiryPost = {
   board: InquiryBoard;
   board_label: string;
   title: string;
+  /** A deck report's title, listed for everyone (특이점 2026-10-16); its body stays private. */
+  title_public: boolean;
   is_private: boolean;
   answered: boolean;
   comment_count: number | null;

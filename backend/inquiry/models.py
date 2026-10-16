@@ -4,7 +4,8 @@ from django.db import models
 
 class InquiryPost(models.Model):
     """A question or report on one of the two inquiry boards (특이점 2026-10-07). Authors always show as 익명;
-    a private post (the default) is readable only by its author and staff. Only staff can comment (answer)."""
+    a private post (the default) is readable only by its author and staff. Only staff can comment (answer).
+    A deck report's title is public from 2026-10-16 (title_public)."""
 
     BOARD_CHOICES = [("deck", "덱 관련 제보 / 건의"), ("site", "사이트 관련 문의")]
 
@@ -13,6 +14,9 @@ class InquiryPost(models.Model):
     title = models.CharField(max_length=100)
     body = models.TextField(max_length=5000)
     is_private = models.BooleanField(default=True, verbose_name="비공개")
+    # a deck report's title is listed for everyone so others can see it was taken up (특이점 2026-10-16); set when
+    # written, so posts from before, written as wholly private, keep their titles hidden
+    title_public = models.BooleanField(default=False, verbose_name="제목 공개")
     notify_email = models.BooleanField(default=False, verbose_name="답변 시 메일 알림")
     answered_at = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)

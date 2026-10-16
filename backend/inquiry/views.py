@@ -13,8 +13,10 @@ from .models import InquiryComment, InquiryPost
 
 PAGE_SIZE = 20
 # Lists and locked pages never show a real title: someone could put abuse in it (특이점 2026-10-07).
-# The real title appears only on the post itself, for its author and staff.
+# The real title appears only on the post itself, for its author and staff — except a deck report's, written from
+# 2026-10-16 on, which everyone sees so they can tell it was taken up (특이점; its body stays private).
 HIDDEN_TITLE = "문의사항"
+PUBLIC_TITLE_BOARDS = {"deck"}
 BOARDS = dict(InquiryPost.BOARD_CHOICES)
 # Enough for anyone with a real problem, too little for a flood.
 LIMITS = ((timedelta(minutes=10), 5), (timedelta(days=1), 30))
@@ -37,7 +39,8 @@ def _post_out(post, user, full=False):
         "id": post.id,
         "board": post.board,
         "board_label": BOARDS.get(post.board, post.board),
-        "title": post.title if full and can_view else HIDDEN_TITLE,
+        "title": post.title if (full and can_view) or post.title_public else HIDDEN_TITLE,
+        "title_public": post.title_public,
         "is_private": post.is_private,
         "answered": post.answered_at is not None,
         "comment_count": getattr(post, "n_comments", None),
@@ -107,7 +110,7 @@ def posts(request):
             return _error("짧은 시간에 글을 너무 많이 썼습니다. 잠시 뒤에 다시 써 주세요.", 429)
     post = InquiryPost.objects.create(
         board=board, author=request.user, title=title, body=body,
-        is_private=True, notify_email=bool(data.get("notify_email", False)),
+        is_private=True, title_public=board in PUBLIC_TITLE_BOARDS, notify_email=bool(data.get("notify_email", False)),
     )
     return Response(_post_out(post, request.user, full=True), status=201)
 
