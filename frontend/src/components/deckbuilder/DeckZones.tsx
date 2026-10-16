@@ -48,7 +48,8 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
-  // while it is built, cards over today's 금제 (one saved before it) are told by the title and ringed in the zone
+  // while it is built, cards over today's 금제 (one saved before it) are ringed in the zone; the editor shows no count
+  // warnings by the title (참혈 2026-10-16), a deck being looked at still says it is short
   const over = onRemove ? overLimit(ids, cards) : [];
   const overIds = new Set(over.map((o) => o.card.id));
   return (
@@ -58,8 +59,7 @@ function Zone({ zone, ids, cards, loading, onRemove, onShow, reserve, picking, m
         <h2 className="m-0 h-6 flex items-baseline gap-2 shrink-0 whitespace-nowrap text-base">
           <span className="font-bold">{ZONE_LABEL[zone]}</span>
           <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{ids.length}장</span>
-          {zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
-          {over.length > 0 && <span className={WARN} title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
+          {!onRemove && zone === "main" && ids.length < MAIN_MIN && <span className={WARN}>{MAIN_MIN}장 이상 필요</span>}
         </h2>
         <p className="m-0 min-w-0 min-h-6 flex flex-wrap items-center justify-end gap-x-1.5 sm:gap-x-2.5 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-300 tabular-nums">
           {loading && ids.length ? (
