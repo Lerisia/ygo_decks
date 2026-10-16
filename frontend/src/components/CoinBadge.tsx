@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
-// Round "coin" mark on deck covers — gold E for engines (특이점 2026-10-02), red N for upcoming decks (2026-10-13; a
-// blue U from 10-03).
+// Round "coin" mark on deck covers — blue E for engines (특이점 2026-10-16; gold from 10-02), red N for upcoming decks
+// (2026-10-13; a blue U from 10-03).
 export const COIN_PALETTES: Record<"gold" | "blue" | "red", CSSProperties> = {
   gold: {
     background: "radial-gradient(circle at 32% 28%, #fff7d1 0%, #fcd34d 30%, #f59e0b 64%, #b45309 100%)",
