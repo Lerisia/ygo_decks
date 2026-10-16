@@ -67,7 +67,7 @@ export default function DeckListView() {
         <>
           {/* laid out as the edit page is (참혈 2026-10-16): the 대표 카드 set on the left, the name and description beside
               them, 24px down to the deck's part */}
-          <div className="mt-3 mb-6 flex items-start gap-3 lg:gap-4">
+          <div className="mt-3 mb-6 flex items-start gap-5 sm:gap-6 lg:gap-8">
             {draft.covers.length > 0 && <CoverCards covers={draft.covers} lookOf={(c) => coverLook(draft, c)} cards={cards} />}
             <div className="min-w-0 flex-1">
               {/* the name with its day beside it, 수정 and 삭제 at the end of the same line (참혈 2026-10-16) */}
