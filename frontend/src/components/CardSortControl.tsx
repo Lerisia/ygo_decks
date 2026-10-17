@@ -19,8 +19,8 @@ export default function CardSortControl({ sorts, filters, onChange, compact = fa
       <Dropdown
         label="정렬"
         value={filters.sort}
-        // 조회수 reads 정확도순 while a query is on: the closest names come first then (참혈 2026-10-14)
-        options={sorts.map((s) => ({ value: s.value, label: s.value === "popular" && filters.q ? "정확도순" : s.label }))}
+        // 조회수 reads 정확도 (정확도순 until 참혈 2026-10-18) while a query is on: the closest names come first then (참혈 2026-10-14)
+        options={sorts.map((s) => ({ value: s.value, label: s.value === "popular" && filters.q ? "정확도" : s.label }))}
         onChange={(sort) => onChange({ sort, dir: "" })}
         className={`h-full py-0 rounded-l-lg rounded-r-none ${compact ? "max-w-[7rem] pl-2 pr-1.5 text-xs" : "max-w-[7.5rem] sm:max-w-none pl-2 sm:pl-3 pr-2 sm:pr-2.5 text-sm"}`}
       />

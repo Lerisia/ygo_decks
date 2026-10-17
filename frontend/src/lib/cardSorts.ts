@@ -12,7 +12,7 @@ export const CARD_SORTS = [
 ];
 
 /** /dev/cards tries 조회수 (조회순 until 참혈 2026-10-18) — the most viewed cards first, then the newest, then by name; with a query it reads
- *  정확도순, the closest names first (참혈 2026-10-14). */
+ *  정확도, the closest names first (참혈 2026-10-14). */
 export const DEV_CARD_SORTS = [{ value: "popular", label: "조회수" }, ...CARD_SORTS];
 
 const SORT_KEY = "card_list_sort";
