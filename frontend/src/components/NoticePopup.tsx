@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Megaphone } from "lucide-react";
 import { getLatestChangelog, type ChangelogEntry } from "@/api/changelogApi";
@@ -59,13 +59,33 @@ export default function NoticePopup({ disabled = false }: { disabled?: boolean }
     if (shown && NOTICE_PAGES.includes(pathname)) setVisible(false);
   }, [pathname, shown]);
 
+  // So does the visitor getting on with the page: a scroll, or a touch or click anywhere but on the popup. On a
+  // phone it sat over the record form's first field and took the tap meant for it (엘리스 2026-10-17).
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!visible) return;
+    const away = () => setVisible(false);
+    const press = (e: PointerEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setVisible(false);
+    };
+    window.addEventListener("scroll", away, { passive: true, once: true });
+    window.addEventListener("pointerdown", press, true);
+    return () => {
+      window.removeEventListener("scroll", away);
+      window.removeEventListener("pointerdown", press, true);
+    };
+  }, [visible]);
+
   if (!shown) return null;
   return (
     <div
+      ref={boxRef}
       role="status"
       aria-live="polite"
       onTransitionEnd={() => !visible && setShown(null)}
-      className={`fixed right-3 top-16 sm:top-24 z-40 w-[min(20rem,calc(100vw-1.5rem))] transition-all duration-500 ${
+      // a phone shows it above the bottom tab bar, clear of the forms and lists that fill the top of the screen;
+      // a desktop keeps it at the top right
+      className={`fixed right-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-auto sm:top-24 z-40 w-[min(20rem,calc(100vw-1.5rem))] transition-all duration-500 ${
         visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
       }`}
     >

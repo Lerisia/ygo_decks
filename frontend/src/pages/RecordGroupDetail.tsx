@@ -364,6 +364,7 @@ const RecordGroupDetailPage = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
+  const deckDefaulted = useRef(false);   // whether 내 덱 has been set from the sheet's recent_deck this visit
   // The form starts folded so the sheet's state shows first; whoever opens it keeps it open next time.
   const [showRegisterForm, setShowRegisterForm] = useState(() => {
     try { return localStorage.getItem("record_form_open") === "1"; } catch { return false; }
@@ -504,6 +505,12 @@ const RecordGroupDetailPage = () => {
       setMatches(response.matches);
       setDays(response.days ?? {});
       setTotalPages(response.total_pages);
+      // the form starts on the deck I last recorded with here (엘리스 2026-10-17), once a visit: a deck cleared on
+      // purpose stays cleared through the polling
+      if (!deckDefaulted.current && response.recent_deck != null) {
+        deckDefaulted.current = true;
+        setNewMatch((prev) => (prev.deck ? prev : { ...prev, deck: String(response.recent_deck) }));
+      }
       setRecordGroupName(response.record_group_name);
       setIsPublic(response.is_public);
       setIsOwner(response.is_owner);
