@@ -112,6 +112,35 @@ class EraseTest(SimpleTestCase):
         # and the figure stands where the cut-in holds it
         np.testing.assert_allclose(picture[500, 500], (40, 30, 60), atol=8)
 
+    def test_a_box_erases_under_the_figure_there_alone(self):
+        """엘리스 10/17 블러드 로즈 드래곤: the head is erased and laid anew, the rest of the picture is the plain
+        composite — a background the erasing cannot refill stays as it was."""
+        from avatar.cutin_illusts import compose_looks, enlarged, _laid
+        rng = np.random.default_rng(6)
+        art = np.full((512, 512, 3), (225, 175, 230), np.uint8)
+        art = np.clip(art.astype(int) + rng.integers(-6, 7, (512, 512, 3)), 0, 255).astype(np.uint8)
+        cv2.rectangle(art, (150, 150), (330, 330), (40, 30, 60), -1)                                # the art's monster
+        figure = np.zeros((ALIGN, ALIGN, 4), np.uint8)
+        fx = lambda a_px: int((2 * a_px - 128) / 0.5)
+        figure[fx(150):fx(330), fx(170):fx(350), :3] = (40, 30, 60)                                 # 20 art px to the right
+        figure[fx(150):fx(330), fx(170):fx(350), 3] = 255
+        M = np.float32([[0.5, 0, 128], [0, 0.5, 128]])
+        plain = compose_looks([figure], M, art, out=1024)[0]
+        whole = compose_looks([figure], M, art, out=1024, erase=True)[0]
+        top = compose_looks([figure], M, art, out=1024, erase=(0.0, 0.0, 1.0, 0.45))[0]          # the upper part only
+        # where the figure stands over what was haze (art px 335: inside the figure, past the art's monster), the plain
+        # composite keeps the art, since the flat figure matches no line there; the box, above its line (y < 460 at
+        # 1024), lays the figure as erasing the whole picture does
+        np.testing.assert_allclose(plain[400, 670], (225, 175, 230), atol=12)
+        np.testing.assert_allclose(whole[400, 670], (40, 30, 60), atol=8)
+        np.testing.assert_allclose(top[400, 670], (40, 30, 60), atol=8)
+        # below the line the plain composite stands, untouched
+        np.testing.assert_array_equal(top[560:640, 600:700], plain[560:640, 600:700])
+        np.testing.assert_allclose(top[600, 670], (225, 175, 230), atol=12)
+        # and beside the figure (left of it, x 302..328, clear of the feathered edge) nothing is erased in the box:
+        # only under the figure
+        np.testing.assert_array_equal(top[320:420, 302:328], plain[320:420, 302:328])
+
 
 class ComposeTest(SimpleTestCase):
     def test_a_light_the_art_paints_over_the_figure_stays_unless_told_otherwise(self):
@@ -317,6 +346,14 @@ class IllustTest(TestCase):
         second = json.loads((out / "report.json").read_text())["4007"]
         self.assertTrue(second["erase"])                   # drawn again, in the mode asked for, without --redo
         self.assertEqual(len(drawn), 12)                   # six looks each time
+        with mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
+            call_command("cutin_illusts", "4007", out=str(out), save=True, replace=True, erase_box="0.1,0.1,0.5,0.4", verbosity=0)
+        third = json.loads(Path(out, "report.json").read_text())["4007"]
+        self.assertEqual(third["erase"], [0.1, 0.1, 0.5, 0.4])   # the box, kept in the report
+        self.assertEqual(len(drawn), 18)
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError), mock.patch("avatar.management.commands.cutin_illusts.PoseRenderer", FakeRenderer):
+            call_command("cutin_illusts", "4007", out=str(out), erase_box="0.5,0.1,0.1,0.4", verbosity=0)
         illust = CustomIllust.objects.get(source_tweet_id="cutin:4007")
         self.assertEqual(second["illust"], illust.id)
 

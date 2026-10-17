@@ -262,9 +262,21 @@ def compose_looks(figures, M, art, out=OUT, keep_lights=True, erase=False):
     alpha = sum(w * a for w, (_, a) in zip(weights, laid)) / total
     solid = alpha[:, :, 0] > 0.95
     shares = [round(float(((choice == i) & solid).sum() / max(solid.sum(), 1)), 3) for i in range(len(laid))]
-    if erase:
+    if erase is True:
         return (*erase_and_lay(base, colour, alpha, out), shares)
-    return (*_finished(base, colour, alpha, out, keep_lights), shares)
+    picture, covered, cover, gap = _finished(base, colour, alpha, out, keep_lights)
+    if erase:
+        # a box (fractions of the picture: x0, y0, x1, y1): the art's monster is erased under the figure there alone —
+        # its head where the cut-in holds it a little differently, while the rest of the art, and a background the
+        # erasing could not refill (블러드 로즈 드래곤's light rays, 엘리스 10/17), stay as the plain composite has them
+        x0, y0, x1, y1 = erase
+        h, w = picture.shape[:2]
+        box = np.zeros((h, w), np.float32)
+        box[int(y0 * h):int(y1 * h), int(x0 * w):int(x1 * w)] = 1
+        mask = cv2.GaussianBlur((alpha[:, :, 0] > 0.5).astype(np.float32) * box, (0, 0), 4 * k)[:, :, None]
+        erased = erase_and_lay(base, colour, alpha, out)[0]
+        picture = (erased.astype(np.float32) * mask + picture.astype(np.float32) * (1 - mask)).clip(0, 255).astype(np.uint8)
+    return picture, covered, cover, gap, shares
 
 
 def art_file(md_id):
@@ -331,7 +343,8 @@ def make(md_id, render, out_dir, keep_lights=True, erase=False):
     file = Path(out_dir, f"{md_id}.webp")
     cv2.imwrite(str(file), picture, [cv2.IMWRITE_WEBP_QUALITY, 92])
     return row | {"verdict": "clean" if covered <= CLEAN else "check", "covered": round(covered, 4), "cover": round(cover, 3),
-                  "looks": dict(zip(map(str, LOOKS), shares)), "lights": keep_lights, "erase": erase, "gap": round(gap, 2), "file": str(file)}
+                  "looks": dict(zip(map(str, LOOKS), shares)), "lights": keep_lights,
+                  "erase": list(erase) if isinstance(erase, tuple) else erase, "gap": round(gap, 2), "file": str(file)}
 
 
 class PoseRenderer:
