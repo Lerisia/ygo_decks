@@ -13,6 +13,8 @@ import { banlistName, banlistTitle } from "@/lib/banlists";
 import { coverLook, deckDayLine, deckWarnings, fromDoc } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
+// 덱 코드 comes much later (참혈 2026-10-17): its button is kept, hidden
+const SHOW_DECK_CODE = false;
 const FOOT_BUTTON = "shrink-0 h-8 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors";
 
 /** A deck list (/dev/decklists/:code): its main and extra decks, each card opening its page, the 금제 it is checked by
@@ -88,12 +90,15 @@ export default function DeckListView() {
           error={error}
         >
           <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} />
-          {/* under the deck: 덱 코드 on the left, the exports on the right (참혈 2026-10-17; the buttons alone for now) */}
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <button type="button" className={FOOT_BUTTON}>덱 코드</button>
-            <div className="flex items-center gap-2">
-              <button type="button" className={FOOT_BUTTON}>이미지로 내보내기</button>
-              <button type="button" className={FOOT_BUTTON}>목록으로 내보내기</button>
+          {/* under the deck: 덱 코드 on the left (hidden until it is made), 「내보내기 | [목록] [이미지]」 on the right
+              (참혈 2026-10-17; the buttons alone for now) */}
+          <div className="mt-3 flex items-center gap-2">
+            {SHOW_DECK_CODE && <button type="button" className={FOOT_BUTTON}>덱 코드</button>}
+            <div role="group" aria-label="내보내기" className="ml-auto flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">내보내기</span>
+              <span aria-hidden className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+              <button type="button" aria-label="목록으로 내보내기" className={FOOT_BUTTON}>목록</button>
+              <button type="button" aria-label="이미지로 내보내기" className={FOOT_BUTTON}>이미지</button>
             </div>
           </div>
         </DeckPage>
