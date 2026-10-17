@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { isAuthenticated } from "@/api/accountApi";
 import { type DeckListDoc, deleteDeckList, getDeckList, likeDeckList } from "@/api/deckListApi";
-import { Eye, Heart, Pencil, Trash2 } from "lucide-react";
+import { Eye, Heart, Lock, Pencil, Trash2 } from "lucide-react";
 import CoverCards from "@/components/deckbuilder/CoverCards";
 import DeckAuthor from "@/components/deckbuilder/DeckAuthor";
 import DeckComments from "@/components/deckbuilder/DeckComments";
@@ -118,6 +118,11 @@ export default function DeckListView() {
             <div className="flex flex-wrap items-baseline gap-x-2">
               <h1 className="m-0 text-xl leading-8 font-bold break-keep">{deck.name}</h1>
               <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{deckDayLine(draft)}</span>
+              {deck.is_private && (
+                <span className="shrink-0 inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-[11px] font-semibold text-gray-700 dark:text-gray-200" title="나만 봅니다">
+                  <Lock className="w-3 h-3" aria-hidden />비공개
+                </span>
+              )}
             </div>
           }
           // 추천 for everyone but the author; 수정·삭제 the author's (삭제 an operator's too)

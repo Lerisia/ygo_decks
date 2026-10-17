@@ -19,6 +19,8 @@ export type DeckListRow = {
   /** What its cards say (deck_chosen false), or what its author picked — a pick of none too (엘리스 2026-10-17). */
   deck?: DeckListDeck | null;
   deck_chosen?: boolean;
+  /** 비공개 (엘리스 2026-10-17): its author's alone; others never get it. */
+  is_private?: boolean;
   like_count?: number;
   view_count?: number;
   comment_count?: number | null;
@@ -40,6 +42,7 @@ export type DeckListBody = {
   /** Sent with deck_chosen true: the author's pick (an id, or null for none); false: the cards decide, again on every save. */
   deck?: number | null;
   deck_chosen?: boolean;
+  is_private?: boolean;
 };
 export type DeckListPage = { results: DeckListRow[]; total: number; page: number; pages: number };
 export type DeckListSort = "new" | "top";

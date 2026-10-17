@@ -33,6 +33,8 @@ export type DeckDraft = {
    *  a pick of none too). */
   deck: DeckListDeck | null;
   deckChosen: boolean;
+  /** 비공개 (엘리스 2026-10-17): the author's alone, off the board for everyone else. */
+  isPrivate: boolean;
 };
 
 /** Where the first layout kept decks in this browser (before 2026-10-14). */
@@ -51,7 +53,7 @@ export const COVERS_MAX = 3;
 
 export const blankDeck = (): DeckDraft => ({
   code: NEW_CODE, name: "", description: "", createdAt: "", main: [], extra: [], looks: { main: [], extra: [] }, covers: [],
-  banlist: DEFAULT_BANLIST, deck: null, deckChosen: false,
+  banlist: DEFAULT_BANLIST, deck: null, deckChosen: false, isPrivate: false,
 });
 
 /** The looks lined up with the zones' cards: a zone whose looks don't (a deck from before them) is all plain. */
@@ -67,7 +69,7 @@ export const fitLooks = (d: Pick<DeckDraft, DeckZone> & { looks?: Partial<DeckLo
 export const fromDoc = (d: DeckListDoc): DeckDraft => ({
   code: d.code, name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at, main: d.main, extra: d.extra,
   looks: fitLooks(d), covers: (d.cover_cards ?? []).map((id, i) => ({ id, copy: d.cover_copies?.[i] ?? 0 })),
-  banlist: d.banlist || DEFAULT_BANLIST, deck: d.deck ?? null, deckChosen: !!d.deck_chosen,
+  banlist: d.banlist || DEFAULT_BANLIST, deck: d.deck ?? null, deckChosen: !!d.deck_chosen, isPrivate: !!d.is_private,
 });
 
 /** The deck's 도감 deck as the server takes it: the author's pick held to, or the cards left to decide. */

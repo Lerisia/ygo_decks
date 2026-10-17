@@ -153,6 +153,7 @@ export default function DeckLists() {
                   likes={d.like_count}
                   comments={d.comment_count ?? 0}
                   liked={d.liked}
+                  isPrivate={d.is_private}
                 />
               </li>
             ))

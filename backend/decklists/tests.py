@@ -462,6 +462,28 @@ class DeckBoardTest(TestCase):
             DeckListComment.objects.create(post=DeckList.objects.get(code=self.first), author=self.other, body=f"{i}")
         self.assertEqual(self.o.post(f"/api/decklists/{self.first}/comments/", {"body": "x"}, format="json").status_code, 429)
 
+    def test_a_private_deck_is_its_authors_alone(self):
+        """비공개 (엘리스 2026-10-17): posted so, or made so later; its author sees it on the board and its page as any
+        other, with the mark; everyone else finds nothing there — not its page, 추천 or comments."""
+        code = self.post(self.c, name="비밀 덱", is_private=True)
+        self.assertEqual([(d["code"], d["is_private"]) for d in self.board(self.c)["results"]][0], (code, True))
+        self.assertEqual([d["code"] for d in self.board(self.c, author="me")["results"]], [code, self.second, self.first])
+        self.assertNotIn(code, [d["code"] for d in self.board()["results"]])
+        self.assertNotIn(code, [d["code"] for d in self.board(self.o)["results"]])
+        self.assertEqual(self.c.get(f"/api/decklists/{code}/").json()["is_private"], True)
+        for client in (self.g, self.o, self.s):
+            self.assertEqual(client.get(f"/api/decklists/{code}/").status_code, 404)
+        self.assertEqual(self.o.post(f"/api/decklists/{code}/like/").status_code, 404)
+        self.assertEqual(self.o.post(f"/api/decklists/{code}/comments/", {"body": "x"}, format="json").status_code, 404)
+        # made public, then private again; a page sending nothing keeps it
+        body = {"name": "비밀 덱", "main": [1] * 3 + [2] * 3 + self.fill, "extra": []}
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", {**body, "is_private": False}, format="json").json()["is_private"], False)
+        self.assertEqual(self.g.get(f"/api/decklists/{code}/").status_code, 200)
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", {**body, "is_private": True}, format="json").json()["is_private"], True)
+        self.assertEqual(self.c.put(f"/api/decklists/{code}/", body, format="json").json()["is_private"], True)
+        self.assertEqual(self.g.get(f"/api/decklists/{code}/").status_code, 404)
+        self.assertEqual(self.board()["results"][0]["is_private"], False)
+
     def test_filed_under_the_deck_its_cards_say_unless_the_author_picks(self):
         ash_deck = site_deck("재와 유령 덱")
         DeckCard.objects.create(deck=ash_deck, card=self.ash)

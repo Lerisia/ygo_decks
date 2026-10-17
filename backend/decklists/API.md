@@ -4,7 +4,7 @@
 (목록은 `results`·`total`·`page`·`pages`, 오류는 `{"error": "…"}`). 주소는 `/api/decklists/…`.
 
 ## 목록 — `GET /api/decklists/`  (누구나)
-쿼리: `page`(20개씩), `sort=new`(기본, 올린 순)·`top`(추천순), `deck=<도감 덱 id>`·`deck=none`(분류 없음),
+남의 비공개 덱은 빠지고, 내 비공개 덱은 보입니다(`is_private: true`). 쿼리: `page`(20개씩), `sort=new`(기본, 올린 순)·`top`(추천순), `deck=<도감 덱 id>`·`deck=none`(분류 없음),
 `banlist=md|ocg|tcg|custom|none`(금제 종류), `author=<닉네임>`, `card=<카드 id>`(그 카드가 든 덱),
 `q=<덱 이름 일부>`. 수정해도 순서는 처음 올린 때 기준.
 
@@ -13,13 +13,13 @@
 {"code": "a1b2c3d4", "name": "…", "description": "…", "kind": "own",
  "main_count": 40, "extra_count": 15, "cover_cards": [id…], "cover_copies": [0…], "banlist": "md",
  "author": {"name": "닉네임", "avatar_icon": {…}, "border": {…}},
- "deck": {"id": 12, "name": "섬도희"} | null, "deck_chosen": false,
+ "deck": {"id": 12, "name": "섬도희"} | null, "deck_chosen": false, "is_private": false,
  "like_count": 0, "view_count": 0, "comment_count": 0, "liked": false, "mine": false,
  "created_at": "…", "updated_at": "…"}
 ```
 `avatar_icon`·`border`는 대회 API의 모양과 같습니다(닉네임 옆에 아이콘+프레임을 늘 같이 그립니다).
 
-## 글 하나 — `GET /api/decklists/<code>/`  (누구나; 대회 제출 사본은 주인만)
+## 글 하나 — `GET /api/decklists/<code>/`  (누구나; 대회 제출 사본과 비공개 덱은 주인만, 남에겐 404)
 행 + `main`, `extra`(카드 id, 한 장마다 하나), `looks`, `issues`(금제 초과·미출시 문장들),
 `comments`: `[{"id", "author": {…}, "body", "created_at", "mine"}]`. 주인이 아닌 사람이 열면 조회수가 1 오릅니다
 (같은 사람은 6시간에 한 번).
@@ -28,8 +28,10 @@
 ```json
 {"name": "40자", "description": "2,000자", "main": [id…], "extra": [id…],
  "looks": {…}, "cover_cards": [], "cover_copies": [], "banlist": "md",
- "deck": 12 | null, "deck_chosen": true}
+ "deck": 12 | null, "deck_chosen": true, "is_private": false}
 ```
+- `is_private: true`면 비공개(엘리스 2026-10-17): 글쓴이만 보고, 남에겐 게시판·주소·추천·댓글 모두 없는 글입니다. 안 보내면
+  새 덱은 공개, 고칠 때는 전과 같습니다.
 - 메인 40~60장, 엑스트라 15장, 같은 이름 3장, 토큰 불가 — 어기면 400. **40장 미만은 저장되지 않습니다**(작업 중인
   덱은 브라우저에 두세요).
 - 금제 초과·미출시는 저장되고 `issues`로만 알립니다.

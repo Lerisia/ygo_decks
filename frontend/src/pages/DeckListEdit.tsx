@@ -5,6 +5,7 @@ import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { classifyDeck, createDeckList, deckNames, getDeckList, updateDeckList } from "@/api/deckListApi";
 import DeckPickerModal from "@/components/DeckPickerModal";
+import Dropdown from "@/components/Dropdown";
 import BanlistPicker from "@/components/deckbuilder/BanlistPicker";
 import CardInfoSheet, { type CardInfoProps, CardInfoPane } from "@/components/deckbuilder/CardInfoSheet";
 import CardSearchPanel from "@/components/deckbuilder/CardSearchPanel";
@@ -30,6 +31,11 @@ import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckH
 const GUEST_NOTE = "로그인하면 덱을 올릴 수 있습니다.";
 const SHORT_NOTE = `메인 덱이 ${MAIN_MIN}장 이상이어야 올릴 수 있습니다`;
 const SMALL_BUTTON = "shrink-0 p-0 border-0 bg-transparent text-xs text-blue-600 dark:text-blue-400 hover:underline";
+// who may see the deck (엘리스 2026-10-17): everyone on the board, or its author alone
+const SCOPES = [
+  { value: "public", label: "공개", title: "게시판에 올라가 누구나 봅니다" },
+  { value: "private", label: "비공개", title: "나만 봅니다" },
+] as const;
 // how long after the last card goes in or out before the cards are asked what deck they make
 const CLASSIFY_WAIT = 700;
 const FIELD = "w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -227,7 +233,7 @@ export default function DeckListEdit() {
     }
     const body = {
       name: deck.name.trim(), description: deck.description.trim(), main: deck.main, extra: deck.extra, looks: deck.looks, banlist: deck.banlist,
-      ...savedCovers(deck), ...savedDeck(deck),
+      ...savedCovers(deck), ...savedDeck(deck), is_private: deck.isPrivate,
     };
     setSaving(true);
     try {
@@ -384,13 +390,24 @@ export default function DeckListEdit() {
                   className={`${FIELD} px-3 py-2 text-base md:text-sm flex-1 min-h-[3.5rem] resize-y`}
                 />
                 {/* the 도감 deck the board files it under (엘리스 2026-10-17): the cards' say, or the author's pick */}
-                <div className="mt-2 h-5 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="mt-2 h-6 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                   <span className="shrink-0">분류</span>
                   <span className="min-w-0 truncate font-semibold text-gray-800 dark:text-gray-100">{deck.deck?.name ?? "없음"}</span>
                   <span className="shrink-0">{deck.deckChosen ? "직접 고름" : "자동"}</span>
                   <button type="button" onClick={() => setPicking(true)} className={SMALL_BUTTON}>바꾸기</button>
                   {deck.deckChosen && <button type="button" onClick={fileAuto} className={SMALL_BUTTON}>자동으로</button>}
                   {deck.deckChosen && deck.deck && <button type="button" onClick={() => file(null)} className={SMALL_BUTTON}>없음으로</button>}
+                  {/* 공개 or 비공개, at the line's end (엘리스 2026-10-17) */}
+                  <span className="ml-auto shrink-0">
+                    <Dropdown
+                      value={deck.isPrivate ? "private" : "public"}
+                      options={[...SCOPES]}
+                      onChange={(v) => setDeck({ ...deck, isPrivate: v === "private" })}
+                      label="공개 범위"
+                      className="h-6 px-2 rounded-md text-xs"
+                      listClassName="text-xs"
+                    />
+                  </span>
                 </div>
               </>
             }

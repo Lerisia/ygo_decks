@@ -37,7 +37,7 @@ def _row(d, user):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
             "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d), "banlist": d.banlist,
             "author": _author(d.owner), "deck": {"id": d.deck_id, "name": d.deck.name} if d.deck_id else None,
-            "deck_chosen": d.deck_chosen, "like_count": d.like_count, "view_count": d.view_count,
+            "deck_chosen": d.deck_chosen, "is_private": d.is_private, "like_count": d.like_count, "view_count": d.view_count,
             "comment_count": getattr(d, "n_comments", None), "liked": bool(getattr(d, "liked", False)),
             "mine": user.is_authenticated and d.owner_id == user.id,
             "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
@@ -106,8 +106,11 @@ def _fields(data, d=None):
         deck_id = d.deck_id if chosen else None
     if not chosen:
         deck_id = classify(main, extra)
+    # 비공개 (엘리스 2026-10-17): as sent; a page sending nothing keeps the deck's own, a new deck is public
+    private = bool(data["is_private"]) if "is_private" in data else bool(d and d.is_private)
     return {"name": name, "description": description, "main": main, "extra": extra, "looks": looks,
-            "cover_cards": covers, "cover_copies": copies, "banlist": list_key, "deck_id": deck_id, "deck_chosen": chosen}
+            "cover_cards": covers, "cover_copies": copies, "banlist": list_key, "deck_id": deck_id, "deck_chosen": chosen,
+            "is_private": private}
 
 
 def _index_cards(d):
@@ -119,8 +122,10 @@ def _index_cards(d):
     DeckListCard.objects.bulk_create([DeckListCard(deck_list=d, card_id=cid, copies=n) for cid, n in held.items()])
 
 
-def _posted():
-    return DeckList.objects.filter(kind=DeckList.Kind.OWN, is_deleted=False).select_related("owner", "deck")
+def _posted(request):
+    """The decks on the board for this viewer: everyone's public ones and their own private ones."""
+    qs = DeckList.objects.filter(kind=DeckList.Kind.OWN, is_deleted=False).select_related("owner", "deck")
+    return qs.filter(Q(is_private=False) | Q(owner=request.user)) if request.user.is_authenticated else qs.filter(is_private=False)
 
 
 def _board(request):
@@ -128,7 +133,7 @@ def _board(request):
     none), the 금제's game (banlist=md|ocg|tcg|custom|none — not ?format=, which DRF takes for itself), the author
     (author=<username>), a card held (card=<id>) and the name (q=)."""
     g = request.GET
-    qs = _posted()
+    qs = _posted(request)
     if g.get("author"):
         qs = qs.filter(owner__username=g["author"])
     if g.get("deck"):
@@ -188,7 +193,8 @@ def deck_list(request, code):
     d = DeckList.objects.filter(code=code, is_deleted=False).select_related("owner", "deck").first()
     user = request.user
     mine = d is not None and user.is_authenticated and d.owner_id == user.id
-    if d is None or (d.kind == DeckList.Kind.ENTRY and not mine):
+    # a tournament's copy and a 비공개 deck are their owner's alone
+    if d is None or ((d.kind == DeckList.Kind.ENTRY or d.is_private) and not mine):
         return error(NOT_FOUND, 404)
     if request.method == "GET":
         if not mine:
@@ -225,7 +231,7 @@ def deck_list(request, code):
 @permission_classes([IsAuthenticated])
 def like(request, code):
     """추천 on, or off again: {"liked", "like_count"}."""
-    d = _posted().filter(code=code).first()
+    d = _posted(request).filter(code=code).first()
     if d is None:
         return error(NOT_FOUND, 404)
     if d.owner_id == request.user.id:
@@ -242,7 +248,7 @@ def like(request, code):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def add_comment(request, code):
-    d = _posted().filter(code=code).first()
+    d = _posted(request).filter(code=code).first()
     if d is None:
         return error(NOT_FOUND, 404)
     body = str(request.data.get("body") or "").strip()

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, Lock, MessageCircle } from "lucide-react";
 import type { DeckListAuthor, DeckListDeck } from "@/api/deckListApi";
 import DeckAuthor from "./DeckAuthor";
 import { type DeckDraft, deckDay, deckUpdated } from "@/lib/deckDrafts";
@@ -10,7 +10,7 @@ const CARD_BOX = "h-[8.25rem] rounded-xl";
 /** One deck list on the board (참혈 2026-10-14, made slimmer; on the board 엘리스 2026-10-17): its name and the day it
  *  was last saved at the top left, who posted it at the top right, two lines of its description under them, and at
  *  the bottom the 도감 deck it is filed under with how many liked it and wrote under it. */
-export default function DeckListCard({ deck, to, author, filed, likes = 0, comments = 0, liked = false }: {
+export default function DeckListCard({ deck, to, author, filed, likes = 0, comments = 0, liked = false, isPrivate = false }: {
   deck: Pick<DeckDraft, "name" | "description" | "createdAt" | "updatedAt">;
   to: string;
   author?: DeckListAuthor;
@@ -19,6 +19,8 @@ export default function DeckListCard({ deck, to, author, filed, likes = 0, comme
   likes?: number;
   comments?: number;
   liked?: boolean;
+  /** 비공개: the author's own, seen by no one else (a lock before the name) */
+  isPrivate?: boolean;
 }) {
   return (
     <Link
@@ -27,6 +29,7 @@ export default function DeckListCard({ deck, to, author, filed, likes = 0, comme
     >
       <div className="h-6 flex items-center justify-between gap-3">
         <span className="min-w-0 flex items-baseline gap-2">
+          {isPrivate && <Lock className="shrink-0 self-center w-3.5 h-3.5 text-gray-500 dark:text-gray-400" aria-label="비공개" />}
           <h2 className="m-0 text-base font-bold truncate">{deck.name || "이름 없는 덱"}</h2>
           <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{deckDay(deckUpdated(deck))}</span>
         </span>

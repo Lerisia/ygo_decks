@@ -43,6 +43,8 @@ class DeckList(models.Model):
     deck_chosen = models.BooleanField(default=False)
     like_count = models.PositiveIntegerField(default=0)
     view_count = models.PositiveIntegerField(default=0)
+    # 비공개 (엘리스 2026-10-17): its author's alone — off the board, its page, 추천 and comments for everyone else
+    is_private = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
