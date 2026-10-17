@@ -11,9 +11,9 @@ export const CARD_SORTS = [
   { value: "def", label: "수비력" },
 ];
 
-/** /dev/cards tries 조회순 — the most viewed cards first, then the newest, then by name; with a query it reads
+/** /dev/cards tries 조회수 (조회순 until 참혈 2026-10-18) — the most viewed cards first, then the newest, then by name; with a query it reads
  *  정확도순, the closest names first (참혈 2026-10-14). */
-export const DEV_CARD_SORTS = [{ value: "popular", label: "조회순" }, ...CARD_SORTS];
+export const DEV_CARD_SORTS = [{ value: "popular", label: "조회수" }, ...CARD_SORTS];
 
 const SORT_KEY = "card_list_sort";
 type Sorted = { sort: string; dir: string };

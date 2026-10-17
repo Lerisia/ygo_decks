@@ -1,5 +1,5 @@
-import { ChevronDown } from "lucide-react";
 import { type CardFilters, sortDir } from "@/api/cardDexApi";
+import Dropdown from "@/components/Dropdown";
 
 type Sorting = Pick<CardFilters, "sort" | "dir" | "q">;
 
@@ -14,21 +14,16 @@ export default function CardSortControl({ sorts, filters, onChange, compact = fa
 }) {
   return (
     <div className={`flex items-stretch ${compact ? "h-7" : "h-9"}`}>
-      {/* its own caret, a little in from the edge (참혈 2026-10-12) */}
-      <span className="relative flex">
-        <select
-          aria-label="정렬"
-          value={filters.sort}
-          onChange={(e) => onChange({ sort: e.target.value, dir: "" })}
-          className={`appearance-none border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white font-semibold ${
-            compact ? "max-w-[7rem] [field-sizing:content] pl-2 pr-6 text-xs" : "max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 text-sm"
-          }`}
-        >
-          {/* 조회순 reads 정확도순 while a query is on: the closest names come first then (참혈 2026-10-14) */}
-          {sorts.map((s) => <option key={s.value} value={s.value}>{s.value === "popular" && filters.q ? "정확도순" : s.label}</option>)}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden />
-      </span>
+      {/* the site's drop-down, not the system select: a phone's 16px floor for selects made it read larger than the
+          filter chips beside it (참혈 2026-10-18) */}
+      <Dropdown
+        label="정렬"
+        value={filters.sort}
+        // 조회수 reads 정확도순 while a query is on: the closest names come first then (참혈 2026-10-14)
+        options={sorts.map((s) => ({ value: s.value, label: s.value === "popular" && filters.q ? "정확도순" : s.label }))}
+        onChange={(sort) => onChange({ sort, dir: "" })}
+        className={`h-full py-0 rounded-l-lg rounded-r-none ${compact ? "max-w-[7rem] pl-2 pr-1.5 text-xs" : "max-w-[7.5rem] sm:max-w-none pl-2 sm:pl-3 pr-2 sm:pr-2.5 text-sm"}`}
+      />
       <button
         type="button"
         onClick={() => onChange({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
