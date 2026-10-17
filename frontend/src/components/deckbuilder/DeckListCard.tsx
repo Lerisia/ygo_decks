@@ -65,15 +65,17 @@ export default function DeckListCard({ deck, to, author, comments = 0, isPrivate
   );
 }
 
-/** Where the first deck will be: a dashed card the size of a deck card that is itself the way to make one. */
-export function DeckListAddCard({ to }: { to: string }) {
+/** Where the first deck will be: a dashed card the size of a deck card that is itself the way to make one (it asks
+ *  how, as the board's button does: 사진으로 or 직접). */
+export function DeckListAddCard({ onClick }: { onClick: () => void }) {
   return (
-    <Link
-      to={to}
-      className={`${CARD_BOX} flex flex-col items-center justify-center gap-1 border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 font-semibold transition hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/60 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${CARD_BOX} w-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-transparent text-gray-500 dark:text-gray-400 font-semibold transition hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/60 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20`}
     >
       <span className="text-2xl leading-none" aria-hidden>+</span>
       덱 리스트 올리기
-    </Link>
+    </button>
   );
 }

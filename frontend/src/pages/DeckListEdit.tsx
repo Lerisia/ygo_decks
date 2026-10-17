@@ -70,6 +70,16 @@ export default function DeckListEdit() {
   const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
   // the game's deck editor sounds (엘리스 2026-10-18), off and on at the title's line, remembered
   const [sound, setSound] = useState(deckSoundOn);
+  // a picture of a deck list asked for (the empty deck's big button, the board's 사진으로 올리기 = ?photo=1): the search
+  // opens its picture search and asks for the file at once (엘리스 2026-10-18)
+  const [picture, setPicture] = useState(0);
+  const askPicture = () => setPicture((n) => n + 1);
+  const photoAsked = useRef(false);
+  useEffect(() => {
+    if (photoAsked.current || !deck || code !== undefined || !new URLSearchParams(location.search).has("photo")) return;
+    photoAsked.current = true;
+    askPicture();
+  }, [deck, code, location.search]);
   // the deck as saved (a new one: empty), which 초기화 brings back (참혈 2026-10-16)
   const saved = useRef<DeckDraft | null>(null);
   const historyKeys = useRef({ undo: () => {}, redo: () => {} });
@@ -420,6 +430,7 @@ export default function DeckListEdit() {
                 onRemove={coverSlot === null ? remove : putCover}
                 onShow={showFromDeck}
                 onDrop={coverSlot === null ? (c) => pick(c) : undefined}
+                onPicture={coverSlot === null ? askPicture : undefined}
                 picking={coverSlot !== null}
                 marks={marks}
               />
@@ -432,6 +443,7 @@ export default function DeckListEdit() {
                   onPickAll={pickAll}
                   onShow={showFromSearch}
                   onDropOut={coverSlot === null ? remove : undefined}
+                  picture={picture}
                   // from lg the card shown takes the search's place, ← 뒤로 bringing the search back as it was (참혈 2026-10-16)
                   overlay={wide && info ? <CardInfoPane {...info} onClose={closeSheet} /> : null}
                   notice={notice}

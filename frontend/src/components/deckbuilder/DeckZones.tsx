@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Camera } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -49,7 +50,7 @@ function OverRing({ ban }: { ban?: BanLimit }) {
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, reserve, picking, marks, mouse, lit }: {
+function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, onPicture, reserve, picking, marks, mouse, lit }: {
   zone: DeckZone;
   /** as kept: an id once per copy, in the order they went in */
   ids: number[];
@@ -69,6 +70,8 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
   mouse?: boolean;
   /** a card from the search is being dragged over the deck and belongs here */
   lit?: boolean;
+  /** building, the main deck empty: the big way in by a picture (엘리스 2026-10-18: 사진 vs 직접, the choice at the start) */
+  onPicture?: () => void;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
@@ -151,9 +154,24 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
           })}
         </div>
       ) : (
-        <p className={`${reserve ? "deck-zone-reserve" : "h-16"} m-0 flex items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 break-keep`}>
-          {onRemove ? (mouse ? "검색에서 카드를 오른쪽 클릭하거나 끌어다 놓으면 여기에 들어갑니다." : "검색에서 카드를 누르면 여기에 들어갑니다.") : "카드가 없습니다."}
-        </p>
+        // empty: the main deck offers a picture first, the search as the other way (엘리스 2026-10-18); read at a size that reads
+        <div className={`${reserve ? "deck-zone-reserve" : "h-16"} flex flex-col items-center justify-center gap-3 px-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-center text-sm sm:text-base text-gray-500 dark:text-gray-400 break-keep`}>
+          {onPicture && zone === "main" && (
+            <button
+              type="button"
+              onClick={onPicture}
+              className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border-0 bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold shadow-md transition"
+            >
+              <Camera size={20} aria-hidden />
+              사진으로 덱 넣기
+            </button>
+          )}
+          <p className="m-0">
+            {!onRemove ? "카드가 없습니다."
+              : onPicture && zone === "main" ? (mouse ? "또는 검색에서 카드를 오른쪽 클릭하거나 끌어다 놓으세요." : "또는 검색에서 카드를 하나씩 넣으세요.")
+              : mouse ? "검색에서 카드를 오른쪽 클릭하거나 끌어다 놓으면 여기에 들어갑니다." : "검색에서 카드를 누르면 여기에 들어갑니다."}
+          </p>
+        </div>
       )}
       </div>
     </section>
@@ -163,7 +181,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, onDrop, picking, marks }: {
+export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, onDrop, onPicture, picking, marks }: {
   deck: Pick<DeckDraft, DeckZone> & { looks: DeckLooks };
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
@@ -176,6 +194,8 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
   onShow?: (card: CardListItem, zone: DeckZone, at: number) => void;
   /** Building: a card from the search dropped on the deck with a mouse goes in (엘리스 2026-10-18). */
   onDrop?: (card: CardListItem) => void;
+  /** Building, the main deck empty: a picture of a deck list read in (엘리스 2026-10-18). */
+  onPicture?: () => void;
   /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: each zone's places
    *  holding one, with their slot. */
   picking?: boolean;
@@ -220,6 +240,7 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
           rule={rule}
           onRemove={onRemove && ((at) => onRemove(z, at))}
           onShow={onShow && ((card, at) => onShow(card, z, at))}
+          onPicture={onRemove ? onPicture : undefined}
           reserve={!!onRemove}
           picking={picking}
           marks={marks?.[z]}

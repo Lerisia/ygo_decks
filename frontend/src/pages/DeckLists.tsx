@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Camera, PenLine } from "lucide-react";
 import { getUserInfo, isAuthenticated } from "@/api/accountApi";
 import { type DeckListBanlistKind, type DeckListPage, createDeckList, listDeckLists } from "@/api/deckListApi";
 import DeckListCard, { DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
@@ -14,6 +15,7 @@ const CHIP = "inline-flex items-center gap-1 h-9 px-3 rounded-lg border text-sm 
 const CHIP_OFF = `${CHIP} border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500`;
 const CHIP_ON = `${CHIP} border-blue-600 bg-blue-600 text-white hover:bg-blue-700`;
 const PAGE_BUTTON = "px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-40";
+const WAY = "flex items-center gap-3 w-full rounded-xl px-4 py-3 text-left transition";
 const KINDS: { value: DeckListBanlistKind | "all"; label: string }[] = [
   { value: "all", label: "모든 금제" }, { value: "md", label: "마스터 듀얼" }, { value: "ocg", label: "OCG" }, { value: "tcg", label: "TCG" }, { value: "none", label: "무금제" },
 ];
@@ -47,6 +49,14 @@ export default function DeckLists() {
   const [error, setError] = useState("");
   const [typed, setTyped] = useState(q);
   const [me, setMe] = useState("");
+  // 덱 리스트 올리기 asks how first (엘리스 2026-10-18): a picture of a deck list read in, or cards put in by hand
+  const [choosing, setChoosing] = useState(false);
+  useEffect(() => {
+    if (!choosing) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setChoosing(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [choosing]);
   const narrowed = !!(author || q || kind !== "all");
 
   // one change to the address at a time; a narrowing starts again from the first page
@@ -82,7 +92,7 @@ export default function DeckLists() {
     <div className="min-h-screen w-full max-w-5xl mx-auto px-4 py-6">
       <div className="h-9 flex items-center justify-between gap-3">
         <h1 className="m-0 text-xl font-bold">덱리 게시판</h1>
-        <Link to={NEW_DECK_PATH} className={ADD_BUTTON}>+ 덱 리스트 올리기</Link>
+        <button type="button" onClick={() => setChoosing(true)} className={`${ADD_BUTTON} border-0`}>+ 덱 리스트 올리기</button>
       </div>
       {/* the narrowing: the 금제, one's own, the name */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -138,10 +148,34 @@ export default function DeckLists() {
             <li className="sm:col-span-2 lg:col-span-3 py-10 text-center text-sm text-gray-500">맞는 덱 리스트가 없습니다.</li>
           ) : (
             <li>
-              <DeckListAddCard to={NEW_DECK_PATH} />
+              <DeckListAddCard onClick={() => setChoosing(true)} />
             </li>
           )}
         </ul>
+      )}
+      {choosing && (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4" onClick={() => setChoosing(false)} role="dialog" aria-modal="true" aria-label="덱 리스트 올리기">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="m-0 text-lg font-bold">어떻게 올릴까요?</h2>
+            <div className="mt-4 flex flex-col gap-2">
+              <Link to={`${NEW_DECK_PATH}?photo=1`} className={`${WAY} bg-blue-600 hover:bg-blue-700 text-white`}>
+                <Camera size={24} className="shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-base font-semibold">사진으로 올리기</span>
+                  <span className="block text-xs opacity-90 break-keep">덱 리스트 사진을 올리면 카드를 읽어 넣습니다</span>
+                </span>
+              </Link>
+              <Link to={NEW_DECK_PATH} className={`${WAY} border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700`}>
+                <PenLine size={24} className="shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-base font-semibold">직접 만들기</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 break-keep">검색해서 카드를 하나씩 넣습니다</span>
+                </span>
+              </Link>
+            </div>
+            <button type="button" onClick={() => setChoosing(false)} className="mt-3 w-full h-9 rounded-lg border-0 bg-transparent text-sm text-gray-500 dark:text-gray-400 hover:underline">취소</button>
+          </div>
+        </div>
       )}
       {data && data.pages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-3 text-sm">

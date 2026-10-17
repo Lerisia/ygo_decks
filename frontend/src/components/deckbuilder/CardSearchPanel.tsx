@@ -66,7 +66,7 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   );
 }
 
-export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, onShow, onDropOut, notice, ready, history, overlay }: {
+export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, onShow, onDropOut, notice, ready, history, overlay, picture = 0 }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   /** The deck's 금제 (참혈 2026-10-16): each card's mark. */
@@ -86,6 +86,9 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   /** From lg, what takes the search's place for a while (a card shown, 참혈 2026-10-16): the search stays as it was
    *  underneath — its typing, chips and scroll — for when it goes. */
   overlay?: ReactNode;
+  /** Counted up by the page to open the picture search and ask for a picture at once (the big 사진으로 덱 넣기 on an
+   *  empty deck, the board's 사진으로 올리기; 엘리스 2026-10-18). */
+  picture?: number;
 }) {
   const press = usePressCard();
   const mouse = useMediaQuery(MOUSE_QUERY);
@@ -115,6 +118,23 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   const keyboard = useKeyboardInset(box);
   const [imaging, setImaging] = useState(false);
   const scan = useImageScan(imaging);
+  // a picture asked for from outside: the picture search opens, and once its file box is there it is clicked (still
+  // within the press that asked, so the browser lets it)
+  const asked = useRef(0);
+  const choosing = useRef(false);
+  useEffect(() => {
+    if (picture === asked.current) return;
+    asked.current = picture;
+    choosing.current = true;
+    setImaging(true);
+    box.current?.blur();
+  }, [picture]);
+  useEffect(() => {
+    if (!imaging || !choosing.current) return;
+    choosing.current = false;
+    scan.choose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imaging]);
   // the cards read that 전체 투입 leaves out, pressed to keep them out (참혈 2026-10-17); a new picture starts with none
   const [skipped, setSkipped] = useState<Set<number>>(() => new Set());
   useEffect(() => setSkipped(new Set()), [scan.found]);
