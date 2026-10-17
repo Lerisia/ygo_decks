@@ -12,7 +12,6 @@ import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { MOUSE_QUERY, draggingDeckCard, droppedDeckCard, startCardDrag } from "@/lib/deckDrag";
-import { playDeckHover } from "@/lib/deckSound";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { type ScanFound, useImageScan } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -227,7 +226,6 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
         key={c.id}
         type="button"
         {...press(onPress, () => onShow?.(c), !!scanned)}
-        onPointerEnter={(e) => e.pointerType === "mouse" && !scanned && !out && playDeckHover()}
         // a mouse drags it onto the deck (엘리스 2026-10-18: as the game's PC editor)
         draggable={mouse && !scanned && !out && ready}
         onDragStart={(e) => startCardDrag(e, c)}

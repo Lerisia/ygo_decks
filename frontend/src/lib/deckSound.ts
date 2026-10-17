@@ -6,18 +6,17 @@ import { openAudio } from "@/lib/webAudio";
 
 const BASE = "/media/md_ui/sfx/";
 // move1–4: SE_CARD_MOVE_01–04, a card put in or taken out (one of the four each time, as the game varies it);
-// select: SE_MENU_SELECT_01, a card under the mouse; decide: SE_MENU_DECIDE; cancel: SE_MENU_CANCEL;
-// open / close: SE_CARDEXPAND_DISPLAY / CLOSE, a card shown and put away; verify: SE_SYS_VERIFY, the deck saved
-const NAMES = ["move1", "move2", "move3", "move4", "select", "decide", "cancel", "open", "close", "verify"] as const;
+// decide: SE_MENU_DECIDE; cancel: SE_MENU_CANCEL; open / close: SE_CARDEXPAND_DISPLAY / CLOSE, a card shown and put
+// away; verify: SE_SYS_VERIFY, the deck saved. (The game's tick for a card under the mouse, SE_MENU_SELECT_01, was
+// here a day and went: 엘리스 2026-10-18 "너무 요란한 거 같기도".)
+const NAMES = ["move1", "move2", "move3", "move4", "decide", "cancel", "open", "close", "verify"] as const;
 export type DeckSoundName = (typeof NAMES)[number];
 const OFF = "deck_sound_off";
 // a step quieter than the game, as the pack opening's are: loud for a page
 const MASTER = 0.6;
-const HOVER_GAP_MS = 70;
 
 let ctx: AudioContext | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
-let lastHover = 0;
 
 export function deckSoundOn(): boolean {
   try {
@@ -83,12 +82,4 @@ export function playDeckSound(name: DeckSoundName, volume = 0.8, rate = 1) {
 /** A card put in or taken out: one of the game's four, at a pitch a little different each time. */
 export function playDeckMove() {
   playDeckSound(`move${1 + Math.floor(Math.random() * 4)}` as DeckSoundName, 0.9, 0.94 + Math.random() * 0.12);
-}
-
-/** A card the mouse comes over: the game's tick, not more often than the ear tells apart. */
-export function playDeckHover() {
-  const now = performance.now();
-  if (now - lastHover < HOVER_GAP_MS) return;
-  lastHover = now;
-  playDeckSound("select", 0.35);
 }

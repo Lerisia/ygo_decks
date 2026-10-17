@@ -5,7 +5,6 @@ import { usePressCard } from "@/hooks/usePressCard";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOUSE_QUERY, draggedCardZone, droppedCard, startDeckCardDrag } from "@/lib/deckDrag";
 import { cardFrom, flyOut, spotAt } from "@/lib/deckMotion";
-import { playDeckHover } from "@/lib/deckSound";
 import { useDeckFlip } from "@/hooks/useDeckFlip";
 import CardKindTag from "@/components/CardKindTag";
 import { type BanLimit, type BanRule, banOf, notOut, unreleasedUnder } from "@/lib/banlists";
@@ -125,7 +124,6 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                   if (!picking) flyOut(el);   // the copy flies back toward the search as it goes
                   onRemove(at);
                 }, () => onShow?.(card, at), picking)}
-                onPointerEnter={(e) => e.pointerType === "mouse" && playDeckHover()}
                 // a mouse drags a copy out, onto the search (엘리스 2026-10-18: as the game's PC editor)
                 draggable={mouse && !picking}
                 onDragStart={(e) => startDeckCardDrag(e, zone, at)}
