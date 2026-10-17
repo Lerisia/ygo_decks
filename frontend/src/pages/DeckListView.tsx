@@ -13,6 +13,8 @@ import { banlistName, banlistTitle } from "@/lib/banlists";
 import { coverLook, deckDayLine, deckWarnings, fromDoc } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
+const FOOT_BUTTON = "shrink-0 h-8 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors";
+
 /** A deck list (/dev/decklists/:code): its main and extra decks, each card opening its page, the 금제 it is checked by
  *  and what keeps it from being played under it (덱 구축, 참혈 2026-10-13; from the server 2026-10-14; its 금제
  *  2026-10-16). Its owner's alone for now. Operators only. */
@@ -86,6 +88,14 @@ export default function DeckListView() {
           error={error}
         >
           <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} />
+          {/* under the deck: 덱 코드 on the left, the exports on the right (참혈 2026-10-17; the buttons alone for now) */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button type="button" className={FOOT_BUTTON}>덱 코드</button>
+            <div className="flex items-center gap-2">
+              <button type="button" className={FOOT_BUTTON}>이미지로 내보내기</button>
+              <button type="button" className={FOOT_BUTTON}>목록으로 내보내기</button>
+            </div>
+          </div>
         </DeckPage>
       ) : (
         <DeckNotFound signedIn={signedIn} />
