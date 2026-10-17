@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { isAuthenticated } from "@/api/accountApi";
-import { type DeckListDoc, deleteDeckList, getDeckList, likeDeckList } from "@/api/deckListApi";
-import { Eye, Heart, Lock, Pencil, Trash2 } from "lucide-react";
+import { type DeckListDoc, deleteDeckList, getDeckList } from "@/api/deckListApi";
+import { Eye, Lock, Pencil, Trash2 } from "lucide-react";
 import CoverCards from "@/components/deckbuilder/CoverCards";
 import DeckAuthor from "@/components/deckbuilder/DeckAuthor";
 import DeckComments from "@/components/deckbuilder/DeckComments";
@@ -15,8 +15,6 @@ import { banlistName, banlistTitle } from "@/lib/banlists";
 import { coverLook, deckDayLine, deckWarnings, fromDoc } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
-// 추천 with its count beside the heart, in a row (DECK_ICON is a grid, which would stack them)
-const LIKE_BUTTON = "shrink-0 inline-flex items-center gap-1 h-8 px-1.5 border-0 rounded-lg bg-transparent text-sm tabular-nums transition-colors";
 const FOOT_BUTTON = "shrink-0 h-8 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors";
 
 // 덱 코드 comes much later (참혈 2026-10-17): its button is kept, hidden
@@ -52,7 +50,7 @@ function ExportButtons() {
 
 /** A deck list on the board (/dev/decklists/:code): who posted it, its main and extra decks, each card opening its
  *  page, the 금제 it is checked by and what keeps it from being played under it (덱 구축, 참혈 2026-10-13; from the
- *  server 2026-10-14; its 금제 2026-10-16), 추천 and the comments (엘리스 2026-10-17:
+ *  server 2026-10-14; its 금제 2026-10-16) and the comments (엘리스 2026-10-17:
  *  every deck list is a post on the board). Anyone reads it; 수정·삭제 are the author's. Operators only while the
  *  pages are laid out. */
 export default function DeckListView() {
@@ -63,7 +61,6 @@ export default function DeckListView() {
   const signedIn = isAuthenticated();
   // undefined while asked, null when there is no such deck
   const [deck, setDeck] = useState<DeckListDoc | null | undefined>(undefined);
-  const [liking, setLiking] = useState(false);
   const { cards, order, loading, error } = useDeckCards(deck ? [...deck.main, ...deck.extra] : null);
   const { index: banlists, rule } = useBanlist(deck?.banlist || "md");
   useEffect(() => {
@@ -85,26 +82,7 @@ export default function DeckListView() {
       window.alert("덱 리스트를 지우지 못했습니다.");
     }
   };
-  // 추천 on or off; a guest goes to sign in and comes back here
-  const like = async () => {
-    if (!deck || liking) return;
-    if (!signedIn) {
-      navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
-      return;
-    }
-    setLiking(true);
-    try {
-      const r = await likeDeckList(deck.code);
-      setDeck({ ...deck, liked: r.liked, like_count: r.like_count });
-    } catch (e) {
-      window.alert((e as Error).message || "추천하지 못했습니다.");
-    } finally {
-      setLiking(false);
-    }
-  };
-
   const draft = deck ? fromDoc(deck) : null;
-  const liked = !!deck?.liked;
 
   return (
     <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6">
@@ -125,23 +103,9 @@ export default function DeckListView() {
               )}
             </div>
           }
-          // 추천 for everyone but the author; 수정·삭제 the author's (삭제 an operator's too)
+          // 수정 the author's, 삭제 the author's and an operator's
           actions={
             <>
-              {!deck.mine && (
-                <button
-                  type="button"
-                  onClick={like}
-                  disabled={liking}
-                  aria-pressed={liked}
-                  aria-label={liked ? "추천 취소" : "추천"}
-                  title={liked ? "추천 취소" : "추천"}
-                  className={`${LIKE_BUTTON} ${liked ? "text-red-500" : "text-gray-500 dark:text-gray-400 hover:text-red-500"}`}
-                >
-                  <Heart className={DECK_ICON_SIZE} fill={liked ? "currentColor" : "none"} aria-hidden />
-                  {deck.like_count ?? 0}
-                </button>
-              )}
               {deck.mine && (
                 <Link to={deckListEditPath(deck.code)} aria-label="수정" title="수정" className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400`}>
                   <Pencil className={DECK_ICON_SIZE} aria-hidden />
@@ -154,14 +118,11 @@ export default function DeckListView() {
               )}
             </>
           }
-          // who posted it, with how many liked it (the author's own view) and opened it, over the description
+          // who posted it, with how many opened it, over the description
           description={
             <>
               <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                 {deck.author && <DeckAuthor author={deck.author} size={24} className="text-sm text-gray-800 dark:text-gray-100" />}
-                {deck.mine && (
-                  <span className="inline-flex items-center gap-1 tabular-nums"><Heart className="w-3.5 h-3.5" aria-hidden />{deck.like_count ?? 0}</span>
-                )}
                 <span className="inline-flex items-center gap-1 tabular-nums" title="조회"><Eye className="w-3.5 h-3.5" aria-hidden />{deck.view_count ?? 0}</span>
               </div>
               {deck.description && <p className="mt-2 mb-0 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line break-keep">{deck.description}</p>}

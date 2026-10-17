@@ -14,7 +14,7 @@ RESERVED = {"new", "comments"}
 class DeckList(models.Model):
     """A member's deck list (덱 구축, 참혈's layout 2026-10-13, kept on the server from 2026-10-14): its main and extra
     decks as card book ids (carddb.Card), an id once per copy. Every one is a post on the deck list board (엘리스
-    2026-10-17: there is no 마이덱 — a deck is made, read, liked and talked about there)."""
+    2026-10-17: there is no 마이덱 — a deck is made, read and talked about there)."""
 
     class Kind(models.TextChoices):
         OWN = "own", "own"        # made and kept in the deck builder
@@ -36,10 +36,9 @@ class DeckList(models.Model):
     # the 금제 it is checked by (참혈 2026-10-16): "md" / "ocg" / "tcg" that game's newest, following the next one;
     # "md:2026-10-06" one list held to; "custom:<code>" one of ours; "none" 무금제 (carddb.banlist.parse_key)
     banlist = models.CharField(max_length=48, default="md", blank=True)
-    # the board (엘리스 2026-10-17): how many liked it and opened it, and a deletion that keeps the row for its comments
-    # and the log. (A 도감 deck it was filed under, said by its cards, went the next day: the name says the theme, and
-    # the guess was wrong as often as not — 엘리스 2026-10-18.)
-    like_count = models.PositiveIntegerField(default=0)
+    # the board (엘리스 2026-10-17): how many opened it, and a deletion that keeps the row for its comments and the log.
+    # (A 도감 deck it was filed under, said by its cards, and 추천 went the next day — the name says the theme, the
+    # guess was wrong as often as not, and likes aren't wanted; 엘리스 2026-10-18.)
     view_count = models.PositiveIntegerField(default=0)
     # 비공개 (엘리스 2026-10-17): its author's alone — off the board, its page, 추천 and comments for everyone else
     is_private = models.BooleanField(default=False)
@@ -73,17 +72,6 @@ class DeckListCard(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["deck_list", "card"], name="uniq_deck_list_card")]
-
-
-class DeckListLike(models.Model):
-    """A member's 추천 of a deck list, once each."""
-
-    deck_list = models.ForeignKey(DeckList, on_delete=models.CASCADE, related_name="likes")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="deck_list_likes")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [models.UniqueConstraint(fields=["deck_list", "user"], name="uniq_deck_list_like")]
 
 
 class DeckListComment(Comment):

@@ -1,9 +1,9 @@
 """The deck list board (엘리스 2026-10-17: every deck list is a post on it; there is no 마이덱). Anyone reads the board
-and a deck; a member posts, changes and deletes their own, likes and comments on others'; staff delete with a log.
+and a deck; a member posts, changes and deletes their own, comments on others'; staff delete with a log.
 On the boards' shared base (board.api), as the inquiry board is, and with its reply shapes."""
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count, Exists, F, OuterRef, Q
+from django.db.models import Count, F, Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,14 +14,13 @@ from board.models import Comment
 from notification.models import notify
 from tournament.serializers import user_avatar
 
-from .models import DeckList, DeckListCard, DeckListComment, DeckListLike
+from .models import DeckList, DeckListCard, DeckListComment
 from .rules import DeckError, check, check_banlist, check_covers, check_looks, cover_copies_of, issues, looks_of
 
 DECKS_MAX = 300   # a member's deck lists, at most
 DESCRIPTION_MAX = 2000
 ENTRY_ERROR = "대회에 제출한 덱은 대회 화면에서 고칩니다."
 NOT_FOUND = "덱 리스트를 찾을 수 없습니다."
-SORTS = {"new": ("-created_at", "-id"), "top": ("-like_count", "-created_at", "-id")}
 FORMATS = ("md", "ocg", "tcg", "custom", "none")
 VIEW_TTL = 6 * 3600   # one open of a deck per viewer counts, this long
 
@@ -34,8 +33,8 @@ def _author(user):
 def _row(d, user):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
             "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d), "banlist": d.banlist,
-            "author": _author(d.owner), "is_private": d.is_private, "like_count": d.like_count, "view_count": d.view_count,
-            "comment_count": getattr(d, "n_comments", None), "liked": bool(getattr(d, "liked", False)),
+            "author": _author(d.owner), "is_private": d.is_private, "view_count": d.view_count,
+            "comment_count": getattr(d, "n_comments", None),
             "mine": user.is_authenticated and d.owner_id == user.id,
             "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
 
@@ -46,8 +45,6 @@ def _comment_out(c, user):
 
 
 def _full(d, user):
-    if not hasattr(d, "liked"):
-        d.liked = user.is_authenticated and DeckListLike.objects.filter(deck_list=d, user=user).exists()
     comments = [_comment_out(c, user) for c in d.comments.filter(is_deleted=False).select_related("author")]
     return {**_row(d, user), "main": d.main, "extra": d.extra, "looks": looks_of(d), "issues": issues(d.main, d.extra, d.banlist),
             "comments": comments, "comment_count": len(comments)}
@@ -113,7 +110,7 @@ def _posted(request):
 
 
 def _board(request):
-    """A page of the board: the newest first, or the most liked (sort=top); narrowed by the 금제's game
+    """A page of the board, the newest first; narrowed by the 금제's game
     (banlist=md|ocg|tcg|custom|none — not ?format=, which DRF takes for itself), the author (author=<username>), a card
     held (card=<id>) and the name (q=)."""
     g = request.GET
@@ -128,10 +125,8 @@ def _board(request):
     if g.get("q", "").strip():
         qs = qs.filter(name__icontains=g["q"].strip())
     qs = qs.annotate(n_comments=Count("comments", filter=Q(comments__is_deleted=False), distinct=True))
-    if request.user.is_authenticated:
-        qs = qs.annotate(liked=Exists(DeckListLike.objects.filter(deck_list=OuterRef("pk"), user=request.user)))
     # said outright: the annotation groups the rows, and Django then drops Meta.ordering
-    qs = qs.order_by(*SORTS.get(g.get("sort"), SORTS["new"]))
+    qs = qs.order_by("-created_at", "-id")
     return page_of(qs, request, lambda d: _row(d, request.user))
 
 
@@ -206,24 +201,6 @@ def deck_list(request, code):
         d.save()
         _index_cards(d)
     return Response(_full(d, user))
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def like(request, code):
-    """추천 on, or off again: {"liked", "like_count"}."""
-    d = _posted(request).filter(code=code).first()
-    if d is None:
-        return error(NOT_FOUND, 404)
-    if d.owner_id == request.user.id:
-        return error("내가 올린 덱 리스트에는 추천할 수 없습니다.")
-    with transaction.atomic():
-        _, made = DeckListLike.objects.get_or_create(deck_list=d, user=request.user)
-        if not made:
-            DeckListLike.objects.filter(deck_list=d, user=request.user).delete()
-        DeckList.objects.filter(pk=d.pk).update(like_count=F("like_count") + (1 if made else -1))
-    d.refresh_from_db(fields=["like_count"])
-    return Response({"liked": made, "like_count": d.like_count})
 
 
 @api_view(["POST"])

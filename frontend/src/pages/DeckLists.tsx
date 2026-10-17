@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getUserInfo, isAuthenticated } from "@/api/accountApi";
-import { type DeckListBanlistKind, type DeckListPage, type DeckListSort, createDeckList, listDeckLists } from "@/api/deckListApi";
+import { type DeckListBanlistKind, type DeckListPage, createDeckList, listDeckLists } from "@/api/deckListApi";
 import DeckListCard, { DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
 import Dropdown from "@/components/Dropdown";
 import SearchForm from "@/components/SearchForm";
@@ -14,7 +14,6 @@ const CHIP = "inline-flex items-center gap-1 h-9 px-3 rounded-lg border text-sm 
 const CHIP_OFF = `${CHIP} border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500`;
 const CHIP_ON = `${CHIP} border-blue-600 bg-blue-600 text-white hover:bg-blue-700`;
 const PAGE_BUTTON = "px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-40";
-const SORTS: { value: DeckListSort; label: string }[] = [{ value: "new", label: "최신순" }, { value: "top", label: "추천순" }];
 const KINDS: { value: DeckListBanlistKind | "all"; label: string }[] = [
   { value: "all", label: "모든 금제" }, { value: "md", label: "마스터 듀얼" }, { value: "ocg", label: "OCG" }, { value: "tcg", label: "TCG" }, { value: "none", label: "무금제" },
 ];
@@ -34,14 +33,12 @@ async function moveLocalDrafts() {
 }
 
 /** 덱리 게시판 (/dev/decklists): every deck list members have posted (엘리스 2026-10-17: there is no 마이덱 — a deck is
- *  made here and read here), the newest or the most liked first, narrowed by the 금제 it is checked by, one's own,
- *  and its name; 20 a page, the page and the narrowing kept in the address so the
+ *  made here and read here), the newest first, narrowed by the 금제 it is checked by, one's own, and its name; 20 a page, the page and the narrowing kept in the address so the
  *  way back finds them. Anyone reads; posting takes signing in. Operators only while it is laid out. */
 export default function DeckLists() {
   const admin = useAdminOnly();
   const signedIn = isAuthenticated();
   const [params, setParams] = useSearchParams();
-  const sort = (params.get("sort") === "top" ? "top" : "new") as DeckListSort;
   const kind = (KINDS.some((k) => k.value === params.get("banlist")) ? params.get("banlist") : "all") as DeckListBanlistKind | "all";
   const author = params.get("author") || "";
   const q = params.get("q") || "";
@@ -67,13 +64,13 @@ export default function DeckLists() {
     setError("");
     (signedIn ? moveLocalDrafts() : Promise.resolve())
       .catch(() => {})
-      .then(() => listDeckLists({ page, sort, banlist: kind === "all" ? undefined : kind, author: author || undefined, q: q || undefined }))
+      .then(() => listDeckLists({ page, banlist: kind === "all" ? undefined : kind, author: author || undefined, q: q || undefined }))
       .then((got) => alive && setData(got))
       .catch(() => alive && setError("덱리 게시판을 불러오지 못했습니다."));
     return () => {
       alive = false;
     };
-  }, [admin, signedIn, page, sort, kind, author, q]);
+  }, [admin, signedIn, page, kind, author, q]);
   useEffect(() => setTyped(q), [q]);
   useEffect(() => {
     if (!signedIn) return;
@@ -87,9 +84,8 @@ export default function DeckLists() {
         <h1 className="m-0 text-xl font-bold">덱리 게시판</h1>
         <Link to={NEW_DECK_PATH} className={ADD_BUTTON}>+ 덱 리스트 올리기</Link>
       </div>
-      {/* the narrowing: the order, the 금제, the 도감 deck, one's own, the name */}
+      {/* the narrowing: the 금제, one's own, the name */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Dropdown value={sort} options={SORTS} onChange={(v) => change({ sort: v === "new" ? undefined : v })} label="정렬" className="h-9 px-3 rounded-lg text-sm" />
         <Dropdown value={kind} options={KINDS} onChange={(v) => change({ banlist: v === "all" ? undefined : v })} label="금제" className="h-9 px-3 rounded-lg text-sm" />
         {signedIn && me && (
           <button
@@ -131,9 +127,7 @@ export default function DeckLists() {
                   deck={{ name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at }}
                   to={deckListPath(d.code)}
                   author={d.author}
-                  likes={d.like_count}
                   comments={d.comment_count ?? 0}
-                  liked={d.liked}
                   isPrivate={d.is_private}
                   mainCount={d.main_count}
                 />

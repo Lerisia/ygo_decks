@@ -9,7 +9,7 @@ from carddb.models import Banlist, BanlistEntry, Card, MdPrint
 from notification.models import Notification
 from user.models import User
 
-from .models import DeckList, DeckListCard, DeckListComment, DeckListLike
+from .models import DeckList, DeckListCard, DeckListComment
 
 
 def card(cid, name, frame="effect", category="monster"):
@@ -81,7 +81,7 @@ class DeckListApiTest(TestCase):
         guest = as_user()
         self.assertEqual(guest.get("/api/decklists/").json()["total"], 1)
         got = guest.get(f"/api/decklists/{code}/").json()
-        self.assertEqual((got["author"]["name"], got["mine"], got["liked"]), ("me", False, False))
+        self.assertEqual((got["author"]["name"], got["mine"]), ("me", False))
         self.assertIn("avatar_icon", got["author"])
         self.assertIn("border", got["author"])
         self.assertIn(guest.post("/api/decklists/", self.body(), format="json").status_code, (401, 403))
@@ -328,8 +328,8 @@ class DeckBanlistTest(TestCase):
 
 class DeckBoardTest(TestCase):
     """The deck list board (엘리스 2026-10-17: every deck list is posted there, there is no 마이덱), on the inquiry
-    board's base: pages of the newest or the most liked, narrowed by 도감 deck, 금제, author, card and name; likes,
-    comments with a note to the author, opens counted; staff deletions logged; floods held off."""
+    board's base: pages of the newest, narrowed by 금제, author, card and name; comments with a note to the author,
+    opens counted; staff deletions logged; floods held off."""
 
     def setUp(self):
         cache.clear()
@@ -361,8 +361,7 @@ class DeckBoardTest(TestCase):
         self.assertEqual((page["total"], page["page"], page["pages"]), (3, 1, 1))
         self.assertEqual([d["code"] for d in page["results"]], [self.theirs, self.second, self.first])
         row = page["results"][0]
-        self.assertEqual((row["author"]["name"], row["like_count"], row["comment_count"], row["view_count"], row["liked"], row["mine"]),
-                         ("other", 0, 0, 0, False, False))
+        self.assertEqual((row["author"]["name"], row["comment_count"], row["view_count"], row["mine"]), ("other", 0, 0, False))
         self.assertEqual({"avatar_icon", "border"} - set(row["author"]), set())
         self.assertEqual([d["mine"] for d in self.board(self.c)["results"]], [False, True, True])
         # a change doesn't lift a deck: the board keeps the order posted
@@ -389,22 +388,6 @@ class DeckBoardTest(TestCase):
         self.assertEqual((page["total"], page["pages"], len(page["results"])), (22, 2, 20))
         self.assertEqual(len(self.board(page=2)["results"]), 2)
         self.assertEqual(self.board(page="x")["page"], 1)
-
-    def test_likes(self):
-        r = self.o.post(f"/api/decklists/{self.first}/like/")
-        self.assertEqual((r.status_code, r.json()), (200, {"liked": True, "like_count": 1}))
-        got = self.o.get(f"/api/decklists/{self.first}/").json()
-        self.assertEqual((got["liked"], got["like_count"]), (True, 1))
-        self.assertEqual([(d["code"], d["liked"]) for d in self.board(self.o)["results"]][-1], (self.first, True))
-        self.assertEqual(self.board()["results"][-1]["liked"], False)
-        # the most liked first
-        self.assertEqual([d["code"] for d in self.board(sort="top")["results"]][0], self.first)
-        # off again, and not on my own or as a guest
-        self.assertEqual(self.o.post(f"/api/decklists/{self.first}/like/").json(), {"liked": False, "like_count": 0})
-        self.assertFalse(DeckListLike.objects.exists())
-        self.assertEqual(self.c.post(f"/api/decklists/{self.first}/like/").status_code, 400)
-        self.assertIn(self.g.post(f"/api/decklists/{self.first}/like/").status_code, (401, 403))
-        self.assertEqual(self.o.post("/api/decklists/nosuch00/like/").status_code, 404)
 
     def test_opens_are_counted_once_per_viewer(self):
         for _ in range(2):
@@ -473,7 +456,6 @@ class DeckBoardTest(TestCase):
         self.assertEqual(self.c.get(f"/api/decklists/{code}/").json()["is_private"], True)
         for client in (self.g, self.o, self.s):
             self.assertEqual(client.get(f"/api/decklists/{code}/").status_code, 404)
-        self.assertEqual(self.o.post(f"/api/decklists/{code}/like/").status_code, 404)
         self.assertEqual(self.o.post(f"/api/decklists/{code}/comments/", {"body": "x"}, format="json").status_code, 404)
         # made public, then private again; a page sending nothing keeps it
         body = {"name": "비밀 덱", "main": [1] * 3 + [2] * 3 + self.fill, "extra": []}

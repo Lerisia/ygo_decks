@@ -16,10 +16,8 @@ export type DeckListRow = {
   author?: DeckListAuthor;
   /** 비공개 (엘리스 2026-10-17): its author's alone; others never get it. */
   is_private?: boolean;
-  like_count?: number;
   view_count?: number;
   comment_count?: number | null;
-  liked?: boolean;
   mine?: boolean;
   created_at: string; updated_at: string;
 };
@@ -37,11 +35,8 @@ export type DeckListBody = {
   is_private?: boolean;
 };
 export type DeckListPage = { results: DeckListRow[]; total: number; page: number; pages: number };
-export type DeckListSort = "new" | "top";
 export type DeckListBanlistKind = "md" | "ocg" | "tcg" | "custom" | "none";
-export type DeckListQuery = {
-  page?: number; sort?: DeckListSort; banlist?: DeckListBanlistKind; author?: string; card?: number; q?: string;
-};
+export type DeckListQuery = { page?: number; banlist?: DeckListBanlistKind; author?: string; card?: number; q?: string };
 
 const auth = (): Record<string, string> => {
   const token = localStorage.getItem("access_token");
@@ -73,7 +68,5 @@ export const getDeckList = (code: string) => send<DeckListDoc>(`${code}/`);
 export const createDeckList = (body: DeckListBody) => send<DeckListDoc>("", "POST", body);
 export const updateDeckList = (code: string, body: DeckListBody) => send<DeckListDoc>(`${code}/`, "PUT", body);
 export const deleteDeckList = (code: string) => send<void>(`${code}/`, "DELETE");
-/** 추천 on, or off again. */
-export const likeDeckList = (code: string) => send<{ liked: boolean; like_count: number }>(`${code}/like/`, "POST", {});
 export const addDeckComment = (code: string, body: string) => send<DeckListComment>(`${code}/comments/`, "POST", { body });
 export const deleteDeckComment = (id: number) => send<void>(`comments/${id}/`, "DELETE");
