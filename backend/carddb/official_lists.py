@@ -12,7 +12,7 @@ import urllib.request
 from collections import namedtuple
 from datetime import date, datetime
 
-from .banlist import CardIndex, plain_ja
+from .banlist import CardIndex
 from .models import Banlist, BanlistEntry, BanStatus
 
 OCG_URL = "https://www.yugioh-card.com/japan/event/limitregulation/?list={}"
@@ -116,8 +116,7 @@ def find_card(index, fmt, entry):
     """The card an entry names, in the game's own language: the OCG's Japanese names against ours (NFKC), the TCG's
     English ones through the usual English matching."""
     if fmt == Banlist.Format.OCG:
-        ids = index.ja.get(plain_ja(entry.name), ())
-        return next(iter(ids)) if len(ids) == 1 else None
+        return index.match_ja(entry.name)
     return index.match(entry.name)
 
 

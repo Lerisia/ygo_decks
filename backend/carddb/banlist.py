@@ -134,21 +134,43 @@ def name_key(name, brackets=False):
 
 
 def plain_ja(text):
-    """A Japanese name as a card page's CardTable2 writes it, without its {{Ruby|字|よみ}} marks, width folded."""
-    return unicodedata.normalize("NFKC", re.sub(r"\{\{Ruby\|([^|}]*)\|[^}]*\}\}", r"\1", text)).strip()
+    """A Japanese name to match on: a card page's {{Ruby|字|よみ}} marks gone, width folded, no spaces (the OCG's own
+    page writes 氷結界の虎王ドゥローレン where the card DB has an ideographic space)."""
+    return "".join(unicodedata.normalize("NFKC", re.sub(r"\{\{Ruby\|([^|}]*)\|[^}]*\}\}", r"\1", text)).split())
+
+
+def kana_key(text):
+    """A Japanese reading to match on: katakana as hiragana, nothing but kana, digits and Latin letters (the OCG's
+    page once wrote 炎舞－「天璣」 by its reading, エンブテンキ)."""
+    text = unicodedata.normalize("NFKC", text).casefold()
+    text = "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in text)
+    return re.sub(r"[^ぁ-ゖー0-9a-z]+", "", text)
 
 
 class CardIndex:
-    """The card DB's English names, to find a list's cards by; its Japanese names for the cards that have none."""
+    """The card DB's English names, to find a list's cards by; its Japanese names, and their readings, for the
+    cards that have none."""
 
     def __init__(self):
-        self.keys, self.loose, self.ja = {}, {}, {}
-        for cid, en, ja in Card.objects.values_list("id", "name_en", "name_ja"):
+        self.keys, self.loose, self.ja, self.yomi = {}, {}, {}, {}
+        for cid, en, ja, ruby in Card.objects.values_list("id", "name_en", "name_ja", "name_ja_ruby"):
             if en:
                 self.keys.setdefault(name_key(en), set()).add(cid)
                 self.loose.setdefault(name_key(en, brackets=True), set()).add(cid)
             if ja:
                 self.ja.setdefault(plain_ja(ja), set()).add(cid)
+            if ruby:
+                self.yomi.setdefault(kana_key(ruby), set()).add(cid)
+
+    def match_ja(self, name):
+        """The card a Japanese name names: the name itself, else its reading, when either names one card."""
+        for index, key in ((self.ja, plain_ja(name)), (self.yomi, kana_key(name))):
+            ids = index.get(key, ()) if key else ()
+            if len(ids) == 1:
+                return next(iter(ids))
+            if ids:
+                return None
+        return None
 
     def match(self, name):
         """The card a list names, or None when there is none or more than one."""

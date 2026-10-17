@@ -98,6 +98,16 @@ class SaveTest(TestCase):
         self.assertEqual(sorted(lost), ["K９－１７号 イヅナ", "アーティファクト－デスサイズ", "キラーチューン・キュー", "旧神ノーデン"])
         self.assertFalse(b.entries.filter(name="Perfectron Hydradrive Dragon").exists())   # Yugipedia's rows are gone
 
+    def test_japanese_names_match_across_spacing_and_by_reading(self):
+        """The OCG page writes 氷結界の虎王ドゥローレン without the card DB's ideographic space, and once wrote 炎舞－「天璣」
+        as its reading エンブテンキ (the 2014 lists)."""
+        Card.objects.create(id=7970, category="monster", name_ja="氷結界の虎王　ドゥローレン", name_ja_ruby="ひょうけっかいのこおう　ドゥローレン", frame="synchro")
+        Card.objects.create(id=10418, category="spell", name_ja="炎舞－「天璣」", name_ja_ruby="えんぶ－「テンキ」", frame="spell")
+        page = official_lists.parse_ocg(ocg_html("2014年4月1日", [("制限カード", [("氷結界の虎王ドゥローレン", "DEWLOREN", ""), ("エンブテンキ", "FIRE FORMATION - TENKI", "")])]))
+        lost = official_lists.save("ocg", page, official_lists.OCG_URL.format("201404"))
+        self.assertEqual(lost, [])
+        self.assertEqual(dict(Banlist.objects.get(format="ocg").entries.values_list("card_id", "status")), {7970: "limited", 10418: "limited"})
+
     def test_a_tcg_list_is_matched_by_english_name(self):
         page = official_lists.parse_tcg(tcg_html("September 21, 2026", [("VICTORY DRAGON", "Forbidden", ""), ("BLUE-EYES WHITE DRAGON", "Limited", "New")]))
         lost = official_lists.save("tcg", page, official_lists.TCG_URL.format("2026-09-21"))
