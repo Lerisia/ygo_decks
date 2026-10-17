@@ -15,6 +15,8 @@ import { banlistName, banlistTitle } from "@/lib/banlists";
 import { coverLook, deckDayLine, deckWarnings, fromDoc } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 
+// 추천 with its count beside the heart, in a row (DECK_ICON is a grid, which would stack them)
+const LIKE_BUTTON = "shrink-0 inline-flex items-center gap-1 h-8 px-1.5 border-0 rounded-lg bg-transparent text-sm tabular-nums transition-colors";
 const FOOT_BUTTON = "shrink-0 h-8 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors";
 
 /** A deck list on the board (/dev/decklists/:code): who posted it, its main and extra decks, each card opening its
@@ -98,7 +100,7 @@ export default function DeckListView() {
                   aria-pressed={liked}
                   aria-label={liked ? "추천 취소" : "추천"}
                   title={liked ? "추천 취소" : "추천"}
-                  className={`${DECK_ICON} w-auto px-1.5 gap-1 text-sm tabular-nums ${liked ? "text-red-500" : "text-gray-500 dark:text-gray-400 hover:text-red-500"}`}
+                  className={`${LIKE_BUTTON} ${liked ? "text-red-500" : "text-gray-500 dark:text-gray-400 hover:text-red-500"}`}
                 >
                   <Heart className={DECK_ICON_SIZE} fill={liked ? "currentColor" : "none"} aria-hidden />
                   {deck.like_count ?? 0}
@@ -140,9 +142,9 @@ export default function DeckListView() {
         >
           <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} />
           {/* under the deck: the 도감 deck it is filed under and 덱 코드 on the left, the exports on the right (참혈 2026-10-17; the
-              export buttons alone for now) */}
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <div className="min-w-0 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+              export buttons alone for now) — on a phone the exports drop to a second line, still at the right */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0 flex-1 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
               <span className="shrink-0">분류</span>
               {deck.deck ? (
                 <Link to={`/database/${deck.deck.id}`} className="min-w-0 truncate font-semibold text-gray-800 dark:text-gray-100 hover:underline">{deck.deck.name}</Link>
@@ -151,7 +153,7 @@ export default function DeckListView() {
               )}
               <button type="button" className={FOOT_BUTTON}>덱 코드</button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <button type="button" className={FOOT_BUTTON}>이미지로 내보내기</button>
               <button type="button" className={FOOT_BUTTON}>목록으로 내보내기</button>
             </div>
