@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { isAuthenticated } from "@/api/accountApi";
 import { type DeckListDoc, deleteDeckList, getDeckList, likeDeckList } from "@/api/deckListApi";
@@ -18,6 +18,37 @@ import { DECK_LISTS_PATH, deckListEditPath } from "@/lib/deckListPaths";
 // 추천 with its count beside the heart, in a row (DECK_ICON is a grid, which would stack them)
 const LIKE_BUTTON = "shrink-0 inline-flex items-center gap-1 h-8 px-1.5 border-0 rounded-lg bg-transparent text-sm tabular-nums transition-colors";
 const FOOT_BUTTON = "shrink-0 h-8 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors";
+
+// 덱 코드 comes much later (참혈 2026-10-17): its button is kept, hidden
+const SHOW_DECK_CODE = false;
+const SLIDE = "transition duration-300 ease-out motion-reduce:transition-none";
+
+/** 내보내기 alone until pressed; then [목록] [이미지] slide in from the right, pushing it off to the left as it fades
+ *  (참혈 2026-10-17; the buttons alone for now). The two's room is kept from the start, so nothing around moves. */
+function ExportButtons() {
+  const [open, setOpen] = useState(false);
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (open) first.current?.focus({ preventScroll: true });
+  }, [open]);
+  return (
+    <div role="group" aria-label="내보내기" className="relative ml-auto flex items-center justify-end">
+      <div aria-hidden={!open} className={`flex items-center gap-2 ${SLIDE} ${open ? "opacity-100 translate-x-0" : "opacity-0 translate-x-6 pointer-events-none"}`}>
+        <button ref={first} type="button" tabIndex={open ? 0 : -1} aria-label="목록으로 내보내기" className={FOOT_BUTTON}>목록</button>
+        <button type="button" tabIndex={open ? 0 : -1} aria-label="이미지로 내보내기" className={FOOT_BUTTON}>이미지</button>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={open}
+        tabIndex={open ? -1 : 0}
+        className={`absolute right-0 ${FOOT_BUTTON} ${SLIDE} ${open ? "opacity-0 -translate-x-10 pointer-events-none" : "opacity-100 translate-x-0"}`}
+      >
+        내보내기
+      </button>
+    </div>
+  );
+}
 
 /** A deck list on the board (/dev/decklists/:code): who posted it, its main and extra decks, each card opening its
  *  page, the 금제 it is checked by and what keeps it from being played under it (덱 구축, 참혈 2026-10-13; from the
@@ -151,12 +182,9 @@ export default function DeckListView() {
               ) : (
                 <span>없음</span>
               )}
-              <button type="button" className={FOOT_BUTTON}>덱 코드</button>
+              {SHOW_DECK_CODE && <button type="button" className={FOOT_BUTTON}>덱 코드</button>}
             </div>
-            <div className="ml-auto flex items-center gap-2">
-              <button type="button" className={FOOT_BUTTON}>이미지로 내보내기</button>
-              <button type="button" className={FOOT_BUTTON}>목록으로 내보내기</button>
-            </div>
+            <ExportButtons />
           </div>
           <DeckComments
             code={deck.code}
