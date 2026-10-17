@@ -175,7 +175,7 @@ export default function InquiryPostPage() {
                   onChange={(e) => setAnswer(e.target.value)}
                   maxLength={3000}
                   rows={4}
-                  placeholder="답변 쓰기 (운영자만 보이는 칸, 답변은 '운영자'로 표시됩니다)"
+                  placeholder="답변 쓰기 (운영자만 보이는 칸, 답변에는 운영자 칩과 내 닉네임이 표시됩니다)"
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="flex items-center justify-between gap-2">
