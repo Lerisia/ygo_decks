@@ -428,8 +428,16 @@ def get_record_group_matches(request, record_group_id):
         for match in current_page
     ]
 
+    # the deck the asker last recorded with in this sheet, for the form to start on (엘리스 2026-10-17: "최근 쓴 덱을
+    # 기본 내 덱 설정으로"); None when they have none here
+    recent_deck = (
+        MatchRecord.objects.filter(record_group_id=record_group_id, is_deleted=False, recorded_by=request.user, deck__isnull=False)
+        .order_by("-id").values_list("deck_id", flat=True).first()
+        if request.user.is_authenticated else None
+    )
     return Response({
         "matches": data,
+        "recent_deck": recent_deck,
         "days": _day_totals(matches, [m.created_at for m in current_page]),
         "total_pages": paginator.num_pages,
         "record_group_name": record_group.name,

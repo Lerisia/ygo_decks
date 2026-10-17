@@ -354,6 +354,22 @@ class GetRecordGroupMatchesTest(TestCase):
         resp = self.client.get(f"/api/record-groups/{self.group.id}/matches/")
         self.assertEqual(len(resp.json()["matches"]), 1)
 
+    def test_recent_deck_is_the_deck_the_asker_last_recorded_with(self):
+        """The form starts on the asker's own latest deck in this sheet (엘리스 10/17), not on someone else's or a
+        deleted record's; None when they have none here."""
+        url = f"/api/record-groups/{self.group.id}/matches/"
+        self.assertIsNone(self.client.get(url).json()["recent_deck"])
+        other = _create_deck(name="다른 덱")
+        someone = User.objects.create_user(email="b@test.com", username="user2", password="pass1234")
+        _create_match(self.group, self.deck)
+        latest = _create_match(self.group, other)
+        _create_match(self.group, self.deck, recorded_by=someone)      # newer, but someone else's
+        _create_match(self.group, None, recorded_by=self.user)         # newer, 기타 (no deck)
+        self.assertEqual(self.client.get(url).json()["recent_deck"], other.id)
+        latest.is_deleted = True
+        latest.save()
+        self.assertEqual(self.client.get(url).json()["recent_deck"], self.deck.id)
+
     def test_created_at_and_day_totals(self):
         from django.utils import timezone
         _create_match(self.group, self.deck, result="win")
