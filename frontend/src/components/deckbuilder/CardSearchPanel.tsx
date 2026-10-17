@@ -40,7 +40,7 @@ function TileSkeleton() {
  *  rounded see-through card, the box at its bottom and the results one row above it, the row folded away until
  *  something is typed. The page keeps DECK_EDITOR_ROOM under the deck for it at its tallest. With the keyboard up it
  *  rides on top of the keyboard, gliding up and down with it, and pressing the box does not scroll the page to it
- *  (참혈 2026-10-14). The camera at the box's right end turns it to AI 이미지 검색, as in /dev/cards (참혈 2026-10-16):
+ *  (참혈 2026-10-14). The camera right of the box, on a blue ground (참혈 2026-10-17), turns it to AI 이미지 검색, as in /dev/cards (참혈 2026-10-16):
  *  the chips and the 카드군·서포트 make way for one row with the picture, how many cards were read and 다른 사진, and
  *  the cards read take the cards' place, going into the deck as the searched ones do; typing goes back. The picture
  *  and its cards stay while the search goes back and forth. */
@@ -232,9 +232,11 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
       {/* hidden, not taken away, while something stands in its place */}
       <div className={`contents ${overlay ? "lg:invisible" : ""}`}>
       {/* no 「카드 검색」 title over it: the box's placeholder says as much (참혈 2026-10-16) */}
-      <div className="order-5 lg:order-none">
+      {/* the box, and at its right outside it the camera on a coloured ground, easier to see than an icon in the box
+          (참혈 2026-10-17) */}
+      <div className="order-5 flex items-center gap-1.5 lg:order-none">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
-          <div className="flex items-center gap-1.5 h-10 lg:h-9 w-full rounded-lg border border-input bg-white dark:bg-gray-900 lg:dark:bg-transparent pl-1.5 pr-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 lg:dark:bg-transparent pl-1.5 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
             {chosenItem && (
               <span className="shrink-0 max-w-[55%] inline-flex items-center gap-1 h-7 pl-2 pr-1 rounded-md bg-blue-600 text-white text-xs font-semibold">
                 <span className="opacity-80">{chosenItem.tag === "카드" ? "서포트" : "카드군"}</span>
@@ -257,23 +259,23 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
               enterKeyHint="search"
               className="min-w-0 flex-1 h-full bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground"
             />
-            <button
-              type="button"
-              onClick={() => {
-                setImaging((v) => !v);
-                box.current?.blur();
-              }}
-              aria-label="사진으로 카드 찾기"
-              aria-expanded={imaging}
-              title="사진으로 카드 찾기"
-              className={`shrink-0 w-8 h-7 p-0 border-0 grid place-items-center rounded-md transition ${
-                imaging ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-              }`}
-            >
-              <Camera size={18} aria-hidden />
-            </button>
           </div>
         </SearchForm>
+        <button
+          type="button"
+          onClick={() => {
+            setImaging((v) => !v);
+            box.current?.blur();
+          }}
+          aria-label="사진으로 카드 찾기"
+          aria-pressed={imaging}
+          title="사진으로 카드 찾기"
+          className={`shrink-0 w-10 h-10 lg:w-9 lg:h-9 p-0 border-0 grid place-items-center rounded-lg text-white shadow-sm transition ${
+            imaging ? "bg-blue-700 ring-2 ring-blue-300 dark:ring-blue-400/60" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          <Camera size={18} aria-hidden />
+        </button>
       </div>
       {/* the card book's filter chips a size smaller; a chip opens its choices under the row (a popup on a phone) */}
       <div className={`order-4 dex-compact lg:order-none lg:mt-2 ${imaging ? "hidden" : ""}`}>
