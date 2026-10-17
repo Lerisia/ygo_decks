@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, Camera, Redo2, Undo2 } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import CardFilterBar from "@/components/CardFilterBar";
@@ -7,7 +7,7 @@ import { ScanInfoRow, ScanState } from "@/components/ImageCardSearch";
 import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardListItem, type CardOptions } from "@/api/cardDexApi";
 import { barFilters, groupItems } from "@/lib/cardFilterBar";
 import { CARD_SORTS, rememberSort, rememberedSort } from "@/lib/cardSorts";
-import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
+import ComboBox from "@/components/ComboBox";
 import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
@@ -35,9 +35,10 @@ function TileSkeleton() {
 
 /** The card search beside a deck being built: the card book's own search (names in Korean, Japanese or English, or
  *  초성), the newest cards first; a card pressed goes into the deck (onPick). With it, as in /dev/cards' search
- *  (참혈 2026-10-15): the filter chips a size smaller, and the 카드군·서포트 answering the typing, one of which picked
- *  goes into the box as a chip and narrows the cards to it. From lg the box, the chips, the 카드군·서포트 and the cards
- *  go down in that order; below lg they go up from the box: the chips, the 카드군·서포트, the cards. Cards whose name is in the deck 3 times,
+ *  (참혈 2026-10-15): the filter chips a size smaller, and the 카드군·서포트 picked in the card book's own search
+ *  drop-down (엘리스 2026-10-18: the same search as the book, the chips that answered the typing gone). From lg the
+ *  box, the 카드군·서포트, the chips and the cards go down in that order; below lg they go up from the box: the chips,
+ *  the 카드군·서포트 (its matches opening upward), the cards. Cards whose name is in the deck 3 times,
  *  and tokens, are dimmed. notice: a short line on why a card didn't go in. From lg it stands to the right of the
  *  deck, as tall as the screen. On phones and tablets it floats over the bottom of the deck (참혈 2026-10-13): a
  *  rounded see-through card, the box at its bottom and the results one row above it, the row folded away until
@@ -101,7 +102,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
     rememberSort(next);
     setSorting(next);
   };
-  const [chosen, setChosen] = useState("");   // a 카드군 (g12) or a card's support list (c34) picked from the suggestions
+  const [chosen, setChosen] = useState("");   // a 카드군 (g12) or a card's support list (c34) picked in the drop-down
   const [found, setFound] = useState<CardListItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -150,21 +151,13 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
     getCardOptions().then(setOptions).catch(() => setOptions(null));
   }, []);
   const items = useMemo(() => groupItems(options), [options]);
-  const chosenItem = items.find((it) => it.key === chosen);
-  const chips = chipQuery(bar);
-  const typed = useDeferredValue(qInput.trim());
-  const suggestions = useGroupSuggestions(items, typed, chips, 6).filter(({ it }) => it.key !== chosen);
+  const narrowed = JSON.stringify([bar, sorting]);   // the chips and the sort, as one key for the search to follow
   const filters: CardFilters = {
     ...EMPTY_FILTERS, ...bar, ...sorting, q,
     group: chosen[0] === "g" ? chosen.slice(1) : "", card: chosen[0] === "c" ? chosen.slice(1) : "",
   };
-  const searching = !!(q || chosen || chips);
+  const searching = !!(q || chosen || Object.values(bar).some(Boolean));
   const noMatch = !loading && total === 0;
-  const pickGroup = (key: string) => {
-    setChosen(key);
-    setQInput("");
-    setQ("");
-  };
 
   // the results follow the typing a moment after it stops, as in the card book
   useEffect(() => {
@@ -190,7 +183,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
       .finally(() => id === request.current && setLoading(false));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chips, chosen]);
+  }, [q, narrowed, chosen]);
 
   const loadMore = () => {
     if (loading || !hasMore) return;
@@ -287,16 +280,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           (참혈 2026-10-17) */}
       <div className="order-5 flex items-center gap-1.5 lg:order-none">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 pl-1.5 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
-            {chosenItem && (
-              <span className="shrink-0 max-w-[55%] inline-flex items-center gap-1 h-7 pl-2 pr-1 rounded-md bg-blue-600 text-white text-xs font-semibold">
-                <span className="opacity-80">{chosenItem.tag === "카드" ? "서포트" : "카드군"}</span>
-                <span className="truncate">{chosenItem.name}</span>
-                <button type="button" onClick={() => setChosen("")} aria-label={`${chosenItem.name} 지우기`} className="shrink-0 w-5 h-5 p-0 border-0 rounded bg-transparent text-white leading-none hover:bg-white/20">
-                  ✕
-                </button>
-              </span>
-            )}
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 pl-3 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
             <input
               ref={box}
               aria-label="카드 검색"
@@ -306,7 +290,6 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
                 setQInput(e.target.value);
                 setImaging(false);
               }}
-              onKeyDown={(e) => e.key === "Backspace" && !qInput && chosen && setChosen("")}
               enterKeyHint="search"
               className="min-w-0 flex-1 h-full bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -356,23 +339,21 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           add={onPickAll && { label: skipped.size ? `${putCount}장 투입` : "전체 투입", count: putCount, onClick: () => ready && onPickAll(toPut) }}
           className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
       )}
-      {!imaging && suggestions.length > 0 && (
-        <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:order-none lg:mt-2 lg:flex-wrap lg:overflow-visible">
-          {suggestions.map(({ it }) => {
-            const support = it.tag === "카드";
-            return (
-              <button
-                key={it.key}
-                type="button"
-                onClick={() => pickGroup(it.key)}
-                className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-full border-0 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap hover:bg-gray-200 dark:hover:bg-gray-600"
-              >
-                <span className="text-gray-500 dark:text-gray-400 font-normal">{support ? "서포트" : "카드군"}</span>
-                {it.name}
-                <span className="text-gray-500 dark:text-gray-400 font-normal tabular-nums">{(support ? it.sub?.replace(/^서포트\s*/, "") : it.sub) ?? ""}</span>
-              </button>
-            );
-          })}
+      {/* the 카드군·서포트 as the card book picks them (엘리스 2026-10-18): the book's own search drop-down, its matches
+          opening upward below lg where the box stands at the foot of the screen */}
+      {!imaging && (
+        <div className="order-3 lg:order-none lg:mt-1.5">
+          <ComboBox
+            label="카드군·서포트"
+            placeholder="카드군·카드 서포트 검색 (이름·초성)"
+            items={items}
+            value={chosen}
+            onPick={setChosen}
+            onClear={() => setChosen("")}
+            emptyText="맞는 카드군·카드가 없습니다."
+            loading={!options}
+            up={!wide}
+          />
         </div>
       )}
       <p

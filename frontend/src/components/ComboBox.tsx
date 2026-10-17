@@ -13,9 +13,11 @@ const STEP = 60;   // rows drawn at a time: drawing all of a long list at once s
  *  drop down under it, drawn a screenful at a time as the list scrolls, and a tap picks one. The box answers each key
  *  at once and the list follows. Arrow keys move through them; Enter — the phone keyboard's 검색 key — picks the one
  *  marked and puts the keyboard away. */
-export default function ComboBox({ items, value, onPick, onClear, placeholder, label, emptyText, loading = false }: {
+export default function ComboBox({ items, value, onPick, onClear, placeholder, label, emptyText, loading = false, up = false }: {
   items: ComboItem[]; value: string; onPick: (key: string) => void; onClear: () => void;
   placeholder: string; label: string; emptyText: string; loading?: boolean;
+  /** the matches open above the box instead (a box at the foot of the screen: the deck builder's search on a phone) */
+  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -108,7 +110,7 @@ export default function ComboBox({ items, value, onPick, onClear, placeholder, l
             const el = e.currentTarget;
             if (limit < matches.length && el.scrollTop + el.clientHeight > el.scrollHeight - 200) setLimit(limit + STEP);
           }}
-          className="absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1"
+          className={`absolute z-30 left-0 right-0 ${up ? "bottom-full mb-1" : "mt-1"} max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1`}
         >
           {loading ? (
             <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">불러오는 중…</li>
