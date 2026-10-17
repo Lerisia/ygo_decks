@@ -1408,6 +1408,18 @@ class CardFaceTest(CardFaceCase):
         self.card.name_ko = "스타더스트 드래곤"
         self.assertEqual(signature(self.card, 7), plain)
 
+    def test_a_card_with_only_an_english_name_gets_it_drawn(self):
+        """엘리스 2026-10-18: Tigress in Silent Repose and other TCG-first cards (no Korean or Japanese name yet) had
+        blank name bars — the face drew the Korean name, else the Japanese, and stopped there. It draws what the site
+        shows for the card (display_name): the English name, then."""
+        from .face import draw_name_mask, signature
+        self.card.name_ko, self.card.name_ja, self.card.name_en = "", "", "Tigress in Silent Repose"
+        lit = sum(1 for v in draw_name_mask(self.card).getdata() if v > 128)
+        self.assertGreater(lit, 500)
+        named = signature(self.card, 7)
+        self.card.name_en = "Another Name"
+        self.assertNotEqual(signature(self.card, 7), named)   # the name is part of what the face is drawn from
+
     def test_type_line(self):
         from .face import type_line
         self.assertEqual(type_line(self.card), "【드래곤족／싱크로／튜너／효과】")

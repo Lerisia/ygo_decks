@@ -16,7 +16,7 @@ from functools import lru_cache
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
 
-from .display import art_name, art_path
+from .display import art_name, art_path, display_name
 
 W, H = 704, 1024
 # Where and how every letter is set (name, type lines, ATK/DEF, scales, card text): one file, which the layout page
@@ -333,7 +333,7 @@ def draw_face(card, texts=None, with_text=False, art_id=None, letters=True):
     if letters:
         lay = LAYOUT["name"]
         x0, y0, x1, y1 = lay["box"]
-        name, font = card.name_ko or card.name_ja, font_of(lay["font"], lay["size"])
+        name, font = display_name(card), font_of(lay["font"], lay["size"])
         if overframe:
             shadow = _squeezed_text(name, font, tuple(lay["shadow_color"]), x1 - x0, y1 - y0, lay["pad"])
             for dx, dy in lay["shadow_offsets"]:
@@ -379,10 +379,10 @@ def draw_face(card, texts=None, with_text=False, art_id=None, letters=True):
 def signature(card, md_id):
     """What a face is drawn from (the drawing version, the card's face fields and the art file): a face is drawn
     again when this changes."""
-    parts = [FACE_VERSION, card.name_ko or card.name_ja, card.category, card.frame, card.attribute, card.race,
+    parts = [FACE_VERSION, display_name(card), card.category, card.frame, card.attribute, card.race,
              card.types, card.level, card.rank, card.link_rating, card.link_markers, card.atk, card.def_value,
              card.pendulum_scale, card.spell_trap_subtype, art_name(md_id)]
-    if needs_fallback(card.name_ko or card.name_ja or ""):
+    if needs_fallback(display_name(card) or ""):
         parts.append("fallback letters 1")   # only the faces with such names were drawn again
     return hashlib.sha1(json.dumps(parts, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
 
@@ -408,7 +408,7 @@ def draw_name_mask(card):
     name from it (Royal in gold, Shine in white) instead of taking it from the face (엘리스 10/11)."""
     lay = LAYOUT["name"]
     x0, y0, x1, y1 = lay["box"]
-    layer = _squeezed_text(card.name_ko or card.name_ja, font_of(lay["font"], lay["size"]), (255, 255, 255, 255),
+    layer = _squeezed_text(display_name(card), font_of(lay["font"], lay["size"]), (255, 255, 255, 255),
                            x1 - x0, y1 - y0, lay["pad"])
     mask = Image.new("L", (W, H), 0)
     mask.paste(255, (x0, y0), layer.getchannel("A"))
