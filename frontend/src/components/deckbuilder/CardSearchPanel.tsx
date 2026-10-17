@@ -238,7 +238,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           (참혈 2026-10-17) */}
       <div className="order-5 flex items-center gap-1.5 lg:order-none">
         <SearchForm onSearch={() => setQ(qInput.trim())}>
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 lg:dark:bg-transparent pl-1.5 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 pl-1.5 pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
             {chosenItem && (
               <span className="shrink-0 max-w-[55%] inline-flex items-center gap-1 h-7 pl-2 pr-1 rounded-md bg-blue-600 text-white text-xs font-semibold">
                 <span className="opacity-80">{chosenItem.tag === "카드" ? "서포트" : "카드군"}</span>
