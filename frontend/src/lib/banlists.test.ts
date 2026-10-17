@@ -2,8 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
   type BanlistIndex, type BanRule, BAN_KINDS, TODAY_MD, banOf, banlistName, banlistOptions, banlistTitle, dayLabel, isCode, latestDay, notOut, parseBanlistKey,
-  pendingRule, ruleOf,
+  pendingRule, ruleOf, unreleasedUnder,
 } from "./banlists";
+
+describe("unreleasedUnder", () => {
+  const ocg: BanRule = { format: "ocg", limits: { 5868: "forbidden" }, releasedBy: "2026-10-01" };
+  it("marks a card not in Master Duel only under Master Duel's rule; another game's rule limits it like any card", () => {
+    const notInMd = { unreleased: true };
+    expect(unreleasedUnder(notInMd)).toBe(true);
+    expect(unreleasedUnder(notInMd, TODAY_MD)).toBe(true);
+    expect(unreleasedUnder(notInMd, { format: "md", limits: {}, releasedBy: "2026-10-06" })).toBe(true);
+    expect(unreleasedUnder(notInMd, ocg)).toBe(false);
+    expect(unreleasedUnder({ unreleased: false }, TODAY_MD)).toBe(false);
+    expect(banOf({ id: 5868, ban: "" }, ocg)).toBe("forbidden");
+  });
+});
 
 const INDEX: BanlistIndex = {
   today: "2026-10-16",

@@ -20,6 +20,8 @@ export type CardInfoProps = {
    *  yet then (미출시). */
   ban?: BanLimit | "";
   notOut?: boolean;
+  /** Not in Master Duel, under a Master Duel rule (banlists.unreleasedUnder); the card's own flag when not given. */
+  unreleased?: boolean;
   /** How many copies of its name the deck holds. */
   inDeck: number;
   /** How it is shown: the copy's look (a copy in the deck), or the look the next copy put in takes (참혈 2026-10-16). */
@@ -40,7 +42,7 @@ export type CardInfoProps = {
  *  lg in the search's place): the card as the look picked draws it, its prints and 일반 / 샤인 / 로얄 under it as on
  *  the card page, its text in Korean, and a copy in or out without leaving the deck. pane: stacked for the
  *  search's narrow column. */
-function CardInfoBody({ card, ban = card.ban, notOut, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
+function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleased, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
   const [doc, setDoc] = useState<CardDoc | null>(null);
   const [failed, setFailed] = useState(false);
   const [canFinish] = useState(finishSupported);
@@ -110,7 +112,7 @@ function CardInfoBody({ card, ban = card.ban, notOut, inDeck, look, onLook, copi
       <p className="mt-1 mb-0 text-xs text-gray-500 dark:text-gray-400">
         {rarity && <span className="mr-2">{rarity}</span>}
         {ban && <span className="font-semibold text-red-600 dark:text-red-400">{BAN_LABEL[ban]}</span>}
-        {(notOut || card.unreleased) && <span className={`font-semibold text-amber-600 dark:text-amber-400 ${ban ? "ml-2" : ""}`}>미출시</span>}
+        {(notOut || unreleased) && <span className={`font-semibold text-amber-600 dark:text-amber-400 ${ban ? "ml-2" : ""}`}>미출시</span>}
         {inDeck > 0 && <span className="ml-2 tabular-nums">덱에 {inDeck}장</span>}
       </p>
     </>

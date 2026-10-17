@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
-import { type BanLimit, type BanRule, banOf } from "@/lib/banlists";
+import { type BanLimit, type BanRule, banOf, unreleasedUnder } from "@/lib/banlists";
 import {
   type CardLook, type DeckDraft, type DeckLooks, type DeckZone, ZONES, ZONE_LABEL, kindCounts, notOutCards, overLimit,
   sortedCopies,
@@ -18,11 +18,11 @@ const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준�
 /** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look, the finish
  *  moving: DeckFinish) — its 금제 in the corner: the deck's list's (ban), today's Master Duel one (on the card) when
  *  none is given. */
-export function DeckCardFace({ card, look, dim = false, ban = card.ban }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | "" }) {
+export function DeckCardFace({ card, look, dim = false, ban = card.ban, rule }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | ""; rule?: BanRule }) {
   return (
     <span className="relative block">
       <CopyFace card={card} look={look} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
-      {card.unreleased ? (
+      {unreleasedUnder(card, rule) ? (
         <span className="absolute bottom-[7%] left-[4%] rounded px-1 py-px text-[10px] font-bold leading-4 bg-amber-500/90 text-white drop-shadow">미출시</span>
       ) : ban && (
         <img
@@ -104,7 +104,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
-                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} />
+                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
                 {ringed.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
                 {mark !== undefined && (
                   <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
@@ -114,7 +114,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
               </button>
             ) : (
               <Link key={`${id}-${at}`} to={`/cards/${id}`} title={card.name} className="group block">
-                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} />
+                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
               </Link>
             );
           })}

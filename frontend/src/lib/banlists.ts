@@ -111,6 +111,12 @@ export function pendingRule(key: string): BanRule {
 export const banOf = (card: Pick<CardListItem, "id" | "ban">, rule: BanRule = TODAY_MD): BanLimit | "" =>
   rule.limits ? rule.limits[card.id] ?? "" : card.ban;
 
+/** Whether a card wears 미출시 under the rule for not being in Master Duel (CardListItem.unreleased): only under
+ *  Master Duel's own rule — another game's rule judges a card by that game's release days (notOut) and limits it like
+ *  any other (엘리스 2026-10-17). */
+export const unreleasedUnder = (card: Pick<CardListItem, "unreleased">, rule: BanRule = TODAY_MD) =>
+  rule.format === "md" && !!card.unreleased;
+
 /** Whether a card was not out yet in the rule's game by its day (미출시); one whose days aren't known is taken as out. */
 export function notOut(card: Pick<CardListItem, "released">, rule: BanRule) {
   const day = card.released?.[rule.format];

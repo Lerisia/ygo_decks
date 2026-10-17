@@ -21,7 +21,7 @@ import {
   coverLook, coverPlace, deckWarnings, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, removeCard, savedCovers, setCover, setLook, setLookAll,
   shiftCopy, tabDraft,
 } from "@/lib/deckDrafts";
-import { banOf, notOut } from "@/lib/banlists";
+import { banOf, notOut, unreleasedUnder } from "@/lib/banlists";
 import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
 import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
 
@@ -220,7 +220,7 @@ export default function DeckListEdit() {
     const { card } = showing;
     const ids = deck[shownZone];
     // on the deck's 금제; a card from the search knows its release days once the deck holds it
-    const judged = { ban: banOf(card, rule), notOut: notOut(cards.get(card.id) ?? card, rule) };
+    const judged = { ban: banOf(card, rule), notOut: notOut(cards.get(card.id) ?? card, rule), unreleased: unreleasedUnder(card, rule) };
     const copies = ids.filter((x) => x === card.id).length;
     if (shownAt >= 0) {
       const look = lookAt(deck, shownZone, shownAt);

@@ -201,7 +201,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
         className={`group block text-center ${TILE} ${out ? "cursor-not-allowed" : ""}`}
       >
         <span className="relative block">
-          <DeckCardFace card={c} dim={out} ban={banOf(c, rule)} />
+          <DeckCardFace card={c} dim={out} ban={banOf(c, rule)} rule={rule} />
           {times !== undefined && times > 1 && (
             <span className="absolute top-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-blue-600/90 text-white tabular-nums">×{times}</span>
           )}
