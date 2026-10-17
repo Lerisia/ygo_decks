@@ -130,6 +130,7 @@ export default function DeckLists() {
                   comments={d.comment_count ?? 0}
                   isPrivate={d.is_private}
                   mainCount={d.main_count}
+                  extraCount={d.extra_count}
                 />
               </li>
             ))

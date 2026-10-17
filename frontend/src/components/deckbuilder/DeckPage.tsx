@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { MAIN_MIN, type deckWarnings } from "@/lib/deckDrafts";
+import { MAIN_MIN, ZONE_PLAY_MAX, type deckWarnings } from "@/lib/deckDrafts";
 import { DECK_LISTS_PATH } from "@/lib/deckListPaths";
 
 // The bare icon buttons at the end of the name's line (참혈 2026-10-16): 수정·삭제 on a deck's page, 취소·저장 while it
@@ -10,13 +10,19 @@ export const DECK_ICON_SIZE = "w-[18px] h-[18px]";
 
 /** What keeps the deck from being played under its 금제, in yellow at the right of the 금제's line (참혈 2026-10-16); on a
  *  phone without 메인 덱, wrapping to a second row inside the line's height when all three are there. */
-export function DeckWarnings({ short, over, later }: ReturnType<typeof deckWarnings>) {
+export function DeckWarnings({ short, big, over, later }: ReturnType<typeof deckWarnings>) {
   return (
     <span
       className="min-w-0 flex-1 flex flex-wrap sm:flex-nowrap items-center content-center justify-end gap-x-2 leading-[14px] font-semibold text-amber-600 dark:text-amber-400"
       aria-live="polite"
     >
       {short && <span className="whitespace-nowrap"><span className="hidden sm:inline">메인 덱 </span>{MAIN_MIN}장 미만</span>}
+      {big.map((z) => (
+        <span key={z} className="whitespace-nowrap">
+          {z === "main" ? <><span className="hidden sm:inline">메인 덱 </span><span className="sm:hidden">메인 </span></> : <><span className="hidden sm:inline">엑스트라 덱 </span><span className="sm:hidden">엑스트라 </span></>}
+          {ZONE_PLAY_MAX[z]}장 초과
+        </span>
+      ))}
       {over.length > 0 && <span className="whitespace-nowrap" title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
       {later.length > 0 && <span className="whitespace-nowrap" title={later.map((o) => o.line).join("\n")}>미출시 {later.length}종</span>}
     </span>

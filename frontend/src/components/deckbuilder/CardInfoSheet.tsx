@@ -1,14 +1,10 @@
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getCard, type CardDoc, type CardListItem } from "@/api/cardDexApi";
-import { FaceThumbs, FinishToggle, faceParams, finishesFor } from "@/components/CardLookPicker";
-import { finishSupported } from "@/lib/cardFinish";
+import { FaceThumbs } from "@/components/CardLookPicker";
 import type { BanLimit } from "@/lib/banlists";
 import { type CardLook, lookThumb } from "@/lib/deckDrafts";
-import { lazyChunk } from "@/lib/lazyChunk";
-
-const CardFinishCanvas = lazyChunk(() => import("@/components/CardFinishCanvas"));
 
 const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
 const BUTTON = "flex-1 h-10 px-2 rounded-lg font-semibold text-sm break-keep transition disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed";
@@ -39,13 +35,12 @@ export type CardInfoProps = {
 };
 
 /** A card shown while a deck is built (참혈 2026-10-16: held or right-clicked, on a phone in a sheet from below, from
- *  lg in the search's place): the card as the look picked draws it, its prints and 일반 / 샤인 / 로얄 under it as on
- *  the card page, its text in Korean, and a copy in or out without leaving the deck. pane: stacked for the
- *  search's narrow column. */
+ *  lg in the search's place): the card in the print picked, its prints under it as on the card page (일반 / 샤인 /
+ *  로얄 left the builder, 엘리스 2026-10-18: a deck list needs no finish), its text in Korean, and a copy in or out
+ *  without leaving the deck. pane: stacked for the search's narrow column. */
 function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleased, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
   const [doc, setDoc] = useState<CardDoc | null>(null);
   const [failed, setFailed] = useState(false);
-  const [canFinish] = useState(finishSupported);
   useEffect(() => {
     let alive = true;
     setDoc(null);
@@ -64,36 +59,24 @@ function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleas
   }, [card.id]);
   const t = doc?.texts.ko ?? doc?.texts.ja ?? null;
   const face = doc?.faces.find((f) => f.id === look.face) ?? doc?.faces[0];
-  const finishes = doc && canFinish ? finishesFor(doc, face) : [];
-  const shown = finishes.some((f) => f.key === look.finish) ? look.finish : "normal";
   // the small face at once, the full one once it comes
   const src = face?.face || doc?.face_url || lookThumb(card, look);
   const alt = `${card.name} 카드`;
   const picture = (
     <span className="relative block w-full">
-      {shown === "normal" || !doc ? (
-        <img src={src} alt={alt} className="block w-full aspect-[704/1024] object-contain card-corner" />
-      ) : (
-        <Suspense fallback={<img src={src} alt={alt} className="block w-full aspect-[704/1024] object-contain card-corner" />}>
-          <CardFinishCanvas faceUrl={src} style={shown} params={faceParams(doc, face)} alt={`${alt} (${shown === "royal" ? "로얄" : "샤인"})`} className="block w-full aspect-[704/1024] card-corner" />
-        </Suspense>
-      )}
+      <img src={src} alt={alt} className="block w-full aspect-[704/1024] object-contain card-corner" />
     </span>
   );
-  // the prints and finishes under the picture, kept their room while the card comes
+  // the prints under the picture, kept their room while the card comes
   const picker = !doc ? (
     !failed && <span className="mt-2 block h-7 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
   ) : (
     <>
-      {finishes.length > 1 && (
-        <FinishToggle finishes={finishes} value={shown} onChange={(finish) => onLook({ face: face?.id ?? card.id, finish })} className="mt-2 text-xs" />
-      )}
       {doc.faces.length > 1 && (
         <FaceThumbs
           faces={doc.faces}
           value={face?.id}
-          // a finish the print picked doesn't come in (로얄 on an R print) goes back to 일반
-          onPick={(f) => onLook({ face: f.id, finish: finishesFor(doc, f).some((x) => x.key === shown) ? shown : "normal" })}
+          onPick={(f) => onLook({ face: f.id, finish: "normal" })}
           className={`mt-2 grid gap-1.5 ${pane ? "grid-cols-4" : "grid-cols-3 sm:grid-cols-4"}`}
           ring="ring-blue-500 ring-offset-white dark:ring-offset-gray-800"
         />

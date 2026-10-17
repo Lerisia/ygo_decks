@@ -18,7 +18,7 @@ def card(cid, name, frame="effect", category="monster"):
 
 def fillers(n=12, start=100):
     """Cards to bring a main deck to 40: three copies each of n plain monsters, as a list of ids."""
-    return [c.id for c in (card(start + i, f"채움 {i:02d}") for i in range(n)) for _ in range(3)]
+    return [c.id for c in (card(start + i, f"채움 {start + i:03d}") for i in range(n)) for _ in range(3)]
 
 
 def as_user(user=None):
@@ -100,7 +100,8 @@ class DeckListApiTest(TestCase):
             "an extra deck card in the main": self.body(main=[3] + self.fill + [1] * 3),
             "a main deck card in the extra": self.body(extra=[1]),
             "no such card": self.body(main=[999] + self.fill + [1] * 3),
-            "61 in the main": self.body(main=[1, 1, 1] + [2] * 58),
+            "81 in the main": self.body(main=[1, 1, 1] + [2] * 78),
+            "31 in the extra": self.body(extra=[3] * 31),
             "a 2,001-letter description": self.body(description="가" * 2001),
         }
         for why, body in bad.items():
@@ -110,13 +111,18 @@ class DeckListApiTest(TestCase):
         self.assertEqual(self.c.post("/api/decklists/", self.body(main=[1, 1, 1] + self.fill + [2]), format="json").status_code, 201)
         self.assertEqual(DeckList.objects.count(), 1)
 
-    def test_a_deck_short_of_forty_is_posted_and_told(self):
+    def test_a_deck_outside_the_games_sizes_is_posted_and_told(self):
         """엘리스 2026-10-18: a deck still being built goes up as it is, marked 40장 미만 (the 2026-10-17 rule that
-        held it back is gone)."""
+        held it back is gone); one over the game's 60 in the main or 15 in the extra too, up to 80 and 30."""
         r = self.c.post("/api/decklists/", self.body(main=[1, 1, 1] + self.fill), format="json")
         self.assertEqual(r.status_code, 201, r.json())
         self.assertEqual(r.json()["issues"][0], "메인 덱이 40장보다 적습니다 (39/40).")
-        self.assertEqual(self.c.get("/api/decklists/").json()["results"][0]["main_count"], 39)
+        more = fillers(14, start=200)   # 42 more plain monsters
+        links = [c.id for c in (card(300 + i, f"링크 {i:02d}", frame="link") for i in range(6)) for _ in range(3)]
+        r = self.c.post("/api/decklists/", self.body(main=[1, 1, 1] + self.fill + more[:38], extra=links[:16]), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        self.assertEqual(r.json()["issues"][:2], ["메인 덱이 60장보다 많습니다 (77/60).", "엑스트라 덱이 15장보다 많습니다 (16/15)."])
+        self.assertEqual(self.c.get("/api/decklists/").json()["results"][0]["main_count"], 77)
         self.assertEqual(self.c.post("/api/decklists/", self.body(main=[], extra=[]), format="json").status_code, 201)
 
     def test_what_it_is_only_told(self):

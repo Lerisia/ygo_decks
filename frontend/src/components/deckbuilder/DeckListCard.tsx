@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Lock, MessageCircle } from "lucide-react";
 import type { DeckListAuthor } from "@/api/deckListApi";
 import DeckAuthor from "./DeckAuthor";
-import { type DeckDraft, MAIN_MIN, deckDay, deckUpdated } from "@/lib/deckDrafts";
+import { type DeckDraft, MAIN_MIN, ZONE_PLAY_MAX, deckDay, deckUpdated } from "@/lib/deckDrafts";
 
 /** Every deck card and the dashed one standing in for an empty board are this tall, so the grid never changes size. */
 const CARD_BOX = "h-[8.25rem] rounded-xl";
@@ -10,15 +10,16 @@ const CARD_BOX = "h-[8.25rem] rounded-xl";
 /** One deck list on the board (참혈 2026-10-14, made slimmer; on the board 엘리스 2026-10-17): its name and the day it
  *  was last saved at the top left, who posted it at the top right, two lines of its description under them, and at
  *  the bottom its size with how many wrote under it. */
-export default function DeckListCard({ deck, to, author, comments = 0, isPrivate = false, mainCount }: {
+export default function DeckListCard({ deck, to, author, comments = 0, isPrivate = false, mainCount, extraCount }: {
   deck: Pick<DeckDraft, "name" | "description" | "createdAt" | "updatedAt">;
   to: string;
   author?: DeckListAuthor;
   comments?: number;
   /** 비공개: the author's own, seen by no one else (a lock before the name) */
   isPrivate?: boolean;
-  /** how many in the main deck: short of 40, a warning (엘리스 2026-10-18: posted all the same) */
+  /** how many in the main and extra decks: outside what the game plays, a warning (엘리스 2026-10-18: posted all the same) */
   mainCount?: number;
+  extraCount?: number;
 }) {
   return (
     <Link
@@ -45,6 +46,12 @@ export default function DeckListCard({ deck, to, author, comments = 0, isPrivate
           {mainCount !== undefined && <span>메인 {mainCount}장</span>}
           {mainCount !== undefined && mainCount < MAIN_MIN && (
             <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">{MAIN_MIN}장 미만</span>
+          )}
+          {mainCount !== undefined && mainCount > ZONE_PLAY_MAX.main && (
+            <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">{ZONE_PLAY_MAX.main}장 초과</span>
+          )}
+          {extraCount !== undefined && extraCount > ZONE_PLAY_MAX.extra && (
+            <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">엑스트라 {ZONE_PLAY_MAX.extra}장 초과</span>
           )}
         </span>
         <span className="shrink-0 flex items-center gap-2.5 tabular-nums">

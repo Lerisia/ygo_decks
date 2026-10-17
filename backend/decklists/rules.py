@@ -1,8 +1,8 @@
 """The rules of a deck list, as Master Duel's deck editor keeps them (엘리스 2026-10-14: "저장과 규칙부터"). Some a
 saved deck may not break (its zones' sizes, 3 of a name, tokens, extra deck monsters in the extra deck); the rest it
-is only told about, as the game tells a deck that a later 금제 has made unusable: fewer than 40 in the main (saved
-and marked 40장 미만, 엘리스 2026-10-18 — a deck still being built is posted as it is), more of a card than its list
-allows, cards not out yet then. The list is the deck's pick (참혈 2026-10-16): a game's newest
+is only told about, as the game tells a deck that a later 금제 has made unusable: fewer than 40 or more than 60 in the
+main, more than 15 in the extra (saved and marked, 엘리스 2026-10-18 — a deck still being built is posted as it is),
+more of a card than its list allows, cards not out yet then. The list is the deck's pick (참혈 2026-10-16): a game's newest
 (Master Duel's by default), one of its lists by day, one of ours by code, or 무금제 (참혈 2026-10-17). A deck may hold
 more of a card than its list allows (참혈 2026-10-17: "금제에 위반되어도 리스트에 투입"); it is only told."""
 from collections import Counter
@@ -11,7 +11,10 @@ from carddb import banlist
 from carddb.display import display_name
 from carddb.models import Banlist, Card, MdPrint
 
-MAIN_MIN, MAIN_MAX, EXTRA_MAX, COPIES_MAX = 40, 60, 15, 3
+# what the game plays: 40–60 in the main, 15 in the extra — a deck outside them is posted and told (엘리스 2026-10-18)
+MAIN_MIN, MAIN_PLAY_MAX, EXTRA_PLAY_MAX = 40, 60, 15
+# what a deck list may hold at most (엘리스 2026-10-18: "80장, 30장까지는 들어갈 수 있게")
+MAIN_MAX, EXTRA_MAX, COPIES_MAX = 80, 30, 3
 COVERS_MAX = 3
 EXTRA_FRAMES = ("fusion", "synchro", "xyz", "link")
 LIMIT = {"forbidden": 0, "limited": 1, "semi_limited": 2}
@@ -153,11 +156,16 @@ def judge_of(key):
 
 
 def issues(main, extra, key="md"):
-    """What keeps a saved deck from being played under its 금제, in words: too few in the main, then each card over
-    the list (the forbidden first, then by name), then each card not out yet then (미출시), by name."""
+    """What keeps a saved deck from being played under its 금제, in words: too few or too many in the main, too many
+    in the extra, then each card over the list (the forbidden first, then by name), then each card not out yet then
+    (미출시), by name."""
     out = []
     if len(main) < MAIN_MIN:
         out.append(f"메인 덱이 {MAIN_MIN}장보다 적습니다 ({len(main)}/{MAIN_MIN}).")
+    if len(main) > MAIN_PLAY_MAX:
+        out.append(f"메인 덱이 {MAIN_PLAY_MAX}장보다 많습니다 ({len(main)}/{MAIN_PLAY_MAX}).")
+    if len(extra) > EXTRA_PLAY_MAX:
+        out.append(f"엑스트라 덱이 {EXTRA_PLAY_MAX}장보다 많습니다 ({len(extra)}/{EXTRA_PLAY_MAX}).")
     judge = judge_of(key)
     statuses = judge.limits
     cards = Card.objects.in_bulk(set(main) | set(extra))

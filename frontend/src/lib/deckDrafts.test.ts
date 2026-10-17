@@ -46,11 +46,15 @@ describe("adding and taking out cards", () => {
 
   it("keeps tokens out and stops at each zone's size", () => {
     expect(addCard(deck([]), CARDS.get(9)!, CARDS)).toHaveProperty("error");
-    const full = deck(Array.from({ length: 60 }, (_, i) => 100 + i));
+    // held up to 80 and 30 (엘리스 2026-10-18); the game's 60 and 15 are only told (deckWarnings)
+    const full = deck(Array.from({ length: 80 }, (_, i) => 100 + i));
     expect(addCard(full, CARDS.get(3)!, CARDS)).toHaveProperty("error");
     expect(addCard(full, CARDS.get(6)!, CARDS)).toEqual({ deck: { ...full, extra: [6], looks: { ...full.looks, extra: [null] } } });
-    const fullExtra = deck([], Array.from({ length: 15 }, (_, i) => 100 + i));
+    const fullExtra = deck([], Array.from({ length: 30 }, (_, i) => 100 + i));
     expect(addCard(fullExtra, CARDS.get(6)!, CARDS)).toHaveProperty("error");
+    const big = deck(Array.from({ length: 61 }, () => 1), Array.from({ length: 16 }, () => 6));
+    expect(deckWarnings(big, CARDS).big).toEqual(["main", "extra"]);
+    expect(deckIssues(big, CARDS).slice(0, 2)).toEqual(["메인 덱이 60장보다 많습니다 (61/60).", "엑스트라 덱이 15장보다 많습니다 (16/15)."]);
   });
 
   it("puts every card a picture held in at once, each as often as it held it, leaving out what cannot go in (전체 투입)", () => {
@@ -140,7 +144,7 @@ describe("the 금제 the deck picked (참혈 2026-10-16)", () => {
     expect(w.over.map((o) => o.card.id)).toEqual([31]);
     expect(w.later.map((o) => o.card.id)).toEqual([31, 32]);
     const full = deckWarnings(deck(Array.from({ length: 40 }, () => 1), [30]), cards);
-    expect(full).toEqual({ short: false, over: [expect.objectContaining({ card: one, count: 1 })], later: [] });   // the extra deck counts too
+    expect(full).toEqual({ short: false, big: [], over: [expect.objectContaining({ card: one, count: 1 })], later: [] });   // the extra deck counts too
   });
 
   it("tells the deck as the server does: too few, then over the list, then not out yet", () => {
@@ -255,7 +259,8 @@ describe("decks kept outside the server", () => {
   it("keeps a guest's deck in the tab until it is saved or given up, through the reload signing in makes", () => {
     expect(tabDraft()).toBeNull();
     keepTabDraft({ ...deck([1, 3]), code: "whatever", name: "손님 덱", looks: { main: [null, { face: 9, finish: "shine" }], extra: [] } });
-    expect(tabDraft()).toEqual({ ...deck([1, 3]), name: "손님 덱", looks: { main: [null, { face: 9, finish: "shine" }], extra: [] } });   // always a new deck
+    // always a new deck; a finish kept from before reads as plain (샤인·로얄 left the builder, 엘리스 2026-10-18)
+    expect(tabDraft()).toEqual({ ...deck([1, 3]), name: "손님 덱", looks: { main: [null, { face: 9, finish: "normal" }], extra: [] } });
     expect(tabDraft()?.name).toBe("손님 덱");
     clearTabDraft();
     expect(tabDraft()).toBeNull();
@@ -286,7 +291,8 @@ describe("decks kept outside the server", () => {
     };
     expect(fromDoc(doc)).toEqual({
       code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1, 1], extra: [],
-      looks: { main: [null, { face: 9, finish: "royal" }], extra: [] }, covers: [{ id: 1, copy: 1 }], banlist: "md",
+      // a finish kept from before reads as plain: 샤인·로얄 left the builder (엘리스 2026-10-18)
+      looks: { main: [null, { face: 9, finish: "normal" }], extra: [] }, covers: [{ id: 1, copy: 1 }], banlist: "md",
       isPrivate: false,
     });
     expect(fromDoc({ ...doc, is_private: true }).isPrivate).toBe(true);

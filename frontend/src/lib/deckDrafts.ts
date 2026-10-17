@@ -42,7 +42,10 @@ export const NEW_CODE = "new";
 
 export const ZONES: DeckZone[] = ["main", "extra"];
 export const ZONE_LABEL: Record<DeckZone, string> = { main: "메인 덱", extra: "엑스트라 덱" };
-export const ZONE_MAX: Record<DeckZone, number> = { main: 60, extra: 15 };
+/** What a deck list may hold at most (엘리스 2026-10-18: 80 and 30), and what the game plays: 40–60 and 15 — outside
+ *  them the deck is kept and marked (deckWarnings). */
+export const ZONE_MAX: Record<DeckZone, number> = { main: 80, extra: 30 };
+export const ZONE_PLAY_MAX: Record<DeckZone, number> = { main: 60, extra: 15 };
 export const MAIN_MIN = 40;
 export const COPIES_MAX = 3;
 export const COVERS_MAX = 3;
@@ -54,9 +57,10 @@ export const blankDeck = (): DeckDraft => ({
 
 /** The looks lined up with the zones' cards: a zone whose looks don't (a deck from before them) is all plain. */
 export const fitLooks = (d: Pick<DeckDraft, DeckZone> & { looks?: Partial<DeckLooks> | null }): DeckLooks => {
+  // a finish kept from before (샤인·로얄 left the builder, 엘리스 2026-10-18) reads as plain; the print stays
   const fit = (z: DeckZone) => {
     const got = d.looks?.[z];
-    return Array.isArray(got) && got.length === d[z].length ? got.map((l) => l ?? null) : d[z].map(() => null);
+    return Array.isArray(got) && got.length === d[z].length ? got.map((l) => (l ? { face: l.face, finish: "normal" as const } : null)) : d[z].map(() => null);
   };
   return { main: fit("main"), extra: fit("extra") };
 };
@@ -264,7 +268,13 @@ export function notOutCards(ids: number[], cards: Map<number, CardListItem>, rul
  *  cards over its 금제, the cards not out yet under it. */
 export function deckWarnings(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>, rule?: BanRule) {
   const ids = [...deck.main, ...deck.extra];
-  return { short: deck.main.length < MAIN_MIN, over: overLimit(ids, cards, rule), later: notOutCards(ids, cards, rule) };
+  return {
+    short: deck.main.length < MAIN_MIN,
+    // the zones over what the game plays (엘리스 2026-10-18: held up to 80 and 30, marked past 60 and 15)
+    big: ZONES.filter((z) => deck[z].length > ZONE_PLAY_MAX[z]),
+    over: overLimit(ids, cards, rule),
+    later: notOutCards(ids, cards, rule),
+  };
 }
 
 /** What keeps the deck from being played under its 금제, as the server says it (decklists/rules.py): too few in the
@@ -272,6 +282,9 @@ export function deckWarnings(deck: Pick<DeckDraft, DeckZone>, cards: Map<number,
 export function deckIssues(deck: Pick<DeckDraft, DeckZone>, cards: Map<number, CardListItem>, rule?: BanRule): string[] {
   const out: string[] = [];
   if (deck.main.length < MAIN_MIN) out.push(`메인 덱이 ${MAIN_MIN}장보다 적습니다 (${deck.main.length}/${MAIN_MIN}).`);
+  for (const z of ZONES) {
+    if (deck[z].length > ZONE_PLAY_MAX[z]) out.push(`${ZONE_LABEL[z]}이 ${ZONE_PLAY_MAX[z]}장보다 많습니다 (${deck[z].length}/${ZONE_PLAY_MAX[z]}).`);
+  }
   const all = [...deck.main, ...deck.extra];
   return [...out, ...overLimit(all, cards, rule).map((o) => o.line), ...notOutCards(all, cards, rule).map((o) => o.line)];
 }
