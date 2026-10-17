@@ -52,7 +52,7 @@ function ExportButtons() {
 
 /** A deck list on the board (/dev/decklists/:code): who posted it, its main and extra decks, each card opening its
  *  page, the 금제 it is checked by and what keeps it from being played under it (덱 구축, 참혈 2026-10-13; from the
- *  server 2026-10-14; its 금제 2026-10-16), the 도감 deck it is filed under, 추천 and the comments (엘리스 2026-10-17:
+ *  server 2026-10-14; its 금제 2026-10-16), 추천 and the comments (엘리스 2026-10-17:
  *  every deck list is a post on the board). Anyone reads it; 수정·삭제 are the author's. Operators only while the
  *  pages are laid out. */
 export default function DeckListView() {
@@ -177,16 +177,9 @@ export default function DeckListView() {
           error={error}
         >
           <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} />
-          {/* under the deck: the 도감 deck it is filed under and 덱 코드 on the left, the exports on the right (참혈 2026-10-17; the
-              export buttons alone for now) — on a phone the exports drop to a second line, still at the right */}
+          {/* under the deck: 덱 코드 on the left once it is made, the exports on the right (참혈 2026-10-17) */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="shrink-0 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-              <span className="shrink-0">분류</span>
-              {deck.deck ? (
-                <Link to={`/database/${deck.deck.id}`} className="max-w-[10rem] truncate font-semibold text-gray-800 dark:text-gray-100 hover:underline">{deck.deck.name}</Link>
-              ) : (
-                <span>없음</span>
-              )}
+            <div className="shrink-0 flex items-center gap-2">
               {SHOW_DECK_CODE && <button type="button" className={FOOT_BUTTON}>덱 코드</button>}
             </div>
             <ExportButtons />

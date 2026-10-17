@@ -1,14 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, Camera, Redo2, Undo2 } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
-import DexFilterBar from "@/components/DexFilterBar";
+import CardFilterBar from "@/components/CardFilterBar";
+import CardSortControl from "@/components/CardSortControl";
 import { ScanInfoRow, ScanState } from "@/components/ImageCardSearch";
 import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardListItem, type CardOptions } from "@/api/cardDexApi";
-import { BAR_EXTRA, barFields, barFilters, barValues, groupItems, misfit } from "@/lib/cardFilterBar";
+import { barFilters, groupItems } from "@/lib/cardFilterBar";
+import { CARD_SORTS, rememberSort, rememberedSort } from "@/lib/cardSorts";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
 import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
+import { MOUSE_QUERY, draggingDeckCard, droppedDeckCard, startCardDrag } from "@/lib/deckDrag";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { type ScanFound, useImageScan } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -62,7 +65,7 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   );
 }
 
-export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, onShow, notice, ready, history, overlay }: {
+export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, onShow, onDropOut, notice, ready, history, overlay }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   /** The deck's 금제 (참혈 2026-10-16): each card's mark. */
@@ -70,8 +73,10 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   onPick: (card: CardListItem) => void;
   /** 전체 투입: every card a picture held, each as many times as it held it (참혈 2026-10-17). */
   onPickAll?: (found: ScanFound[]) => void;
-  /** A card held or right-clicked is shown. */
+  /** A card held (a finger) or clicked (a mouse) is shown. */
   onShow?: (card: CardListItem) => void;
+  /** A copy of the deck dragged here with a mouse comes out, as Master Duel's PC editor has it (엘리스 2026-10-18). */
+  onDropOut?: (zone: DeckZone, at: number) => void;
   notice: string;
   /** false while the deck's own cards are still coming (their names count toward 3). */
   ready: boolean;
@@ -81,10 +86,20 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   overlay?: ReactNode;
 }) {
   const press = usePressCard();
+  const mouse = useMediaQuery(MOUSE_QUERY);
+  // a copy of the deck being dragged over the search, to come out (counted in and out of the children)
+  const [dropping, setDropping] = useState(0);
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [options, setOptions] = useState<CardOptions | null>(null);
   const [bar, setBar] = useState(() => barFilters({}));
+  // the sort and its way, remembered with the card book's (엘리스 2026-10-18: one search, one filter, one sort)
+  const [sorting, setSorting] = useState(() => rememberedSort(CARD_SORTS) ?? { sort: "new", dir: "" });
+  const pickSort = (patch: Partial<typeof sorting>) => {
+    const next = { ...sorting, ...patch };
+    rememberSort(next);
+    setSorting(next);
+  };
   const [chosen, setChosen] = useState("");   // a 카드군 (g12) or a card's support list (c34) picked from the suggestions
   const [found, setFound] = useState<CardListItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -139,7 +154,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   const typed = useDeferredValue(qInput.trim());
   const suggestions = useGroupSuggestions(items, typed, chips, 6).filter(({ it }) => it.key !== chosen);
   const filters: CardFilters = {
-    ...EMPTY_FILTERS, ...bar, q, sort: "new",
+    ...EMPTY_FILTERS, ...bar, ...sorting, q,
     group: chosen[0] === "g" ? chosen.slice(1) : "", card: chosen[0] === "c" ? chosen.slice(1) : "",
   };
   const searching = !!(q || chosen || chips);
@@ -209,10 +224,14 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
       <button
         key={c.id}
         type="button"
-        {...press(onPress, () => onShow?.(c))}
+        {...press(onPress, () => onShow?.(c), !!scanned)}
+        // a mouse drags it onto the deck (엘리스 2026-10-18: as the game's PC editor)
+        draggable={mouse && !scanned && !out && ready}
+        onDragStart={(e) => startCardDrag(e, c)}
         aria-disabled={scanned ? undefined : out || !ready}
         aria-pressed={scanned ? !scanned.skipped : undefined}
-        title={scanned ? `${c.name} (눌러서 ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}, 길게 누르면 보기)` : c.name}
+        title={scanned ? `${c.name} (눌러서 ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}, 길게 누르면 보기)`
+          : mouse ? `${c.name} (오른쪽 클릭이나 끌어서 넣기, 눌러서 보기)` : c.name}
         aria-label={scanned ? `${c.name} ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}` : `${c.name} 넣기`}
         className={`group block text-center ${TILE} ${out && !scanned ? "cursor-not-allowed" : ""}`}
       >
@@ -237,13 +256,27 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   return (
     <aside
       aria-label="카드 검색"
+      onDragEnter={(e) => draggingDeckCard(e) && setDropping((n) => n + 1)}
+      onDragOver={(e) => {
+        if (!draggingDeckCard(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDragLeave={(e) => draggingDeckCard(e) && setDropping((n) => Math.max(0, n - 1))}
+      onDrop={(e) => {
+        setDropping(0);
+        const copy = droppedDeckCard(e);
+        if (!copy) return;
+        e.preventDefault();
+        onDropOut?.(copy.zone, copy.at);
+      }}
       // above the keyboard while it is up, else above the bottom edge (and the home bar); gliding as the keyboard does
       style={{
         "--float-bottom": keyboard.inset ? `${keyboard.inset + 8}px` : "calc(0.75rem + env(safe-area-inset-bottom))",
         transition: keyboard.glide ? "bottom 250ms cubic-bezier(0.2, 0.8, 0.2, 1)" : undefined,
       } as CSSProperties}
       className={`fixed inset-x-3 sm:inset-x-4 bottom-[var(--float-bottom)] z-40 mx-auto max-w-3xl flex flex-col gap-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-600/60 bg-white/75 dark:bg-gray-800/75 backdrop-blur-md shadow-xl p-2.5
-        lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3`}
+        lg:absolute lg:inset-0 lg:z-auto lg:mx-0 lg:max-w-none lg:gap-0 lg:rounded-xl lg:border-gray-200 lg:dark:border-gray-700 lg:bg-white lg:dark:bg-gray-800 lg:backdrop-blur-none lg:shadow-none lg:p-3 ${dropping ? "ring-2 ring-red-400/70" : ""}`}
     >
       {overlay && <div className="hidden lg:block absolute inset-0 z-10 rounded-xl bg-white dark:bg-gray-800 p-3 pt-2">{overlay}</div>}
       {/* hidden, not taken away, while something stands in its place */}
@@ -295,16 +328,18 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           {imaging ? <ArrowLeft size={18} aria-hidden /> : <Camera size={18} aria-hidden />}
         </button>
       </div>
-      {/* the card book's filter chips a size smaller; a chip opens its choices under the row (a popup on a phone) */}
+      {/* the card book's own filter bar and sort, a size smaller (엘리스 2026-10-18: the same search filters the same way) */}
       <div className={`order-4 dex-compact lg:order-none lg:mt-2 ${imaging ? "hidden" : ""}`}>
-        <DexFilterBar
-          fields={barFields(options)}
-          extra={BAR_EXTRA}
-          values={barValues(bar)}
-          onChange={(v) => setBar(barFilters(v))}
-          isDisabled={misfit}
-          trial
-          right={history && <UndoButtons {...history} />}
+        <CardFilterBar
+          options={options}
+          filters={bar}
+          onChange={(f) => setBar({ ...bar, ...f })}
+          right={
+            <div className="flex items-center gap-1.5">
+              <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} />
+              {history && <UndoButtons {...history} />}
+            </div>
+          }
         />
       </div>
       {imaging && scan.status.kind === "done" && (

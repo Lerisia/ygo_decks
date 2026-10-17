@@ -16,3 +16,26 @@ export const DEV_CARD_SORTS = [
   { value: "popular", label: "조회순" },
   ...CARD_SORTS.map((s) => (s.value === "type" ? { ...s, label: "유형순" } : s)),
 ];
+
+const SORT_KEY = "card_list_sort";
+type Sorted = { sort: string; dir: string };
+
+/** The viewer's last sort and its way, kept in this browser (엘리스 10/12) — one memory for the card book and the deck
+ *  builder's search (엘리스 2026-10-18); none, or one not among `sorts`, is null. */
+export function rememberedSort(sorts: { value: string }[]): Sorted | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_KEY) || "null");
+    if (sorts.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) return { sort: saved.sort, dir: saved.dir };
+  } catch {
+    /* no storage: the default sort */
+  }
+  return null;
+}
+
+export function rememberSort(f: Sorted) {
+  try {
+    localStorage.setItem(SORT_KEY, JSON.stringify({ sort: f.sort, dir: f.dir }));
+  } catch {
+    /* private mode: the choice lasts while the page is open */
+  }
+}

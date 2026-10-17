@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import CardFilterBar from "@/components/CardFilterBar";
+import CardSortControl from "@/components/CardSortControl";
 import ComboBox, { type ComboItem } from "@/components/ComboBox";
-import DexFilterBar from "@/components/DexFilterBar";
 import DexTabs from "@/components/DexTabs";
 import SearchForm from "@/components/SearchForm";
 import UnifiedCardSearch from "@/components/UnifiedCardSearch";
@@ -12,39 +12,19 @@ import {
   type CardFilters, type CardListItem, type CardOptions,
   filtersToSearch, getCardOptions, listCards, searchToFilters, sortDir,
 } from "@/api/cardDexApi";
-import type { DexValues } from "@/utils/dexFilter";
-import {
-  BAR_EXTRA, barFields as cardBarFields, barFilters as cardBarFilters, barValues as cardBarValues, groupItems as cardGroupItems, misfit,
-} from "@/lib/cardFilterBar";
+import { groupItems as cardGroupItems } from "@/lib/cardFilterBar";
 import { trackEvent } from "@/api/analyticsApi";
-import { CARD_SORTS, DEV_CARD_SORTS } from "@/lib/cardSorts";
+import { CARD_SORTS, DEV_CARD_SORTS, rememberSort, rememberedSort } from "@/lib/cardSorts";
 
 const GRID = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3";
 const SORTS = CARD_SORTS;
 
-const SORT_KEY = "card_list_sort";
-
-/** The viewer's last sort and its way, kept in this browser (엘리스 10/12); an address that names one wins. */
+/** The viewer's last sort and its way (lib/cardSorts); an address that names one wins. */
 function withRememberedSort(f: CardFilters, search: string, sorts = SORTS): CardFilters {
   const qs = new URLSearchParams(search);
   if (qs.has("sort") || qs.has("dir")) return f;
-  try {
-    const saved = JSON.parse(localStorage.getItem(SORT_KEY) || "null");
-    if (sorts.some((s) => s.value === saved?.sort) && ["", "asc", "desc"].includes(saved.dir)) {
-      return { ...f, sort: saved.sort, dir: saved.dir };
-    }
-  } catch {
-    /* no storage: the default sort */
-  }
-  return f;
-}
-
-function rememberSort(f: CardFilters) {
-  try {
-    localStorage.setItem(SORT_KEY, JSON.stringify({ sort: f.sort, dir: f.dir }));
-  } catch {
-    /* private mode: the choice lasts while the page is open */
-  }
+  const saved = rememberedSort(sorts);
+  return saved ? { ...f, ...saved } : f;
 }
 
 const hasFilter = (f: CardFilters) =>
@@ -220,10 +200,6 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
   const groupName = options?.groups.find((g) => String(g.id) === filters.group)?.name;
   // 카드군, and once a name is typed the cards with a support list (엘리스 10/12: a card's 서포트 searched here too)
   const groupItems: ComboItem[] = useMemo(() => cardGroupItems(options), [options]);
-  const barFields = cardBarFields(options);
-  const barExtra = BAR_EXTRA;
-  const barValues = cardBarValues(filters);
-  const applyBar = (v: DexValues) => update(cardBarFilters(v));
 
   if (!allowed) return <div className="min-h-screen" />;
   const chosenGroup = groupItems.find((it) => it.key === (filters.group ? `g${filters.group}` : filters.card ? `c${filters.card}` : ""));
@@ -252,7 +228,7 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
               update({ q: text });
             }}
             filters={filters}
-            filterBar={<DexFilterBar fields={barFields} extra={barExtra} values={barValues} onChange={applyBar} isDisabled={misfit} active={onList} trial />}
+            filterBar={<CardFilterBar options={options} filters={filters} onChange={update} active={onList} trial />}
             onClear={() => update({ group: "", card: "" })}
           />
         </div>
@@ -279,42 +255,15 @@ export default function CardList({ basePath = "/cards", unifiedSearch = false }:
       </div>
       )}
 
-      {/* Filters, with the sort and its way at the row's right end, joined as Master Duel shows them */}
+      {/* Filters, with the sort and its way at the row's right end — the one bar every card search uses */}
       <div className="mb-4">
-        <DexFilterBar
-          fields={barFields}
-          extra={barExtra}
-          values={barValues}
-          onChange={applyBar}
-          isDisabled={misfit}
+        <CardFilterBar
+          options={options}
+          filters={filters}
+          onChange={update}
           active={onList}
           trial={unifiedSearch}
-          right={
-            <div className="flex items-stretch h-9">
-              {/* its own caret, a little in from the edge (참혈 2026-10-12) */}
-              <span className="relative flex">
-                <select
-                  aria-label="정렬"
-                  value={filters.sort}
-                  onChange={(e) => pickSort({ sort: e.target.value, dir: "" })}
-                  className="appearance-none max-w-[7.5rem] sm:max-w-none max-sm:[field-sizing:content] pl-2 sm:pl-3 pr-7 sm:pr-8 border border-gray-300 dark:border-gray-600 rounded-l-lg rounded-r-none bg-white text-black dark:bg-gray-800 dark:text-white text-sm font-semibold"
-                >
-                  {/* 조회순 reads 정확도순 while a query is on: the closest names come first then (참혈 2026-10-14) */}
-                  {sorts.map((s) => <option key={s.value} value={s.value}>{s.value === "popular" && filters.q ? "정확도순" : s.label}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden />
-              </span>
-              <button
-                type="button"
-                onClick={() => pickSort({ dir: sortDir(filters) === "asc" ? "desc" : "asc" })}
-                aria-label={sortDir(filters) === "asc" ? "오름차순 (누르면 내림차순)" : "내림차순 (누르면 오름차순)"}
-                title={sortDir(filters) === "asc" ? "오름차순" : "내림차순"}
-                className="w-8 sm:w-9 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg rounded-l-none bg-white text-black dark:bg-gray-800 dark:text-white text-base font-bold"
-              >
-                {sortDir(filters) === "asc" ? "↑" : "↓"}
-              </button>
-            </div>
-          }
+          right={<CardSortControl sorts={sorts} filters={filters} onChange={pickSort} />}
         />
       </div>
 

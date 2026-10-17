@@ -16,7 +16,7 @@ export function DeckWarnings({ short, over, later }: ReturnType<typeof deckWarni
       className="min-w-0 flex-1 flex flex-wrap sm:flex-nowrap items-center content-center justify-end gap-x-2 leading-[14px] font-semibold text-amber-600 dark:text-amber-400"
       aria-live="polite"
     >
-      {short && <span className="whitespace-nowrap"><span className="hidden sm:inline">메인 덱 </span>{MAIN_MIN}장 이상 필요</span>}
+      {short && <span className="whitespace-nowrap"><span className="hidden sm:inline">메인 덱 </span>{MAIN_MIN}장 미만</span>}
       {over.length > 0 && <span className="whitespace-nowrap" title={over.map((o) => o.line).join("\n")}>금제 초과 {over.length}종</span>}
       {later.length > 0 && <span className="whitespace-nowrap" title={later.map((o) => o.line).join("\n")}>미출시 {later.length}종</span>}
     </span>

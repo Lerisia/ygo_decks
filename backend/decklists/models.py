@@ -8,7 +8,7 @@ from board.models import Comment
 
 ALPHABET = string.ascii_lowercase + string.digits
 # addresses under /decklists/ that are not a deck's
-RESERVED = {"new", "classify", "comments"}
+RESERVED = {"new", "comments"}
 
 
 class DeckList(models.Model):
@@ -36,11 +36,9 @@ class DeckList(models.Model):
     # the 금제 it is checked by (참혈 2026-10-16): "md" / "ocg" / "tcg" that game's newest, following the next one;
     # "md:2026-10-06" one list held to; "custom:<code>" one of ours; "none" 무금제 (carddb.banlist.parse_key)
     banlist = models.CharField(max_length=48, default="md", blank=True)
-    # the board (엘리스 2026-10-17): the 도감 deck it is filed under — what its cards say (decklists.classify) on every
-    # save, unless its author picked one (deck_chosen; a pick of none too) — how many liked it and opened it, and a
-    # deletion that keeps the row for its comments and the log
-    deck = models.ForeignKey("deck.Deck", null=True, blank=True, on_delete=models.SET_NULL, related_name="deck_lists")
-    deck_chosen = models.BooleanField(default=False)
+    # the board (엘리스 2026-10-17): how many liked it and opened it, and a deletion that keeps the row for its comments
+    # and the log. (A 도감 deck it was filed under, said by its cards, went the next day: the name says the theme, and
+    # the guess was wrong as often as not — 엘리스 2026-10-18.)
     like_count = models.PositiveIntegerField(default=0)
     view_count = models.PositiveIntegerField(default=0)
     # 비공개 (엘리스 2026-10-17): its author's alone — off the board, its page, 추천 and comments for everyone else

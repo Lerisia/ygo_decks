@@ -11,11 +11,9 @@ from rest_framework.response import Response
 
 from board.api import COMMENT_LIMITS, POST_LIMITS, TOO_FAST, error, is_staff, log_deletion, page_of, too_fast
 from board.models import Comment
-from deck.models import Deck
 from notification.models import notify
 from tournament.serializers import user_avatar
 
-from .classify import candidates, classify, pick
 from .models import DeckList, DeckListCard, DeckListComment, DeckListLike
 from .rules import DeckError, check, check_banlist, check_covers, check_looks, cover_copies_of, issues, looks_of
 
@@ -36,8 +34,7 @@ def _author(user):
 def _row(d, user):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
             "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d), "banlist": d.banlist,
-            "author": _author(d.owner), "deck": {"id": d.deck_id, "name": d.deck.name} if d.deck_id else None,
-            "deck_chosen": d.deck_chosen, "is_private": d.is_private, "like_count": d.like_count, "view_count": d.view_count,
+            "author": _author(d.owner), "is_private": d.is_private, "like_count": d.like_count, "view_count": d.view_count,
             "comment_count": getattr(d, "n_comments", None), "liked": bool(getattr(d, "liked", False)),
             "mine": user.is_authenticated and d.owner_id == user.id,
             "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
@@ -68,7 +65,7 @@ def _is_id(value):
 
 
 def _fields(data, d=None):
-    """The name, description, cards, their looks, 대표 카드, 금제 and 도감 deck sent, checked; DeckError on a rule broken. A
+    """The name, description, cards, their looks, 대표 카드 and 금제 sent, checked; DeckError on a rule broken. A
     body from a page before them keeps the deck's own (d): its 대표 카드 still in it (a copy gone, the last left), its
     looks while its cards are as they were."""
     name = " ".join(str(data.get("name") or "").split())
@@ -94,23 +91,10 @@ def _fields(data, d=None):
         looks = d.looks if d and (d.main, d.extra) == (main, extra) else {}
     # its 금제 (참혈 2026-10-16); a page from before it keeps the deck's own, a new deck Master Duel's newest
     list_key = check_banlist(data["banlist"]) if "banlist" in data else (d.banlist if d else "md")
-    # the 도감 deck it is filed under (엘리스 2026-10-17): the author's pick when one is sent (deck_chosen, or deck
-    # itself: an id, or null for none), the pick from before when nothing is sent, else what the cards say
-    if "deck_chosen" in data or "deck" in data:
-        chosen = bool(data.get("deck_chosen", True))
-        deck_id = data.get("deck") if chosen else None
-        if chosen and deck_id is not None and not (_is_id(deck_id) and Deck.objects.filter(pk=deck_id).exists()):
-            raise DeckError("없는 덱입니다.")
-    else:
-        chosen = bool(d and d.deck_chosen)
-        deck_id = d.deck_id if chosen else None
-    if not chosen:
-        deck_id = classify(main, extra)
     # 비공개 (엘리스 2026-10-17): as sent; a page sending nothing keeps the deck's own, a new deck is public
     private = bool(data["is_private"]) if "is_private" in data else bool(d and d.is_private)
     return {"name": name, "description": description, "main": main, "extra": extra, "looks": looks,
-            "cover_cards": covers, "cover_copies": copies, "banlist": list_key, "deck_id": deck_id, "deck_chosen": chosen,
-            "is_private": private}
+            "cover_cards": covers, "cover_copies": copies, "banlist": list_key, "is_private": private}
 
 
 def _index_cards(d):
@@ -124,20 +108,18 @@ def _index_cards(d):
 
 def _posted(request):
     """The decks on the board for this viewer: everyone's public ones and their own private ones."""
-    qs = DeckList.objects.filter(kind=DeckList.Kind.OWN, is_deleted=False).select_related("owner", "deck")
+    qs = DeckList.objects.filter(kind=DeckList.Kind.OWN, is_deleted=False).select_related("owner")
     return qs.filter(Q(is_private=False) | Q(owner=request.user)) if request.user.is_authenticated else qs.filter(is_private=False)
 
 
 def _board(request):
-    """A page of the board: the newest first, or the most liked (sort=top); narrowed by the 도감 deck (deck=<id>, or
-    none), the 금제's game (banlist=md|ocg|tcg|custom|none — not ?format=, which DRF takes for itself), the author
-    (author=<username>), a card held (card=<id>) and the name (q=)."""
+    """A page of the board: the newest first, or the most liked (sort=top); narrowed by the 금제's game
+    (banlist=md|ocg|tcg|custom|none — not ?format=, which DRF takes for itself), the author (author=<username>), a card
+    held (card=<id>) and the name (q=)."""
     g = request.GET
     qs = _posted(request)
     if g.get("author"):
         qs = qs.filter(owner__username=g["author"])
-    if g.get("deck"):
-        qs = qs.filter(deck=None) if g["deck"] == "none" else qs.filter(deck_id=_int(g["deck"]))
     if g.get("banlist") in FORMATS:
         fmt = g["banlist"]
         qs = qs.filter(banlist="none") if fmt == "none" else qs.filter(Q(banlist=fmt) | Q(banlist__startswith=fmt + ":"))
@@ -190,7 +172,7 @@ def deck_lists(request):
 def deck_list(request, code):
     """One deck list: read by anyone (a tournament's copy by its owner alone), changed by its author, deleted by its
     author or staff."""
-    d = DeckList.objects.filter(code=code, is_deleted=False).select_related("owner", "deck").first()
+    d = DeckList.objects.filter(code=code, is_deleted=False).select_related("owner").first()
     user = request.user
     mine = d is not None and user.is_authenticated and d.owner_id == user.id
     # a tournament's copy and a 비공개 deck are their owner's alone
@@ -223,7 +205,6 @@ def deck_list(request, code):
             setattr(d, k, v)
         d.save()
         _index_cards(d)
-    d.refresh_from_db(fields=["deck"])
     return Response(_full(d, user))
 
 
@@ -278,13 +259,3 @@ def delete_comment(request, pk):
         log_deletion(request.user, c, f"사이트에서 덱 리스트 댓글 삭제: {c.body[:40]}")
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def classify_deck(request):
-    """What 도감 deck these cards make, for the editor to show as it is built: {"deck": the pick or null, "candidates"}."""
-    main, extra = request.data.get("main", []), request.data.get("extra", [])
-    if not all(isinstance(z, list) and all(_is_id(i) for i in z) for z in (main, extra)):
-        return error("카드가 올바르지 않습니다.")
-    found = candidates(main, extra)
-    return Response({"deck": pick(found), "candidates": found})

@@ -3,8 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
-import { classifyDeck, createDeckList, deckNames, getDeckList, updateDeckList } from "@/api/deckListApi";
-import DeckPickerModal from "@/components/DeckPickerModal";
+import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
 import Dropdown from "@/components/Dropdown";
 import BanlistPicker from "@/components/deckbuilder/BanlistPicker";
 import CardInfoSheet, { type CardInfoProps, CardInfoPane } from "@/components/deckbuilder/CardInfoSheet";
@@ -20,8 +19,8 @@ import { useDeckCards } from "@/hooks/useDeckCards";
 import type { ScanFound } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
-  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, MAIN_MIN, addCard, addCards, blankDeck, clearTabDraft, copiesOf, copyIndex,
-  copyRank, coverLook, coverPlace, deckWarnings, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, removeCard, savedCovers, savedDeck, setCover,
+  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, addCard, addCards, blankDeck, clearTabDraft, copiesOf, copyIndex,
+  copyRank, coverLook, coverPlace, deckWarnings, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, removeCard, savedCovers, setCover,
   setLook, setLookAll, shiftCopy, tabDraft,
 } from "@/lib/deckDrafts";
 import { banOf, notOut, unreleasedUnder } from "@/lib/banlists";
@@ -29,15 +28,11 @@ import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
 import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
 
 const GUEST_NOTE = "로그인하면 덱을 올릴 수 있습니다.";
-const SHORT_NOTE = `메인 덱이 ${MAIN_MIN}장 이상이어야 올릴 수 있습니다`;
-const SMALL_BUTTON = "shrink-0 p-0 border-0 bg-transparent text-xs text-blue-600 dark:text-blue-400 hover:underline";
 // who may see the deck (엘리스 2026-10-17): everyone on the board, or its author alone
 const SCOPES = [
   { value: "public", label: "공개", title: "게시판에 올라가 누구나 봅니다" },
   { value: "private", label: "비공개", title: "나만 봅니다" },
 ] as const;
-// how long after the last card goes in or out before the cards are asked what deck they make
-const CLASSIFY_WAIT = 700;
 const FIELD = "w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 /** Making a deck list (/dev/decklists/new) or changing one (/dev/decklists/:code/edit) (덱 구축, 참혈 2026-10-13), laid out
@@ -71,9 +66,6 @@ export default function DeckListEdit() {
   const [coverSlot, setCoverSlot] = useState<number | null>(null);   // the 대표 카드 slot being set
   // undo / redo of the deck's cards and 대표 카드 (참혈 2026-10-16); Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside the boxes
   const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
-  // the 도감 deck picker, for the author to file the deck under another (엘리스 2026-10-17)
-  const [picking, setPicking] = useState(false);
-  const classified = useRef("");   // the cards last asked about, so a deck just read isn't asked again
   // the deck as saved (a new one: empty), which 초기화 brings back (참혈 2026-10-16)
   const saved = useRef<DeckDraft | null>(null);
   const historyKeys = useRef({ undo: () => {}, redo: () => {} });
@@ -104,25 +96,6 @@ export default function DeckListEdit() {
     };
   }, [admin, code, signedIn]);
   useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
-  // the cards say what deck this is (the board files it so, 엘리스 2026-10-17) unless the author picked one; asked a
-  // moment after they stop changing, by members (the server asks them to sign in)
-  const cardKey = deck ? JSON.stringify([deck.main, deck.extra]) : "";
-  useEffect(() => {
-    if (!deck || !signedIn || deck.deckChosen || cardKey === classified.current) return;
-    if (!classified.current) {
-      classified.current = cardKey;   // the deck as read (or empty): the server already said
-      return;
-    }
-    const t = window.setTimeout(() => {
-      classified.current = cardKey;
-      classifyDeck(deck.main, deck.extra).then(
-        (r) => setDeck((d) => (d && !d.deckChosen ? { ...d, deck: r.deck ? { id: r.deck.id, name: r.deck.name } : null } : d)),
-        () => {},
-      );
-    }, CLASSIFY_WAIT);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardKey, signedIn, deck?.deckChosen]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
@@ -233,7 +206,7 @@ export default function DeckListEdit() {
     }
     const body = {
       name: deck.name.trim(), description: deck.description.trim(), main: deck.main, extra: deck.extra, looks: deck.looks, banlist: deck.banlist,
-      ...savedCovers(deck), ...savedDeck(deck), is_private: deck.isPrivate,
+      ...savedCovers(deck), is_private: deck.isPrivate,
     };
     setSaving(true);
     try {
@@ -297,22 +270,6 @@ export default function DeckListEdit() {
 
   const saveLabel = signedIn ? "저장" : "로그인하고 저장";
   const named = !!deck?.name.trim();
-  const short = !!deck && deck.main.length < MAIN_MIN;
-  // the author files the deck under a 도감 deck of their own choosing, none, or leaves it to the cards again
-  const file = (id: number | null) => {
-    if (!deck) return;
-    setPicking(false);
-    if (id === null) {
-      setDeck({ ...deck, deck: null, deckChosen: true });
-      return;
-    }
-    deckNames().then((names) => setDeck((d) => (d ? { ...d, deck: { id, name: names.get(id) ?? `덱 ${id}` }, deckChosen: true } : d)));
-  };
-  const fileAuto = () => {
-    if (!deck) return;
-    classified.current = "";
-    setDeck({ ...deck, deckChosen: false });
-  };
 
   return (
     <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6">
@@ -344,9 +301,9 @@ export default function DeckListEdit() {
                   <button
                     type="button"
                     onClick={save}
-                    disabled={!named || short || saving}
+                    disabled={!named || saving}
                     aria-label={saveLabel}
-                    title={!named ? "덱 이름을 넣으면 올릴 수 있습니다" : short ? SHORT_NOTE : saveLabel}
+                    title={named ? saveLabel : "덱 이름을 넣으면 올릴 수 있습니다"}
                     className={`${DECK_ICON} text-gray-500 dark:text-gray-400 enabled:hover:text-gray-800 dark:enabled:hover:text-gray-100 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
                   >
                     {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <SaveLineIcon className={DECK_ICON_SIZE} />}
@@ -389,15 +346,8 @@ export default function DeckListEdit() {
                   onChange={(e) => setDeck({ ...deck, description: e.target.value })}
                   className={`${FIELD} px-3 py-2 text-base md:text-sm flex-1 min-h-[3.5rem] resize-y`}
                 />
-                {/* the 도감 deck the board files it under (엘리스 2026-10-17): the cards' say, or the author's pick */}
+                {/* 공개 or 비공개 under the description, at the line's end (엘리스 2026-10-17) */}
                 <div className="mt-2 h-6 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="shrink-0">분류</span>
-                  <span className="min-w-0 truncate font-semibold text-gray-800 dark:text-gray-100">{deck.deck?.name ?? "없음"}</span>
-                  <span className="shrink-0">{deck.deckChosen ? "직접 고름" : "자동"}</span>
-                  <button type="button" onClick={() => setPicking(true)} className={SMALL_BUTTON}>바꾸기</button>
-                  {deck.deckChosen && <button type="button" onClick={fileAuto} className={SMALL_BUTTON}>자동으로</button>}
-                  {deck.deckChosen && deck.deck && <button type="button" onClick={() => file(null)} className={SMALL_BUTTON}>없음으로</button>}
-                  {/* 공개 or 비공개, at the line's end (엘리스 2026-10-17) */}
                   <span className="ml-auto shrink-0">
                     <Dropdown
                       value={deck.isPrivate ? "private" : "public"}
@@ -427,6 +377,7 @@ export default function DeckListEdit() {
                 rule={rule}
                 onRemove={coverSlot === null ? remove : putCover}
                 onShow={showFromDeck}
+                onDrop={coverSlot === null ? (c) => pick(c) : undefined}
                 picking={coverSlot !== null}
                 marks={marks}
               />
@@ -438,6 +389,7 @@ export default function DeckListEdit() {
                   onPick={(c) => pick(c)}
                   onPickAll={pickAll}
                   onShow={showFromSearch}
+                  onDropOut={coverSlot === null ? remove : undefined}
                   // from lg the card shown takes the search's place, ← 뒤로 bringing the search back as it was (참혈 2026-10-16)
                   overlay={wide && info ? <CardInfoPane {...info} onClose={closeSheet} /> : null}
                   notice={notice}
@@ -448,7 +400,6 @@ export default function DeckListEdit() {
             </div>
           </DeckPage>
           {!wide && info && <CardInfoSheet {...info} onClose={closeSheet} />}
-          <DeckPickerModal open={picking} onClose={() => setPicking(false)} onPick={file} />
         </>
       ) : (
         <DeckNotFound signedIn={signedIn} />

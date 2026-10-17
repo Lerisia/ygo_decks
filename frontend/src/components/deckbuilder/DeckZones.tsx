@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOUSE_QUERY, draggedCardZone, droppedCard, startDeckCardDrag } from "@/lib/deckDrag";
 import CardKindTag from "@/components/CardKindTag";
 import { type BanLimit, type BanRule, banOf, notOut, unreleasedUnder } from "@/lib/banlists";
 import {
@@ -42,7 +45,7 @@ function OverRing({ ban }: { ban?: BanLimit }) {
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, reserve, picking, marks }: {
+function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, reserve, picking, marks, mouse, lit }: {
   zone: DeckZone;
   /** as kept: an id once per copy, in the order they went in */
   ids: number[];
@@ -58,6 +61,10 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
   picking?: boolean;
   /** the 대표 카드 slot (1–3) of the copy at each place marked */
   marks?: Map<number, number>;
+  /** a mouse: copies drag out, and the titles say so */
+  mouse?: boolean;
+  /** a card from the search is being dragged over the deck and belongs here */
+  lit?: boolean;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
@@ -66,7 +73,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
   // them (참혈 2026-10-16)
   const over = new Map(overLimit(ids, cards, rule).map((o) => [o.card.id, o.ban]));
   return (
-    <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
+    <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking || lit ? "ring-2 ring-blue-500/70" : ""}`}>
       {/* the zone on the left, how many of each kind on the right, on a phone too (참혈 2026-10-16) */}
       <header className="mb-2 flex items-start justify-between gap-2 sm:gap-3">
         <h2 className="m-0 h-6 flex items-baseline gap-2 shrink-0 whitespace-nowrap text-base">
@@ -105,8 +112,12 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
               <button
                 key={`${id}-${at}`}
                 type="button"
-                {...press(() => onRemove(at), () => onShow?.(card, at))}
-                title={picking ? `${card.name} (눌러서 대표 카드로)` : `${card.name} (눌러서 빼기, 길게 누르거나 오른쪽 클릭으로 보기)`}
+                {...press(() => onRemove(at), () => onShow?.(card, at), picking)}
+                // a mouse drags a copy out, onto the search (엘리스 2026-10-18: as the game's PC editor)
+                draggable={mouse && !picking}
+                onDragStart={(e) => startDeckCardDrag(e, zone, at)}
+                title={picking ? `${card.name} (눌러서 대표 카드로)`
+                  : mouse ? `${card.name} (오른쪽 클릭이나 검색 쪽으로 끌어서 빼기, 눌러서 보기)` : `${card.name} (눌러서 빼기, 길게 누르면 보기)`}
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
@@ -128,7 +139,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
         </div>
       ) : (
         <p className={`${reserve ? "deck-zone-reserve" : "h-16"} m-0 flex items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 break-keep`}>
-          {onRemove ? "검색에서 카드를 누르면 여기에 들어갑니다." : "카드가 없습니다."}
+          {onRemove ? (mouse ? "검색에서 카드를 오른쪽 클릭하거나 끌어다 놓으면 여기에 들어갑니다." : "검색에서 카드를 누르면 여기에 들어갑니다.") : "카드가 없습니다."}
         </p>
       )}
       </div>
@@ -139,7 +150,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, picking, marks }: {
+export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, onDrop, picking, marks }: {
   deck: Pick<DeckDraft, DeckZone> & { looks: DeckLooks };
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
@@ -148,15 +159,41 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
   rule?: BanRule;
   /** Building: the copy pressed, by its place in the zone as kept. */
   onRemove?: (zone: DeckZone, at: number) => void;
-  /** Building: a copy held or right-clicked is shown. */
+  /** Building: a copy held (a finger) or clicked (a mouse) is shown. */
   onShow?: (card: CardListItem, zone: DeckZone, at: number) => void;
+  /** Building: a card from the search dropped on the deck with a mouse goes in (엘리스 2026-10-18). */
+  onDrop?: (card: CardListItem) => void;
   /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: each zone's places
    *  holding one, with their slot. */
   picking?: boolean;
   marks?: Record<DeckZone, Map<number, number>>;
 }) {
+  const mouse = useMediaQuery(MOUSE_QUERY);
+  // the zone a card being dragged over the deck belongs in, lit while it is (counted in and out of the children)
+  const [drag, setDrag] = useState<{ zone: DeckZone; depth: number } | null>(null);
   return (
-    <div className="flex flex-col gap-3 min-w-0">
+    <div
+      className="flex flex-col gap-3 min-w-0"
+      onDragEnter={(e) => {
+        const zone = onDrop && draggedCardZone(e);
+        if (zone) setDrag((d) => ({ zone, depth: (d?.depth ?? 0) + 1 }));
+      }}
+      onDragOver={(e) => {
+        if (!onDrop || !draggedCardZone(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (onDrop && draggedCardZone(e)) setDrag((d) => (d && d.depth > 1 ? { ...d, depth: d.depth - 1 } : null));
+      }}
+      onDrop={(e) => {
+        setDrag(null);
+        const card = onDrop && droppedCard(e);
+        if (!card) return;
+        e.preventDefault();
+        onDrop(card);
+      }}
+    >
       {ZONES.map((z) => (
         <Zone
           key={z}
@@ -172,6 +209,8 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
           reserve={!!onRemove}
           picking={picking}
           marks={marks?.[z]}
+          mouse={mouse && !!onRemove}
+          lit={drag?.zone === z}
         />
       ))}
     </div>

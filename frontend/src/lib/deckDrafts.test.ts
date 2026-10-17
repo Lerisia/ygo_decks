@@ -287,11 +287,9 @@ describe("decks kept outside the server", () => {
     expect(fromDoc(doc)).toEqual({
       code: "ab12cd34", name: "덱", description: "", createdAt: "a", updatedAt: "b", main: [1, 1], extra: [],
       looks: { main: [null, { face: 9, finish: "royal" }], extra: [] }, covers: [{ id: 1, copy: 1 }], banlist: "md",
-      deck: null, deckChosen: false, isPrivate: false,
+      isPrivate: false,
     });
     expect(fromDoc({ ...doc, is_private: true }).isPrivate).toBe(true);
-    // filed under a 도감 deck on the board (엘리스 2026-10-17): the cards' say, or the author's pick
-    expect(fromDoc({ ...doc, deck: { id: 7, name: "히어로" }, deck_chosen: true })).toMatchObject({ deck: { id: 7, name: "히어로" }, deckChosen: true });
     // a deck from before looks and copies (or one whose looks no longer line up): plain, the first copy
     expect(fromDoc({ ...doc, looks: { main: [null], extra: [] }, cover_copies: undefined }))
       .toMatchObject({ looks: { main: [null, null], extra: [] }, covers: [{ id: 1, copy: 0 }] });

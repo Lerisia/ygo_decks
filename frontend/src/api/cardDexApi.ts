@@ -37,7 +37,7 @@ export const EMPTY_FILTERS: CardFilters = {
 };
 
 /** The way a sort goes when none is chosen. */
-export const sortDir = (f: CardFilters) => f.dir || (f.sort === "new" || f.sort === "popular" ? "desc" : "asc");
+export const sortDir = (f: Pick<CardFilters, "sort" | "dir">) => f.dir || (f.sort === "new" || f.sort === "popular" ? "desc" : "asc");
 
 export type CardListItem = {
   id: number;

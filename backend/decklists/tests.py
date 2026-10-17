@@ -6,7 +6,6 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from carddb.models import Banlist, BanlistEntry, Card, MdPrint
-from deck.models import Deck, DeckCard
 from notification.models import Notification
 from user.models import User
 
@@ -20,10 +19,6 @@ def card(cid, name, frame="effect", category="monster"):
 def fillers(n=12, start=100):
     """Cards to bring a main deck to 40: three copies each of n plain monsters, as a list of ids."""
     return [c.id for c in (card(start + i, f"채움 {i:02d}") for i in range(n)) for _ in range(3)]
-
-
-def site_deck(name):
-    return Deck.objects.create(name=name, strength=0, difficulty=0, deck_type=0, art_style=0)
 
 
 def as_user(user=None):
@@ -79,7 +74,7 @@ class DeckListApiTest(TestCase):
         self.assertEqual(self.c.put("/api/decklists/entry001/", self.body(), format="json").status_code, 403)
         self.assertEqual(self.c.delete("/api/decklists/entry001/").status_code, 403)
         self.assertTrue(DeckList.objects.filter(code="entry001").exists())
-        self.assertNotIn(DeckList.new_code(), ("new", "classify", "comments"))
+        self.assertNotIn(DeckList.new_code(), ("new", "comments"))
 
     def test_anyone_reads_only_the_author_writes(self):
         code = self.c.post("/api/decklists/", self.body(), format="json").json()["code"]
@@ -106,7 +101,6 @@ class DeckListApiTest(TestCase):
             "a main deck card in the extra": self.body(extra=[1]),
             "no such card": self.body(main=[999] + self.fill + [1] * 3),
             "61 in the main": self.body(main=[1, 1, 1] + [2] * 58),
-            "39 in the main": self.body(main=[1, 1, 1] + self.fill),
             "a 2,001-letter description": self.body(description="가" * 2001),
         }
         for why, body in bad.items():
@@ -115,6 +109,15 @@ class DeckListApiTest(TestCase):
             self.assertTrue(r.json().get("error"), why)
         self.assertEqual(self.c.post("/api/decklists/", self.body(main=[1, 1, 1] + self.fill + [2]), format="json").status_code, 201)
         self.assertEqual(DeckList.objects.count(), 1)
+
+    def test_a_deck_short_of_forty_is_posted_and_told(self):
+        """엘리스 2026-10-18: a deck still being built goes up as it is, marked 40장 미만 (the 2026-10-17 rule that
+        held it back is gone)."""
+        r = self.c.post("/api/decklists/", self.body(main=[1, 1, 1] + self.fill), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        self.assertEqual(r.json()["issues"][0], "메인 덱이 40장보다 적습니다 (39/40).")
+        self.assertEqual(self.c.get("/api/decklists/").json()["results"][0]["main_count"], 39)
+        self.assertEqual(self.c.post("/api/decklists/", self.body(main=[], extra=[]), format="json").status_code, 201)
 
     def test_what_it_is_only_told(self):
         # more of a card than today's Master Duel list allows: posted, and said
@@ -366,7 +369,7 @@ class DeckBoardTest(TestCase):
         self.c.put(f"/api/decklists/{self.first}/", {"name": "첫 덱 고침", "main": [1, 1, 1] + self.fill + [2], "extra": []}, format="json")
         self.assertEqual([d["code"] for d in self.board()["results"]], [self.theirs, self.second, self.first])
 
-    def test_narrowed_by_author_card_name_banlist_and_deck(self):
+    def test_narrowed_by_author_card_name_and_banlist(self):
         self.assertEqual([d["code"] for d in self.board(author="me")["results"]], [self.second, self.first])
         self.assertEqual([d["code"] for d in self.board(card=3)["results"]], [self.theirs])
         self.assertEqual(self.board(card="x")["total"], 0)
@@ -374,9 +377,6 @@ class DeckBoardTest(TestCase):
         self.assertEqual([d["code"] for d in self.board(banlist="ocg")["results"]], [self.second])
         self.assertEqual(self.board(banlist="md")["total"], 2)
         self.assertEqual(self.board(banlist="xx")["total"], 3)
-        # the 도감 deck: none have one yet
-        self.assertEqual(self.board(deck="none")["total"], 3)
-        self.assertEqual(self.board(deck=1)["total"], 0)
         # the card rows the search runs on follow a change
         self.c.put(f"/api/decklists/{self.first}/", {"name": "첫 덱", "main": [1, 1, 1] + self.fill + [2], "extra": [3]}, format="json")
         self.assertEqual(self.board(card=3)["total"], 2)
@@ -483,31 +483,3 @@ class DeckBoardTest(TestCase):
         self.assertEqual(self.c.put(f"/api/decklists/{code}/", body, format="json").json()["is_private"], True)
         self.assertEqual(self.g.get(f"/api/decklists/{code}/").status_code, 404)
         self.assertEqual(self.board()["results"][0]["is_private"], False)
-
-    def test_filed_under_the_deck_its_cards_say_unless_the_author_picks(self):
-        ash_deck = site_deck("재와 유령 덱")
-        DeckCard.objects.create(deck=ash_deck, card=self.ash)
-        pot_deck = site_deck("항아리 덱")
-        r = self.c.post("/api/decklists/", {"name": "재", "main": [1, 1, 1] + self.fill + [2], "extra": []}, format="json")
-        self.assertEqual(r.status_code, 201, r.json())
-        code = r.json()["code"]
-        self.assertEqual((r.json()["deck"], r.json()["deck_chosen"]), ({"id": ash_deck.id, "name": "재와 유령 덱"}, False))
-        self.assertEqual([d["code"] for d in self.board(deck=ash_deck.id)["results"]], [code])
-        # the author picks another, or none; a page sending nothing keeps the pick; letting go asks the cards again
-        body = {"name": "재", "main": [1, 1, 1] + self.fill + [2], "extra": []}
-        r = self.c.put(f"/api/decklists/{code}/", {**body, "deck": pot_deck.id}, format="json")
-        self.assertEqual((r.json()["deck"]["id"], r.json()["deck_chosen"]), (pot_deck.id, True))
-        r = self.c.put(f"/api/decklists/{code}/", {**body, "deck": None}, format="json")
-        self.assertEqual((r.json()["deck"], r.json()["deck_chosen"]), (None, True))
-        self.assertEqual(self.c.put(f"/api/decklists/{code}/", body, format="json").json()["deck"], None)
-        r = self.c.put(f"/api/decklists/{code}/", {**body, "deck_chosen": False}, format="json")
-        self.assertEqual((r.json()["deck"]["id"], r.json()["deck_chosen"]), (ash_deck.id, False))
-        self.assertEqual(self.c.put(f"/api/decklists/{code}/", {**body, "deck": 999}, format="json").status_code, 400)
-        # the editor asks as the deck is built
-        r = self.c.post("/api/decklists/classify/", {"main": [1, 1, 2], "extra": []}, format="json")
-        self.assertEqual(r.status_code, 200, r.json())
-        self.assertEqual(r.json()["deck"]["id"], ash_deck.id)
-        self.assertEqual([c["name"] for c in r.json()["candidates"]], ["재와 유령 덱"])
-        self.assertEqual(self.c.post("/api/decklists/classify/", {"main": [2], "extra": []}, format="json").json(), {"deck": None, "candidates": []})
-        self.assertEqual(self.c.post("/api/decklists/classify/", {"main": ["1"], "extra": []}, format="json").status_code, 400)
-        self.assertIn(self.g.post("/api/decklists/classify/", {"main": [1], "extra": []}, format="json").status_code, (401, 403))

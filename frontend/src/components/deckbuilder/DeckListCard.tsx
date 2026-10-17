@@ -1,26 +1,26 @@
 import { Link } from "react-router-dom";
 import { Heart, Lock, MessageCircle } from "lucide-react";
-import type { DeckListAuthor, DeckListDeck } from "@/api/deckListApi";
+import type { DeckListAuthor } from "@/api/deckListApi";
 import DeckAuthor from "./DeckAuthor";
-import { type DeckDraft, deckDay, deckUpdated } from "@/lib/deckDrafts";
+import { type DeckDraft, MAIN_MIN, deckDay, deckUpdated } from "@/lib/deckDrafts";
 
 /** Every deck card and the dashed one standing in for an empty board are this tall, so the grid never changes size. */
 const CARD_BOX = "h-[8.25rem] rounded-xl";
 
 /** One deck list on the board (참혈 2026-10-14, made slimmer; on the board 엘리스 2026-10-17): its name and the day it
  *  was last saved at the top left, who posted it at the top right, two lines of its description under them, and at
- *  the bottom the 도감 deck it is filed under with how many liked it and wrote under it. */
-export default function DeckListCard({ deck, to, author, filed, likes = 0, comments = 0, liked = false, isPrivate = false }: {
+ *  the bottom its size with how many liked it and wrote under it. */
+export default function DeckListCard({ deck, to, author, likes = 0, comments = 0, liked = false, isPrivate = false, mainCount }: {
   deck: Pick<DeckDraft, "name" | "description" | "createdAt" | "updatedAt">;
   to: string;
   author?: DeckListAuthor;
-  /** the 도감 deck it is filed under; none, 분류 없음 */
-  filed?: DeckListDeck | null;
   likes?: number;
   comments?: number;
   liked?: boolean;
   /** 비공개: the author's own, seen by no one else (a lock before the name) */
   isPrivate?: boolean;
+  /** how many in the main deck: short of 40, a warning (엘리스 2026-10-18: posted all the same) */
+  mainCount?: number;
 }) {
   return (
     <Link
@@ -43,8 +43,11 @@ export default function DeckListCard({ deck, to, author, filed, likes = 0, comme
         {deck.description || "설명이 없습니다."}
       </p>
       <div className="mt-2 h-5 flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-        <span className="min-w-0 truncate">
-          {filed ? <span className="font-semibold text-gray-700 dark:text-gray-200">{filed.name}</span> : "분류 없음"}
+        <span className="min-w-0 flex items-center gap-2 truncate tabular-nums">
+          {mainCount !== undefined && <span>메인 {mainCount}장</span>}
+          {mainCount !== undefined && mainCount < MAIN_MIN && (
+            <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">{MAIN_MIN}장 미만</span>
+          )}
         </span>
         <span className="shrink-0 flex items-center gap-2.5 tabular-nums">
           <span className={`inline-flex items-center gap-1 ${liked ? "text-red-500" : ""}`}>
