@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Camera, PenLine } from "lucide-react";
 import { getUserInfo, isAuthenticated } from "@/api/accountApi";
 import { type DeckListBanlistKind, type DeckListPage, createDeckList, listDeckLists } from "@/api/deckListApi";
-import DeckListCard, { DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
+import DeckListCard, { DECK_CARD_HEIGHT, DeckListAddCard } from "@/components/deckbuilder/DeckListCard";
 import Dropdown from "@/components/Dropdown";
 import SearchForm from "@/components/SearchForm";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
@@ -129,18 +129,17 @@ export default function DeckLists() {
       ) : (
         <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 list-none p-0">
           {data === null ? (
-            Array.from({ length: 6 }, (_, i) => <li key={i} className="h-[8.25rem] rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />)
+            Array.from({ length: 6 }, (_, i) => <li key={i} className={`${DECK_CARD_HEIGHT} rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse`} />)
           ) : data.results.length ? (
             data.results.map((d) => (
               <li key={d.code}>
                 <DeckListCard
-                  deck={{ name: d.name, description: d.description, createdAt: d.created_at, updatedAt: d.updated_at }}
+                  deck={{ name: d.name, createdAt: d.created_at, updatedAt: d.updated_at }}
                   to={deckListPath(d.code)}
                   author={d.author}
                   comments={d.comment_count ?? 0}
                   isPrivate={d.is_private}
-                  mainCount={d.main_count}
-                  extraCount={d.extra_count}
+                  banlist={d.banlist}
                 />
               </li>
             ))
