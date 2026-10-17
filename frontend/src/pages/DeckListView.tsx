@@ -144,10 +144,10 @@ export default function DeckListView() {
           {/* under the deck: the 도감 deck it is filed under and 덱 코드 on the left, the exports on the right (참혈 2026-10-17; the
               export buttons alone for now) — on a phone the exports drop to a second line, still at the right */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0 flex-1 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            <div className="shrink-0 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
               <span className="shrink-0">분류</span>
               {deck.deck ? (
-                <Link to={`/database/${deck.deck.id}`} className="min-w-0 truncate font-semibold text-gray-800 dark:text-gray-100 hover:underline">{deck.deck.name}</Link>
+                <Link to={`/database/${deck.deck.id}`} className="max-w-[10rem] truncate font-semibold text-gray-800 dark:text-gray-100 hover:underline">{deck.deck.name}</Link>
               ) : (
                 <span>없음</span>
               )}
