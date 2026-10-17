@@ -8,7 +8,7 @@ import time
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from carddb import banlist
+from carddb import banlist, official_lists
 from carddb.models import Banlist, BanlistEntry
 
 PAUSE = 1.5   # seconds between asks: Yugipedia is a volunteer wiki
@@ -66,7 +66,12 @@ class Command(BaseCommand):
         lost, resolved = {}, {}
         with transaction.atomic():
             for page_title, p in pages:
-                b, _ = Banlist.objects.update_or_create(format=fmt, effective=p.effective, defaults={"source": page_title})
+                b, made = Banlist.objects.get_or_create(format=fmt, effective=p.effective, defaults={"source": page_title})
+                if not made and official_lists.is_official(b):
+                    continue   # the game's own page gave this list (import_official_lists): it stands
+                if b.source != page_title:
+                    b.source = page_title
+                    b.save(update_fields=["source"])
                 rows = []
                 for name, status, previous in p.entries:
                     card_id = index.match(name)

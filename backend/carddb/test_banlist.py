@@ -204,6 +204,16 @@ class ImportBanlistsTest(TestCase):
         july = Banlist.objects.get(effective=date(2022, 7, 11))
         self.assertEqual(list(july.entries.values_list("card_id", "status")), [(10, "limited")])
 
+    def test_a_list_from_the_games_own_page_stands(self):
+        """A list import_official_lists gave (source "official:…") is not written over by Yugipedia's (엘리스 10/17)."""
+        b = Banlist.objects.create(format="md", effective=date(2022, 5, 9), source="official:https://example.test/list")
+        BanlistEntry.objects.create(banlist=b, name="Pot of Greed", card_id=10, status="limited")
+        self.run_import()
+        b.refresh_from_db()
+        self.assertEqual(b.source, "official:https://example.test/list")
+        self.assertEqual(list(b.entries.values_list("name", "status")), [("Pot of Greed", "limited")])
+        self.assertEqual(Banlist.objects.count(), 2)   # the January list came in as usual
+
     def test_a_card_found_later_is_linked(self):
         self.run_import()
         Card.objects.create(id=13, category="spell", name_ja="Lost Card", name_en="Lost Card", frame="spell")
