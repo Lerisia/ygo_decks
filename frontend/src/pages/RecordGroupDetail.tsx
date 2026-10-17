@@ -364,7 +364,8 @@ const RecordGroupDetailPage = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [winOptions, setWinOptions] = useState<{ value: number; label: string }[]>([]);
   const [lastMatch, setLastMatch] = useState<MatchRecord | null>(null);
-  const deckDefaulted = useRef(false);   // whether 내 덱 has been set from the sheet's recent_deck this visit
+  // the sheet's recent_deck (the deck I last recorded with there, null when none), undefined until the sheet answers
+  const [recentDeck, setRecentDeck] = useState<number | null | undefined>(undefined);
   // The form starts folded so the sheet's state shows first; whoever opens it keeps it open next time.
   const [showRegisterForm, setShowRegisterForm] = useState(() => {
     try { return localStorage.getItem("record_form_open") === "1"; } catch { return false; }
@@ -505,12 +506,7 @@ const RecordGroupDetailPage = () => {
       setMatches(response.matches);
       setDays(response.days ?? {});
       setTotalPages(response.total_pages);
-      // the form starts on the deck I last recorded with here (엘리스 2026-10-17), once a visit: a deck cleared on
-      // purpose stays cleared through the polling
-      if (!deckDefaulted.current && response.recent_deck != null) {
-        deckDefaulted.current = true;
-        setNewMatch((prev) => (prev.deck ? prev : { ...prev, deck: String(response.recent_deck) }));
-      }
+      setRecentDeck(response.recent_deck ?? null);   // the deck I last recorded with here, for the next-match defaults
       setRecordGroupName(response.record_group_name);
       setIsPublic(response.is_public);
       setIsOwner(response.is_owner);
@@ -614,17 +610,18 @@ const RecordGroupDetailPage = () => {
  // same record, and re-applying it used to wipe an opponent deck / memo the person was still typing.
  const appliedLastMatchId = useRef<number | null>(null);
  useEffect(() => {
-  if (!lastMatch || owned_decks.length === 0) return;
+  if (!lastMatch || recentDeck === undefined) return;
   if (appliedLastMatchId.current === lastMatch.id) return;
   appliedLastMatchId.current = lastMatch.id;
   const formTouched =
     !!newMatch.opponent_deck || !!newMatch.opponent_deck_name.trim() || !!newMatch.notes.trim();
   if (formTouched) return;
 
-  const matchedDeck = owned_decks.find((d) => d.id === lastMatch.deck?.id);
-
+  // 내 덱: the deck I last recorded with in this sheet (엘리스 2026-10-17: "최근 쓴 덱을 기본 내 덱 설정으로"), whether or
+  // not it is among my owned decks (every deck is in the list, owned ones first); on a sheet I have no record in, the
+  // sheet's last record's deck, 기타 when that had none
   const base: Partial<MatchForm> = {
-    deck: !lastMatch.deck ? "null" : matchedDeck ? String(matchedDeck.id) : "",
+    deck: recentDeck != null ? String(recentDeck) : !lastMatch.deck ? "null" : String(lastMatch.deck.id),
     opponent_deck: "",
     opponent_deck_name: "",
     first_or_second: "first",
@@ -668,7 +665,7 @@ const RecordGroupDetailPage = () => {
   }
   // newMatch is read for the touched check only; adding it here would re-run this on every keystroke.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [lastMatch, owned_decks]);
+}, [lastMatch, recentDeck]);
 
   const handleRegisterMatch = async () => {
     if (!newMatch.deck) return;
