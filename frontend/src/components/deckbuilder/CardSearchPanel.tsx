@@ -8,6 +8,10 @@ import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardLi
 import { barFilters, groupItems } from "@/lib/cardFilterBar";
 import { CARD_SORTS, rememberSort, rememberedSort } from "@/lib/cardSorts";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
+import CardKindTag from "@/components/CardKindTag";
+import { cardTag } from "@/lib/cardTag";
+import { orderSuggestions, type RankedSuggestion } from "@/lib/suggestionOrder";
+import { matchRank, nameKeys } from "@/utils/hangul";
 import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
@@ -48,6 +52,9 @@ function TileSkeleton() {
  *  the chips and the 카드군·서포트 make way for one row with the picture, how many cards were read and 다른 사진, and
  *  the cards read take the cards' place, pressed to leave them out of 전체 투입 (참혈 2026-10-17); typing goes back. The picture
  *  and its cards stay while the search goes back and forth. */
+const SUGGESTIONS_SHOWN = 10;
+type Suggestion = RankedSuggestion & { key: string; name: string; tag: string; frame?: string; sub?: string; group?: string; card?: CardListItem };
+
 export type DeckUndo = { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void };
 
 const STEP_BUTTON = "w-7 h-7 p-0 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:text-gray-300 dark:disabled:text-gray-600 disabled:bg-white dark:disabled:bg-gray-800 disabled:cursor-not-allowed";
@@ -189,11 +196,54 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   const searching = !!(q || chosen || Object.values(bar).some(Boolean));
   const noMatch = !loading && total === 0;
 
-  // the results follow the typing a moment after it stops, as in the card book
+  // Below lg the results follow the typing a moment after it stops, as in the card book. From lg the box suggests
+  // instead, in the cards' place, as /dev/cards does (참혈 2026-10-18): the 카드군·서포트 and the cards whose names
+  // answer, in one list, the 카드군·서포트 picked going into the box as a chip and a card picked shown; Enter searches
+  // the names. The box emptied shows the cards again.
   useEffect(() => {
-    const t = setTimeout(() => setQ(qInput.trim()), 150);
+    const t = setTimeout(() => (!wide || !qInput.trim()) && setQ(qInput.trim()), 150);
     return () => clearTimeout(t);
-  }, [qInput]);
+  }, [qInput, wide]);
+  const suggesting = wide && !imaging && !!typed && typed !== q;
+  const [nameHits, setNameHits] = useState<CardListItem[]>([]);
+  useEffect(() => {
+    if (!suggesting) {
+      setNameHits([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      listCards({ ...EMPTY_FILTERS, ...bar, q: typed }, 1, ctrl.signal).then((r) => setNameHits(r.results.slice(0, 6))).catch(() => {});
+    }, 150);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggesting, typed, chips]);
+  const rows: Suggestion[] = useMemo(() => {
+    if (!suggesting) return [];
+    const rank = matchRank(typed);
+    return orderSuggestions<Suggestion>([
+      ...suggestions.map(({ it, rank, order }) => {
+        const support = it.tag === "카드";
+        return {
+          key: it.key, name: it.name, tag: support ? "서포트" : "카드군", group: it.key, rank, order,
+          kind: support ? ("support" as const) : ("group" as const), sub: support ? it.sub?.replace(/^서포트\s*/, "") : it.sub,
+        };
+      }),
+      ...nameHits.map((c, i) => ({
+        key: `card${c.id}`, name: c.name, tag: cardTag(c), frame: c.frame, card: c, rank: rank(nameKeys(c.name)), kind: "card" as const, order: i,
+      })),
+    ], SUGGESTIONS_SHOWN);
+  }, [suggesting, suggestions, nameHits, typed]);
+  const [active, setActive] = useState(-1);   // the suggestion marked with the arrow keys; -1: Enter searches the names
+  useEffect(() => setActive(-1), [typed]);
+  const pickRow = (it: Suggestion) => {
+    setActive(-1);
+    if (it.group) pickGroup(it.group);
+    else if (it.card) onShow?.(it.card);
+  };
 
   useEffect(() => {
     const id = ++request.current;
@@ -309,7 +359,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
       {/* the box, and at its right outside it the camera on a coloured ground, easier to see than an icon in the box
           (참혈 2026-10-17) */}
       <div className="order-5 flex items-center gap-1.5 lg:order-none">
-        <SearchForm onSearch={() => setQ(qInput.trim())}>
+        <SearchForm onSearch={() => (suggesting && rows[active] ? pickRow(rows[active]) : setQ(qInput.trim()))}>
           <div className={`min-w-0 flex-1 flex items-center gap-1.5 h-10 lg:h-9 rounded-lg border border-input bg-white dark:bg-gray-900 ${chosenItem ? "pl-1.5" : "pl-3"} pr-2 shadow-sm focus-within:ring-1 focus-within:ring-ring`}>
             {/* a 카드군 or support list picked sits in the box as a chip */}
             {chosenItem && (
@@ -330,7 +380,13 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
                 setQInput(e.target.value);
                 setImaging(false);
               }}
-              onKeyDown={(e) => e.key === "Backspace" && !qInput && chosen && setChosen("")}
+              onKeyDown={(e) => {
+                if (e.key === "Backspace" && !qInput && chosen) setChosen("");
+                else if (suggesting && rows.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                  e.preventDefault();
+                  setActive(Math.max(-1, Math.min(rows.length - 1, active + (e.key === "ArrowDown" ? 1 : -1))));
+                }
+              }}
               enterKeyHint="search"
               className="min-w-0 flex-1 h-full bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -363,7 +419,6 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           onChange={(f) => setBar({ ...bar, ...f })}
           right={
             <div className="flex items-center gap-1.5">
-              <span className="lg:hidden"><CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact /></span>
               {history && <UndoButtons {...history} />}
             </div>
           }
@@ -377,8 +432,9 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           add={onPickAll && { label: skipped.size ? `${putCount}장 투입` : "전체 투입", count: putCount, onClick: () => ready && onPickAll(toPut) }}
           className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
       )}
+      {/* below lg only: from lg the 카드군·서포트 are among the box's suggestions (참혈 2026-10-18) */}
       {!imaging && suggestions.length > 0 && (
-        <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:order-none lg:mt-2 lg:flex-wrap lg:overflow-visible">
+        <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:hidden">
           {suggestions.map(({ it }) => {
             const support = it.tag === "카드";
             return (
@@ -396,8 +452,9 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           })}
         </div>
       )}
+      {/* how many cards were found and the sort, over the cards on a phone too (참혈 2026-10-18); a notice in the count's place */}
       <div
-        className={`order-1 h-5 px-0.5 text-xs lg:order-none lg:mt-1.5 lg:h-7 lg:px-0 lg:flex lg:items-center lg:gap-2 ${notice || (error && !imaging) ? "" : "hidden"}`}
+        className={`order-1 h-7 px-0.5 flex items-center gap-2 text-xs lg:order-none lg:mt-1.5 lg:px-0 ${notice || (error && !imaging) || (searching && !imaging) ? "" : "hidden lg:flex"}`}
       >
         <p className="m-0 min-w-0 flex-1 truncate" aria-live="polite">
           {notice ? (
@@ -405,11 +462,11 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           ) : imaging ? null : error ? (
             <span className="text-red-600 dark:text-red-400">{error}</span>
           ) : (
-            total !== null && <span className="text-gray-500 dark:text-gray-400 tabular-nums">카드 {total.toLocaleString()}장</span>
+            !suggesting && total !== null && <span className="text-gray-500 dark:text-gray-400 tabular-nums">카드 {total.toLocaleString()}장</span>
           )}
         </p>
         {!imaging && (
-          <span className="hidden lg:block shrink-0">
+          <span className="shrink-0">
             <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact />
           </span>
         )}
@@ -435,7 +492,30 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           searching ? "" : "hidden lg:block"
         }`}
       >
-        {noMatch ? (
+        {suggesting ? (
+          rows.length ? (
+            <ul role="listbox" aria-label="검색 추천" onMouseLeave={() => setActive(-1)} className="m-0 p-0 list-none">
+              {rows.map((it, i) => (
+                <li
+                  key={it.key}
+                  role="option"
+                  aria-selected={i === active}
+                  onClick={() => pickRow(it)}
+                  onMouseEnter={() => setActive(i)}
+                  className={`px-2 py-2 flex items-center justify-between gap-3 rounded-md text-sm cursor-pointer ${i === active ? "bg-blue-50 dark:bg-gray-700" : ""}`}
+                >
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <CardKindTag tag={it.tag} frame={it.frame} />
+                    <span className="break-keep text-left">{it.name}</span>
+                  </span>
+                  {it.sub && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{it.sub}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="m-0 py-10 text-center text-sm text-gray-500 dark:text-gray-400 break-keep">맞는 추천이 없습니다. Enter로 카드 이름을 검색합니다.</p>
+          )
+        ) : noMatch ? (
           <p className="h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 lg:h-auto lg:py-10">맞는 카드가 없습니다.</p>
         ) : (
           <div

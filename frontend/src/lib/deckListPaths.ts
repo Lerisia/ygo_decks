@@ -17,4 +17,5 @@ export const isDeckEditorPath = (path: string) =>
  *  search grows or shrinks. */
 // the cards row, the 카드군·서포트 row and the filter chips over the box (참혈 2026-10-15); the image search's cards
 // row and picture row stand lower (2026-10-16)
-export const DECK_EDITOR_ROOM = "lg:hidden h-[calc(17rem+env(safe-area-inset-bottom))] sm:h-[calc(18rem+env(safe-area-inset-bottom))]";
+// and the count and sort over the cards (참혈 2026-10-18)
+export const DECK_EDITOR_ROOM = "lg:hidden h-[calc(18rem+env(safe-area-inset-bottom))] sm:h-[calc(19rem+env(safe-area-inset-bottom))]";
