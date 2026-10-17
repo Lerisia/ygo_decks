@@ -47,6 +47,32 @@ const PRESETS: Record<string, string[]> = {
   "상/중/하": ["상", "중", "하"],
 };
 
+// The tier list being made is kept in this browser (엘리스 2026-10-18: "새로고침을 해도 유지"), until 초기화.
+const KEPT_KEY = "tier_list_maker_v1";
+type Kept = { tiers: Tier[]; title: string; showLabels: boolean };
+const DEFAULT_TITLE = "내 티어표";
+const freshTiers = (key: string) => PRESETS[key].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }));
+
+function readKept(): Kept | null {
+  try {
+    const raw = localStorage.getItem(KEPT_KEY);
+    const k = raw ? JSON.parse(raw) : null;
+    const tiers = Array.isArray(k?.tiers) ? k.tiers.filter((t: Tier) => t && typeof t.id === "string" && typeof t.name === "string" && Array.isArray(t.deckIds)) : null;
+    if (!tiers?.length) return null;
+    return { tiers: tiers.map((t: Tier) => ({ ...t, deckIds: t.deckIds.filter((id) => Number.isInteger(id)) })), title: typeof k.title === "string" ? k.title : DEFAULT_TITLE, showLabels: k.showLabels !== false };
+  } catch {
+    return null;
+  }
+}
+
+function keep(k: Kept) {
+  try {
+    localStorage.setItem(KEPT_KEY, JSON.stringify(k));
+  } catch {
+    /* no storage: the list lasts while the page is open */
+  }
+}
+
 const DEFAULT_PRESET = "S-D";
 
 const DnDBackends = {
@@ -471,14 +497,29 @@ export default function TierListMaker() {
   const navigate = useNavigate();
   const [allDecks, setAllDecks] = useState<Deck[]>([]);
   const [search, setSearch] = useState("");
-  const [tiers, setTiers] = useState<Tier[]>(
-    PRESETS[DEFAULT_PRESET].map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] }))
-  );
-  const [title, setTitle] = useState("내 티어표");
+  const kept = useRef(readKept());
+  const [tiers, setTiers] = useState<Tier[]>(() => kept.current?.tiers ?? freshTiers(DEFAULT_PRESET));
+  const [title, setTitle] = useState(() => kept.current?.title ?? DEFAULT_TITLE);
   const hiddenExportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [tapMenuDeckId, setTapMenuDeckId] = useState<number | null>(null);
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(() => kept.current?.showLabels ?? true);
+  // kept as it changes, so a reload (or a tab closed by mistake) loses nothing
+  useEffect(() => {
+    keep({ tiers, title, showLabels });
+  }, [tiers, title, showLabels]);
+  // 초기화: back to the default preset, the kept list gone (엘리스 2026-10-18)
+  const resetAll = () => {
+    if (!window.confirm("티어표를 비우고 처음 상태로 돌릴까요?")) return;
+    setTiers(freshTiers(DEFAULT_PRESET));
+    setTitle(DEFAULT_TITLE);
+    setTapMenuDeckId(null);
+    try {
+      localStorage.removeItem(KEPT_KEY);
+    } catch {
+      /* nothing kept */
+    }
+  };
   const [aestheticTags, setAestheticTags] = useState<string[]>([]);
   const [selectedAestheticTags, setSelectedAestheticTags] = useState<string[]>([]);
   // null = logged out or not loaded, so the owned-only filter stays hidden
@@ -595,7 +636,7 @@ export default function TierListMaker() {
   const applyPreset = (key: string) => {
     const preset = PRESETS[key];
     if (!preset) return;
-    setTiers(preset.map((name, i) => ({ id: `t${i}-${Date.now()}`, name, deckIds: [] })));
+    setTiers(freshTiers(key));
   };
 
   const exportImage = async () => {
@@ -659,6 +700,14 @@ export default function TierListMaker() {
               {k}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={resetAll}
+            title="티어표를 비우고 처음 상태로"
+            className="ml-auto px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            초기화
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-2">
