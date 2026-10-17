@@ -33,17 +33,38 @@ export function takeSource(): Spot | null {
 
 const centre = (s: Spot | DOMRect) => [s.left + s.width / 2, s.top + s.height / 2];
 
-/** A card arrived at `el`: from `from` to its place, growing or shrinking to its size on the way. */
+/** A ghost of a card's face, fixed over the page where `at` is, above everything and clipped by nothing. */
+function ghostOf(src: string, at: Spot | DOMRect) {
+  const ghost = document.createElement("img");
+  ghost.src = src;
+  ghost.alt = "";
+  Object.assign(ghost.style, {
+    position: "fixed", left: `${at.left}px`, top: `${at.top}px`, width: `${at.width}px`, height: `${at.height}px`,
+    objectFit: "contain", pointerEvents: "none", zIndex: "80", borderRadius: "3.5% / 2.4%", willChange: "transform",
+  });
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+/** A card arrived at `el`: its face flies from `from` to its place, growing or shrinking to its size on the way — as a
+ *  ghost over the page (its picture already drawn, above the other cards, clipped by nothing: 엘리스 2026-10-18 "정갈하지가
+ *  않게 느껴지죠"), the card itself kept out of sight until the ghost lands on it. */
 export function flyIn(el: HTMLElement, from: Spot) {
   const to = el.getBoundingClientRect();
-  if (!to.width) return;
+  const face = el.querySelector("img");
+  if (!to.width || !face?.src) return;
   const [fx, fy] = centre(from);
   const [tx, ty] = centre(to);
   const scale = Math.max(0.3, Math.min(1.6, from.width / to.width));
-  el.animate(
-    [{ transform: `translate(${fx - tx}px, ${fy - ty}px) scale(${scale})`, opacity: 0.7 }, { transform: "none", opacity: 1 }],
-    { duration: FLY_MS, easing: EASE_OUT },
-  );
+  const ghost = ghostOf(face.src, to);
+  el.style.visibility = "hidden";
+  const a = ghost.animate([{ transform: `translate(${fx - tx}px, ${fy - ty}px) scale(${scale})` }, { transform: "none" }], { duration: FLY_MS, easing: EASE_OUT });
+  const land = () => {
+    el.style.visibility = "";
+    ghost.remove();
+  };
+  a.onfinish = land;
+  a.oncancel = land;
 }
 
 /** A card arrived with no known source (1장 넣기 from a card shown): grows in place. */
@@ -63,14 +84,7 @@ export function flyOut(el: Element) {
   const from = el.getBoundingClientRect();
   const face = el.querySelector("img");
   if (!face?.src || !from.width) return;
-  const ghost = document.createElement("img");
-  ghost.src = face.src;
-  ghost.alt = "";
-  Object.assign(ghost.style, {
-    position: "fixed", left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`,
-    objectFit: "contain", pointerEvents: "none", zIndex: "80", borderRadius: "3.5% / 2.4%",
-  });
-  document.body.appendChild(ghost);
+  const ghost = ghostOf(face.src, from);
   const search = document.querySelector('aside[aria-label="카드 검색"]')?.getBoundingClientRect();
   const [fx, fy] = centre(from);
   const [tx, ty] = search ? [search.left + search.width / 2, search.top + Math.min(search.height / 2, 140)] : [fx, fy - 24];

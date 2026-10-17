@@ -24,10 +24,12 @@ const OVER_RING: Record<BanLimit, string> = { forbidden: "ring-red-500", limited
  *  moving: DeckFinish) — its 금제 in the corner: the deck's list's (ban), today's Master Duel one (on the card) when
  *  none is given; 미출시 in its place for a card not out under the rule (not in Master Duel, or not out yet by the
  *  list's day). */
-export function DeckCardFace({ card, look, dim = false, ban = card.ban, rule }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | ""; rule?: BanRule }) {
+export function DeckCardFace({ card, look, dim = false, ban = card.ban, rule, eager = false }: {
+  card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | ""; rule?: BanRule; eager?: boolean;
+}) {
   return (
     <span className="relative block">
-      <CopyFace card={card} look={look} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
+      <CopyFace card={card} look={look} eager={eager} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
       {unreleasedUnder(card, rule) || (rule && notOut(card, rule)) ? (
         <span className="absolute bottom-[7%] left-[4%] rounded px-1 py-px text-[10px] font-bold leading-4 bg-amber-500/90 text-white drop-shadow">미출시</span>
       ) : ban && (
@@ -132,7 +134,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                 aria-label={picking ? `${card.name} 대표 카드로` : `${card.name} 1장 빼기`}
                 className={`group relative block ${picking ? "cursor-copy" : ""} ${mouse && !picking ? "card-lift" : ""}`}
               >
-                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
+                <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} eager />
                 <OverRing ban={over.get(id)} />
                 {mark !== undefined && (
                   <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
