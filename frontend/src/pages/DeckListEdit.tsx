@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2, Volume2, VolumeX } from "lucide-react";
+import { Check, Loader2, Volume2, VolumeX } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -24,7 +24,7 @@ import {
   setLook, setLookAll, shiftCopy, tabDraft,
 } from "@/lib/deckDrafts";
 import { banOf, notOut, unreleasedUnder } from "@/lib/banlists";
-import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
+import { DECK_LISTS_PATH, deckListEditPath, deckListPath } from "@/lib/deckListPaths";
 import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
 import { cardFrom } from "@/lib/deckMotion";
 import { deckSoundOn, playDeckMove, playDeckSound, setDeckSoundOn, unlockDeckSound } from "@/lib/deckSound";
@@ -58,6 +58,7 @@ export default function DeckListEdit() {
   // undefined until read, null when there is no such deck (or not this member's)
   const [deck, setDeck] = useState<DeckDraft | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [savedTick, setSavedTick] = useState(false);
   // the card shown: a copy in the deck (its zone and which copy of the card), or a card from the search
   const [showing, setShowing] = useState<{ card: CardListItem; zone?: DeckZone; copy?: number } | null>(null);
   // the look the next copy of a card shown from the search goes in with
@@ -239,10 +240,19 @@ export default function DeckListEdit() {
     setSaving(true);
     playDeckSound("decide", 0.7);
     try {
-      const saved = code === undefined ? await createDeckList(body) : await updateDeckList(code, body);
+      const doc = code === undefined ? await createDeckList(body) : await updateDeckList(code, body);
       playDeckSound("verify", 0.6);
-      if (code === undefined) clearTabDraft();
-      navigate(deckListPath(saved.code), { replace: true });
+      // the editor stays (참혈 2026-10-18): a new deck moves to its own editor's address, a saved one takes what was
+      // saved as the state 초기화 goes back to; 저장 ticks for a moment
+      if (code === undefined) {
+        clearTabDraft();
+        navigate(deckListEditPath(doc.code), { replace: true });
+      } else {
+        saved.current = fromDoc(doc);
+        setDeck(structuredClone(saved.current));
+      }
+      setSavedTick(true);
+      window.setTimeout(() => setSavedTick(false), 1500);
     } catch (e) {
       say((e as Error).message || "저장하지 못했습니다.");
     } finally {
@@ -360,7 +370,13 @@ export default function DeckListEdit() {
                     title={named ? saveLabel : "덱 이름을 넣으면 올릴 수 있습니다"}
                     className={`${DECK_ICON} text-gray-500 dark:text-gray-400 enabled:hover:text-gray-800 dark:enabled:hover:text-gray-100 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed`}
                   >
-                    {saving ? <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden /> : <SaveLineIcon className={DECK_ICON_SIZE} />}
+                    {saving ? (
+                      <Loader2 className={`${DECK_ICON_SIZE} animate-spin`} aria-hidden />
+                    ) : savedTick ? (
+                      <Check className={`${DECK_ICON_SIZE} text-green-600 dark:text-green-400`} aria-hidden />
+                    ) : (
+                      <SaveLineIcon className={DECK_ICON_SIZE} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -378,16 +394,27 @@ export default function DeckListEdit() {
                 onDone={() => setCoverSlot(null)}
               />
             }
-            // a box like the description's, in its size and weight (참혈 2026-10-16)
+            // a box like the description's, in its size and weight (참혈 2026-10-16), 공개 or 비공개 at its right, the box
+            // narrower for it (참혈 2026-10-18)
             name={
-              <input
-                aria-label="덱 이름"
-                placeholder="덱 이름"
-                maxLength={40}
-                value={deck.name}
-                onChange={(e) => setDeck({ ...deck, name: e.target.value })}
-                className={`${FIELD} block px-3 py-2 text-base md:text-sm`}
-              />
+              <div className="flex items-stretch gap-2">
+                <input
+                  aria-label="덱 이름"
+                  placeholder="덱 이름"
+                  maxLength={40}
+                  value={deck.name}
+                  onChange={(e) => setDeck({ ...deck, name: e.target.value })}
+                  className={`${FIELD} block min-w-0 flex-1 px-3 py-2 text-base md:text-sm`}
+                />
+                <Dropdown
+                  value={deck.isPrivate ? "private" : "public"}
+                  options={[...SCOPES]}
+                  onChange={(v) => setDeck({ ...deck, isPrivate: v === "private" })}
+                  label="공개 범위"
+                  className="shrink-0 px-3 rounded-lg text-sm"
+                  listClassName="text-sm"
+                />
+              </div>
             }
             description={
               <>
@@ -400,19 +427,6 @@ export default function DeckListEdit() {
                   onChange={(e) => setDeck({ ...deck, description: e.target.value })}
                   className={`${FIELD} px-3 py-2 text-base md:text-sm flex-1 min-h-[3.5rem] resize-y`}
                 />
-                {/* 공개 or 비공개 under the description, at the line's end (엘리스 2026-10-17) */}
-                <div className="mt-2 h-6 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="ml-auto shrink-0">
-                    <Dropdown
-                      value={deck.isPrivate ? "private" : "public"}
-                      options={[...SCOPES]}
-                      onChange={(v) => setDeck({ ...deck, isPrivate: v === "private" })}
-                      label="공개 범위"
-                      className="h-6 px-2 rounded-md text-xs"
-                      listClassName="text-xs"
-                    />
-                  </span>
-                </div>
               </>
             }
             banlist={<BanlistPicker value={deck.banlist} index={banlists} onChange={(banlist) => setDeck({ ...deck, banlist })} />}

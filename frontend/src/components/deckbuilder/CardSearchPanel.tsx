@@ -333,8 +333,8 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
         </button>
       </div>
       {/* the card book's own filter bar and sort, a size smaller (엘리스 2026-10-18: the same search filters the same way);
-          the sort at the row's right end below lg, and on its own line under the chips from lg, where the column is
-          too narrow for both */}
+          the sort at the row's right end below lg, and from lg on the line that counts the cards (참혈 2026-10-18), the
+          column being too narrow for it beside the chips */}
       <div className={`order-4 dex-compact lg:order-none lg:mt-2 ${imaging ? "hidden" : ""}`}>
         <CardFilterBar
           options={options}
@@ -347,9 +347,6 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
             </div>
           }
         />
-        <div className="hidden lg:flex mt-1.5 justify-end">
-          <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact />
-        </div>
       </div>
       {imaging && scan.status.kind === "done" && (
         <ScanInfoRow
@@ -376,18 +373,24 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           />
         </div>
       )}
-      <p
-        className={`order-1 h-5 px-0.5 text-xs truncate lg:order-none lg:mt-1 lg:px-0 ${notice || (error && !imaging) ? "" : "hidden lg:block"}`}
-        aria-live="polite"
+      <div
+        className={`order-1 h-5 px-0.5 text-xs lg:order-none lg:mt-1.5 lg:h-7 lg:px-0 lg:flex lg:items-center lg:gap-2 ${notice || (error && !imaging) ? "" : "hidden"}`}
       >
-        {notice ? (
-          <span className="text-red-600 dark:text-red-400">{notice}</span>
-        ) : imaging ? null : error ? (
-          <span className="text-red-600 dark:text-red-400">{error}</span>
-        ) : (
-          total !== null && <span className="text-gray-500 dark:text-gray-400 tabular-nums">카드 {total.toLocaleString()}장</span>
+        <p className="m-0 min-w-0 flex-1 truncate" aria-live="polite">
+          {notice ? (
+            <span className="text-red-600 dark:text-red-400">{notice}</span>
+          ) : imaging ? null : error ? (
+            <span className="text-red-600 dark:text-red-400">{error}</span>
+          ) : (
+            total !== null && <span className="text-gray-500 dark:text-gray-400 tabular-nums">카드 {total.toLocaleString()}장</span>
+          )}
+        </p>
+        {!imaging && (
+          <span className="hidden lg:block shrink-0">
+            <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact />
+          </span>
         )}
-      </p>
+      </div>
       {imaging ? (
         <div className={`order-2 ${ROW} flex flex-col lg:order-none lg:mt-1 lg:flex-1 lg:min-h-0`} {...scan.drop}>
           <input {...scan.fileInput} />
