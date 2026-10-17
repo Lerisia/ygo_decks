@@ -145,7 +145,17 @@ class CommandTest(TestCase):
 
     def fetch(self, url):
         self.fetched.append(url)
+        if url not in self.pages:
+            import urllib.error
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
         return self.pages[url]
+
+    def test_a_dead_link_is_skipped(self):
+        """The site's own pages link lists that are not there (2026-02-02 on 10/17): the rest still comes in."""
+        self.pages[official_lists.TCG_URL.format("2026-09-21")] += '<a href="/en/limited/list_2025-12-31/">dead</a>'
+        out = self.run_import("tcg")
+        self.assertIn("list_2025-12-31/: HTTP 404, skipped", out)
+        self.assertEqual(Banlist.objects.filter(format="tcg").count(), 2)
 
     def run_import(self, fmt):
         out = StringIO()

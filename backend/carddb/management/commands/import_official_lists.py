@@ -3,6 +3,7 @@
 seen), and the TCG lists /en/limited/ links to (kept in official-tcg, the newest two asked again)."""
 import os
 import time
+import urllib.error
 from datetime import date
 
 from django.conf import settings
@@ -49,7 +50,11 @@ class Command(BaseCommand):
                 url = official_lists.OCG_URL.format(month)
                 # a month without a list is a page without a date: kept too, but asked again while it is recent
                 again = fresh or month >= self._months_back(today, RECENT)
-                p = official_lists.parse_ocg(self.page("official-ocg", month, url, again))
+                try:
+                    p = official_lists.parse_ocg(self.page("official-ocg", month, url, again))
+                except urllib.error.HTTPError as e:
+                    self.stdout.write(f"  {url}: HTTP {e.code}, skipped")
+                    continue
                 if p:
                     pages.append((url, p))
         else:
@@ -65,7 +70,11 @@ class Command(BaseCommand):
                         continue
                     done.add(day)
                     url = official_lists.TCG_URL.format(day)
-                    text = self.page("official-tcg", f"list_{day}", url, fresh or i < RECENT)
+                    try:
+                        text = self.page("official-tcg", f"list_{day}", url, fresh or i < RECENT)
+                    except urllib.error.HTTPError as e:   # a dead link on the site (the 2026-02-02 one, 10/17)
+                        self.stdout.write(f"  {url}: HTTP {e.code}, skipped")
+                        break
                     days |= set(official_lists.tcg_list_days(text))
                     p = official_lists.parse_tcg(text)
                     if p:
