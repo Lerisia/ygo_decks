@@ -1,7 +1,8 @@
 """The rules of a deck list, as Master Duel's deck editor keeps them (엘리스 2026-10-14: "저장과 규칙부터"). Some a
 saved deck may not break (its zones' sizes, 3 of a name, tokens, extra deck monsters in the extra deck); the rest it
-is only told about, as the game tells a deck that a later 금제 has made unusable: fewer than 40 in the main, more of a
-card than its list allows, cards not out yet then. The list is the deck's pick (참혈 2026-10-16): a game's newest
+is only told about, as the game tells a deck that a later 금제 has made unusable: more of a card than its list
+allows, cards not out yet then (and fewer than 40 in the main, which only a tournament's copy can have now: a deck
+posted on the board holds 40, 엘리스 2026-10-17). The list is the deck's pick (참혈 2026-10-16): a game's newest
 (Master Duel's by default), one of its lists by day, one of ours by code, or 무금제 (참혈 2026-10-17). A deck may hold
 more of a card than its list allows (참혈 2026-10-17: "금제에 위반되어도 리스트에 투입"); it is only told."""
 from collections import Counter
@@ -35,6 +36,9 @@ def check(main, extra):
             raise DeckError(f"{zone}의 카드가 올바르지 않습니다.")
         if len(ids) > most:
             raise DeckError(f"{zone}은 {most}장까지입니다.")
+    # a deck the game can't play has no place on the board (엘리스 2026-10-17); one still being built stays in the tab
+    if len(main) < MAIN_MIN:
+        raise DeckError(f"메인 덱은 {MAIN_MIN}장 이상이어야 합니다 ({len(main)}/{MAIN_MIN}).")
     cards = Card.objects.in_bulk(set(main) | set(extra))
     if len(cards) < len(set(main) | set(extra)):
         raise DeckError("없는 카드가 들어 있습니다.")

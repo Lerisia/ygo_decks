@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from board.models import Comment
+
 
 class InquiryPost(models.Model):
     """A question or report on one of the two inquiry boards (특이점 2026-10-07). Authors always show as 익명;
@@ -31,16 +33,12 @@ class InquiryPost(models.Model):
         return f"[{self.get_board_display()}] {self.title}"
 
 
-class InquiryComment(models.Model):
-    """A staff answer under an inquiry post; shown as 운영자 (특이점 2026-10-15: one person answers, so not 운영진)."""
+class InquiryComment(Comment):
+    """A staff answer under an inquiry post; shown as 운영자 (특이점 2026-10-15: one person answers, so not 운영진).
+    On the boards' shared comment (board.models.Comment) since 2026-10-17."""
 
     post = models.ForeignKey(InquiryPost, on_delete=models.CASCADE, related_name="comments")
-    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="inquiry_comments")
-    body = models.TextField(max_length=3000)
-    is_deleted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ["created_at", "id"]
+    class Meta(Comment.Meta):
         verbose_name = "문의 답변"
         verbose_name_plural = "문의 답변"

@@ -1,29 +1,19 @@
-from datetime import timedelta
-
 from django.conf import settings
-from django.contrib.admin.models import DELETION, LogEntry
 from django.core.mail import get_connection, send_mail
 from django.db.models import Count, Q
-from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from board.api import POST_LIMITS, TOO_FAST, error as _error, is_staff as _is_staff, log_deletion, page_of, too_fast
 from .models import InquiryComment, InquiryPost
 
-PAGE_SIZE = 20
 # Lists and locked pages never show a real title: someone could put abuse in it (특이점 2026-10-07).
 # The real title appears only on the post itself, for its author and staff — except a deck report's, written from
 # 2026-10-16 on, which everyone sees so they can tell it was taken up (특이점; its body stays private).
 HIDDEN_TITLE = "문의사항"
 PUBLIC_TITLE_BOARDS = {"deck"}
 BOARDS = dict(InquiryPost.BOARD_CHOICES)
-# Enough for anyone with a real problem, too little for a flood.
-LIMITS = ((timedelta(minutes=10), 5), (timedelta(days=1), 30))
-
-
-def _is_staff(user):
-    return bool(user and user.is_authenticated and user.is_staff)
 
 
 def _can_view(post, user):
@@ -62,10 +52,6 @@ def _post_out(post, user, full=False):
     return out
 
 
-def _error(message, code=400):
-    return Response({"error": message}, status=code)
-
-
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def posts(request):
@@ -80,14 +66,7 @@ def posts(request):
               .order_by("-created_at", "-id"))
         if request.GET.get("mine") == "1" and request.user.is_authenticated:
             qs = qs.filter(author=request.user)
-        total = qs.count()
-        try:
-            page = max(int(request.GET.get("page") or 1), 1)
-        except ValueError:
-            page = 1
-        rows = qs[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
-        out = {"results": [_post_out(p, request.user) for p in rows], "total": total, "page": page,
-               "pages": max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1)}
+        out = page_of(qs, request, lambda p: _post_out(p, request.user))
         if _is_staff(request.user):
             out["unanswered"] = InquiryPost.objects.filter(board=board, is_deleted=False, answered_at__isnull=True).count()
         return Response(out)
@@ -104,10 +83,8 @@ def posts(request):
         return _error("제목은 1~100자로 써 주세요.")
     if not body or len(body) > 5000:
         return _error("내용은 1~5,000자로 써 주세요.")
-    now = timezone.now()
-    for span, most in LIMITS:
-        if InquiryPost.objects.filter(author=request.user, created_at__gte=now - span).count() >= most:
-            return _error("짧은 시간에 글을 너무 많이 썼습니다. 잠시 뒤에 다시 써 주세요.", 429)
+    if too_fast(InquiryPost.objects.filter(author=request.user), POST_LIMITS):
+        return _error(TOO_FAST, 429)
     post = InquiryPost.objects.create(
         board=board, author=request.user, title=title, body=body,
         is_private=True, title_public=board in PUBLIC_TITLE_BOARDS, notify_email=bool(data.get("notify_email", False)),
@@ -131,8 +108,7 @@ def post_detail(request, pk):
     post.is_deleted = True
     post.save(update_fields=["is_deleted"])
     if staff and post.author_id != request.user.id:
-        LogEntry.objects.log_actions(user_id=request.user.id, queryset=InquiryPost.objects.filter(id=post.id),
-                                     action_flag=DELETION, change_message=f"사이트에서 문의 글 삭제: {post.title}")
+        log_deletion(request.user, post, f"사이트에서 문의 글 삭제: {post.title}")
     return Response(status=204)
 
 

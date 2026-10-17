@@ -4,5 +4,9 @@ from . import views
 
 urlpatterns = [
     path("", views.deck_lists),
+    path("classify/", views.classify_deck),
+    path("comments/<int:pk>/", views.delete_comment),
     path("<str:code>/", views.deck_list),
+    path("<str:code>/like/", views.like),
+    path("<str:code>/comments/", views.add_comment),
 ]

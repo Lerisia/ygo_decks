@@ -556,8 +556,8 @@ class DeckSubmissionTest(TournamentApiTestBase):
         self.assertEqual(d.name, f"{self.t.name} 덱 1")
         zones = {c["card"]["name"]: c["zone"] for c in body["cards"]}
         self.assertEqual(zones, {"푸른 눈의 백룡": "main", "궁극의 푸른 눈의 백룡": "extra"})
-        # the builder lists the member's own decks only, shows this one, and will not change or delete it
-        self.assertEqual(self.c.get("/api/decklists/").json()["decks"], [])
+        # the board does not list it; the builder shows it to its owner, and will not change or delete it
+        self.assertEqual(self.c.get("/api/decklists/").json()["results"], [])
         self.assertEqual(self.c.get(f"/api/decklists/{d.code}/").status_code, 200)
         self.assertEqual(self.c.put(f"/api/decklists/{d.code}/", {"name": "x", "main": [], "extra": []}, format="json").status_code, 403)
         self.assertEqual(self.c.delete(f"/api/decklists/{d.code}/").status_code, 403)
