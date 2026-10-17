@@ -77,11 +77,11 @@ export default function DeckPage({ back, top, topEnd, cover, name, actions, desc
   );
 }
 
-/** Either page with no such deck of this member's. */
-export function DeckNotFound({ signedIn }: { signedIn: boolean }) {
+/** Either page with no such deck: on the board, none by that code; in the editor, none of this member's. */
+export function DeckNotFound({ signedIn, message }: { signedIn: boolean; message?: string }) {
   return (
     <div className="py-16 flex flex-col items-center gap-4">
-      <p className="text-gray-600 dark:text-gray-300">{signedIn ? "덱을 찾을 수 없습니다." : "로그인하면 저장한 덱을 볼 수 있습니다."}</p>
+      <p className="text-gray-600 dark:text-gray-300">{message ?? (signedIn ? "덱을 찾을 수 없습니다." : "로그인하면 저장한 덱을 볼 수 있습니다.")}</p>
       <Link to={DECK_LISTS_PATH} className="shrink-0 inline-flex items-center justify-center h-9 px-4 rounded-lg font-semibold text-sm transition bg-blue-600 hover:bg-blue-700 text-white">
         목록으로
       </Link>
