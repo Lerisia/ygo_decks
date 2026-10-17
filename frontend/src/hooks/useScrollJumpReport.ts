@@ -3,6 +3,7 @@ import { trackEvent } from "@/api/analyticsApi";
 
 const JUMP = 300;      // px the page must move up, right after a field is focused, to count
 const WINDOW_MS = 1500;
+const HOLD_MS = 400;     // how long the page is held in place after a jump
 
 /** The phone's keyboard jump (엘리스 2026-10-17): as the keyboard rises for a field, iOS Safari sometimes scrolls the
  *  page far up — the beacon caught it 91 ms after focus, with the visual viewport's height reported as -24 and the
@@ -46,7 +47,16 @@ export function useScrollJumpReport() {
           trackEvent("scroll_jump", `t${Math.round(performance.now() - started)} a${active} r${resizes} k${entry() === entry0 ? 0 : 1} p${window.location.pathname === path0 ? 0 : 1}`.slice(0, 40));
         }
         puts += 1;
-        window.scrollTo(0, y0);   // back to where the field was tapped
+        // back to where the field was tapped — and held there frame by frame while Safari's pan plays out, so the
+        // page does not visibly travel up and snap back (엘리스 10/17: "어색하긴 해도 돌아오긴 하네요")
+        window.scrollTo(0, y0);
+        const until = performance.now() + HOLD_MS;
+        const hold = () => {
+          if (performance.now() > until) return;
+          if (Math.abs(window.scrollY - y0) > 2) window.scrollTo(0, y0);
+          requestAnimationFrame(hold);
+        };
+        requestAnimationFrame(hold);
         if (puts >= 3) stop();
       };
       window.addEventListener("scroll", onScroll, { passive: true });
