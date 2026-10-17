@@ -119,8 +119,9 @@ class CommandTest(TestCase):
             official_lists.OCG_URL.format("202607"): ocg_html("2026年7月1日", [("制限カード", [("青眼の白龍", "BLUE-EYES WHITE DRAGON", "新規・制限")])]),
             official_lists.OCG_URL.format("202608"): "<html><title>リミットレギュレーション (禁止・制限・準制限カード)</title></html>",
             official_lists.OCG_URL.format("202610"): OCG_PAGE,
-            official_lists.TCG_INDEX: '<a href="/en/limited/list_2026-02-02/">x</a><a href="/en/limited/list_2026-09-21/">y</a>',
-            official_lists.TCG_URL.format("2026-09-21"): TCG_PAGE,
+            # the index links only the newest list; that page links the one before it (as the site does)
+            official_lists.TCG_INDEX: '<a href="/en/limited/list_2026-09-21/">View the list here</a>',
+            official_lists.TCG_URL.format("2026-09-21"): TCG_PAGE + '<a href="/en/limited/list_2026-02-02/">February 2, 2026</a>',
             official_lists.TCG_URL.format("2026-02-02"): tcg_html("February 2, 2026", [("POT OF DESIRES", "Limited", "")]),
         }
         for patcher in (mock.patch.object(official_lists, "fetch", side_effect=self.fetch),

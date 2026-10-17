@@ -53,16 +53,24 @@ class Command(BaseCommand):
                 if p:
                     pages.append((url, p))
         else:
+            # /en/limited/ links the newest list; each list page links the ones before it, so every list reachable
+            # from the newest comes in, and the days kept from earlier runs with them
             index_text = self.page("official-tcg", "index", official_lists.TCG_INDEX, True)
-            days = official_lists.tcg_list_days(index_text)
-            cached = sorted({f[5:-5] for f in os.listdir(os.path.join(settings.BANLIST_CACHE, "official-tcg"))
-                             if f.startswith("list_") and f.endswith(".wiki")}, reverse=True) \
-                if os.path.isdir(os.path.join(settings.BANLIST_CACHE, "official-tcg")) else []
-            for i, day in enumerate(sorted(set(days) | set(cached), reverse=True)):
-                url = official_lists.TCG_URL.format(day)
-                p = official_lists.parse_tcg(self.page("official-tcg", f"list_{day}", url, fresh or i < RECENT))
-                if p:
-                    pages.append((url, p))
+            folder = os.path.join(settings.BANLIST_CACHE, "official-tcg")
+            cached = {f[5:-5] for f in os.listdir(folder) if f.startswith("list_") and f.endswith(".wiki")} if os.path.isdir(folder) else set()
+            days, done = set(official_lists.tcg_list_days(index_text)) | cached, set()
+            while days - done:
+                for i, day in enumerate(sorted(days, reverse=True)):
+                    if day in done:
+                        continue
+                    done.add(day)
+                    url = official_lists.TCG_URL.format(day)
+                    text = self.page("official-tcg", f"list_{day}", url, fresh or i < RECENT)
+                    days |= set(official_lists.tcg_list_days(text))
+                    p = official_lists.parse_tcg(text)
+                    if p:
+                        pages.append((url, p))
+                    break   # the newest first, then whatever it linked
         index = banlist.CardIndex()
         lost = {}
         with transaction.atomic():
