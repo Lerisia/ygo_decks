@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getCard, type CardDoc, type CardListItem } from "@/api/cardDexApi";
+import type { BackFrom } from "@/components/BackToDex";
 import { FaceThumbs } from "@/components/CardLookPicker";
 import type { BanLimit } from "@/lib/banlists";
 import { type CardLook, lookThumb } from "@/lib/deckDrafts";
@@ -11,6 +12,8 @@ const BUTTON = "flex-1 h-10 px-2 rounded-lg font-semibold text-sm break-keep tra
 const SMALL = "h-7 px-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 break-keep transition hover:bg-gray-50 dark:hover:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800";
 
 export type CardInfoProps = {
+  /** where the card's page should lead back to: the deck list page or editor it was opened from (엘리스 2026-10-18) */
+  from?: BackFrom;
   card: CardListItem;
   /** Its 금제 on the deck's list (참혈 2026-10-16; today's Master Duel one when not given), and whether it was not out
    *  yet then (미출시). */
@@ -38,7 +41,7 @@ export type CardInfoProps = {
  *  lg in the search's place): the card in the print picked, its prints under it as on the card page (일반 / 샤인 /
  *  로얄 left the builder, 엘리스 2026-10-18: a deck list needs no finish), its text in Korean, and a copy in or out
  *  without leaving the deck. pane: stacked for the search's narrow column. */
-function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleased, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, pane }: CardInfoProps & { pane: boolean }) {
+function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleased, inDeck, look, onLook, copies = 0, sameLook, onLookAll, onFaces, onAdd, onRemove, canRemove, from, pane }: CardInfoProps & { pane: boolean }) {
   const [doc, setDoc] = useState<CardDoc | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -119,7 +122,7 @@ function CardInfoBody({ card, ban = card.ban, notOut, unreleased = card.unreleas
     <div className={`flex gap-2 ${pane ? "mt-3" : "mt-4"}`}>
       {onRemove && <button type="button" onClick={onRemove} disabled={!canRemove} className={`${BUTTON} bg-gray-500 hover:bg-gray-600 text-white`}>1장 빼기</button>}
       {onAdd && <button type="button" onClick={onAdd} className={`${BUTTON} bg-blue-600 hover:bg-blue-700 text-white`}>1장 넣기</button>}
-      <Link to={`/cards/${card.id}`} className={`${BUTTON} inline-flex items-center justify-center border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100`}>카드 문서</Link>
+      <Link to={`/cards/${card.id}`} state={from ? { from } : undefined} className={`${BUTTON} inline-flex items-center justify-center border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100`}>카드 문서</Link>
     </div>
   );
 

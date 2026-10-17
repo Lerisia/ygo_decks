@@ -261,6 +261,8 @@ export default function DeckListEdit() {
   // the card shown: a copy in the deck while it is still there (an undo may take it), else as from the search
   const shownZone = showing ? (showing.zone ?? (isExtraCard(showing.card) ? "extra" : "main")) : "main";
   const shownAt = showing?.zone && showing.copy !== undefined && deck ? copyIndex(deck[showing.zone], showing.card.id, showing.copy) : -1;
+  // a card's page opened from the sheet leads back to this editor (엘리스 2026-10-18)
+  const pageFrom = { path: location.pathname + location.search, label: code === undefined ? "덱 리스트 만들기로" : "덱 리스트 수정으로" };
   const info: CardInfoProps | null = showing && deck ? (() => {
     const { card } = showing;
     const ids = deck[shownZone];
@@ -271,7 +273,7 @@ export default function DeckListEdit() {
       const look = lookAt(deck, shownZone, shownAt);
       const same = keptLook(card.id, look);
       return {
-        card, ...judged, inDeck: copiesOf(deck, card.name, cards), look, copies,
+        card, ...judged, from: pageFrom, inDeck: copiesOf(deck, card.name, cards), look, copies,
         sameLook: ids.every((x, i) => x !== card.id || JSON.stringify(deck.looks[shownZone][i]) === JSON.stringify(same)),
         onLook: (l: CardLook) => change(setLook(deck, shownZone, shownAt, l)),
         onLookAll: () => change(setLookAll(deck, shownZone, card.id, look)),
@@ -283,7 +285,7 @@ export default function DeckListEdit() {
     }
     const look = nextLook?.id === card.id ? nextLook.look : { face: card.id, finish: "normal" as const };
     return {
-      card, ...judged, inDeck: copiesOf(deck, card.name, cards), look,
+      card, ...judged, from: pageFrom, inDeck: copiesOf(deck, card.name, cards), look,
       onLook: (l: CardLook) => setNextLook({ id: card.id, look: l }),
       onAdd: () => pick(card, look),
       // from the search: its last copy put in comes out

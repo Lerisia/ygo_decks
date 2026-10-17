@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Camera } from "lucide-react";
+import type { BackFrom } from "@/components/BackToDex";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -50,7 +51,7 @@ function OverRing({ ban }: { ban?: BanLimit }) {
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
 
-function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, onPicture, reserve, picking, marks, mouse, lit }: {
+function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow, onPicture, reserve, picking, marks, mouse, lit, from }: {
   zone: DeckZone;
   /** as kept: an id once per copy, in the order they went in */
   ids: number[];
@@ -72,6 +73,8 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
   lit?: boolean;
   /** building, the main deck empty: the big way in by a picture (엘리스 2026-10-18: 사진 vs 직접, the choice at the start) */
   onPicture?: () => void;
+  /** on a deck's page: where a card's page should lead back to (this deck) */
+  from?: BackFrom;
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
@@ -146,7 +149,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                 )}
               </button>
             ) : (
-              <Link key={flipKey} to={`/cards/${id}`} title={card.name} className="group relative block">
+              <Link key={flipKey} to={`/cards/${id}`} state={from ? { from } : undefined} title={card.name} className="group relative block">
                 <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
                 <OverRing ban={over.get(id)} />
               </Link>
@@ -181,7 +184,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
 /** A deck's main and extra decks, each card in the 디폴트 순 (order: the server's); shown on its page and while it is
  *  built. With onRemove (building) a card pressed comes out and the zones keep room for their first rows; without, a
  *  card opens its page. */
-export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, onDrop, onPicture, picking, marks }: {
+export default function DeckZones({ deck, cards, order, loading, rule, onRemove, onShow, onDrop, onPicture, picking, marks, from }: {
   deck: Pick<DeckDraft, DeckZone> & { looks: DeckLooks };
   cards: Map<number, CardListItem>;
   order: Map<number, number>;
@@ -196,6 +199,8 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
   onDrop?: (card: CardListItem) => void;
   /** Building, the main deck empty: a picture of a deck list read in (엘리스 2026-10-18). */
   onPicture?: () => void;
+  /** On the deck's page: a card's page opened from it leads back here (엘리스 2026-10-18). */
+  from?: BackFrom;
   /** Building, a 대표 카드 being set: a card pressed goes there (onRemove) instead of out; marks: each zone's places
    *  holding one, with their slot. */
   picking?: boolean;
@@ -241,6 +246,7 @@ export default function DeckZones({ deck, cards, order, loading, rule, onRemove,
           onRemove={onRemove && ((at) => onRemove(z, at))}
           onShow={onShow && ((card, at) => onShow(card, z, at))}
           onPicture={onRemove ? onPicture : undefined}
+          from={from}
           reserve={!!onRemove}
           picking={picking}
           marks={marks?.[z]}

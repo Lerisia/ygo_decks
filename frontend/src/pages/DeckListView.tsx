@@ -137,7 +137,8 @@ export default function DeckListView() {
           warnings={deckWarnings(draft, cards, rule)}
           error={error}
         >
-          <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} />
+          {/* a card opened from here leads back here, not to the card book (엘리스 2026-10-18) */}
+          <DeckZones deck={draft} cards={cards} order={order} loading={loading} rule={rule} from={{ path: location.pathname, label: `'${deck.name}' 덱 리스트로` }} />
           {/* under the deck: 덱 코드 on the left once it is made, the exports on the right (참혈 2026-10-17) */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <div className="shrink-0 flex items-center gap-2">
