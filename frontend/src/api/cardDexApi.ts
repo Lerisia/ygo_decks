@@ -49,6 +49,8 @@ export type CardListItem = {
   rarity: string;
   /** Its 금제 in Master Duel today: forbidden / limited / semi_limited, "" when unlimited. */
   ban: "" | "forbidden" | "limited" | "semi_limited";
+  /** Not in Master Duel (미출시): its picture is the stand-in cut from the published card image (엘리스 10/17). */
+  unreleased: boolean;
   category: "monster" | "spell" | "trap";
   /** normal, effect, ritual, fusion, synchro, xyz, link (each but link also *_pendulum), token; spell / trap. */
   frame: string;
@@ -138,6 +140,8 @@ export type CardDoc = {
   rarity: string;
   /** Its 금제 in Master Duel today, for the icon beside its name; "" when unlimited. */
   ban: "" | "forbidden" | "limited" | "semi_limited";
+  /** Not in Master Duel (미출시): the picture is the stand-in cut from the published card image (엘리스 10/17). */
+  provisional: boolean;
   /** md: the day the card came to Master Duel. */
   dates: { md: string | null; ocg: string | null; kr: string | null; tcg: string | null };
   groups: { id: number; name: string; parent_id: number | null }[];

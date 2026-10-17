@@ -72,8 +72,11 @@ export function CardTile({ card }: { card: CardListItem }) {
           alt={card.name}
           className="w-full aspect-[704/1024] object-contain card-corner group-hover:opacity-90 transition"
         />
-        {/* today's Master Duel 금제 in the top left corner, in the game's own icon (엘리스 10/12) */}
-        {card.ban && (
+        {/* today's Master Duel 금제 in the top left corner, in the game's own icon (엘리스 10/12); a card not in
+            Master Duel says so there instead (엘리스 10/17) */}
+        {card.unreleased ? (
+          <span className="absolute top-[3%] left-[4%] rounded px-1 py-px text-[10px] font-bold leading-4 bg-amber-500/90 text-white drop-shadow">미출시</span>
+        ) : card.ban && (
           <img
             src={`/media/md_ui/info/limit/${card.ban}.webp`}
             alt={{ forbidden: "금지", limited: "제한", semi_limited: "준제한" }[card.ban]}

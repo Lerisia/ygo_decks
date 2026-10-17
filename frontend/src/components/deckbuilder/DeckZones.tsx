@@ -22,7 +22,9 @@ export function DeckCardFace({ card, look, dim = false, ban = card.ban }: { card
   return (
     <span className="relative block">
       <CopyFace card={card} look={look} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
-      {ban && (
+      {card.unreleased ? (
+        <span className="absolute top-[3%] left-[4%] rounded px-1 py-px text-[10px] font-bold leading-4 bg-amber-500/90 text-white drop-shadow">미출시</span>
+      ) : ban && (
         <img
           src={`/media/md_ui/info/limit/${ban}.webp`}
           alt={BAN_LABEL[ban]}

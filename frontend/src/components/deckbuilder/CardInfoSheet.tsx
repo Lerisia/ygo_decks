@@ -110,7 +110,7 @@ function CardInfoBody({ card, ban = card.ban, notOut, inDeck, look, onLook, copi
       <p className="mt-1 mb-0 text-xs text-gray-500 dark:text-gray-400">
         {rarity && <span className="mr-2">{rarity}</span>}
         {ban && <span className="font-semibold text-red-600 dark:text-red-400">{BAN_LABEL[ban]}</span>}
-        {notOut && <span className={`font-semibold text-amber-600 dark:text-amber-400 ${ban ? "ml-2" : ""}`}>미출시</span>}
+        {(notOut || card.unreleased) && <span className={`font-semibold text-amber-600 dark:text-amber-400 ${ban ? "ml-2" : ""}`}>미출시</span>}
         {inDeck > 0 && <span className="ml-2 tabular-nums">덱에 {inDeck}장</span>}
       </p>
     </>

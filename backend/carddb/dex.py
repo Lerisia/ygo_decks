@@ -60,7 +60,7 @@ def choseong(s):
 class _Row:
     __slots__ = ("id", "name", "norms", "cho", "released", "category", "frame", "attribute", "race", "numbers", "st",
                  "groups", "supports", "as_cards", "named", "names", "alt", "cutin", "overframe", "rarity", "type_key", "number", "atk",
-                 "def_", "ban")
+                 "def_", "ban", "unreleased")
 
 
 # 디폴트 순, as Master Duel names it (몬마함순; 엘리스 2026-10-12, from the game's list): each monster frame before its pendulum,
@@ -86,7 +86,7 @@ SORTS = {
     # 조회순 (/dev/cards, 참혈 2026-10-14): ordered by _popular_order, as the counts behind it change
     "popular": (None, True),
 }
-BAN_FILTERS = {"forbidden", "limited", "semi_limited", "unlimited"}
+BAN_FILTERS = {"forbidden", "limited", "semi_limited", "unlimited", "unreleased"}   # 미출시: not in Master Duel
 HIGH_FIRST = {"new", "popular"}   # the way a sort goes when none is asked: the newest first, the rest low to high
 
 _index = {"key": None, "at": 0.0, "type": [], "orders": {}, "face_thumbs": set(), "thumbs": set()}
@@ -176,6 +176,7 @@ def _card_index():
         r.named, r.names = named.get(cid, set()), names.get(cid, set())
         r.alt, r.cutin, r.overframe = cid in alt_cards, cid in cutin_cards, cid in overframe_cards
         r.rarity = md_rarity.get(cid, "")
+        r.unreleased = cid not in md_rarity   # outside Master Duel, shown by its stand-in art (엘리스 10/17)
         r.ban = md_ban.get(cid, "")   # today's Master Duel 금제, for the icon in the card's corner (엘리스 10/12)
         kind = frame if category == "monster" else f"{category}:{st}"
         number = rank if frame.startswith("xyz") else link if frame == "link" else level
@@ -329,7 +330,7 @@ def _keep(p):
     # today's Master Duel 금제, any of several: ban=forbidden,limited (엘리스 10/12); not on the list is unlimited
     bans = {b for b in str(p.get("ban", "")).split(",") if b in BAN_FILTERS}
     if bans:
-        tests.append(lambda r, v=bans: (r.ban or "unlimited") in v)
+        tests.append(lambda r, v=bans: ("unreleased" if r.unreleased else r.ban or "unlimited") in v)
     if str(p.get("card", "")).isdigit():
         # a card's own support list: the card, cards bearing its name and cards naming it (엘리스 2026-10-11)
         tests.append(lambda r, v=int(p["card"]): v in r.as_cards)
@@ -432,7 +433,7 @@ def cards(request):
                      "id": r.id, "name": r.name,
                      "face_thumb_url": face_thumb_url(r.id) if r.id in index["face_thumbs"] else None,
                      "thumb_url": f"{media}{CARD_THUMB_DIR}/{r.id}.webp" if r.id in index["thumbs"] else None,
-                     "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban,
+                     "image_url": art_url(r.id), "rarity": r.rarity, "ban": r.ban, "unreleased": r.unreleased,
                      "category": r.category, "frame": r.frame} for r in chunk],
         "total": len(rows), "page": page, "has_more": has_more,
     })

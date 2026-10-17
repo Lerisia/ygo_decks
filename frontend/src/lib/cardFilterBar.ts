@@ -19,6 +19,7 @@ export const BANS = [
   { value: "limited", label: "제한" },
   { value: "semi_limited", label: "준제한" },
   { value: "unlimited", label: "무제한" },
+  { value: "unreleased", label: "미출시" },
 ];
 const MONSTER_KEYS = ["frame", "attribute", "race", "level"];
 export const misfit = (key: string, v: DexValues) =>

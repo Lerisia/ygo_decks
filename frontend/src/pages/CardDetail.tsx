@@ -405,7 +405,9 @@ export default function CardDetail() {
             <img src={`/media/md_ui/rarity_${rarity.toLowerCase()}_hd.png`} alt={`레어도 ${rarity}`} title={rarity} className="float-right ml-2 mt-1 h-5 md:h-6 w-auto" />
           )}
           {/* today's Master Duel 금제 at the top left, as the rarity is at the top right (엘리스 10/12) */}
-          {card.ban && (
+          {card.provisional ? (
+            <span title="마스터 듀얼에 아직 없는 카드: 그림은 공개된 카드 이미지에서 잘라 둔 것" className="float-left mr-2 mt-1 rounded px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">미출시</span>
+          ) : card.ban && (
             <img src={`${ICONS}/limit/${card.ban}.webp`} alt={BAN_LABELS[card.ban]} title={`마스터 듀얼 ${BAN_LABELS[card.ban]}`} className="float-left mr-2 mt-0.5 w-7 h-7 md:w-8 md:h-8" />
           )}
           <h1 className="text-xl md:text-2xl font-extrabold break-keep">{card.name_ko || card.name}</h1>

@@ -848,7 +848,11 @@ class CardDexApiTest(TestCase):
         self.assertIn(23902, ids)
         self.assertNotIn(23903, ids)
         row = next(r for r in self.client.get("/api/carddb/cards/").json()["results"] if r["id"] == 23902)
-        self.assertEqual((row["image_url"], row["rarity"]), ("/media/cards/art/provisional/23902.webp", ""))
+        self.assertEqual((row["image_url"], row["rarity"], row["ban"], row["unreleased"]), ("/media/cards/art/provisional/23902.webp", "", "", True))
+        self.assertFalse(next(r for r in self.client.get("/api/carddb/cards/").json()["results"] if r["id"] == 1)["unreleased"])
+        # the 금제 filter tells them apart as 미출시 (엘리스 10/17)
+        self.assertEqual([r["id"] for r in self.client.get("/api/carddb/cards/", {"ban": "unreleased"}).json()["results"]], [23902])
+        self.assertNotIn(23902, [r["id"] for r in self.client.get("/api/carddb/cards/", {"ban": "unlimited"}).json()["results"]])
         doc = self.client.get("/api/carddb/cards/23902/").json()
         self.assertEqual((doc["image_url"], doc["provisional"], doc["rarity"], doc["dates"]["md"]),
                          ("/media/cards/art/provisional/23902.webp", True, "", None))
