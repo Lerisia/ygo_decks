@@ -328,7 +328,9 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           {imaging ? <ArrowLeft size={18} aria-hidden /> : <Camera size={18} aria-hidden />}
         </button>
       </div>
-      {/* the card book's own filter bar and sort, a size smaller (엘리스 2026-10-18: the same search filters the same way) */}
+      {/* the card book's own filter bar and sort, a size smaller (엘리스 2026-10-18: the same search filters the same way);
+          the sort at the row's right end below lg, and on its own line under the chips from lg, where the column is
+          too narrow for both */}
       <div className={`order-4 dex-compact lg:order-none lg:mt-2 ${imaging ? "hidden" : ""}`}>
         <CardFilterBar
           options={options}
@@ -336,11 +338,14 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           onChange={(f) => setBar({ ...bar, ...f })}
           right={
             <div className="flex items-center gap-1.5">
-              <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} />
+              <span className="lg:hidden"><CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact /></span>
               {history && <UndoButtons {...history} />}
             </div>
           }
         />
+        <div className="hidden lg:flex mt-1.5 justify-end">
+          <CardSortControl sorts={CARD_SORTS} filters={{ ...sorting, q }} onChange={pickSort} compact />
+        </div>
       </div>
       {imaging && scan.status.kind === "done" && (
         <ScanInfoRow
