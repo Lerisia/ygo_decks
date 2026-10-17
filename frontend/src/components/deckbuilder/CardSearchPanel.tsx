@@ -10,7 +10,7 @@ import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
-import { useImageScan } from "@/hooks/useImageScan";
+import { type ScanFound, useImageScan } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DeckCardFace } from "./DeckZones";
 
@@ -62,12 +62,14 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
   );
 }
 
-export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, notice, ready, history, overlay }: {
+export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, onShow, notice, ready, history, overlay }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
   /** The deck's 금제 (참혈 2026-10-16): each card's mark. */
   rule?: BanRule;
   onPick: (card: CardListItem) => void;
+  /** 전체 투입: every card a picture held, each as many times as it held it (참혈 2026-10-17). */
+  onPickAll?: (found: ScanFound[]) => void;
   /** A card held or right-clicked is shown. */
   onShow?: (card: CardListItem) => void;
   notice: string;
@@ -290,7 +292,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
         />
       </div>
       {imaging && scan.status.kind === "done" && (
-        <ScanInfoRow scan={scan} compact={wide} className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
+        <ScanInfoRow scan={scan} compact={wide} onAddAll={onPickAll && (() => ready && onPickAll(scan.found))} className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
       )}
       {!imaging && suggestions.length > 0 && (
         <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:order-none lg:mt-2 lg:flex-wrap lg:overflow-visible">

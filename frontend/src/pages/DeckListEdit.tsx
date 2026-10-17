@@ -15,9 +15,10 @@ import DeckZones from "@/components/deckbuilder/DeckZones";
 import { useAdminOnly } from "@/hooks/useAdminOnly";
 import { useBanlist } from "@/hooks/useBanlist";
 import { useDeckCards } from "@/hooks/useDeckCards";
+import type { ScanFound } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
-  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, addCard, blankDeck, clearTabDraft, copiesOf, copyIndex, copyRank,
+  type CardLook, type CoverPick, type DeckDraft, type DeckZone, COVERS_MAX, addCard, addCards, blankDeck, clearTabDraft, copiesOf, copyIndex, copyRank,
   coverLook, coverPlace, deckWarnings, fromDoc, isExtraCard, keepTabDraft, keptLook, lookAt, removeCard, savedCovers, setCover, setLook, setLookAll,
   shiftCopy, tabDraft,
 } from "@/lib/deckDrafts";
@@ -138,6 +139,14 @@ export default function DeckListEdit() {
     const r = addCard(deck, card, cards, look);
     if ("error" in r) say(r.error);
     else change(r.deck);
+  };
+  // 전체 투입: every card the picture held, as one change (one undo); those left out said (참혈 2026-10-17)
+  const pickAll = (picks: ScanFound[]) => {
+    if (!deck) return;
+    picks.forEach(({ card }) => remember(card));
+    const r = addCards(deck, picks, cards);
+    if (r.added) change(r.deck);
+    if (r.left) say(`${r.left}장은 넣지 못했습니다 · ${r.why}`);
   };
   // the copy at `at` out; a copy shown follows its place, as a 대표 카드 does
   const remove = (zone: DeckZone, at: number) => {
@@ -356,6 +365,7 @@ export default function DeckListEdit() {
                   cards={cards}
                   rule={rule}
                   onPick={(c) => pick(c)}
+                  onPickAll={pickAll}
                   onShow={showFromSearch}
                   // from lg the card shown takes the search's place, ← 뒤로 bringing the search back as it was (참혈 2026-10-16)
                   overlay={wide && info ? <CardInfoPane {...info} onClose={closeSheet} /> : null}

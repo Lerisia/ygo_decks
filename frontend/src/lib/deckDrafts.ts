@@ -211,6 +211,28 @@ export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards:
   return { deck: { ...deck, [zone]: [...deck[zone], card.id], looks: { ...deck.looks, [zone]: [...deck.looks[zone], keptLook(card.id, look)] } } };
 }
 
+/** Every card read from a picture into the deck at once (전체 투입, 참혈 2026-10-17): each as many times as the picture
+ *  held it, put in one by one as addCard puts them; those that cannot go in (3 of a name, a zone full, a token) are
+ *  left out and counted, with the first reason. */
+export function addCards<D extends DeckDraft>(deck: D, picks: { card: CardListItem; count: number }[], cards: Map<number, CardInfo>) {
+  const known = new Map(cards);
+  let next = deck, added = 0, left = 0, why = "";
+  for (const { card, count } of picks) {
+    known.set(card.id, card);
+    for (let i = 0; i < count; i++) {
+      const r = addCard(next, card, known);
+      if ("deck" in r) {
+        next = r.deck;
+        added++;
+      } else {
+        left++;
+        why ||= r.error;
+      }
+    }
+  }
+  return { deck: next, added, left, why };
+}
+
 const byName = (a: { card: CardListItem }, b: { card: CardListItem }) => (a.card.name < b.card.name ? -1 : a.card.name > b.card.name ? 1 : 0);
 
 /** The cards held more often than the deck's list allows (rule; a 금제 since saving), the forbidden first, then by

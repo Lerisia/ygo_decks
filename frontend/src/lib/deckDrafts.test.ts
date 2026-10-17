@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckWarnings, deckUpdated, fromDoc,
+  type DeckDraft, NEW_CODE, addCard, addCards, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckWarnings, deckUpdated, fromDoc,
   keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, notOutCards, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll,
   sortedCopies, sortedZone, tabDraft,
 } from "./deckDrafts";
@@ -51,6 +51,14 @@ describe("adding and taking out cards", () => {
     expect(addCard(full, CARDS.get(6)!, CARDS)).toEqual({ deck: { ...full, extra: [6], looks: { ...full.looks, extra: [null] } } });
     const fullExtra = deck([], Array.from({ length: 15 }, (_, i) => 100 + i));
     expect(addCard(fullExtra, CARDS.get(6)!, CARDS)).toHaveProperty("error");
+  });
+
+  it("puts every card a picture held in at once, each as often as it held it, leaving out what cannot go in (전체 투입)", () => {
+    const fresh = card(40, "새 카드", "spell", "spell");   // not among the deck's cards yet
+    const r = addCards(deck([1]), [{ card: CARDS.get(2)!, count: 3 }, { card: CARDS.get(5)!, count: 1 }, { card: CARDS.get(9)!, count: 1 }, { card: fresh, count: 2 }], CARDS);
+    expect(r.deck).toEqual(deck([1, 2, 2, 40, 40], [5]));
+    expect([r.added, r.left, r.why]).toEqual([5, 2, "같은 이름의 카드는 3장까지 넣을 수 있습니다."]);
+    expect(addCards(deck([]), [], CARDS)).toEqual({ deck: deck([]), added: 0, left: 0, why: "" });
   });
 
   it("takes out the one copy pressed, by its place in the zone", () => {

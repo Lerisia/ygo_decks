@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import LogoLoader from "@/components/LogoLoader";
+import ResetRightLineIcon from "@/components/icons/ResetRightLineIcon";
 import { cardTag } from "@/lib/cardTag";
 import { type ImageScan, type ScanStatus, useImageScan } from "@/hooks/useImageScan";
 
@@ -51,9 +52,11 @@ export function PicturePreview({ src, onClose }: { src: string; onClose: () => v
 
 /** One row on phones and computers alike (참혈 2026-10-16): the picture sent as a small thumbnail — pressed, shown
  *  large — how many cards were read, and 다른 사진 at the right end. compact: a size smaller, for the deck builder's
- *  narrow column. */
-export function ScanInfoRow({ scan, compact = false, className = "" }: { scan: ImageScan; compact?: boolean; className?: string }) {
+ *  narrow column. With onAddAll, the deck builder's row (참혈 2026-10-17): 「n장 인식」, 다른 사진 as a bare ↻ right after
+ *  it, and 전체 투입 at the right end putting every card read into the deck. */
+export function ScanInfoRow({ scan, compact = false, onAddAll, className = "" }: { scan: ImageScan; compact?: boolean; onAddAll?: () => void; className?: string }) {
   const [big, setBig] = useState(false);
+  const deck = !!onAddAll;
   return (
     <div className={`flex items-center ${compact ? "gap-2 text-xs" : "gap-2.5 text-sm"} ${className}`}>
       {scan.preview && (
@@ -62,17 +65,39 @@ export function ScanInfoRow({ scan, compact = false, className = "" }: { scan: I
         </button>
       )}
       <span className="min-w-0 truncate">
-        <span className="font-semibold">인식된 카드 {scan.recognized}장</span>
+        <span className="font-semibold">{deck ? `${scan.recognized}장 인식` : `인식된 카드 ${scan.recognized}장`}</span>
         {/* short, so the row stays one line in the deck builder's narrow column and on phones */}
         {scan.unknown > 0 && <span className="text-xs text-gray-500 dark:text-gray-400"> · 미인식 {scan.unknown}장</span>}
       </span>
-      <button
-        type="button"
-        onClick={scan.choose}
-        className={`ml-auto shrink-0 h-7 ${compact ? "px-2" : "px-2.5"} rounded-md text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700`}
-      >
-        다른 사진
-      </button>
+      {deck ? (
+        <>
+          <button
+            type="button"
+            onClick={scan.choose}
+            aria-label="다른 사진"
+            title="다른 사진"
+            className="-ml-1 shrink-0 w-7 h-7 p-0 border-0 grid place-items-center rounded-md bg-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ResetRightLineIcon className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onAddAll}
+            disabled={!scan.recognized}
+            className="ml-auto shrink-0 h-7 px-2.5 border-0 rounded-md text-xs font-semibold transition bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+          >
+            전체 투입
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={scan.choose}
+          className={`ml-auto shrink-0 h-7 ${compact ? "px-2" : "px-2.5"} rounded-md text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700`}
+        >
+          다른 사진
+        </button>
+      )}
       {big && scan.preview && <PicturePreview src={scan.preview} onClose={() => setBig(false)} />}
     </div>
   );
