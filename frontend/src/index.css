@@ -31,10 +31,18 @@ a {
   }
 }
 
+/* No sideways scrolling, without making the body a scroll container of its own: with overflow-x: hidden on the body,
+   iOS Safari scrolls the body element (not the page) to show a focused input and the page jumps to the top (엘리스
+   2026-10-17, the record form's deck pickers). `clip` keeps the clipping and creates no scroller; `hidden` on html
+   stays as the fallback for browsers without `clip`. */
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* iOS Safari auto-zooms when an input/textarea has font-size < 16px,
