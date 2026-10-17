@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Camera, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, Camera, Redo2, Undo2 } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import DexFilterBar from "@/components/DexFilterBar";
 import { ScanInfoRow, ScanState } from "@/components/ImageCardSearch";
@@ -42,7 +42,7 @@ function TileSkeleton() {
  *  rides on top of the keyboard, gliding up and down with it, and pressing the box does not scroll the page to it
  *  (참혈 2026-10-14). The camera right of the box, on a blue ground (참혈 2026-10-17), turns it to AI 이미지 검색, as in /dev/cards (참혈 2026-10-16):
  *  the chips and the 카드군·서포트 make way for one row with the picture, how many cards were read and 다른 사진, and
- *  the cards read take the cards' place, going into the deck as the searched ones do; typing goes back. The picture
+ *  the cards read take the cards' place, pressed to leave them out of 전체 투입 (참혈 2026-10-17); typing goes back. The picture
  *  and its cards stay while the search goes back and forth. */
 export type DeckUndo = { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void };
 
@@ -98,6 +98,11 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   const keyboard = useKeyboardInset(box);
   const [imaging, setImaging] = useState(false);
   const scan = useImageScan(imaging);
+  // the cards read that 전체 투입 leaves out, pressed to keep them out (참혈 2026-10-17); a new picture starts with none
+  const [skipped, setSkipped] = useState<Set<number>>(() => new Set());
+  useEffect(() => setSkipped(new Set()), [scan.found]);
+  const toPut = scan.found.filter((f) => !skipped.has(f.card.id));
+  const putCount = toPut.reduce((n, f) => n + f.count, 0);
   const wide = useMediaQuery("(min-width: 1024px)");
 
   // A tap on the box lets the browser scroll the page to it, which below lg throws the deck far down. The tap is
@@ -187,32 +192,42 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   };
 
   // a card found: pressed it goes in, held or right-clicked it is shown; n/3 once the deck holds it — the deck's 금제
-  // keeps none out (참혈 2026-10-17), its mark in the corner says it —, and how many the picture held (times)
-  const tile = (c: CardListItem, times?: number) => {
+  // keeps none out (참혈 2026-10-17), its mark in the corner says it. A card read from a picture (scanned) is pressed
+  // instead to leave it out of 전체 투입 or take it back, see-through while left out, and says how many the picture
+  // held at its bottom right, after n/3 (참혈 2026-10-17).
+  const tile = (c: CardListItem, scanned?: { times: number; skipped: boolean }) => {
     const n = copiesOf(deck, c.name, cards);
     const out = n >= COPIES_MAX || c.frame === "token";
+    const onPress = scanned
+      ? () => setSkipped((was) => {
+          const next = new Set(was);
+          if (!next.delete(c.id)) next.add(c.id);
+          return next;
+        })
+      : () => ready && onPick(c);
     return (
       <button
         key={c.id}
         type="button"
-        {...press(() => ready && onPick(c), () => onShow?.(c))}
-        aria-disabled={out || !ready}
-        title={c.name}
-        aria-label={`${c.name} 넣기`}
-        className={`group block text-center ${TILE} ${out ? "cursor-not-allowed" : ""}`}
+        {...press(onPress, () => onShow?.(c))}
+        aria-disabled={scanned ? undefined : out || !ready}
+        aria-pressed={scanned ? !scanned.skipped : undefined}
+        title={scanned ? `${c.name} (눌러서 ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}, 길게 누르면 보기)` : c.name}
+        aria-label={scanned ? `${c.name} ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}` : `${c.name} 넣기`}
+        className={`group block text-center ${TILE} ${out && !scanned ? "cursor-not-allowed" : ""}`}
       >
         <span className="relative block">
-          <DeckCardFace card={c} dim={out} ban={banOf(c, rule)} rule={rule} />
-          {times !== undefined && times > 1 && (
-            <span className="absolute top-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-blue-600/90 text-white tabular-nums">×{times}</span>
-          )}
-          {n > 0 && (
-            <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">
-              {n}/{COPIES_MAX}
+          <DeckCardFace card={c} dim={scanned ? scanned.skipped : out} ban={banOf(c, rule)} rule={rule} />
+          {(n > 0 || (scanned && scanned.times > 1)) && (
+            <span className={`absolute bottom-1 right-1 flex items-center gap-0.5 ${scanned?.skipped ? "opacity-40" : ""}`}>
+              {n > 0 && <span className="rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">{n}/{COPIES_MAX}</span>}
+              {scanned && scanned.times > 1 && (
+                <span className="rounded px-1 text-[10px] leading-4 font-bold bg-blue-600/90 text-white tabular-nums">×{scanned.times}</span>
+              )}
             </span>
           )}
         </span>
-        <span className="hidden lg:block mt-0.5 h-8 text-[11px] leading-4 line-clamp-2 break-keep">{c.name}</span>
+        <span className={`hidden lg:block mt-0.5 h-8 text-[11px] leading-4 line-clamp-2 break-keep ${scanned?.skipped ? "opacity-40" : ""}`}>{c.name}</span>
       </button>
     );
   };
@@ -269,14 +284,15 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
             setImaging((v) => !v);
             box.current?.blur();
           }}
-          aria-label="사진으로 카드 찾기"
+          aria-label={imaging ? "사진 검색 닫기" : "사진으로 카드 찾기"}
           aria-pressed={imaging}
-          title="사진으로 카드 찾기"
+          title={imaging ? "사진 검색 닫기" : "사진으로 카드 찾기"}
+          // while the picture search is open: gray, a ← to go back to the search (참혈 2026-10-17)
           className={`shrink-0 w-10 h-10 lg:w-9 lg:h-9 p-0 border-0 grid place-items-center rounded-lg text-white shadow-sm transition ${
-            imaging ? "bg-blue-700 ring-2 ring-blue-300 dark:ring-blue-400/60" : "bg-blue-600 hover:bg-blue-700"
+            imaging ? "bg-gray-500 hover:bg-gray-600" : "bg-blue-600 hover:bg-blue-700"
           }`}
         >
-          <Camera size={18} aria-hidden />
+          {imaging ? <ArrowLeft size={18} aria-hidden /> : <Camera size={18} aria-hidden />}
         </button>
       </div>
       {/* the card book's filter chips a size smaller; a chip opens its choices under the row (a popup on a phone) */}
@@ -292,7 +308,12 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
         />
       </div>
       {imaging && scan.status.kind === "done" && (
-        <ScanInfoRow scan={scan} compact={wide} onAddAll={onPickAll && (() => ready && onPickAll(scan.found))} className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
+        <ScanInfoRow
+          scan={scan}
+          compact={wide}
+          // 전체 투입, or 「n장 투입」 once some are left out (참혈 2026-10-17)
+          add={onPickAll && { label: skipped.size ? `${putCount}장 투입` : "전체 투입", count: putCount, onClick: () => ready && onPickAll(toPut) }}
+          className="order-3 shrink-0 h-8 px-0.5 lg:order-none lg:mt-2 lg:h-9 lg:px-0 lg:border-b lg:border-gray-100 lg:dark:border-gray-700" />
       )}
       {!imaging && suggestions.length > 0 && (
         <div className="order-3 flex gap-1.5 overflow-x-auto overscroll-contain lg:order-none lg:mt-2 lg:flex-wrap lg:overflow-visible">
@@ -332,7 +353,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           {scan.status.kind === "done" && (
             scan.found.length ? (
               <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden overscroll-contain lg:overflow-x-hidden lg:overflow-y-auto">
-                <div className="flex gap-1.5 w-max lg:w-auto lg:grid lg:grid-cols-3 lg:gap-2">{scan.found.map(({ card, count }) => tile(card, count))}</div>
+                <div className="flex gap-1.5 w-max lg:w-auto lg:grid lg:grid-cols-3 lg:gap-2">{scan.found.map(({ card, count }) => tile(card, { times: count, skipped: skipped.has(card.id) }))}</div>
               </div>
             ) : (
               <p className="flex-1 m-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">사진에서 카드를 찾지 못했습니다.</p>

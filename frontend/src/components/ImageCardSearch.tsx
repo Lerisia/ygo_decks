@@ -52,11 +52,17 @@ export function PicturePreview({ src, onClose }: { src: string; onClose: () => v
 
 /** One row on phones and computers alike (참혈 2026-10-16): the picture sent as a small thumbnail — pressed, shown
  *  large — how many cards were read, and 다른 사진 at the right end. compact: a size smaller, for the deck builder's
- *  narrow column. With onAddAll, the deck builder's row (참혈 2026-10-17): 「n장 인식」, 다른 사진 as a bare ↻ right after
- *  it, and 전체 투입 at the right end putting every card read into the deck. */
-export function ScanInfoRow({ scan, compact = false, onAddAll, className = "" }: { scan: ImageScan; compact?: boolean; onAddAll?: () => void; className?: string }) {
+ *  narrow column. With add, the deck builder's row (참혈 2026-10-17): 「n장 인식」, 다른 사진 as a bare ↻ right after
+ *  it, and at the right end the button putting the cards read into the deck (전체 투입, or 「n장 투입」 with some left
+ *  out; none to put, off). */
+export function ScanInfoRow({ scan, compact = false, add, className = "" }: {
+  scan: ImageScan;
+  compact?: boolean;
+  add?: { label: string; count: number; onClick: () => void };
+  className?: string;
+}) {
   const [big, setBig] = useState(false);
-  const deck = !!onAddAll;
+  const deck = !!add;
   return (
     <div className={`flex items-center ${compact ? "gap-2 text-xs" : "gap-2.5 text-sm"} ${className}`}>
       {scan.preview && (
@@ -82,11 +88,11 @@ export function ScanInfoRow({ scan, compact = false, onAddAll, className = "" }:
           </button>
           <button
             type="button"
-            onClick={onAddAll}
-            disabled={!scan.recognized}
+            onClick={add?.onClick}
+            disabled={!add?.count}
             className="ml-auto shrink-0 h-7 px-2.5 border-0 rounded-md text-xs font-semibold transition bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
           >
-            전체 투입
+            {add?.label}
           </button>
         </>
       ) : (
