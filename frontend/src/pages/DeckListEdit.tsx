@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Volume2, VolumeX } from "lucide-react";
 import type { CardListItem } from "@/api/cardDexApi";
 import { isAuthenticated } from "@/api/accountApi";
 import { createDeckList, getDeckList, updateDeckList } from "@/api/deckListApi";
@@ -26,6 +26,8 @@ import {
 import { banOf, notOut, unreleasedUnder } from "@/lib/banlists";
 import { DECK_LISTS_PATH, deckListPath } from "@/lib/deckListPaths";
 import { type DeckHistory, EMPTY_HISTORY, record, redo, undo } from "@/lib/deckHistory";
+import { cardFrom } from "@/lib/deckMotion";
+import { deckSoundOn, playDeckMove, playDeckSound, setDeckSoundOn, unlockDeckSound } from "@/lib/deckSound";
 
 const GUEST_NOTE = "로그인하면 덱을 올릴 수 있습니다.";
 // who may see the deck (엘리스 2026-10-17): everyone on the board, or its author alone
@@ -66,6 +68,8 @@ export default function DeckListEdit() {
   const [coverSlot, setCoverSlot] = useState<number | null>(null);   // the 대표 카드 slot being set
   // undo / redo of the deck's cards and 대표 카드 (참혈 2026-10-16); Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y outside the boxes
   const [history, setHistory] = useState<DeckHistory>(EMPTY_HISTORY);
+  // the game's deck editor sounds (엘리스 2026-10-18), off and on at the title's line, remembered
+  const [sound, setSound] = useState(deckSoundOn);
   // the deck as saved (a new one: empty), which 초기화 brings back (참혈 2026-10-16)
   const saved = useRef<DeckDraft | null>(null);
   const historyKeys = useRef({ undo: () => {}, redo: () => {} });
@@ -109,7 +113,12 @@ export default function DeckListEdit() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const closeSheet = useCallback(() => setShowing(null), []);
+  const closeSheet = useCallback(() => {
+    setShowing((was) => {
+      if (was) playDeckSound("close", 0.6);
+      return null;
+    });
+  }, []);
   // Esc stops setting the 대표 카드 (a card shown takes its own Esc first)
   useEffect(() => {
     if (coverSlot === null || showing) return;
@@ -139,19 +148,25 @@ export default function DeckListEdit() {
     setDeck({ ...deck, ...r[1] });
   };
   historyKeys.current = { undo: () => step(undo), redo: () => step(redo) };
-  const pick = (card: CardListItem, look?: CardLook | null) => {
+  // from: the tile pressed, for the card to fly from it (none: it grows in its place)
+  const pick = (card: CardListItem, look?: CardLook | null, from?: Element) => {
     if (!deck) return;
     remember(card);
     const r = addCard(deck, card, cards, look);
-    if ("error" in r) say(r.error);
-    else change(r.deck);
+    if ("error" in r) return say(r.error);
+    cardFrom(from ?? null);
+    change(r.deck);
+    playDeckMove();
   };
   // 전체 투입: every card the picture held, as one change (one undo); those left out said (참혈 2026-10-17)
   const pickAll = (picks: ScanFound[]) => {
     if (!deck) return;
     picks.forEach(({ card }) => remember(card));
     const r = addCards(deck, picks, cards);
-    if (r.added) change(r.deck);
+    if (r.added) {
+      change(r.deck);
+      playDeckMove();
+    }
     if (r.left) say(`${r.left}장은 넣지 못했습니다 · ${r.why}`);
   };
   // the copy at `at` out; a copy shown follows its place, as a 대표 카드 does
@@ -160,6 +175,7 @@ export default function DeckListEdit() {
     const id = deck[zone][at];
     const next = removeCard(deck, zone, at);
     change(next);
+    playDeckMove();
     if (showing?.zone === zone && showing.card.id === id && showing.copy !== undefined) {
       const moved = shiftCopy({ id, copy: showing.copy }, id, copyRank(deck[zone], at), next[zone].filter((x) => x === id).length);
       setShowing(moved ? { ...showing, copy: moved.copy } : { card: showing.card });
@@ -181,6 +197,7 @@ export default function DeckListEdit() {
   };
   // ← 뒤로 leaves without saving, as 취소 did (참혈 2026-10-16)
   const leave = () => {
+    playDeckSound("cancel", 0.6);
     if (code === undefined) clearTabDraft();
     if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
     else navigate(code === undefined ? DECK_LISTS_PATH : deckListPath(code));
@@ -190,6 +207,7 @@ export default function DeckListEdit() {
   const reset = () => {
     if (!changed || !saved.current) return;
     if (!window.confirm(code === undefined ? "만든 내용을 모두 지울까요?" : "수정한 내용을 지우고 저장된 상태로 되돌릴까요?")) return;
+    playDeckSound("cancel", 0.6);
     if (code === undefined) clearTabDraft();
     setDeck(structuredClone(saved.current));
     setHistory(EMPTY_HISTORY);
@@ -209,8 +227,10 @@ export default function DeckListEdit() {
       ...savedCovers(deck), is_private: deck.isPrivate,
     };
     setSaving(true);
+    playDeckSound("decide", 0.7);
     try {
       const saved = code === undefined ? await createDeckList(body) : await updateDeckList(code, body);
+      playDeckSound("verify", 0.6);
       if (code === undefined) clearTabDraft();
       navigate(deckListPath(saved.code), { replace: true });
     } catch (e) {
@@ -262,17 +282,29 @@ export default function DeckListEdit() {
       onFaces: (faces) => rememberAlts(card.id, faces),
     };
   })() : null;
-  const showFromDeck = (card: CardListItem, zone: DeckZone, at: number) => deck && setShowing({ card, zone, copy: copyRank(deck[zone], at) });
+  const showFromDeck = (card: CardListItem, zone: DeckZone, at: number) => {
+    if (!deck) return;
+    playDeckSound("open", 0.6);
+    setShowing({ card, zone, copy: copyRank(deck[zone], at) });
+  };
   const showFromSearch = (card: CardListItem) => {
+    playDeckSound("open", 0.6);
     setShowing({ card });
     setNextLook(null);
+  };
+  const toggleSound = () => {
+    const on = !sound;
+    setDeckSoundOn(on);
+    setSound(on);
+    if (on) playDeckSound("decide", 0.7);
   };
 
   const saveLabel = signedIn ? "저장" : "로그인하고 저장";
   const named = !!deck?.name.trim();
 
   return (
-    <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6">
+    // any press opens the sound within it, so the sounds that follow play on a phone too
+    <div className="min-h-screen w-full max-w-6xl mx-auto px-4 py-6" onPointerDownCapture={() => unlockDeckSound()}>
       {deck ? (
         <>
           <DeckPage
@@ -288,6 +320,16 @@ export default function DeckListEdit() {
               <div className="min-w-0 flex items-center gap-2">
                 {!signedIn && <p className="m-0 min-w-0 text-right text-[11px] sm:text-xs leading-4 text-gray-500 dark:text-gray-400 break-keep">{GUEST_NOTE}</p>}
                 <div className="shrink-0 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={toggleSound}
+                    aria-pressed={sound}
+                    aria-label={sound ? "효과음 끄기" : "효과음 켜기"}
+                    title={sound ? "효과음 끄기" : "효과음 켜기"}
+                    className={`${DECK_ICON} text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100`}
+                  >
+                    {sound ? <Volume2 className={DECK_ICON_SIZE} aria-hidden /> : <VolumeX className={DECK_ICON_SIZE} aria-hidden />}
+                  </button>
                   <button
                     type="button"
                     onClick={reset}
@@ -386,7 +428,7 @@ export default function DeckListEdit() {
                   deck={deck}
                   cards={cards}
                   rule={rule}
-                  onPick={(c) => pick(c)}
+                  onPick={(c, from) => pick(c, undefined, from)}
                   onPickAll={pickAll}
                   onShow={showFromSearch}
                   onDropOut={coverSlot === null ? remove : undefined}

@@ -12,6 +12,7 @@ import { type BanRule, banOf } from "@/lib/banlists";
 import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { MOUSE_QUERY, draggingDeckCard, droppedDeckCard, startCardDrag } from "@/lib/deckDrag";
+import { playDeckHover } from "@/lib/deckSound";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { type ScanFound, useImageScan } from "@/hooks/useImageScan";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -70,7 +71,8 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
   cards: Map<number, CardListItem>;
   /** The deck's 금제 (참혈 2026-10-16): each card's mark. */
   rule?: BanRule;
-  onPick: (card: CardListItem) => void;
+  /** `from`: the tile pressed, for the card to fly from it (lib/deckMotion). */
+  onPick: (card: CardListItem, from?: Element) => void;
   /** 전체 투입: every card a picture held, each as many times as it held it (참혈 2026-10-17). */
   onPickAll?: (found: ScanFound[]) => void;
   /** A card held (a finger) or clicked (a mouse) is shown. */
@@ -219,12 +221,13 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
           if (!next.delete(c.id)) next.add(c.id);
           return next;
         })
-      : () => ready && onPick(c);
+      : (el: HTMLElement) => ready && onPick(c, el);
     return (
       <button
         key={c.id}
         type="button"
         {...press(onPress, () => onShow?.(c), !!scanned)}
+        onPointerEnter={(e) => e.pointerType === "mouse" && !scanned && !out && playDeckHover()}
         // a mouse drags it onto the deck (엘리스 2026-10-18: as the game's PC editor)
         draggable={mouse && !scanned && !out && ready}
         onDragStart={(e) => startCardDrag(e, c)}
@@ -233,7 +236,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onPickAll, 
         title={scanned ? `${c.name} (눌러서 ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}, 길게 누르면 보기)`
           : mouse ? `${c.name} (오른쪽 클릭이나 끌어서 넣기, 눌러서 보기)` : c.name}
         aria-label={scanned ? `${c.name} ${scanned.skipped ? "다시 투입" : "투입에서 빼기"}` : `${c.name} 넣기`}
-        className={`group block text-center ${TILE} ${out && !scanned ? "cursor-not-allowed" : ""}`}
+        className={`group block text-center ${TILE} ${out && !scanned ? "cursor-not-allowed" : ""} ${mouse && !scanned && !out ? "card-lift" : ""}`}
       >
         <span className="relative block">
           <DeckCardFace card={c} dim={scanned ? scanned.skipped : out} ban={banOf(c, rule)} rule={rule} />

@@ -323,6 +323,24 @@ button:focus-visible {
   .fade-in { animation: none; }
 }
 
+/* A card lifts a little under the mouse, as the game's deck editor's do (엘리스 2026-10-18); never on a finger, and not
+   for a viewer who asked for less motion. */
+@media (hover: hover) {
+  .card-lift {
+    transition: transform 120ms ease-out;
+  }
+  .card-lift:hover {
+    transform: translateY(-4px) scale(1.04);
+    z-index: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-lift, .card-lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
 /* A card face gets a real card's slightly rounded corners (특이점 2026-10-12): 3.5% of the width across and the same
    length down (2.4% of a 704×1024 card's height), so each corner is a true quarter circle. */
 .card-corner {

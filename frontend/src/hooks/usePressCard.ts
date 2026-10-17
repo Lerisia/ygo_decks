@@ -17,7 +17,8 @@ export function usePressCard() {
     window.clearTimeout(timer.current);
     start.current = null;
   };
-  return (onPress: () => void, onShow: () => void, mouseClicks = false) => ({
+  // onPress gets the card's element, for a card put in to fly from it (lib/deckMotion)
+  return (onPress: (el: HTMLElement) => void, onShow: () => void, mouseClicks = false) => ({
     onPointerDown: (e: React.PointerEvent) => {
       held.current = false;
       mouse.current = e.pointerType === "mouse";
@@ -37,15 +38,15 @@ export function usePressCard() {
     onPointerUp: cancel,
     onPointerCancel: cancel,
     onPointerLeave: cancel,
-    onClick: () => {
+    onClick: (e: React.MouseEvent) => {
       if (held.current) held.current = false;   // the hold showed the card: the release presses nothing
       else if (mouse.current && !mouseClicks) onShow();
-      else onPress();
+      else onPress(e.currentTarget as HTMLElement);
     },
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
       cancel();
-      if (mouse.current && !mouseClicks) onPress();
+      if (mouse.current && !mouseClicks) onPress(e.currentTarget as HTMLElement);
       else onShow();
     },
     // a held card on a phone opens no selection or callout of its own
