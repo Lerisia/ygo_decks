@@ -124,7 +124,7 @@ export default function Changelog() {
                     <time className="text-xs md:text-sm text-gray-500">
                       {formatDate(e.published_at)}
                     </time>
-                    {e.author && <UserName user={e.author} size={18} className="ml-2 align-middle text-xs md:text-sm text-gray-700 dark:text-gray-200" />}
+                    {e.author && <UserName user={e.author} size={22} className="ml-2 align-middle text-sm md:text-base text-gray-700 dark:text-gray-200" />}
                     {e.scheduled && (
                       <span className="ml-2 inline-block whitespace-nowrap px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 text-[11px] font-semibold">
                         예약 · {formatTime(e.published_at)} 공개

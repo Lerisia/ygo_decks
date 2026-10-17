@@ -55,7 +55,7 @@ export default function DeckComments({ code, comments, admin, signedIn, next, on
           {comments.map((c) => (
             <li key={c.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <UserName user={c.author} size={20} className="text-gray-800 dark:text-gray-100" />
+                <UserName user={c.author} size={22} className="text-sm text-gray-800 dark:text-gray-100" />
                 <span className="tabular-nums">{deckDay(c.created_at)}</span>
                 {(c.mine || admin) && (
                   <button type="button" onClick={() => remove(c)} className="ml-auto p-0 border-0 bg-transparent text-red-500 hover:underline">

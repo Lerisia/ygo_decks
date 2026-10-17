@@ -14,7 +14,8 @@ const ROLE = {
 export function RoleChip({ role, className = "" }: { role: UserRef["role"]; className?: string }) {
   if (!role) return null;
   const r = ROLE[role];
-  return <span className={`shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[10px] font-bold leading-none ${r.className} ${className}`}>{r.label}</span>;
+  // sized in em, so the chip grows with the text it stands in (엘리스 2026-10-18: too small beside a notice)
+  return <span className={`shrink-0 inline-flex items-center h-[1.5em] px-[0.5em] rounded text-[0.8em] font-bold leading-none ${r.className} ${className}`}>{r.label}</span>;
 }
 
 /** Who wrote something: their icon in its frame, their role's chip, and their name — always together, wherever a

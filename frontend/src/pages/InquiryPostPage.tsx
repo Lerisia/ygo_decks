@@ -149,7 +149,7 @@ export default function InquiryPostPage() {
                   <li key={c.id} className="rounded-xl border border-blue-100 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 p-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                       {c.author ? (
-                        <UserName user={c.author} size={20} className="text-gray-800 dark:text-gray-100" />
+                        <UserName user={c.author} size={22} className="text-sm text-gray-800 dark:text-gray-100" />
                       ) : (
                         <span className="font-semibold text-blue-700 dark:text-blue-300">운영자</span>
                       )}
