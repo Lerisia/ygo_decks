@@ -35,6 +35,18 @@ class Command(BaseCommand):
             f.write(text)
         return text
 
+    def card_page(self, name):
+        """A card's Yugipedia page, kept once it is had (a page not there yet is asked for again next time)."""
+        path = banlist.cache_path("card", name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        try:
+            text = self.page("card", name, fresh=True)
+        except Exception:   # no such page, or Yugipedia away: the card stays unplaced this time
+            return ""
+        return text
+
     def handle(self, *args, **opts):
         fmt = opts["format"]
         self.asked, self.fetched = 0, set()
@@ -51,13 +63,18 @@ class Command(BaseCommand):
 
         filled = banlist.fill_gaps([p for _, p in pages])
         index = banlist.CardIndex()
-        lost = {}
+        lost, resolved = {}, {}
         with transaction.atomic():
             for page_title, p in pages:
                 b, _ = Banlist.objects.update_or_create(format=fmt, effective=p.effective, defaults={"source": page_title})
                 rows = []
                 for name, status, previous in p.entries:
                     card_id = index.match(name)
+                    if card_id is None:
+                        # a card without an English name here (not out in the TCG): its own page says which it is
+                        if name not in resolved:
+                            resolved[name] = index.resolve(self.card_page(name))
+                        card_id = resolved[name]
                     if card_id is None:
                         lost.setdefault(name, p.effective)
                     rows.append((name, card_id, status, previous))

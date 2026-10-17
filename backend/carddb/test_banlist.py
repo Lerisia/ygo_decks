@@ -118,6 +118,21 @@ class MatchTest(TestCase):
         self.assertEqual(self.index.match("Maliss P Dormouse"), 3)   # the OCG / TCG pages write the letter bare
         self.assertIsNone(self.index.match("Card That Is Not Here"))
 
+    def test_a_card_without_an_english_name_is_placed_by_its_page(self):
+        """Not out in the TCG, so no English name in our DB (퍼펙트론 하이드라이브 드래곤, 엘리스 10/17): the card's
+        Yugipedia page carries Konami's database id (our id outside Master Duel) and its Japanese name."""
+        Card.objects.create(id=22743, category="monster", name_ja="パーフェクトロン・ハイドライブ・ドラゴン", frame="effect")
+        Card.objects.create(id=23161, category="spell", name_ja="完全なる世界 トゥーン・ワールド", frame="spell")
+        Card.objects.create(id=4007, category="monster", name_ja="青眼の白龍", name_en="Blue-Eyes White Dragon", frame="normal")
+        index = banlist.CardIndex()
+        self.assertIsNone(index.match("Perfectron Hydradrive Dragon"))
+        self.assertEqual(index.resolve("| ja_name = パーフェクトロン・ハイドライブ・ドラゴン\n| database_id = 22743\n"), 22743)
+        # a ruby-marked name, and one whose database id is not ours (a Master Duel id could collide): the name decides
+        self.assertEqual(index.resolve("| ja_name = {{Ruby|完全|かんぜん}}なる{{Ruby|世界|せかい}} トゥーン・ワールド\n| database_id = 23161\n"), 23161)
+        self.assertEqual(index.resolve("| ja_name = 完全なる世界 トゥーン・ワールド\n| database_id = 4007\n"), 23161)
+        self.assertIsNone(index.resolve("| ja_name = ここにないカード\n| database_id = 4007\n"))
+        self.assertIsNone(index.resolve(""))
+
 
 class ImportBanlistsTest(TestCase):
     PAGES = {
@@ -156,7 +171,8 @@ class ImportBanlistsTest(TestCase):
 
     def test_import(self):
         out = self.run_import()
-        self.assertEqual(self.fetched, ["January 2022 Lists (Master Duel)", "May 2022 Lists (Master Duel)"])   # once each
+        # each list page once, then the page of the one card it could not place (엘리스 10/17)
+        self.assertEqual(self.fetched, ["January 2022 Lists (Master Duel)", "May 2022 Lists (Master Duel)", "Lost Card"])
         lists = list(Banlist.objects.order_by("effective").values_list("format", "effective", "source"))
         self.assertEqual(lists, [("md", date(2022, 1, 19), "January 2022 Lists (Master Duel)"),
                                  ("md", date(2022, 5, 9), "May 2022 Lists (Master Duel)")])
@@ -176,7 +192,7 @@ class ImportBanlistsTest(TestCase):
         self.assertEqual(Banlist.objects.count(), 2)
         self.assertEqual(BanlistEntry.objects.count(), 7)
         # only the newest page is asked again: its "next" is how a new list is found
-        self.assertEqual(self.fetched, ["May 2022 Lists (Master Duel)"])
+        self.assertEqual(self.fetched, ["May 2022 Lists (Master Duel)", "Lost Card"])   # the newest list, and the unplaced card's page
 
     def test_a_new_list_is_found_from_the_last(self):
         self.run_import()
@@ -193,6 +209,24 @@ class ImportBanlistsTest(TestCase):
         Card.objects.create(id=13, category="spell", name_ja="Lost Card", name_en="Lost Card", frame="spell")
         self.run_import()
         self.assertEqual(set(BanlistEntry.objects.filter(name="Lost Card").values_list("card_id", flat=True)), {13})
+
+    def test_a_card_without_an_english_name_is_placed_by_its_page(self):
+        """A list names a card our DB has no English name for: its Yugipedia page is read once and kept (엘리스 10/17)."""
+        self.pages["May 2022 Lists (Master Duel)"] = page(
+            "May 9, 2022", prev="January 2022 Lists (Master Duel)",
+            cards=["Pot of Greed; Forbidden", "Pot of Desires; Unlimited; Limited", "New Card; Limited; Did not exist",
+                   "Lost Card; Semi-Limited", "Perfectron Hydradrive Dragon; Limited"])
+        self.pages["Perfectron Hydradrive Dragon"] = "{{CardTable2\n| ja_name = パーフェクトロン・ハイドライブ・ドラゴン\n| database_id = 22743\n}}"
+        Card.objects.create(id=22743, category="monster", name_ja="パーフェクトロン・ハイドライブ・ドラゴン", frame="effect")
+        out = self.run_import()
+        self.assertEqual(BanlistEntry.objects.get(name="Perfectron Hydradrive Dragon").card_id, 22743)
+        self.assertEqual(self.fetched.count("Perfectron Hydradrive Dragon"), 1)
+        self.assertNotIn("Perfectron", out)                          # not among the cards it could not place
+        self.assertIn("no card for 'Lost Card'", out)
+        self.assertEqual(self.fetched.count("Lost Card"), 1)         # its page was asked for and is not there
+        self.run_import()
+        self.assertEqual(self.fetched.count("Perfectron Hydradrive Dragon"), 1)   # kept, not asked again
+        self.assertEqual(self.fetched.count("Lost Card"), 2)                      # a missing page is tried again
 
     def test_a_card_left_out_of_one_list_is_filled_in(self):
         # on the list before and after, unchanged, but missing between: the page left it out (Pot of Greed, OCG

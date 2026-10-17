@@ -133,14 +133,22 @@ def name_key(name, brackets=False):
     return re.sub(r"[^0-9a-z]+", "", name.casefold())
 
 
+def plain_ja(text):
+    """A Japanese name as a card page's CardTable2 writes it, without its {{Ruby|字|よみ}} marks, width folded."""
+    return unicodedata.normalize("NFKC", re.sub(r"\{\{Ruby\|([^|}]*)\|[^}]*\}\}", r"\1", text)).strip()
+
+
 class CardIndex:
-    """The card DB's English names, to find a list's cards by."""
+    """The card DB's English names, to find a list's cards by; its Japanese names for the cards that have none."""
 
     def __init__(self):
-        self.keys, self.loose = {}, {}
-        for cid, en in Card.objects.exclude(name_en="").values_list("id", "name_en"):
-            self.keys.setdefault(name_key(en), set()).add(cid)
-            self.loose.setdefault(name_key(en, brackets=True), set()).add(cid)
+        self.keys, self.loose, self.ja = {}, {}, {}
+        for cid, en, ja in Card.objects.values_list("id", "name_en", "name_ja"):
+            if en:
+                self.keys.setdefault(name_key(en), set()).add(cid)
+                self.loose.setdefault(name_key(en, brackets=True), set()).add(cid)
+            if ja:
+                self.ja.setdefault(plain_ja(ja), set()).add(cid)
 
     def match(self, name):
         """The card a list names, or None when there is none or more than one."""
@@ -151,6 +159,20 @@ class CardIndex:
             if ids:
                 return None
         return None
+
+    def resolve(self, page):
+        """The card whose Yugipedia page this is, for a name `match` could not place — a card not out in the TCG has
+        no English name in our DB (퍼펙트론 하이드라이브 드래곤, 엘리스 2026-10-17). The page's Konami database id is
+        our id for a card outside Master Duel, taken when the card's Japanese name agrees (a Master Duel card's id is
+        its Master Duel one, which could collide); else the Japanese name alone, when it names one card."""
+        ja = plain_ja(_field(page, "ja_name"))
+        if not ja:
+            return None
+        database_id = _field(page, "database_id")
+        if database_id.isdigit() and int(database_id) in self.ja.get(ja, ()):
+            return int(database_id)
+        ids = self.ja.get(ja, ())
+        return next(iter(ids)) if len(ids) == 1 else None
 
 
 def cache_path(fmt, page_title):
