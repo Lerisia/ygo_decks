@@ -1,11 +1,10 @@
 /** The deck list board (덱 구축 → 덱리 게시판, 엘리스 2026-10-17: every deck list is a post on it; there is no 마이덱).
  *  Replies are shaped as the inquiry board's: a page is results / total / page / pages, an error {"error"}.
  *  The server's own notes: backend/decklists/API.md. */
-import type { AvatarIcon } from "@/components/Avatar";
-import type { Border } from "@/api/avatarApi";
+import type { UserRef } from "@/components/UserName";
 
-/** Who posted it: shown as name + icon + frame, always together. */
-export type DeckListAuthor = { name: string; avatar_icon: AvatarIcon | null; border: Border | null };
+/** Who posted it: shown as icon + role chip + name, always together (components/UserName). */
+export type DeckListAuthor = UserRef;
 export type DeckListRow = {
   code: string; name: string; description: string; kind?: "own" | "entry"; main_count: number; extra_count: number;
   /** Up to 3 of its cards standing for it, in order (대표 카드, 참혈 2026-10-16), and which copy of each (0 the first). */

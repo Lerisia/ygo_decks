@@ -79,6 +79,10 @@ class ChangelogStaffWriteTests(TestCase):
         entry = ChangelogEntry.objects.get(title="[10/3] 새 공지")
         self.assertLessEqual(abs((entry.published_at - timezone.now()).total_seconds()), 5)
         self.assertEqual(self.client.get(reverse("changelog-latest")).json()["entry"]["title"], "[10/3] 새 공지")
+        # which operator wrote it, with the 운영자 chip (엘리스 2026-10-18)
+        latest = self.client.get(reverse("changelog-latest")).json()["entry"]
+        self.assertEqual((latest["author"]["name"], latest["author"]["role"]), (self.staff.username, "staff"))
+        self.assertEqual(entry.author, self.staff)
 
     def test_staff_can_schedule_and_sees_scheduled_entries(self):
         self.client.force_authenticate(self.staff)

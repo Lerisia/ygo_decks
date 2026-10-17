@@ -81,7 +81,7 @@ class DeckListApiTest(TestCase):
         guest = as_user()
         self.assertEqual(guest.get("/api/decklists/").json()["total"], 1)
         got = guest.get(f"/api/decklists/{code}/").json()
-        self.assertEqual((got["author"]["name"], got["mine"]), ("me", False))
+        self.assertEqual((got["author"]["name"], got["mine"], got["author"]["role"]), ("me", False, None))
         self.assertIn("avatar_icon", got["author"])
         self.assertIn("border", got["author"])
         self.assertIn(guest.post("/api/decklists/", self.body(), format="json").status_code, (401, 403))
@@ -431,6 +431,17 @@ class DeckBoardTest(TestCase):
         self.assertEqual(self.g.get(f"/api/decklists/{self.first}/").json()["comments"], [])
         self.assertEqual(LogEntry.objects.filter(user=self.staff).count(), 1)
         self.assertEqual(self.o.delete(f"/api/decklists/comments/{first.id}/").status_code, 404)
+
+    def test_an_operators_or_editors_role_comes_with_their_name(self):
+        """운영자·에디터 chips before the name (엘리스 2026-10-18): the server says the role with the author, on decks and
+        comments alike."""
+        editor = User.objects.create_user(email="e@test.com", username="editor", password="pass1234", is_editor=True)
+        staffs = self.post(self.s, name="운영자 덱")
+        editors = self.post(as_user(editor), name="에디터 덱")
+        roles = {d["code"]: d["author"]["role"] for d in self.board()["results"]}
+        self.assertEqual((roles[staffs], roles[editors], roles[self.first]), ("staff", "editor", None))
+        c = self.s.post(f"/api/decklists/{self.first}/comments/", {"body": "운영자입니다"}, format="json").json()
+        self.assertEqual((c["author"]["name"], c["author"]["role"]), ("staffer", "staff"))
 
     def test_staff_delete_a_deck_with_a_log(self):
         self.assertEqual(self.s.delete(f"/api/decklists/{self.first}/").status_code, 204)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import UserName from "@/components/UserName";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { isAdmin, isAuthenticated } from "@/api/accountApi";
 import {
@@ -147,7 +148,11 @@ export default function InquiryPostPage() {
                 {post.comments.map((c) => (
                   <li key={c.id} className="rounded-xl border border-blue-100 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 p-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="font-semibold text-blue-700 dark:text-blue-300">운영자</span>
+                      {c.author ? (
+                        <UserName user={c.author} size={20} className="text-gray-800 dark:text-gray-100" />
+                      ) : (
+                        <span className="font-semibold text-blue-700 dark:text-blue-300">운영자</span>
+                      )}
                       <span>{formatInquiryDate(c.created_at)}</span>
                       {staff && (
                         <button type="button" onClick={() => removeAnswer(c.id)} className="ml-auto text-red-500 hover:underline bg-transparent p-0 border-0">

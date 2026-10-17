@@ -1,8 +1,12 @@
+import type { UserRef } from "@/components/UserName";
+
 const API_BASE = "/api";
 
 export type ChangelogEntry = {
   id: number;
   title: string;
+  /** which operator wrote it (엘리스 2026-10-18); none on the oldest notices */
+  author?: UserRef | null;
   /** "deck": the monthly deck-addition notice, shown in its own colour (특이점 2026-10-10). */
   kind?: "update" | "deck";
   body: string;
@@ -27,7 +31,9 @@ async function request<T>(path: string, init?: RequestInit, withAuth = false): P
     try {
       const body = await res.json();
       msg = body.error || body.detail || JSON.stringify(body);
-    } catch {}
+    } catch {
+      /* no body to read: the status alone */
+    }
     throw new Error(msg);
   }
   return res.status === 204 ? (undefined as T) : res.json();

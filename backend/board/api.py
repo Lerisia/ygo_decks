@@ -46,3 +46,15 @@ def log_deletion(user, obj, message):
     """A staff member's deletion of someone else's post or comment, in the admin log."""
     LogEntry.objects.log_actions(user_id=user.id, queryset=type(obj).objects.filter(pk=obj.pk), action_flag=DELETION,
                                  change_message=message)
+
+
+def author_of(user):
+    """A member as shown beside what they wrote: name, icon and frame (as the tournament pages have them) and their
+    role on the site — "staff" (운영자) or "editor" (에디터), else None — for the chip the pages draw before the name
+    (엘리스 2026-10-18). None for no one."""
+    if user is None:
+        return None
+    from tournament.serializers import user_avatar
+    icon, border = user_avatar(user)
+    role = "staff" if user.is_staff else "editor" if getattr(user, "is_editor", False) else None
+    return {"name": user.username, "avatar_icon": icon, "border": border, "role": role}

@@ -124,7 +124,9 @@ class InquiryBoardTest(TestCase):
         detail = self._as(self.author).get(f"/api/inquiry/{pid}/").json()
         self.assertTrue(detail["answered"])
         self.assertEqual([c["body"] for c in detail["comments"]], ["확인해 보겠습니다."])
-        self.assertNotIn("staffer", str(detail))
+        # which operator answered, for the 운영자 chip and name (엘리스 2026-10-18)
+        self.assertEqual((detail["comments"][0]["author"]["name"], detail["comments"][0]["author"]["role"]), ("staffer", "staff"))
+        # the answering operator's name is shown since 2026-10-18 (엘리스): the 운영자 chip and the name, not 익명
         # removing the only answer makes it unanswered again
         self._as(self.staff).delete(f"/api/inquiry/comments/{res.json()['id']}/")
         self.assertFalse(self._as(self.author).get(f"/api/inquiry/{pid}/").json()["answered"])

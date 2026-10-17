@@ -9,10 +9,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from board.api import COMMENT_LIMITS, POST_LIMITS, TOO_FAST, error, is_staff, log_deletion, page_of, too_fast
+from board.api import COMMENT_LIMITS, POST_LIMITS, TOO_FAST, author_of, error, is_staff, log_deletion, page_of, too_fast
 from board.models import Comment
 from notification.models import notify
-from tournament.serializers import user_avatar
 
 from .models import DeckList, DeckListCard, DeckListComment
 from .rules import DeckError, check, check_banlist, check_covers, check_looks, cover_copies_of, issues, looks_of
@@ -25,22 +24,17 @@ FORMATS = ("md", "ocg", "tcg", "custom", "none")
 VIEW_TTL = 6 * 3600   # one open of a deck per viewer counts, this long
 
 
-def _author(user):
-    icon, border = user_avatar(user)
-    return {"name": user.username, "avatar_icon": icon, "border": border}
-
-
 def _row(d, user):
     return {"code": d.code, "name": d.name, "description": d.description, "kind": d.kind, "main_count": len(d.main),
             "extra_count": len(d.extra), "cover_cards": d.cover_cards, "cover_copies": cover_copies_of(d), "banlist": d.banlist,
-            "author": _author(d.owner), "is_private": d.is_private, "view_count": d.view_count,
+            "author": author_of(d.owner), "is_private": d.is_private, "view_count": d.view_count,
             "comment_count": getattr(d, "n_comments", None),
             "mine": user.is_authenticated and d.owner_id == user.id,
             "created_at": d.created_at.isoformat(), "updated_at": d.updated_at.isoformat()}
 
 
 def _comment_out(c, user):
-    return {"id": c.id, "author": _author(c.author), "body": c.body, "created_at": c.created_at.isoformat(),
+    return {"id": c.id, "author": author_of(c.author), "body": c.body, "created_at": c.created_at.isoformat(),
             "mine": user.is_authenticated and c.author_id == user.id}
 
 

@@ -4,7 +4,7 @@ import { isAuthenticated } from "@/api/accountApi";
 import { type DeckListDoc, deleteDeckList, getDeckList } from "@/api/deckListApi";
 import { Eye, Lock, Pencil, Trash2 } from "lucide-react";
 import CoverCards from "@/components/deckbuilder/CoverCards";
-import DeckAuthor from "@/components/deckbuilder/DeckAuthor";
+import UserName from "@/components/UserName";
 import DeckComments from "@/components/deckbuilder/DeckComments";
 import DeckPage, { DECK_ICON, DECK_ICON_SIZE, DeckNotFound } from "@/components/deckbuilder/DeckPage";
 import DeckZones from "@/components/deckbuilder/DeckZones";
@@ -122,7 +122,7 @@ export default function DeckListView() {
           description={
             <>
               <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                {deck.author && <DeckAuthor author={deck.author} size={24} className="text-sm text-gray-800 dark:text-gray-100" />}
+                {deck.author && <UserName user={deck.author} size={24} className="text-sm text-gray-800 dark:text-gray-100" />}
                 <span className="inline-flex items-center gap-1 tabular-nums" title="조회"><Eye className="w-3.5 h-3.5" aria-hidden />{deck.view_count ?? 0}</span>
               </div>
               {deck.description && <p className="mt-2 mb-0 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line break-keep">{deck.description}</p>}

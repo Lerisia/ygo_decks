@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -11,6 +12,8 @@ class ChangelogEntry(models.Model):
     published_at = models.DateTimeField(
         help_text="메인 화면 노출 시각. 미래 시각으로 두면 그 시간까지 숨겨집니다."
     )
+    # which operator wrote it, shown with the notice (엘리스 2026-10-18); the notices from before were given theirs
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="notices")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

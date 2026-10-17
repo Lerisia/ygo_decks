@@ -18,7 +18,10 @@ export const BOARD_INFO: Record<InquiryBoard, { title: string; icon: string; des
   },
 };
 
-export type InquiryComment = { id: number; body: string; created_at: string };
+import type { UserRef } from "@/components/UserName";
+
+/** An operator's answer, with who answered (엘리스 2026-10-18). */
+export type InquiryComment = { id: number; body: string; created_at: string; author?: UserRef | null };
 
 export type InquiryPost = {
   id: number;

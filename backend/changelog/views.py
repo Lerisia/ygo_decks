@@ -38,14 +38,14 @@ def list_entries(request):
     if request.method == "GET":
         # Staff also see scheduled (future) entries so they can check and fix them before they go out.
         entries = ChangelogEntry.objects.all() if _is_staff(request) else _visible_entries()
-        return Response(ChangelogEntrySerializer(entries, many=True).data)
+        return Response(ChangelogEntrySerializer(entries.select_related("author"), many=True).data)
 
     if not _is_staff(request):
         return _forbidden(request)
     ser = ChangelogWriteSerializer(data=request.data)
     if not ser.is_valid():
         return Response({"error": _first_error(ser.errors)}, status=400)
-    entry = ser.save()
+    entry = ser.save(author=request.user)
     _log(request, entry, ADDITION, "사이트에서 공지 작성")
     return Response(ChangelogEntrySerializer(entry).data, status=201)
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { type DeckListComment, addDeckComment, deleteDeckComment } from "@/api/deckListApi";
-import DeckAuthor from "./DeckAuthor";
+import UserName from "@/components/UserName";
 import { deckDay } from "@/lib/deckDrafts";
 
 const BOX = "w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -55,7 +55,7 @@ export default function DeckComments({ code, comments, admin, signedIn, next, on
           {comments.map((c) => (
             <li key={c.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <DeckAuthor author={c.author} size={20} className="text-gray-800 dark:text-gray-100" />
+                <UserName user={c.author} size={20} className="text-gray-800 dark:text-gray-100" />
                 <span className="tabular-nums">{deckDay(c.created_at)}</span>
                 {(c.mine || admin) && (
                   <button type="button" onClick={() => remove(c)} className="ml-auto p-0 border-0 bg-transparent text-red-500 hover:underline">

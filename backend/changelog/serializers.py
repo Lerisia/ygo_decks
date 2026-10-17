@@ -1,18 +1,23 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from board.api import author_of
 from .models import ChangelogEntry
 
 
 class ChangelogEntrySerializer(serializers.ModelSerializer):
     scheduled = serializers.SerializerMethodField()
+    author = serializers.SerializerMethodField()
 
     class Meta:
         model = ChangelogEntry
-        fields = ("id", "title", "kind", "body", "published_at", "scheduled")
+        fields = ("id", "title", "kind", "body", "published_at", "scheduled", "author")
 
     def get_scheduled(self, obj):
         return obj.published_at > timezone.now()
+
+    def get_author(self, obj):
+        return author_of(obj.author)
 
 
 class ChangelogWriteSerializer(serializers.ModelSerializer):

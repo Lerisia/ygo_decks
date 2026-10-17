@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from board.api import POST_LIMITS, TOO_FAST, error as _error, is_staff as _is_staff, log_deletion, page_of, too_fast
+from board.api import POST_LIMITS, TOO_FAST, author_of, error as _error, is_staff as _is_staff, log_deletion, page_of, too_fast
 from .models import InquiryComment, InquiryPost
 
 # Lists and locked pages never show a real title: someone could put abuse in it (특이점 2026-10-07).
@@ -42,9 +42,10 @@ def _post_out(post, user, full=False):
         out["author_name"] = post.author.username  # staff only, so they can follow up; everyone else sees 익명
     if full and can_view:
         out["body"] = post.body
+        # which operator answered, with their icon and 운영자 chip (엘리스 2026-10-18)
         out["comments"] = [
-            {"id": c.id, "body": c.body, "created_at": c.created_at}
-            for c in post.comments.filter(is_deleted=False)
+            {"id": c.id, "body": c.body, "created_at": c.created_at, "author": author_of(c.author)}
+            for c in post.comments.filter(is_deleted=False).select_related("author")
         ]
         out["comment_count"] = len(out["comments"])
         if mine or staff:
@@ -145,7 +146,7 @@ def add_comment(request, pk):
     post.answered_at = comment.created_at
     post.save(update_fields=["answered_at"])
     _notify_author(post)
-    return Response({"id": comment.id, "body": comment.body, "created_at": comment.created_at}, status=201)
+    return Response({"id": comment.id, "body": comment.body, "created_at": comment.created_at, "author": author_of(comment.author)}, status=201)
 
 
 @api_view(["DELETE"])

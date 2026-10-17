@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Lock, MessageCircle } from "lucide-react";
 import type { DeckListAuthor } from "@/api/deckListApi";
-import DeckAuthor from "./DeckAuthor";
+import UserName from "@/components/UserName";
 import { type DeckDraft, MAIN_MIN, ZONE_PLAY_MAX, deckDay, deckUpdated } from "@/lib/deckDrafts";
 
 /** Every deck card and the dashed one standing in for an empty board are this tall, so the grid never changes size. */
@@ -33,7 +33,7 @@ export default function DeckListCard({ deck, to, author, comments = 0, isPrivate
           <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">{deckDay(deckUpdated(deck))}</span>
         </span>
         {author ? (
-          <DeckAuthor author={author} size={24} className="shrink-0 max-w-[45%] text-xs" />
+          <UserName user={author} size={24} className="shrink-0 max-w-[50%] text-xs" />
         ) : (
           <span className="invisible h-6" aria-hidden />
         )}
