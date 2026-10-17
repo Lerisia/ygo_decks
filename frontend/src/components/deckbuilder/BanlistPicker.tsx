@@ -6,7 +6,7 @@ import SearchForm from "@/components/SearchForm";
 import { getBanTable } from "@/api/banlistApi";
 import { dropPlace } from "@/lib/dropdown";
 import {
-  type BanFormat, type BanKind, type BanlistIndex, BAN_KINDS, NO_BANLIST, NO_BANLIST_LABEL, banlistName, banlistTitle, banlistYears, followsTitle,
+  type BanFormat, type BanKind, type BanlistIndex, BAN_KINDS, NO_BANLIST, NO_BANLIST_LABEL, banlistName, banlistTitle, banlistUpcoming, banlistYears, followsTitle,
   fullDay, isCode, latestDay, parseBanlistKey, pickerKind, recentCodes, rememberCode,
 } from "@/lib/banlists";
 
@@ -15,7 +15,8 @@ const PANEL_WIDTH = 448;
 const PANEL_HEIGHT = 300;
 // a group's name over its items, its text where theirs starts
 const GROUP = "m-0 mb-1 px-2 text-[11px] leading-4 font-semibold text-gray-500 dark:text-gray-400";
-const ITEM = "shrink-0 h-7 px-2 inline-flex items-center rounded-md border-0 text-xs font-semibold tabular-nums whitespace-nowrap transition-colors";
+const ITEM_BOX = "shrink-0 h-7 px-2 inline-flex items-center rounded-md text-xs font-semibold tabular-nums whitespace-nowrap transition-colors";
+const ITEM = `${ITEM_BOX} border-0`;
 const ITEM_OFF = "bg-transparent text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700";
 const ITEM_ON = "bg-blue-600 text-white hover:bg-blue-600";
 
@@ -27,44 +28,66 @@ function Item({ on, title, onClick, children, className = "" }: { on: boolean; t
   );
 }
 
-/** A game's lists (참혈 2026-10-17): 최신 on top — its newest list's whole day, followed to the next —, under it the
- *  lists by year, the newest year on the left, each year's newest on top; a list announced for a later day says 예정. */
+/** Groups side by side, each a column of items under its name, in what is left of the panel, scrolling both ways:
+ *  a game's years, 커스텀's 프리셋 and 최근 사용 (참혈 2026-10-17). */
+function Columns({ groups, empty }: { groups: { key: string; name: string; items: ReactNode }[]; empty?: ReactNode }) {
+  return (
+    <div className="min-h-0 flex-1 -mx-1 px-1 overflow-auto overscroll-contain">
+      {groups.length ? (
+        <div className="flex gap-3 w-max">
+          {groups.map((g) => (
+            <div key={g.key} className="flex flex-col items-start">
+              <p className={`${GROUP} sticky top-0 z-[1] w-full mb-0 h-6 leading-6 bg-white dark:bg-gray-800 tabular-nums`}>{g.name}</p>
+              {g.items}
+            </div>
+          ))}
+        </div>
+      ) : (
+        empty
+      )}
+    </div>
+  );
+}
+
+/** A game's lists (참혈 2026-10-17): on top 최신 — its newest list's whole day, followed to the next —, and to its right
+ *  any list announced for a later day (예정); under them the lists in effect by year, the newest year on the left, each
+ *  year's from 1월 down to 12월. */
 function GameLists({ format, value, index, onPick }: { format: BanFormat; value: string; index: BanlistIndex | null; onPick: (key: string) => void }) {
   const latest = index && latestDay(index, format);
-  const years = banlistYears(format, index);
   return (
     <>
       <section className="shrink-0">
         <p className={GROUP}>최신</p>
-        <Item on={value === format} title={followsTitle(index, format)} onClick={() => onPick(format)}>
-          {latest ? fullDay(latest) : "최신"}
-        </Item>
+        <div className="flex flex-wrap gap-1">
+          <Item on={value === format} title={followsTitle(index, format)} onClick={() => onPick(format)}>
+            {latest ? fullDay(latest) : "최신"}
+          </Item>
+          {banlistUpcoming(format, index).map((d) => (
+            <Item key={d.key} on={value === d.key} title={`${fullDay(d.day)} 적용 예정`} onClick={() => onPick(d.key)}>
+              {fullDay(d.day)}
+              <span className={`ml-1 text-[10px] font-normal ${value === d.key ? "" : "text-gray-400 dark:text-gray-500"}`}>예정</span>
+            </Item>
+          ))}
+        </div>
       </section>
-      <div className="min-h-0 flex-1 -mx-1 px-1 overflow-auto overscroll-contain">
-        {years.length ? (
-          <div className="flex gap-3 w-max">
-            {years.map(({ year, days }) => (
-              <div key={year} className="flex flex-col items-start">
-                <p className={`${GROUP} sticky top-0 z-[1] w-full mb-0 h-6 leading-6 bg-white dark:bg-gray-800 tabular-nums`}>{year}년</p>
-                {days.map((d) => (
-                  <Item key={d.key} on={value === d.key} title={d.later ? `${fullDay(d.day)} 적용 예정` : fullDay(d.day)} onClick={() => onPick(d.key)}>
-                    {d.label}
-                    {d.later && <span className={`ml-1 text-[10px] font-normal ${value === d.key ? "" : "text-gray-400 dark:text-gray-500"}`}>예정</span>}
-                  </Item>
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="m-0 px-2 py-2 text-gray-500 dark:text-gray-400">{index ? "아직 금제가 없습니다." : "불러오는 중…"}</p>
-        )}
-      </div>
+      <Columns
+        groups={banlistYears(format, index).map(({ year, days }) => ({
+          key: year,
+          name: `${year}년`,
+          items: days.map((d) => (
+            <Item key={d.key} on={value === d.key} title={fullDay(d.day)} onClick={() => onPick(d.key)}>
+              {d.label}
+            </Item>
+          )),
+        }))}
+        empty={<p className="m-0 px-2 py-2 text-gray-500 dark:text-gray-400">{index ? "아직 금제가 없습니다." : "불러오는 중…"}</p>}
+      />
     </>
   );
 }
 
-/** 커스텀 (참혈 2026-10-17): 커스텀 코드 — 직접 입력, a code asked for on Enter —, 프리셋 (무금제), and the codes this
- *  browser used last. */
+/** 커스텀 (참혈 2026-10-17): on top 커스텀 코드 — 직접 입력, a code asked for on Enter —; under it 프리셋 (무금제) and the
+ *  codes this browser used last (최근 사용), each a column. */
 function CustomLists({ value, onPick }: { value: string; onPick: (key: string) => void }) {
   const [typing, setTyping] = useState(false);
   const [code, setCode] = useState("");
@@ -90,8 +113,8 @@ function CustomLists({ value, onPick }: { value: string; onPick: (key: string) =
   };
   const message = asked === "missing" ? "없는 금제 코드예요" : asked === "failed" ? "코드를 확인하지 못했어요" : "";
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain flex flex-col gap-3">
-      <section>
+    <>
+      <section className="shrink-0">
         <p className={GROUP}>커스텀 코드</p>
         {typing ? (
           <SearchForm onSearch={() => lookUp(code.trim())}>
@@ -121,31 +144,34 @@ function CustomLists({ value, onPick }: { value: string; onPick: (key: string) =
             </div>
           </SearchForm>
         ) : (
-          <button type="button" onClick={() => setTyping(true)} className={`${ITEM} border border-dashed border-gray-300 dark:border-gray-600 ${ITEM_OFF}`}>
+          <button type="button" onClick={() => setTyping(true)} className={`${ITEM_BOX} border border-dashed border-gray-300 dark:border-gray-600 ${ITEM_OFF}`}>
             직접 입력
           </button>
         )}
         <p role="alert" className="m-0 mt-1 px-2 h-4 text-[11px] leading-4 font-semibold text-red-600 dark:text-red-400">{message}</p>
       </section>
-      <section>
-        <p className={GROUP}>프리셋</p>
-        <Item on={value === NO_BANLIST} title={banlistTitle(NO_BANLIST, null)} onClick={() => onPick(NO_BANLIST)}>
-          {NO_BANLIST_LABEL}
-        </Item>
-      </section>
-      <section>
-        <p className={GROUP}>최근 사용</p>
-        {recent.length ? (
-          <div className="flex flex-wrap gap-1">
-            {recent.map((c) => (
-              <Item key={c} on={c === current} onClick={() => lookUp(c)}>{c}</Item>
-            ))}
-          </div>
-        ) : (
-          <p className="m-0 px-2 text-gray-400 dark:text-gray-500">최근 사용한 코드가 없습니다.</p>
-        )}
-      </section>
-    </div>
+      {/* 프리셋 and 최근 사용 side by side, each a column as a game's years (참혈 2026-10-17) */}
+      <Columns
+        groups={[
+          {
+            key: "preset",
+            name: "프리셋",
+            items: (
+              <Item on={value === NO_BANLIST} title={banlistTitle(NO_BANLIST, null)} onClick={() => onPick(NO_BANLIST)}>
+                {NO_BANLIST_LABEL}
+              </Item>
+            ),
+          },
+          {
+            key: "recent",
+            name: "최근 사용",
+            items: recent.length
+              ? recent.map((c) => <Item key={c} on={c === current} onClick={() => lookUp(c)}>{c}</Item>)
+              : <p className="m-0 h-7 px-2 leading-7 text-gray-400 dark:text-gray-500 whitespace-nowrap">아직 없습니다</p>,
+          },
+        ]}
+      />
+    </>
   );
 }
 

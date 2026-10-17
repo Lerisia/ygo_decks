@@ -48,19 +48,27 @@ export function dayLabel(format: BanFormat, day: string, days: string[] = []) {
 /** A game's newest list in effect on the index's day (one announced for a later day waits for it). */
 export const latestDay = (index: BanlistIndex, format: BanFormat) => index.lists[format].find((d) => d <= index.today) ?? null;
 
-/** A list in the picker's years: its key, "10.06", and whether it is announced for a later day (예정). */
-export type BanDay = { key: string; day: string; label: string; later: boolean };
+/** A list in the picker: its key and day, and "10.06" for the years. */
+export type BanDay = { key: string; day: string; label: string };
 
-/** A game's lists by year for the picker (참혈 2026-10-17): the newest year first, each year's lists newest first. */
+const banDay = (format: BanFormat, day: string): BanDay => ({ key: `${format}:${day}`, day, label: day.slice(5).replace("-", ".") });
+
+/** A game's lists in effect by now, by year, for the picker (참혈 2026-10-17): the newest year first, each year's lists
+ *  oldest first (1월 to 12월); one announced for a later day is not among them (banlistUpcoming). */
 export function banlistYears(format: BanFormat, index: BanlistIndex | null): { year: string; days: BanDay[] }[] {
   const out: { year: string; days: BanDay[] }[] = [];
   for (const day of index?.lists[format] ?? []) {
+    if (day > index!.today) continue;
     const year = day.slice(0, 4);
     if (out[out.length - 1]?.year !== year) out.push({ year, days: [] });
-    out[out.length - 1].days.push({ key: `${format}:${day}`, day, label: day.slice(5).replace("-", "."), later: day > index!.today });
+    out[out.length - 1].days.unshift(banDay(format, day));
   }
   return out;
 }
+
+/** A game's lists announced for a later day (예정), the soonest first: beside 최신 in the picker (참혈 2026-10-17). */
+export const banlistUpcoming = (format: BanFormat, index: BanlistIndex | null): BanDay[] =>
+  (index?.lists[format] ?? []).filter((day) => day > index!.today).reverse().map((day) => banDay(format, day));
 
 /** The note on a game's 최신 in the picker. */
 export const followsTitle = (index: BanlistIndex | null, format: BanFormat) => {

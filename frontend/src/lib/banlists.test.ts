@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type BanlistIndex, type BanRule, BAN_KINDS, NO_RULE, TODAY_MD, banOf, banlistName, banlistTitle, banlistYears, dayLabel, isCode, latestDay, notOut,
+  type BanlistIndex, type BanRule, BAN_KINDS, NO_RULE, TODAY_MD, banOf, banlistName, banlistTitle, banlistUpcoming, banlistYears, dayLabel, isCode, latestDay, notOut,
   parseBanlistKey, pendingRule, pickerKind, recentCodes, rememberCode, ruleOf, unreleasedUnder,
 } from "./banlists";
 
@@ -60,18 +60,22 @@ describe("a list's day as the picker writes it", () => {
     expect(latestDay({ ...INDEX, lists: { ...INDEX.lists, tcg: [] } }, "tcg")).toBeNull();
   });
 
-  it("lays a game's lists out by year for the picker, the newest first, mm.dd each, a later one marked (참혈 2026-10-17)", () => {
-    const index = { ...INDEX, lists: { ...INDEX.lists, tcg: ["2026-10-19", "2026-09-21", "2025-12-01", "2024-04-15"] } };
+  it("lays a game's lists in effect out by year for the picker, the newest year first, each oldest first (참혈 2026-10-17)", () => {
+    const index = { ...INDEX, lists: { ...INDEX.lists, tcg: ["2027-01-10", "2026-10-19", "2026-09-21", "2026-02-02", "2025-12-01", "2024-04-15"] } };
     expect(banlistYears("tcg", index)).toEqual([
       { year: "2026", days: [
-        { key: "tcg:2026-10-19", day: "2026-10-19", label: "10.19", later: true },
-        { key: "tcg:2026-09-21", day: "2026-09-21", label: "09.21", later: false },
+        { key: "tcg:2026-02-02", day: "2026-02-02", label: "02.02" },
+        { key: "tcg:2026-09-21", day: "2026-09-21", label: "09.21" },
       ] },
-      { year: "2025", days: [{ key: "tcg:2025-12-01", day: "2025-12-01", label: "12.01", later: false }] },
-      { year: "2024", days: [{ key: "tcg:2024-04-15", day: "2024-04-15", label: "04.15", later: false }] },
+      { year: "2025", days: [{ key: "tcg:2025-12-01", day: "2025-12-01", label: "12.01" }] },
+      { year: "2024", days: [{ key: "tcg:2024-04-15", day: "2024-04-15", label: "04.15" }] },
     ]);
-    expect(banlistYears("ocg", INDEX).map((y) => y.days.map((d) => d.label))).toEqual([["10.01", "07.01", "04.01"]]);
+    // the ones announced for a later day go beside 최신, the soonest first
+    expect(banlistUpcoming("tcg", index).map((d) => d.key)).toEqual(["tcg:2026-10-19", "tcg:2027-01-10"]);
+    expect(banlistYears("ocg", INDEX).map((y) => y.days.map((d) => d.label))).toEqual([["04.01", "07.01", "10.01"]]);
+    expect(banlistUpcoming("ocg", INDEX)).toEqual([]);
     expect(banlistYears("md", null)).toEqual([]);
+    expect(banlistUpcoming("md", null)).toEqual([]);
   });
 
   it("puts 무금제 under 커스텀 in the picker", () => {
