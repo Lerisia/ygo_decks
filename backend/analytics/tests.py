@@ -142,6 +142,13 @@ class SortPickTest(TestCase):
         self.assertEqual(self._pick("atk:desc", visitor="x").status_code, 400)
         self.assertEqual(UiEvent.objects.count(), 1)
 
+    def test_a_scroll_jump_report_is_kept(self):
+        """The phone's page-to-top diagnostic (엘리스 10/17): two short lines a jump, nothing else in them."""
+        self.assertEqual(self._pick("y943>12 h2969>2969 s664>300", name="scroll_jump").status_code, 201)
+        self.assertEqual(self._pick("t812 ainput r1 k0 p0", name="scroll_jump").status_code, 201)
+        self.assertEqual(self._pick("y943>12 <script>", name="scroll_jump").status_code, 400)
+        self.assertEqual(UiEvent.objects.filter(name="scroll_jump").count(), 2)
+
     def test_summary_counts_picks_and_people_leaving_the_team_out(self):
         self._pick("new:desc", "visitor00001")
         self._pick("new:desc", "visitor00001")

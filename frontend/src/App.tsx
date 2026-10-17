@@ -12,6 +12,7 @@ import Footer from "./components/Footer";
 import Info from "./pages/Info";
 import { usePageTracking } from "./hooks/usePageTracking";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { useScrollJumpReport } from "./hooks/useScrollJumpReport";
 import NoticePopup from "./components/NoticePopup";
 import StaffInquiryAlert from "./components/StaffInquiryAlert";
 import TournamentNoticePopup from "./components/TournamentNoticePopup";
@@ -109,6 +110,7 @@ function OldDeckListPath() {
 function App() {
   const { pathname } = useLocation();
   useScrollRestoration();
+  useScrollJumpReport();   // diagnostic for the phone's page-to-top jump (엘리스 10/17); remove once found
   usePageTracking();
   const inMultiplayerRoom = pathname.startsWith("/multiplayer/rooms/");
   const inDeckEditor = isDeckEditorPath(pathname);

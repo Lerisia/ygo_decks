@@ -16,7 +16,12 @@ MAX_DURATION_SEC = 30 * 60
 DEFAULT_DAYS, MAX_DAYS = 14, 90
 # The events a page may report, each with the values it may carry (참혈 2026-10-14: card_sort = a card book sort and
 # its way, picked by the viewer).
-EVENTS = {"card_sort": re.compile(r"^[a-z_]{1,16}:(asc|desc)$")}
+EVENTS = {
+    "card_sort": re.compile(r"^[a-z_]{1,16}:(asc|desc)$"),
+    # a phone's page flying to the top as the keyboard rises: what the page looked like around it, two lines per
+    # jump, from hooks/useScrollJumpReport (엘리스 2026-10-17; to be removed once the cause is found)
+    "scroll_jump": re.compile(r"^[a-z0-9> -]{1,40}$"),
+}
 
 
 @api_view(["POST"])
