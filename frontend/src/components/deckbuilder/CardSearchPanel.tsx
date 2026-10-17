@@ -7,7 +7,7 @@ import { EMPTY_FILTERS, getCardOptions, listCards, type CardFilters, type CardLi
 import { BAR_EXTRA, barFields, barFilters, barValues, groupItems, misfit } from "@/lib/cardFilterBar";
 import { chipQuery, useGroupSuggestions } from "@/hooks/useGroupSuggestions";
 import { type BanRule, banOf } from "@/lib/banlists";
-import { type DeckDraft, type DeckZone, copiesAllowed, copiesOf } from "@/lib/deckDrafts";
+import { type DeckDraft, type DeckZone, COPIES_MAX, copiesOf } from "@/lib/deckDrafts";
 import { usePressCard } from "@/hooks/usePressCard";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { useImageScan } from "@/hooks/useImageScan";
@@ -65,7 +65,7 @@ function UndoButtons({ canUndo, canRedo, onUndo, onRedo }: DeckUndo) {
 export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, notice, ready, history, overlay }: {
   deck: Pick<DeckDraft, DeckZone>;
   cards: Map<number, CardListItem>;
-  /** The deck's 금제 (참혈 2026-10-16): each card's mark and how many may go in. */
+  /** The deck's 금제 (참혈 2026-10-16): each card's mark. */
   rule?: BanRule;
   onPick: (card: CardListItem) => void;
   /** A card held or right-clicked is shown. */
@@ -184,12 +184,11 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
       .finally(() => id === request.current && setLoading(false));
   };
 
-  // a card found: pressed it goes in, held or right-clicked it is shown; n/most once the deck holds it, and how many
-  // the picture held (times)
+  // a card found: pressed it goes in, held or right-clicked it is shown; n/3 once the deck holds it — the deck's 금제
+  // keeps none out (참혈 2026-10-17), its mark in the corner says it —, and how many the picture held (times)
   const tile = (c: CardListItem, times?: number) => {
     const n = copiesOf(deck, c.name, cards);
-    const most = copiesAllowed(c, rule);   // 3, or fewer on the deck's 금제
-    const out = n >= most || c.frame === "token";
+    const out = n >= COPIES_MAX || c.frame === "token";
     return (
       <button
         key={c.id}
@@ -207,7 +206,7 @@ export default function CardSearchPanel({ deck, cards, rule, onPick, onShow, not
           )}
           {n > 0 && (
             <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] leading-4 font-bold bg-black/75 text-white tabular-nums">
-              {n}/{most}
+              {n}/{COPIES_MAX}
             </span>
           )}
         </span>

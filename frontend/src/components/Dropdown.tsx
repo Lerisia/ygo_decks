@@ -7,7 +7,7 @@ import { dropPlace, listKey, scrollToShow } from "@/lib/dropdown";
 export type DropdownOption<T extends string = string> = { value: T; label: ReactNode; shown?: ReactNode; title?: string };
 
 const MAX_HEIGHT = 288;
-const BOX = "relative inline-flex items-center gap-1 min-w-0 text-left font-semibold text-black dark:text-white bg-white dark:bg-gray-800 "
+export const DROPDOWN_BOX = "relative inline-flex items-center gap-1 min-w-0 text-left font-semibold text-black dark:text-white bg-white dark:bg-gray-800 "
   + "border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors "
   + "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:z-10 aria-expanded:ring-2 aria-expanded:ring-blue-500 aria-expanded:z-10";
 
@@ -127,7 +127,7 @@ export default function Dropdown<T extends string>({ value, options, onChange, l
         onKeyDown={onKey}
         // a Space let through would press the button again once the list has opened
         onKeyUp={(e) => e.key === " " && e.preventDefault()}
-        className={`${BOX} ${className}`}
+        className={`${DROPDOWN_BOX} ${className}`}
       >
         <span className="min-w-0 truncate">{picked ? (picked.shown ?? picked.label) : ""}</span>
         {caret && <ChevronDown aria-hidden className={`ml-auto shrink-0 w-3.5 h-3.5 text-gray-500 dark:text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />}

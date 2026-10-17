@@ -257,6 +257,23 @@ class DeckBanlistTest(TestCase):
         self.assertEqual(r.json()["error"], "없는 금제 코드입니다.")
         self.assertEqual(DeckList.objects.get(code=code).banlist, "md")
 
+    def test_no_banlist(self):
+        """무금제 (참혈 2026-10-17): nothing limited and nothing 미출시, kept as "none"."""
+        r = self.c.post("/api/decklists/", self.body(main=[1, 1, 1, 2, 2, 5], banlist="none"), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        self.assertEqual((r.json()["banlist"], r.json()["issues"]), ("none", ["메인 덱이 40장보다 적습니다 (6/40)."]))
+        self.assertEqual(self.c.get("/api/banlists/none/latest/").status_code, 404)
+
+    def test_a_deck_may_hold_more_than_its_list_allows(self):
+        """A deck goes in over its 금제 and is saved so, only told (참혈 2026-10-17); 3 of a name stays a rule."""
+        r = self.c.post("/api/decklists/", self.body(main=[1, 1, 1, 2, 2, 2]), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        self.assertEqual(r.json()["issues"][1:], ["재와 유령: 제한 카드는 1장까지입니다 (3장)."])
+        r = self.c.post("/api/decklists/", self.body(main=[1, 2, 2, 2], banlist="md:2022-01-19"), format="json")
+        self.assertEqual(r.status_code, 201, r.json())
+        self.assertEqual(r.json()["issues"][1:], ["강욕한 항아리: 금지 카드입니다."])
+        self.assertEqual(self.c.post("/api/decklists/", self.body(main=[1, 1, 1, 1]), format="json").status_code, 400)
+
     def test_a_list_gone_since_falls_back_to_its_games_newest(self):
         d = DeckList.objects.create(owner=self.me, code="old00001", name="옛 덱", main=[1, 1], extra=[], banlist="md:2021-01-01")
         self.assertEqual(self.c.get(f"/api/decklists/{d.code}/").json()["issues"][1:], ["재와 유령: 제한 카드는 1장까지입니다 (2장)."])

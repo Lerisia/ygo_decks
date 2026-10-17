@@ -196,29 +196,16 @@ export function copiesOf(deck: Pick<DeckDraft, DeckZone>, name: string, cards: M
   return ZONES.reduce((n, z) => n + deck[z].filter((id) => cards.get(id)?.name === name).length, 0);
 }
 
-type BanInfo = Pick<CardListItem, "id" | "ban">;
 const BAN_LIMIT = { forbidden: 0, limited: 1, semi_limited: 2 } as const;
 const BAN_WORD = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
 
-/** How many of a card a deck may hold under its 금제 (rule; today's Master Duel list when none): 3, or fewer on the
- *  list (금지 0, 제한 1, 준제한 2). */
-export function copiesAllowed(card: BanInfo, rule?: BanRule) {
-  const ban = banOf(card, rule);
-  return ban ? BAN_LIMIT[ban] : COPIES_MAX;
-}
-
-/** A card picked in the search: into the extra or main deck by its frame, as many as its name and the deck's 금제
- *  allow, in the look picked for it (its own print in 일반 by default). A card not out yet then goes in (미출시 is
- *  only told). */
-export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards: Map<number, CardInfo>, look?: CardLook | null, rule?: BanRule):
+/** A card picked in the search: into the extra or main deck by its frame, up to 3 of a name, in the look picked for
+ *  it (its own print in 일반 by default). The deck's 금제 keeps nothing out (참혈 2026-10-17: "금제에 위반되어도 리스트에
+ *  투입"): a card over it, or not out yet then, goes in and is only told (overLimit, notOutCards). */
+export function addCard<D extends DeckDraft>(deck: D, card: CardListItem, cards: Map<number, CardInfo>, look?: CardLook | null):
   { deck: D } | { error: string } {
-  const ban = banOf(card, rule);
   if (card.frame === "token") return { error: "토큰은 덱에 넣을 수 없습니다." };
-  if (ban === "forbidden") return { error: "금지 카드는 넣을 수 없습니다." };
-  const most = copiesAllowed(card, rule);
-  if (copiesOf(deck, card.name, cards) >= most) {
-    return { error: ban ? `${BAN_WORD[ban]} 카드는 ${most}장까지 넣을 수 있습니다.` : `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
-  }
+  if (copiesOf(deck, card.name, cards) >= COPIES_MAX) return { error: `같은 이름의 카드는 ${COPIES_MAX}장까지 넣을 수 있습니다.` };
   const zone: DeckZone = isExtraCard(card) ? "extra" : "main";
   if (deck[zone].length >= ZONE_MAX[zone]) return { error: `${ZONE_LABEL[zone]}은 ${ZONE_MAX[zone]}장까지입니다.` };
   return { deck: { ...deck, [zone]: [...deck[zone], card.id], looks: { ...deck.looks, [zone]: [...deck.looks[zone], keptLook(card.id, look)] } } };

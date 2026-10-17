@@ -2,7 +2,8 @@
 saved deck may not break (its zones' sizes, 3 of a name, tokens, extra deck monsters in the extra deck); the rest it
 is only told about, as the game tells a deck that a later 금제 has made unusable: fewer than 40 in the main, more of a
 card than its list allows, cards not out yet then. The list is the deck's pick (참혈 2026-10-16): a game's newest
-(Master Duel's by default), one of its lists by day, or one of ours by code."""
+(Master Duel's by default), one of its lists by day, one of ours by code, or 무금제 (참혈 2026-10-17). A deck may hold
+more of a card than its list allows (참혈 2026-10-17: "금제에 위반되어도 리스트에 투입"); it is only told."""
 from collections import Counter
 
 from carddb import banlist
@@ -133,8 +134,8 @@ def cover_copies_of(d):
 
 
 def check_banlist(key):
-    """The 금제 a deck is kept with, or DeckError: a game's newest, a list of its that is there, or a code of ours that
-    is (none yet)."""
+    """The 금제 a deck is kept with, or DeckError: a game's newest, a list of its that is there, a code of ours that
+    is (none yet), or 무금제."""
     parsed = banlist.parse_key(key)
     if parsed and parsed[0] == "custom" and banlist.custom_list(parsed[2]) is None:
         raise DeckError("없는 금제 코드입니다.")
@@ -171,6 +172,6 @@ def issues(main, extra, key="md"):
             out.append(f"{name}: 금지 카드입니다.")
         else:
             out.append(f"{name}: {LIMIT_WORD[status]} 카드는 {LIMIT[status]}장까지입니다 ({copies[i]}장).")
-    later = banlist.not_out(cards, judge.format, judge.released_by)
+    later = banlist.not_out(cards, judge.format, judge.released_by) if judge.format else set()
     out += [f"{name}: 미출시 카드입니다." for name in sorted(display_name(cards[i]) for i in later)]
     return out

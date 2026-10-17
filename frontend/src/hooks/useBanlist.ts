@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getBanTable, getBanlistIndex, loadedBanTable } from "@/api/banlistApi";
-import { type BanTable, type BanlistIndex, pendingRule, ruleOf } from "@/lib/banlists";
+import { type BanTable, type BanlistIndex, NO_BANLIST, pendingRule, ruleOf } from "@/lib/banlists";
 
 /** The 금제 a deck picked (key, lib/banlists) as its cards are judged by, and every game's lists for picking another
  *  (참혈 2026-10-16). Until its table comes the deck is judged by what the cards carry for Master Duel's newest, or
@@ -16,6 +16,7 @@ export function useBanlist(key: string) {
     };
   }, []);
   useEffect(() => {
+    if (key === NO_BANLIST) return;   // 무금제 limits nothing, known without asking
     let alive = true;
     getBanTable(key).then((t) => alive && setTable({ key, table: t }), () => {});
     return () => {

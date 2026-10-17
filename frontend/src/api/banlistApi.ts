@@ -24,7 +24,8 @@ export function getBanlistIndex(): Promise<BanlistIndex> {
 /** A list's table by the deck's key; a code of ours that is not there fails with status 404. */
 export function getBanTable(key: string): Promise<BanTable> {
   const choice = parseBanlistKey(key);
-  if (!choice) return Promise.reject(Object.assign(new Error("없는 금제입니다."), { status: 404 }));
+  // 무금제 has no table (lib/banlists NO_RULE)
+  if (!choice || choice.kind === "none") return Promise.reject(Object.assign(new Error("없는 금제입니다."), { status: 404 }));
   const path = choice.kind === "custom" ? `custom/${choice.code}/` : `${choice.kind}/${choice.day ?? "latest"}/`;
   let got = tables.get(key);
   if (!got) {

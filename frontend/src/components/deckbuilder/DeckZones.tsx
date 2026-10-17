@@ -2,10 +2,9 @@ import { Link } from "react-router-dom";
 import type { CardListItem } from "@/api/cardDexApi";
 import { usePressCard } from "@/hooks/usePressCard";
 import CardKindTag from "@/components/CardKindTag";
-import { type BanLimit, type BanRule, banOf, unreleasedUnder } from "@/lib/banlists";
+import { type BanLimit, type BanRule, banOf, notOut, unreleasedUnder } from "@/lib/banlists";
 import {
-  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, ZONES, ZONE_LABEL, kindCounts, notOutCards, overLimit,
-  sortedCopies,
+  type CardLook, type DeckDraft, type DeckLooks, type DeckZone, ZONES, ZONE_LABEL, kindCounts, overLimit, sortedCopies,
 } from "@/lib/deckDrafts";
 import CopyFace from "./DeckFinish";
 
@@ -13,16 +12,18 @@ import CopyFace from "./DeckFinish";
 // deck two on phones and tablets and three from lg, the extra deck one (deck-zone-reserve in index.css).
 const RESERVE: Record<DeckZone, string> = { main: "[--rows:2] lg:[--rows:3]", extra: "[--rows:1]" };
 const BAN_LABEL = { forbidden: "금지", limited: "제한", semi_limited: "준제한" } as const;
-// what a zone lacks or holds too many of, by its title, in yellow (참혈 2026-10-16)
+// a card held more often than the deck's 금제 allows, ringed by how it is limited (참혈 2026-10-17)
+const OVER_RING: Record<BanLimit, string> = { forbidden: "ring-red-500", limited: "ring-orange-500", semi_limited: "ring-yellow-400" };
 
 /** A card's picture as the card book draws it — a copy in the deck in its own print and finish (look, the finish
  *  moving: DeckFinish) — its 금제 in the corner: the deck's list's (ban), today's Master Duel one (on the card) when
- *  none is given. */
+ *  none is given; 미출시 in its place for a card not out under the rule (not in Master Duel, or not out yet by the
+ *  list's day). */
 export function DeckCardFace({ card, look, dim = false, ban = card.ban, rule }: { card: CardListItem; look?: CardLook | null; dim?: boolean; ban?: BanLimit | ""; rule?: BanRule }) {
   return (
     <span className="relative block">
       <CopyFace card={card} look={look} className="w-full aspect-[704/1024] object-contain card-corner" tone={`transition ${dim ? "opacity-40" : "group-hover:opacity-75"}`} />
-      {unreleasedUnder(card, rule) ? (
+      {unreleasedUnder(card, rule) || (rule && notOut(card, rule)) ? (
         <span className="absolute bottom-[7%] left-[4%] rounded px-1 py-px text-[10px] font-bold leading-4 bg-amber-500/90 text-white drop-shadow">미출시</span>
       ) : ban && (
         <img
@@ -33,6 +34,10 @@ export function DeckCardFace({ card, look, dim = false, ban = card.ban, rule }: 
       )}
     </span>
   );
+}
+
+function OverRing({ ban }: { ban?: BanLimit }) {
+  return ban ? <span className={`absolute inset-0 card-corner ring-[3px] ring-inset ${OVER_RING[ban]} pointer-events-none`} /> : null;
 }
 
 const TILE_BLANK = "block w-full aspect-[704/1024] card-corner bg-gray-200 dark:bg-gray-700";
@@ -56,9 +61,10 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
 }) {
   const counts = kindCounts(ids, cards);
   const press = usePressCard();
-  // while it is built, cards over the deck's 금제 (one saved before it) and cards not out yet then are ringed in the
-  // zone; no count warnings by the title, the pages' line under the name has them (참혈 2026-10-16)
-  const ringed = new Set(onRemove ? [...overLimit(ids, cards, rule), ...notOutCards(ids, cards, rule)].map((o) => o.card.id) : []);
+  // every copy of a card over the deck's 금제 ringed in its colour, while it is built and on its page (참혈 2026-10-17);
+  // a card not out yet then wears 미출시 (DeckCardFace); no count warnings by the title, the line under the name has
+  // them (참혈 2026-10-16)
+  const over = new Map(overLimit(ids, cards, rule).map((o) => [o.card.id, o.ban]));
   return (
     <section className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 transition-shadow ${picking ? "ring-2 ring-blue-500/70" : ""}`}>
       {/* the zone on the left, how many of each kind on the right, on a phone too (참혈 2026-10-16) */}
@@ -105,7 +111,7 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                 className={`group relative block ${picking ? "cursor-copy" : ""}`}
               >
                 <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
-                {ringed.has(id) && <span className="absolute inset-0 card-corner ring-2 ring-inset ring-amber-400 pointer-events-none" />}
+                <OverRing ban={over.get(id)} />
                 {mark !== undefined && (
                   <span className="absolute top-0.5 right-0.5 w-4 h-4 grid place-items-center rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none shadow">
                     {mark}
@@ -113,8 +119,9 @@ function Zone({ zone, ids, looks, order, cards, loading, rule, onRemove, onShow,
                 )}
               </button>
             ) : (
-              <Link key={`${id}-${at}`} to={`/cards/${id}`} title={card.name} className="group block">
+              <Link key={`${id}-${at}`} to={`/cards/${id}`} title={card.name} className="group relative block">
                 <DeckCardFace card={card} look={looks[at]} ban={banOf(card, rule)} rule={rule} />
+                <OverRing ban={over.get(id)} />
               </Link>
             );
           })}

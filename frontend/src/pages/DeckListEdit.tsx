@@ -135,7 +135,7 @@ export default function DeckListEdit() {
   const pick = (card: CardListItem, look?: CardLook | null) => {
     if (!deck) return;
     remember(card);
-    const r = addCard(deck, card, cards, look, rule);
+    const r = addCard(deck, card, cards, look);
     if ("error" in r) say(r.error);
     else change(r.deck);
   };

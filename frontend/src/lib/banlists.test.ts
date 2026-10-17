@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CardListItem } from "@/api/cardDexApi";
 import {
-  type BanlistIndex, type BanRule, BAN_KINDS, TODAY_MD, banOf, banlistName, banlistOptions, banlistTitle, dayLabel, isCode, latestDay, notOut, parseBanlistKey,
-  pendingRule, ruleOf, unreleasedUnder,
+  type BanlistIndex, type BanRule, BAN_KINDS, NO_RULE, TODAY_MD, banOf, banlistName, banlistTitle, banlistYears, dayLabel, isCode, latestDay, notOut,
+  parseBanlistKey, pendingRule, pickerKind, recentCodes, rememberCode, ruleOf, unreleasedUnder,
 } from "./banlists";
 
 describe("unreleasedUnder", () => {
@@ -37,7 +37,8 @@ describe("a deck's 금제 key (참혈 2026-10-16)", () => {
     expect(parseBanlistKey("md")).toEqual({ kind: "md", day: null });
     expect(parseBanlistKey("tcg:2025-04-07")).toEqual({ kind: "tcg", day: "2025-04-07" });
     expect(parseBanlistKey("custom:Our-List_2")).toEqual({ kind: "custom", code: "Our-List_2" });
-    for (const bad of ["", "xx", "md:", "md:20250407", "ocg:2025-04-07:x", "custom:", "custom:a b", `custom:${"a".repeat(33)}`, undefined, null]) {
+    expect(parseBanlistKey("none")).toEqual({ kind: "none" });   // 무금제 (참혈 2026-10-17)
+    for (const bad of ["", "xx", "md:", "md:20250407", "ocg:2025-04-07:x", "custom:", "custom:a b", `custom:${"a".repeat(33)}`, "none:x", undefined, null]) {
       expect(parseBanlistKey(bad)).toBeNull();
     }
     expect(isCode("abc_1-2")).toBe(true);
@@ -59,21 +60,39 @@ describe("a list's day as the picker writes it", () => {
     expect(latestDay({ ...INDEX, lists: { ...INDEX.lists, tcg: [] } }, "tcg")).toBeNull();
   });
 
-  it("offers 최신 first, then every list newest first, each with its whole day in the title", () => {
-    expect(banlistOptions("md", INDEX).slice(0, 3)).toEqual([
-      { value: "md", label: "최신 (26.10.06)", shown: "최신", title: "2026.10.06 · 새 금제가 나오면 따라갑니다" },
-      { value: "md:2026-10-06", label: "26.10.06", shown: "26.10.06", title: "2026.10.06" },
-      { value: "md:2026-07-28", label: "26.07.28", shown: "26.07.28", title: "2026.07.28" },
+  it("lays a game's lists out by year for the picker, the newest first, mm.dd each, a later one marked (참혈 2026-10-17)", () => {
+    const index = { ...INDEX, lists: { ...INDEX.lists, tcg: ["2026-10-19", "2026-09-21", "2025-12-01", "2024-04-15"] } };
+    expect(banlistYears("tcg", index)).toEqual([
+      { year: "2026", days: [
+        { key: "tcg:2026-10-19", day: "2026-10-19", label: "10.19", later: true },
+        { key: "tcg:2026-09-21", day: "2026-09-21", label: "09.21", later: false },
+      ] },
+      { year: "2025", days: [{ key: "tcg:2025-12-01", day: "2025-12-01", label: "12.01", later: false }] },
+      { year: "2024", days: [{ key: "tcg:2024-04-15", day: "2024-04-15", label: "04.15", later: false }] },
     ]);
-    expect(banlistOptions("ocg", INDEX).map((o) => o.label)).toEqual(["최신 (26.10)", "26.10", "26.07", "26.04"]);
-    expect(banlistOptions("tcg", INDEX)[0].label).toBe("최신 (26.09.21)");
-    // before the lists are known: 최신 alone
-    expect(banlistOptions("md", null)).toEqual([{ value: "md", label: "최신", shown: "최신", title: "새 금제가 나오면 따라갑니다" }]);
+    expect(banlistYears("ocg", INDEX).map((y) => y.days.map((d) => d.label))).toEqual([["10.01", "07.01", "04.01"]]);
+    expect(banlistYears("md", null)).toEqual([]);
   });
 
-  it("shows 최신 closed with no day, its day only in the open list; a list held to by its day either way (참혈 2026-10-16)", () => {
-    expect(banlistOptions("md", INDEX).map((o) => o.shown)).toEqual(["최신", "26.10.06", "26.07.28", "26.07.14", "26.07.01"]);
-    expect(banlistOptions("ocg", INDEX).map((o) => o.shown)).toEqual(["최신", "26.10", "26.07", "26.04"]);
+  it("puts 무금제 under 커스텀 in the picker", () => {
+    expect(pickerKind(parseBanlistKey("none"))).toBe("custom");
+    expect(pickerKind(parseBanlistKey("custom:ours"))).toBe("custom");
+    expect(pickerKind(parseBanlistKey("ocg:2026-07-01"))).toBe("ocg");
+    expect(pickerKind(null)).toBe("md");
+  });
+
+  it("remembers the custom codes used last, the last first, five at most", () => {
+    const m: Record<string, string> = {};
+    vi.stubGlobal("localStorage", { getItem: (k: string) => m[k] ?? null, setItem: (k: string, v: string) => (m[k] = v) });
+    try {
+      expect(recentCodes()).toEqual([]);
+      for (const c of ["a", "b", "c", "d", "e", "f", "b"]) rememberCode(c);
+      expect(recentCodes()).toEqual(["b", "f", "e", "d", "c"]);
+      m.banlist_recent_codes = JSON.stringify(["ok", "a b", 3]);
+      expect(recentCodes()).toEqual(["ok"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("names the kinds 마스터 듀얼, OCG, TCG and 커스텀 in the picker, the game by its Korean name (참혈 2026-10-16)", () => {
@@ -88,6 +107,7 @@ describe("a list's day as the picker writes it", () => {
     expect(banlistName("tcg", INDEX)).toBe("TCG • 최신");
     expect(banlistName("tcg:2026-06-02", null)).toBe("TCG • 2026.06.02");
     expect(banlistName("custom:ours", INDEX)).toBe("커스텀 • ours");
+    expect(banlistName("none", INDEX)).toBe("무금제");
   });
 
   it("gives the newest list's day in the name's title", () => {
@@ -95,6 +115,7 @@ describe("a list's day as the picker writes it", () => {
     expect(banlistTitle("md", null)).toBe("새 금제가 나오면 따라갑니다");
     expect(banlistTitle("ocg:2026-07-01", INDEX)).toBe("2026.07.01");
     expect(banlistTitle("custom:ours", INDEX)).toBe("");
+    expect(banlistTitle("none", INDEX)).toBe("금제를 적용하지 않습니다");
   });
 });
 
@@ -126,5 +147,13 @@ describe("what a card is under the list picked", () => {
     expect(pendingRule("md:2026-07-01")).toEqual({ format: "md", limits: {}, releasedBy: null });
     expect(pendingRule("ocg")).toEqual({ format: "ocg", limits: {}, releasedBy: null });
     expect(pendingRule("custom:ours")).toEqual({ format: "md", limits: {}, releasedBy: null });
+    expect(pendingRule("none")).toEqual(NO_RULE);
+  });
+
+  it("limits nothing and holds nothing back as 미출시 under 무금제 (참혈 2026-10-17)", () => {
+    const released = { md: null, ocg: null, tcg: null };
+    expect(banOf(card(1, "forbidden"), NO_RULE)).toBe("");
+    expect(notOut(card(1, "", released), NO_RULE)).toBe(false);
+    expect(unreleasedUnder({ unreleased: true }, NO_RULE)).toBe(false);
   });
 });

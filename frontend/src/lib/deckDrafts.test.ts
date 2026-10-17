@@ -3,7 +3,7 @@ import type { CardListItem } from "@/api/cardDexApi";
 import {
   type DeckDraft, NEW_CODE, addCard, blankDeck, clearLocalDrafts, clearTabDraft, copyIndex, copyRank, coverLook, deckDayLine, deckIssues, deckWarnings, deckUpdated, fromDoc,
   keepTabDraft, kindCounts, localDrafts, lookAt, lookThumb, notOutCards, overLimit, removeCard, savedCovers, setCover, setLook, setLookAll,
-  sortedCopies, sortedZone, tabDraft, copiesAllowed,
+  sortedCopies, sortedZone, tabDraft,
 } from "./deckDrafts";
 import type { BanRule } from "./banlists";
 import { isDeckEditorPath } from "./deckListPaths";
@@ -86,12 +86,11 @@ describe("today's 금제", () => {
   const forbidden = banned(20, "금지", "forbidden"), limited = banned(21, "제한", "limited"), semi = banned(22, "준제한", "semi_limited");
   const cards = new Map([...CARDS, [20, forbidden], [21, limited], [22, semi]]);
 
-  it("keeps a forbidden card out, a limited one to 1 and a semi-limited one to 2", () => {
-    expect(addCard(deck([]), forbidden, cards)).toEqual({ error: "금지 카드는 넣을 수 없습니다." });
-    expect(addCard(deck([]), limited, cards)).toEqual({ deck: deck([21]) });
-    expect(addCard(deck([21]), limited, cards)).toEqual({ error: "제한 카드는 1장까지 넣을 수 있습니다." });
-    expect(addCard(deck([22]), semi, cards)).toEqual({ deck: deck([22, 22]) });
-    expect(addCard(deck([22, 22]), semi, cards)).toHaveProperty("error");
+  it("lets cards in over it, up to 3 of a name, only telling (참혈 2026-10-17)", () => {
+    expect(addCard(deck([]), forbidden, cards)).toEqual({ deck: deck([20]) });
+    expect(addCard(deck([21]), limited, cards)).toEqual({ deck: deck([21, 21]) });
+    expect(addCard(deck([22, 22]), semi, cards)).toEqual({ deck: deck([22, 22, 22]) });
+    expect(addCard(deck([22, 22, 22]), semi, cards)).toEqual({ error: "같은 이름의 카드는 3장까지 넣을 수 있습니다." });
   });
 
   it("tells a deck what keeps it from being played, as the server does", () => {
@@ -117,15 +116,6 @@ describe("the 금제 the deck picked (참혈 2026-10-16)", () => {
   const cards = new Map([...CARDS, [30, one], [31, two], [32, three]]);
   // an OCG list of 2020: 하나 free there (forbidden in Master Duel today), 둘 limited and not out yet, 셋 never out
   const ocg2020: BanRule = { format: "ocg", limits: { 31: "limited" }, releasedBy: "2020-01-01" };
-
-  it("lets in and counts by that list instead of today's Master Duel one", () => {
-    expect(copiesAllowed(one)).toBe(0);
-    expect(copiesAllowed(one, ocg2020)).toBe(3);
-    expect(copiesAllowed(two, ocg2020)).toBe(1);
-    expect(addCard(deck([]), one, cards)).toEqual({ error: "금지 카드는 넣을 수 없습니다." });
-    expect(addCard(deck([]), one, cards, null, ocg2020)).toEqual({ deck: deck([30]) });
-    expect(addCard(deck([31]), two, cards, null, ocg2020)).toEqual({ error: "제한 카드는 1장까지 넣을 수 있습니다." });
-  });
 
   it("finds the cards over it, and the cards not out yet then, each with its line", () => {
     expect(overLimit([30, 31, 31], cards, ocg2020).map((o) => [o.card.id, o.count, o.line])).toEqual([[31, 2, "둘: 제한 카드는 1장까지입니다 (2장)."]]);

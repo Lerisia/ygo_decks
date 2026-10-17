@@ -411,8 +411,9 @@ class DeckBanlistTest(TestCase):
         self.assertEqual(parse("md"), ("md", None, None))
         self.assertEqual(parse("ocg:2020-01-01"), ("ocg", date(2020, 1, 1), None))
         self.assertEqual(parse("custom:Our-List_2"), ("custom", None, "Our-List_2"))
+        self.assertEqual(parse("none"), ("none", None, None))   # 무금제 (참혈 2026-10-17)
         for bad in ("", "xx", "md:", "md:2020-13-01", "md:20200101", "ocg:2020-01-01:x", "custom", "custom:",
-                    "custom:a b", "custom:" + "a" * 33, None, 3):
+                    "custom:a b", "custom:" + "a" * 33, "none:2020-01-01", "custom:none:x", None, 3):
             self.assertIsNone(parse(bad), bad)
 
     def test_judged_by(self):
@@ -433,6 +434,8 @@ class DeckBanlistTest(TestCase):
         self.assertEqual((j.day, j.limits), (None, {}))
         for none in ("md:2022-01-20", "custom:ours", "xx"):
             self.assertIsNone(banlist.judged_by(none, today), none)
+        # 무금제: no game, nothing limited
+        self.assertEqual(banlist.judged_by("none", today), banlist.Judge(None, None, None, False, {}))
 
     def test_not_out_agrees_with_status_on(self):
         ids = [c.id for c in self.cards]

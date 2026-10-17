@@ -316,19 +316,24 @@ def current_statuses(fmt, day, card=None):
 # A deck list's 금제 (참혈 2026-10-16), kept as a key: a game alone ("md", "ocg", "tcg") follows its newest list, the
 # next one too when it comes, as the game holds a deck to a new list; "md:2026-10-06" holds to that list;
 # "custom:<code>" is one of ours (none yet: 참혈's team plans them).
-KEY_RE = re.compile(r"^(md|ocg|tcg)(?::(\d{4}-\d\d-\d\d))?$|^custom:([A-Za-z0-9_-]{1,32})$")
+KEY_RE = re.compile(r"^(md|ocg|tcg)(?::(\d{4}-\d\d-\d\d))?$|^custom:([A-Za-z0-9_-]{1,32})$|^(none)$")
+# 무금제 (참혈 2026-10-17): a preset among the custom ones that limits nothing and holds no card back as 미출시
+NONE = "none"
 LIMITS = (BanStatus.FORBIDDEN, BanStatus.LIMITED, BanStatus.SEMI_LIMITED)
 
 # what a deck is judged by: its game, the list's day (None with no list yet), the day a card must be out by (today
-# for the newest, else the list's day), whether it follows the newest, and {card id: status} of the cards it limits
+# for the newest, else the list's day), whether it follows the newest, and {card id: status} of the cards it limits;
+# 무금제's has no game and no day, so nothing is 미출시 under it
 Judge = namedtuple("Judge", "format day released_by latest limits")
 
 
 def parse_key(key):
-    """(game or "custom", the day held to or None, the code or None) for a key, None when it is no key."""
+    """(game, "custom" or "none", the day held to or None, the code or None) for a key, None when it is no key."""
     m = KEY_RE.match(key) if isinstance(key, str) else None
     if not m:
         return None
+    if m.group(4):
+        return (NONE, None, None)
     if m.group(3):
         return ("custom", None, m.group(3))
     try:
@@ -355,6 +360,8 @@ def judged_by(key, today=None):
     if parsed is None:
         return None
     fmt, day, code = parsed
+    if fmt == NONE:
+        return Judge(None, None, None, False, {})
     if fmt == "custom":
         return custom_list(code)
     today = today or timezone.localdate()

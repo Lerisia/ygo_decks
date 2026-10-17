@@ -10,6 +10,7 @@ from . import banlist
 
 MAX_AGE = "public, max-age=600"
 NO_CODE = "없는 금제 코드입니다."
+GAMES = ("md", "ocg", "tcg")   # 무금제 has no table: a page knows it limits nothing
 
 
 def _kept(body, status=200):
@@ -37,7 +38,7 @@ def banlist_table(request, fmt, which):
     """A game's list by its day, or its newest in effect ("latest"): the cards it limits, and the day a card must be
     out by."""
     key = fmt if which == "latest" else f"{fmt}:{which}"
-    j = banlist.judged_by(key) if fmt != "custom" else None
+    j = banlist.judged_by(key) if fmt in GAMES else None
     if j is None:
         raise Http404
     return _kept(_table(j))
